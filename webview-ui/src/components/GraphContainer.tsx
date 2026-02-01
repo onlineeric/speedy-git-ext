@@ -5,9 +5,10 @@ import { CommitRow } from './CommitRow';
 
 const ROW_HEIGHT = 40;
 const OVERSCAN = 10;
+const LANE_WIDTH = 16;
 
 export function GraphContainer() {
-  const { commits, selectedCommit, setSelectedCommit } = useGraphStore();
+  const { commits, topology, selectedCommit, setSelectedCommit } = useGraphStore();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
@@ -28,6 +29,9 @@ export function GraphContainer() {
     );
   }
 
+  // Calculate graph cell width based on max lanes
+  const graphWidth = Math.max(LANE_WIDTH * (topology.maxLanes + 1), 40);
+
   return (
     <div
       ref={containerRef}
@@ -45,7 +49,10 @@ export function GraphContainer() {
             <CommitRow
               key={commit.hash}
               commit={commit}
+              commits={commits}
               index={virtualItem.index}
+              topology={topology}
+              graphWidth={graphWidth}
               isSelected={isSelected}
               onClick={() => setSelectedCommit(commit.hash)}
               style={{

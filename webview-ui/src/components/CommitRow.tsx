@@ -1,11 +1,15 @@
 import { memo } from 'react';
 import type { Commit } from '@shared/types';
+import type { GraphTopology } from '../utils/graphTopology';
 import { GraphCell } from './GraphCell';
 import { formatRelativeDate } from '../utils/formatDate';
 
 interface CommitRowProps {
   commit: Commit;
+  commits: Commit[];
   index: number;
+  topology: GraphTopology;
+  graphWidth: number;
   isSelected: boolean;
   onClick: () => void;
   style: React.CSSProperties;
@@ -13,7 +17,10 @@ interface CommitRowProps {
 
 export const CommitRow = memo(function CommitRow({
   commit,
+  commits,
   index,
+  topology,
+  graphWidth,
   isSelected,
   onClick,
   style,
@@ -30,7 +37,13 @@ export const CommitRow = memo(function CommitRow({
       style={style}
       onClick={onClick}
     >
-      <GraphCell index={index} commit={commit} />
+      <GraphCell
+        commit={commit}
+        commits={commits}
+        index={index}
+        topology={topology}
+        width={graphWidth}
+      />
 
       <span
         className="w-16 flex-shrink-0 font-mono text-xs text-[var(--vscode-textLink-foreground)]"

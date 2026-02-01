@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import type { Commit, Branch, GraphFilters } from '@shared/types';
+import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
 
 interface GraphStore {
   commits: Commit[];
   branches: Branch[];
+  topology: GraphTopology;
   selectedCommit: string | undefined;
   loading: boolean;
   error: string | undefined;
@@ -16,16 +18,27 @@ interface GraphStore {
   setFilters: (filters: Partial<GraphFilters>) => void;
 }
 
+const emptyTopology: GraphTopology = {
+  nodes: new Map(),
+  maxLanes: 0,
+  connections: [],
+};
+
 export const useGraphStore = create<GraphStore>((set) => ({
   commits: [],
   branches: [],
+  topology: emptyTopology,
   selectedCommit: undefined,
   loading: true,
   error: undefined,
   filters: {
     maxCount: 500,
   },
-  setCommits: (commits) => set({ commits }),
+  setCommits: (commits) => {
+    // Calculate topology when commits are set
+    const topology = calculateTopology(commits);
+    set({ commits, topology });
+  },
   setBranches: (branches) => set({ branches }),
   setSelectedCommit: (selectedCommit) => set({ selectedCommit }),
   setLoading: (loading) => set({ loading }),
