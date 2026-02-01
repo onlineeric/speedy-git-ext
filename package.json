@@ -1,0 +1,53 @@
+{
+  "name": "speedy-git-ext",
+  "displayName": "Speedy Git",
+  "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
+  "version": "0.1.0",
+  "publisher": "speedy-git",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["SCM Providers", "Visualization"],
+  "keywords": ["git", "graph", "visualization", "scm"],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "speedyGit.showGraph",
+        "title": "Show Git Graph",
+        "category": "Speedy Git"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "speedyGit.showGraph",
+          "when": "workspaceFolderCount > 0"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run build:prod",
+    "build": "pnpm run build:ext && pnpm run build:webview",
+    "build:prod": "pnpm run build:ext:prod && pnpm run build:webview",
+    "build:ext": "node esbuild.config.mjs",
+    "build:ext:prod": "node esbuild.config.mjs --production",
+    "build:webview": "cd webview-ui && pnpm run build",
+    "watch": "concurrently \"pnpm run watch:ext\" \"pnpm run watch:webview\"",
+    "watch:ext": "node esbuild.config.mjs --watch",
+    "watch:webview": "cd webview-ui && pnpm run dev",
+    "lint": "eslint src --ext ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "concurrently": "^8.2.2",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.3"
+  },
+  "packageManager": "pnpm@10.28.2"
+}
