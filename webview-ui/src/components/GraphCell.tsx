@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import type { Commit } from '@shared/types';
-import { type GraphTopology, getPassingLanesAtRow } from '../utils/graphTopology';
+import { type GraphTopology, getPassingLanes } from '../utils/graphTopology';
 
 interface GraphCellProps {
   commit: Commit;
@@ -43,7 +43,6 @@ export const GraphCell = memo(function GraphCell({
   const node = topology.nodes.get(commit.hash);
 
   if (!node) {
-    // Fallback if topology not calculated
     return (
       <svg width={width} height={CELL_HEIGHT} className="flex-shrink-0">
         <circle cx={LANE_WIDTH / 2} cy={CELL_HEIGHT / 2} r={NODE_RADIUS} fill="#888" />
@@ -56,28 +55,59 @@ export const GraphCell = memo(function GraphCell({
   const color = getColor(node.colorIndex);
   const hasMerge = commit.parents.length > 1;
 
-  // Get lanes that pass through this row (from commits above connecting to parents below)
-  const passingLanes = getPassingLanesAtRow(index, commits, topology);
+  // Get lanes that pass through this row
+  const passingLanes = getPassingLanes(index, commits, topology);
 
   return (
     <svg width={width} height={CELL_HEIGHT} className="flex-shrink-0">
-      {/* Draw passing-through vertical lines (branches that don't have a node on this row) */}
-      {passingLanes
-        .filter((pl) => pl.lane !== node.lane) // Don't draw on our own lane
-        .map((pl) => (
-          <line
-            key={`pass-${pl.lane}`}
-            x1={getLaneX(pl.lane)}
-            y1={0}
-            x2={getLaneX(pl.lane)}
-            y2={CELL_HEIGHT}
-            stroke={getColor(pl.colorIndex)}
-            strokeWidth={2}
-          />
-        ))}
+      {/* 1. Draw passing-through vertical lines */}
+      {passingLanes.map((pl) => (
+        <line
+          key={`pass-${pl.lane}`}
+          x1={getLaneX(pl.lane)}
+          y1={0}
+          x2={getLaneX(pl.lane)}
+          y2={CELL_HEIGHT}
+          stroke={getColor(pl.colorIndex)}
+          strokeWidth={2}
+        />
+      ))}
 
-      {/* Draw line from top to node (if not first commit) */}
-      {index > 0 && (
+      {/* 2. Draw incoming connections (from merge commits above connecting to this commit) */}
+      {node.incomingConnections.map((incoming, idx) => {
+        const fromX = getLaneX(incoming.fromLane);
+        const toX = nodeX;
+        const incomingColor = getColor(incoming.colorIndex);
+
+        if (incoming.fromLane === node.lane) {
+          // Same lane - straight line from top to node
+          return (
+            <line
+              key={`incoming-${idx}`}
+              x1={toX}
+              y1={0}
+              x2={toX}
+              y2={nodeY - NODE_RADIUS}
+              stroke={incomingColor}
+              strokeWidth={2}
+            />
+          );
+        } else {
+          // Different lane - diagonal from top corner to node
+          return (
+            <path
+              key={`incoming-${idx}`}
+              d={`M ${fromX} 0 Q ${fromX} ${nodeY * 0.5} ${toX} ${nodeY - NODE_RADIUS}`}
+              stroke={incomingColor}
+              strokeWidth={2}
+              fill="none"
+            />
+          );
+        }
+      })}
+
+      {/* 3. Draw line from top to node on this commit's lane (if has children above) */}
+      {index > 0 && node.incomingConnections.length === 0 && (
         <line
           x1={nodeX}
           y1={0}
@@ -88,54 +118,41 @@ export const GraphCell = memo(function GraphCell({
         />
       )}
 
-      {/* Draw connections to parents */}
-      {node.parentLanes.map((parent, pIndex) => {
-        const parentX = getLaneX(parent.lane);
-        const parentColor = getColor(parent.colorIndex);
+      {/* 4. Draw connections to parents */}
+      {node.parentConnections.map((conn, idx) => {
+        const fromX = getLaneX(conn.fromLane);
+        const toX = getLaneX(conn.toLane);
+        const connColor = getColor(conn.colorIndex);
 
-        if (parent.lane === node.lane) {
-          // Straight down - same lane
+        if (conn.fromLane === conn.toLane) {
+          // Same lane - straight line down
           return (
             <line
-              key={`parent-${pIndex}`}
-              x1={nodeX}
+              key={`parent-${idx}`}
+              x1={fromX}
               y1={nodeY + NODE_RADIUS}
-              x2={nodeX}
+              x2={toX}
               y2={CELL_HEIGHT}
-              stroke={parentColor}
+              stroke={connColor}
               strokeWidth={2}
             />
           );
         } else {
-          // Diagonal/curved connection to different lane
-          // Draw from node down, then curve to the parent lane
-          const midY = nodeY + NODE_RADIUS + 8;
+          // Different lane - curve from node to target lane
+          const midY = nodeY + NODE_RADIUS + 6;
           return (
-            <g key={`parent-${pIndex}`}>
-              {/* Short vertical from node */}
-              <line
-                x1={nodeX}
-                y1={nodeY + NODE_RADIUS}
-                x2={nodeX}
-                y2={midY}
-                stroke={parentColor}
-                strokeWidth={2}
-              />
-              {/* Diagonal to parent lane */}
-              <line
-                x1={nodeX}
-                y1={midY}
-                x2={parentX}
-                y2={CELL_HEIGHT}
-                stroke={parentColor}
-                strokeWidth={2}
-              />
-            </g>
+            <path
+              key={`parent-${idx}`}
+              d={`M ${fromX} ${nodeY + NODE_RADIUS} L ${fromX} ${midY} Q ${fromX} ${CELL_HEIGHT * 0.75} ${toX} ${CELL_HEIGHT}`}
+              stroke={connColor}
+              strokeWidth={2}
+              fill="none"
+            />
           );
         }
       })}
 
-      {/* Draw the commit node circle */}
+      {/* 5. Draw the commit node circle */}
       <circle
         cx={nodeX}
         cy={nodeY}

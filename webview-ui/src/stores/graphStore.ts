@@ -21,7 +21,6 @@ interface GraphStore {
 const emptyTopology: GraphTopology = {
   nodes: new Map(),
   maxLanes: 0,
-  connections: [],
 };
 
 export const useGraphStore = create<GraphStore>((set) => ({
