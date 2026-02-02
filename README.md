@@ -1,15 +1,15 @@
 # Speedy Git Extension
 
-A performance-first, lightweight Git graph visualization extension for VS Code.
+A performance-first, lightweight Git visualization extension for VS Code.
 
 ## Overview
 
-Speedy Git Extension is a modern VSCode extension that provides an interactive Git repository visualization with a focus on performance and maintainability. Inspired by Git Graph, this project reimagines the architecture with a modular design and modern frontend technologies.
+Speedy Git Extension is a modern VSCode extension that provides an interactive Git repository visualization with a focus on performance and maintainability.
 
 ## Key Features
 
 ### Current Features
-- Interactive Git graph visualization
+- Interactive Git UI visualization
 - Read-only repository browsing
 - Virtual scrolling for efficient rendering of large repositories
 - Modular backend architecture
@@ -143,7 +143,7 @@ MIT
 ## Roadmap
 
 ### Phase 1: Read-Only Features ✓
-- [x] Basic Git graph visualization
+- [x] Basic Git visualization
 - [x] Virtual scrolling for performance
 - [x] Modular backend architecture
 - [x] React-based UI
