@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "."
+  },
+  "include": ["src/**/*", "shared/**/*"],
+  "exclude": ["node_modules", "dist", "webview-ui"]
+}
