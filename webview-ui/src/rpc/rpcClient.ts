@@ -9,16 +9,28 @@ declare const acquireVsCodeApi: () => {
 
 class RpcClient {
   private vscode: ReturnType<typeof acquireVsCodeApi> | undefined;
+  private initialized = false;
+
+  private messageHandler = (event: MessageEvent) => {
+    const message = event.data as ResponseMessage;
+    this.handleMessage(message);
+  };
 
   initialize() {
+    // Prevent duplicate initialization
+    if (this.initialized) return;
+    this.initialized = true;
+
     if (typeof acquireVsCodeApi !== 'undefined') {
       this.vscode = acquireVsCodeApi();
     }
 
-    window.addEventListener('message', (event) => {
-      const message = event.data as ResponseMessage;
-      this.handleMessage(message);
-    });
+    window.addEventListener('message', this.messageHandler);
+  }
+
+  dispose() {
+    window.removeEventListener('message', this.messageHandler);
+    this.initialized = false;
   }
 
   private handleMessage(message: ResponseMessage) {

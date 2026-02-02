@@ -26,6 +26,10 @@ export interface CommitNode {
 export interface GraphTopology {
   nodes: Map<string, CommitNode>;
   maxLanes: number;
+  /** Pre-computed passing lanes for each row index (O(1) lookup instead of O(n²)) */
+  passingLanesByRow: Map<number, { lane: number; colorIndex: number }[]>;
+  /** Hash to index map for O(1) lookups */
+  commitIndexByHash: Map<string, number>;
 }
 
 /**
@@ -42,7 +46,7 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
   const nodes = new Map<string, CommitNode>();
 
   if (commits.length === 0) {
-    return { nodes, maxLanes: 0 };
+    return { nodes, maxLanes: 0, passingLanesByRow: new Map(), commitIndexByHash: new Map() };
   }
 
   // Build commit index for quick lookup
@@ -223,7 +227,73 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
     }
   }
 
-  return { nodes, maxLanes };
+  // Pre-compute passing lanes for each row (O(n) instead of O(n²) at render time)
+  const passingLanesByRow = computePassingLanes(commits, nodes, commitIndexByHash);
+
+  return { nodes, maxLanes, passingLanesByRow, commitIndexByHash };
+}
+
+/**
+ * Pre-compute passing lanes for all rows during topology calculation.
+ * This avoids O(n²) complexity at render time.
+ */
+function computePassingLanes(
+  commits: Commit[],
+  nodes: Map<string, CommitNode>,
+  commitIndexByHash: Map<string, number>
+): Map<number, { lane: number; colorIndex: number }[]> {
+  const passingLanesByRow = new Map<number, { lane: number; colorIndex: number }[]>();
+
+  // Track active connections: Map<toLane, { colorIndex, endRowIndex }>
+  // A connection is active from the row after the source commit until the parent row
+  const activeConnections = new Map<number, { colorIndex: number; endRowIndex: number }[]>();
+
+  for (let i = 0; i < commits.length; i++) {
+    const commit = commits[i];
+    const node = nodes.get(commit.hash);
+
+    // Collect passing lanes for this row (exclude the current node's lane)
+    const passingLanes: { lane: number; colorIndex: number }[] = [];
+    const currentLane = node?.lane ?? -1;
+
+    for (const [lane, connections] of activeConnections.entries()) {
+      if (lane === currentLane) continue;
+
+      // Check if any connection on this lane passes through this row
+      for (const conn of connections) {
+        if (i < conn.endRowIndex) {
+          passingLanes.push({ lane, colorIndex: conn.colorIndex });
+          break; // Only add lane once
+        }
+      }
+    }
+
+    passingLanesByRow.set(i, passingLanes);
+
+    // Add new connections from this commit to activeConnections
+    if (node) {
+      for (const conn of node.parentConnections) {
+        const parentIndex = commitIndexByHash.get(conn.parentHash);
+        if (parentIndex !== undefined && parentIndex > i) {
+          const laneConnections = activeConnections.get(conn.toLane) || [];
+          laneConnections.push({ colorIndex: conn.colorIndex, endRowIndex: parentIndex });
+          activeConnections.set(conn.toLane, laneConnections);
+        }
+      }
+    }
+
+    // Clean up completed connections
+    for (const [lane, connections] of activeConnections.entries()) {
+      const remaining = connections.filter(c => c.endRowIndex > i);
+      if (remaining.length === 0) {
+        activeConnections.delete(lane);
+      } else {
+        activeConnections.set(lane, remaining);
+      }
+    }
+  }
+
+  return passingLanesByRow;
 }
 
 function addIncomingConnection(
@@ -269,41 +339,14 @@ function findAdjacentLane(lanes: (string | null)[], nearLane: number): number {
 }
 
 /**
- * Get lanes that pass through a row (branches continuing without a node on this row)
+ * Get lanes that pass through a row (branches continuing without a node on this row).
+ * Uses pre-computed data for O(1) lookup instead of O(n²) computation.
  */
 export function getPassingLanes(
   rowIndex: number,
-  commits: Commit[],
+  _commits: Commit[],
   topology: GraphTopology
 ): { lane: number; colorIndex: number }[] {
-  const currentCommit = commits[rowIndex];
-  const currentNode = topology.nodes.get(currentCommit.hash);
-  if (!currentNode) return [];
-
-  const passingLanes: { lane: number; colorIndex: number }[] = [];
-  const seenLanes = new Set<number>();
-
-  // Add current node's lane to seen (don't draw passing line where we have a node)
-  seenLanes.add(currentNode.lane);
-
-  // Check all commits above this row
-  for (let i = 0; i < rowIndex; i++) {
-    const commit = commits[i];
-    const node = topology.nodes.get(commit.hash);
-    if (!node) continue;
-
-    // Check each parent connection
-    for (const conn of node.parentConnections) {
-      // Find parent's row index
-      const parentIndex = commits.findIndex((c) => c.hash === conn.parentHash);
-
-      // If parent is below current row, the target lane passes through this row
-      if (parentIndex > rowIndex && !seenLanes.has(conn.toLane)) {
-        seenLanes.add(conn.toLane);
-        passingLanes.push({ lane: conn.toLane, colorIndex: conn.colorIndex });
-      }
-    }
-  }
-
-  return passingLanes;
+  // Use pre-computed passing lanes for O(1) lookup
+  return topology.passingLanesByRow.get(rowIndex) || [];
 }

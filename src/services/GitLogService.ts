@@ -15,17 +15,20 @@ export class GitLogService {
 
   async getCommits(filters?: Partial<GraphFilters>): Promise<Result<Commit[]>> {
     const maxCount = filters?.maxCount ?? 500;
-    const args = [
-      'log',
-      '--all',
+    const args = ['log'];
+
+    // Add branch filter or --all flag
+    if (filters?.branch) {
+      args.push(filters.branch);
+    } else {
+      args.push('--all');
+    }
+
+    args.push(
       `--max-count=${maxCount}`,
       `--format=${LOG_FORMAT}`,
-      '--date-order',
-    ];
-
-    if (filters?.branch) {
-      args[1] = filters.branch;
-    }
+      '--date-order'
+    );
 
     if (filters?.author) {
       args.push(`--author=${filters.author}`);
@@ -54,8 +57,9 @@ export class GitLogService {
   }
 
   async getBranches(): Promise<Result<Branch[]>> {
+    // Use null byte separators for reliable parsing
     const result = await this.executor.execute({
-      args: ['branch', '-a', '--format=%(refname:short)%(HEAD)%(objectname:short)'],
+      args: ['branch', '-a', '--format=%(refname:short)%00%(HEAD)%00%(objectname:short)'],
       cwd: this.workspacePath,
     });
 

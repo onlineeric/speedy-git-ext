@@ -29,7 +29,7 @@ export class WebviewProvider {
       }
     );
 
-    this.panel.webview.html = this.getWebviewContent();
+    this.panel.webview.html = this.getWebviewContent(this.panel.webview);
 
     this.panel.webview.onDidReceiveMessage(
       (message: RequestMessage) => this.handleMessage(message),
@@ -82,8 +82,7 @@ export class WebviewProvider {
     this.panel?.webview.postMessage(message);
   }
 
-  private getWebviewContent(): string {
-    const webview = this.panel!.webview;
+  private getWebviewContent(webview: vscode.Webview): string {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'assets', 'index.js')
     );

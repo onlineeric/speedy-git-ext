@@ -63,44 +63,73 @@ function parseRefPart(part: string): RefInfo | null {
     return { name: tagName, type: 'tag' };
   }
 
-  if (part.startsWith('origin/') || part.includes('/')) {
-    const slashIndex = part.indexOf('/');
-    const remote = part.slice(0, slashIndex);
-    const branchName = part.slice(slashIndex + 1);
-    return { name: branchName, type: 'remote', remote };
+  // Check for remote branches - refs from git log %D format include "origin/branch"
+  // We check for common remote prefixes to distinguish from local branches with slashes
+  const commonRemotes = ['origin', 'upstream', 'fork'];
+  const slashIndex = part.indexOf('/');
+
+  if (slashIndex > 0) {
+    const potentialRemote = part.slice(0, slashIndex);
+    // Only treat as remote if it starts with a known remote prefix
+    if (commonRemotes.includes(potentialRemote)) {
+      const branchName = part.slice(slashIndex + 1);
+      return { name: branchName, type: 'remote', remote: potentialRemote };
+    }
   }
 
+  // Local branch (may contain slashes like "feature/login")
   return { name: part, type: 'branch' };
 }
 
 export function parseBranchLine(line: string): Branch | null {
-  const match = line.match(/^(.+?)(\*?)([a-f0-9]+)$/);
-  if (!match) {
+  // Format: refname\x00HEAD_marker\x00hash
+  const parts = line.split(NULL_CHAR);
+  if (parts.length !== 3) {
     return null;
   }
 
-  const [, name, currentMarker, hash] = match;
-  const trimmedName = name.trim();
+  const [rawName, headMarker, hash] = parts;
+  const trimmedName = rawName.trim();
+  const isCurrent = headMarker === '*';
 
-  const isRemote = trimmedName.startsWith('remotes/') || trimmedName.includes('/');
-  let remote: string | undefined;
+  // Determine if this is a remote branch
+  // Remote branches from `git branch -a` have format like "remotes/origin/branch" or "origin/branch"
   let branchName = trimmedName;
+  let remote: string | undefined;
 
-  if (isRemote) {
-    if (trimmedName.startsWith('remotes/')) {
-      branchName = trimmedName.slice('remotes/'.length);
-    }
-    const slashIndex = branchName.indexOf('/');
-    if (slashIndex > 0) {
-      remote = branchName.slice(0, slashIndex);
-      branchName = branchName.slice(slashIndex + 1);
+  // Strip "remotes/" prefix if present (from `git branch -a` output)
+  if (branchName.startsWith('remotes/')) {
+    branchName = branchName.slice('remotes/'.length);
+  }
+
+  // Check if this is a remote tracking branch (e.g., "origin/main")
+  // Only split on first slash and check against common remote patterns
+  const slashIndex = branchName.indexOf('/');
+  if (slashIndex > 0) {
+    const potentialRemote = branchName.slice(0, slashIndex);
+    const restOfName = branchName.slice(slashIndex + 1);
+
+    // For branches from `git branch -a`, remote branches are always prefixed with remote name
+    // We treat any branch with format "xxx/yyy" where the branch came from -a as remote
+    // unless it's clearly a local branch pattern
+    // Since we're using `git branch -a`, branches like "origin/main" ARE remote branches
+    if (restOfName && !potentialRemote.includes('-')) {
+      // Likely a remote - remote names typically don't have dashes followed by feature names
+      // This heuristic works for most cases: origin/main, upstream/feature
+      // But local branches like feature/login have "feature" which could match
+      // Better approach: check if the first part looks like a remote name (short, no special chars)
+      const looksLikeRemote = /^[a-z][a-z0-9_-]*$/i.test(potentialRemote) && potentialRemote.length <= 20;
+      if (looksLikeRemote && !['feature', 'bugfix', 'hotfix', 'release', 'fix', 'feat', 'chore', 'docs', 'test', 'refactor'].includes(potentialRemote.toLowerCase())) {
+        remote = potentialRemote;
+        branchName = restOfName;
+      }
     }
   }
 
   return {
     name: branchName,
     remote,
-    current: currentMarker === '*',
-    hash,
+    current: isCurrent,
+    hash: hash.trim(),
   };
 }

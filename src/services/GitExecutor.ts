@@ -24,12 +24,18 @@ export class GitExecutor {
 
       let stdout = '';
       let stderr = '';
-      let killed = false;
+      let resolved = false;
+
+      const safeResolve = (result: Result<GitExecResult>) => {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(timeoutId);
+        resolve(result);
+      };
 
       const timeoutId = setTimeout(() => {
-        killed = true;
         process.kill();
-        resolve(
+        safeResolve(
           err(
             new GitError(
               `Git command timed out after ${timeout}ms`,
@@ -49,12 +55,9 @@ export class GitExecutor {
       });
 
       process.on('close', (code) => {
-        clearTimeout(timeoutId);
-        if (killed) return;
-
         if (code !== 0) {
           if (stderr.includes('not a git repository')) {
-            resolve(
+            safeResolve(
               err(
                 new GitError(
                   'Not a git repository',
@@ -65,7 +68,7 @@ export class GitExecutor {
               )
             );
           } else {
-            resolve(
+            safeResolve(
               err(
                 new GitError(
                   `Git command failed with code ${code}`,
@@ -77,14 +80,12 @@ export class GitExecutor {
             );
           }
         } else {
-          resolve(ok({ stdout, stderr }));
+          safeResolve(ok({ stdout, stderr }));
         }
       });
 
       process.on('error', (error) => {
-        clearTimeout(timeoutId);
-        if (killed) return;
-        resolve(
+        safeResolve(
           err(
             new GitError(
               error.message,
