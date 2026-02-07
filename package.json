@@ -40,13 +40,15 @@
     "watch:ext": "node esbuild.config.mjs --watch",
     "watch:webview": "cd webview-ui && pnpm run dev",
     "lint": "eslint src --ext ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "generate-test-repo": "tsx scripts/generate-test-repo.ts"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "concurrently": "^8.2.2",
     "esbuild": "^0.20.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.3.3"
   },
   "packageManager": "pnpm@10.28.2"

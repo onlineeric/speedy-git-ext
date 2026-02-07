@@ -53,6 +53,9 @@ speedy-git-ext/
 │       ├── components/       # React components
 │       ├── stores/           # State management
 │       └── rpc/              # Extension-webview communication
+├── scripts/                  # Development scripts
+│   └── generate-test-repo.ts # Test repo generator
+├── test-repo/                # Generated test repo (gitignored)
 ├── shared/                   # Shared types and utilities
 │   ├── types.ts              # Type definitions
 │   ├── messages.ts           # Message protocols
@@ -86,6 +89,24 @@ pnpm run watch
 2. Press `F5` to launch the Extension Development Host
 3. Open a Git repository
 4. Run command: "Speedy Git: Show Git Graph"
+
+## Test Repo Generator
+
+A script that generates a deterministic test Git repository for development and testing.
+
+- **Script**: `scripts/generate-test-repo.ts`
+- **Output**: `test-repo/` (gitignored)
+- **Run**: `pnpm generate-test-repo`
+
+Produces ~273 commits, 10 branches, 11 tags covering all graph topology cases:
+- Linear history, dev + feature branches with multi-merge and backward merge
+- Parallel branches, cross-merges, criss-cross pattern
+- Octopus merges (3 and 4 parents), crossing topology
+- Rebase-style, squash merges, release cycle with RC tags
+- Long-running parallel lanes with periodic merge points
+- Orphan branch (disconnected history), fast-forward
+
+Uses `git fast-import` for fast generation and a seeded PRNG (seed=42) for deterministic, identical output every run.
 
 ## Building
 
