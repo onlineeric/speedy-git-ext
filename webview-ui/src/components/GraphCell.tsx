@@ -44,7 +44,7 @@ export const GraphCell = memo(function GraphCell({
 
   if (!node) {
     return (
-      <svg width={width} height={CELL_HEIGHT} className="flex-shrink-0">
+      <svg width={width} height={CELL_HEIGHT} className="relative z-[1] flex-shrink-0">
         <circle cx={LANE_WIDTH / 2} cy={CELL_HEIGHT / 2} r={NODE_RADIUS} fill="#888" />
       </svg>
     );
@@ -59,7 +59,7 @@ export const GraphCell = memo(function GraphCell({
   const passingLanes = getPassingLanes(index, commits, topology);
 
   return (
-    <svg width={width} height={CELL_HEIGHT} className="flex-shrink-0">
+    <svg width={width} height={CELL_HEIGHT} className="relative z-[1] flex-shrink-0">
       {/* 1. Draw passing-through vertical lines */}
       {passingLanes.map((pl) => (
         <line
@@ -106,8 +106,8 @@ export const GraphCell = memo(function GraphCell({
         }
       })}
 
-      {/* 3. Draw line from top to node on this commit's lane (if has children above) */}
-      {index > 0 && node.incomingConnections.length === 0 && (
+      {/* 3. Draw line from top to node on this commit's lane (if has same-lane children above) */}
+      {node.hasConnectionFromAbove && node.incomingConnections.length === 0 && (
         <line
           x1={nodeX}
           y1={0}

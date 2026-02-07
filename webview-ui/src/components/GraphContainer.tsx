@@ -3,7 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useGraphStore } from '../stores/graphStore';
 import { CommitRow } from './CommitRow';
 
-const ROW_HEIGHT = 40;
+const ROW_HEIGHT = 28;
 const OVERSCAN = 10;
 const LANE_WIDTH = 16;
 
