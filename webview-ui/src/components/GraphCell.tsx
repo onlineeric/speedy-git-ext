@@ -106,8 +106,8 @@ export const GraphCell = memo(function GraphCell({
         }
       })}
 
-      {/* 3. Draw line from top to node on this commit's lane (if has children above) */}
-      {index > 0 && node.incomingConnections.length === 0 && (
+      {/* 3. Draw line from top to node on this commit's lane (if has same-lane children above) */}
+      {node.hasConnectionFromAbove && node.incomingConnections.length === 0 && (
         <line
           x1={nodeX}
           y1={0}

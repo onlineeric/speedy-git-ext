@@ -21,6 +21,8 @@ export interface CommitNode {
     fromLane: number;
     colorIndex: number;
   }[];
+  /** Whether a same-lane child commit above connects down to this commit */
+  hasConnectionFromAbove: boolean;
 }
 
 export interface GraphTopology {
@@ -67,6 +69,9 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
 
   // Track incoming connections for each commit (from children above)
   const incomingConnections = new Map<string, { fromLane: number; colorIndex: number }[]>();
+
+  // Track parent hashes that have a same-lane child connecting down to them
+  const hasConnectionFromAboveSet = new Set<string>();
 
   for (let i = 0; i < commits.length; i++) {
     const commit = commits[i];
@@ -128,6 +133,7 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
           // Reserve parent on same lane
           activeLanes[assignedLane] = parentHash;
           reservedLane.set(parentHash, assignedLane);
+          hasConnectionFromAboveSet.add(parentHash);
           parentConnections.push({
             parentHash,
             fromLane: assignedLane,
@@ -160,6 +166,7 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
             // Use same lane
             activeLanes[assignedLane] = parentHash;
             reservedLane.set(parentHash, assignedLane);
+            hasConnectionFromAboveSet.add(parentHash);
             parentConnections.push({
               parentHash,
               fromLane: assignedLane,
@@ -215,6 +222,7 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
       colorIndex,
       parentConnections,
       incomingConnections: incomingConnections.get(hash) || [],
+      hasConnectionFromAbove: hasConnectionFromAboveSet.has(hash),
     });
   }
 
