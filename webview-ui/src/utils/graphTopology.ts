@@ -73,6 +73,9 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
   // Track parent hashes that have a same-lane child connecting down to them
   const hasConnectionFromAboveSet = new Set<string>();
 
+  // Track which commit hash reserved each parent (for re-reservation when lower lane claims it)
+  const reservedByHash = new Map<string, string>();
+
   for (let i = 0; i < commits.length; i++) {
     const commit = commits[i];
     const hash = commit.hash;
@@ -122,17 +125,30 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
         const existingLane = reservedLane.get(parentHash);
 
         if (existingLane !== undefined && existingLane !== assignedLane) {
-          // Parent already reserved on different lane - draw connection to that lane
-          parentConnections.push({
-            parentHash,
-            fromLane: assignedLane,
-            toLane: existingLane,
-            colorIndex: laneColors.get(existingLane) ?? colorIndex,
-          });
+          if (assignedLane < existingLane) {
+            // Lower lane takes priority - re-reserve parent here
+            reReserveParent(parentHash, assignedLane, existingLane, colorIndex, activeLanes, reservedLane, reservedByHash, nodes, laneColors);
+            hasConnectionFromAboveSet.add(parentHash);
+            parentConnections.push({
+              parentHash,
+              fromLane: assignedLane,
+              toLane: assignedLane,
+              colorIndex,
+            });
+          } else {
+            // Parent already reserved on lower lane - draw connection to that lane
+            parentConnections.push({
+              parentHash,
+              fromLane: assignedLane,
+              toLane: existingLane,
+              colorIndex: laneColors.get(existingLane) ?? colorIndex,
+            });
+          }
         } else {
           // Reserve parent on same lane
           activeLanes[assignedLane] = parentHash;
           reservedLane.set(parentHash, assignedLane);
+          reservedByHash.set(parentHash, hash);
           hasConnectionFromAboveSet.add(parentHash);
           parentConnections.push({
             parentHash,
@@ -155,17 +171,30 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
         if (p === 0) {
           // First parent - prefer same lane
           if (existingLane !== undefined && existingLane !== assignedLane) {
-            // Already reserved elsewhere, connect to that lane
-            parentConnections.push({
-              parentHash,
-              fromLane: assignedLane,
-              toLane: existingLane,
-              colorIndex: laneColors.get(existingLane) ?? colorIndex,
-            });
+            if (assignedLane < existingLane) {
+              // Lower lane takes priority - re-reserve parent here
+              reReserveParent(parentHash, assignedLane, existingLane, colorIndex, activeLanes, reservedLane, reservedByHash, nodes, laneColors);
+              hasConnectionFromAboveSet.add(parentHash);
+              parentConnections.push({
+                parentHash,
+                fromLane: assignedLane,
+                toLane: assignedLane,
+                colorIndex,
+              });
+            } else {
+              // Already reserved on lower lane, connect to that lane
+              parentConnections.push({
+                parentHash,
+                fromLane: assignedLane,
+                toLane: existingLane,
+                colorIndex: laneColors.get(existingLane) ?? colorIndex,
+              });
+            }
           } else {
             // Use same lane
             activeLanes[assignedLane] = parentHash;
             reservedLane.set(parentHash, assignedLane);
+            reservedByHash.set(parentHash, hash);
             hasConnectionFromAboveSet.add(parentHash);
             parentConnections.push({
               parentHash,
@@ -302,6 +331,47 @@ function computePassingLanes(
   }
 
   return passingLanesByRow;
+}
+
+/**
+ * Re-reserve a parent on a lower lane when a lane conflict is detected.
+ * Frees the old (higher) lane and fixes the previous commit's parentConnection
+ * from same-lane to cross-lane.
+ */
+function reReserveParent(
+  parentHash: string,
+  newLane: number,
+  oldLane: number,
+  newColorIndex: number,
+  activeLanes: (string | null)[],
+  reservedLane: Map<string, number>,
+  reservedByHash: Map<string, string>,
+  nodes: Map<string, CommitNode>,
+  laneColors: Map<number, number>,
+) {
+  // Free old lane and reserve on the new (lower) lane
+  activeLanes[oldLane] = null;
+  activeLanes[newLane] = parentHash;
+  reservedLane.set(parentHash, newLane);
+
+  // Find the previous commit that reserved this parent and fix its parentConnection
+  const previousCommitHash = reservedByHash.get(parentHash);
+  if (previousCommitHash) {
+    const previousNode = nodes.get(previousCommitHash);
+    if (previousNode) {
+      for (const conn of previousNode.parentConnections) {
+        if (conn.parentHash === parentHash && conn.toLane === oldLane) {
+          conn.toLane = newLane;
+          conn.colorIndex = laneColors.get(newLane) ?? newColorIndex;
+          break;
+        }
+      }
+    }
+  }
+
+  // The parent's hasConnectionFromAbove from the old same-lane connection is no longer valid
+  // from that branch, but the new same-lane connection (from the lower lane) will re-add it
+  reservedByHash.set(parentHash, '');
 }
 
 function addIncomingConnection(
