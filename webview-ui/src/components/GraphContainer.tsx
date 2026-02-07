@@ -53,6 +53,7 @@ export function GraphContainer() {
               index={virtualItem.index}
               topology={topology}
               graphWidth={graphWidth}
+              rowHeight={ROW_HEIGHT}
               isSelected={isSelected}
               onClick={() => setSelectedCommit(commit.hash)}
               style={{

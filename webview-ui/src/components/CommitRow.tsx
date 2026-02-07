@@ -10,6 +10,7 @@ interface CommitRowProps {
   index: number;
   topology: GraphTopology;
   graphWidth: number;
+  rowHeight: number;
   isSelected: boolean;
   onClick: () => void;
   style: React.CSSProperties;
@@ -21,6 +22,7 @@ export const CommitRow = memo(function CommitRow({
   index,
   topology,
   graphWidth,
+  rowHeight,
   isSelected,
   onClick,
   style,
@@ -43,6 +45,7 @@ export const CommitRow = memo(function CommitRow({
         index={index}
         topology={topology}
         width={graphWidth}
+        height={rowHeight}
       />
 
       <span

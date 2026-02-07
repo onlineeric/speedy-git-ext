@@ -8,9 +8,9 @@ interface GraphCellProps {
   index: number;
   topology: GraphTopology;
   width: number;
+  height: number;
 }
 
-const CELL_HEIGHT = 40;
 const LANE_WIDTH = 16;
 const NODE_RADIUS = 4;
 
@@ -39,19 +39,20 @@ export const GraphCell = memo(function GraphCell({
   index,
   topology,
   width,
+  height,
 }: GraphCellProps) {
   const node = topology.nodes.get(commit.hash);
 
   if (!node) {
     return (
-      <svg width={width} height={CELL_HEIGHT} className="relative z-[1] flex-shrink-0">
-        <circle cx={LANE_WIDTH / 2} cy={CELL_HEIGHT / 2} r={NODE_RADIUS} fill="#888" />
+      <svg width={width} height={height} className="relative z-[1] flex-shrink-0">
+        <circle cx={LANE_WIDTH / 2} cy={height / 2} r={NODE_RADIUS} fill="#888" />
       </svg>
     );
   }
 
   const nodeX = getLaneX(node.lane);
-  const nodeY = CELL_HEIGHT / 2;
+  const nodeY = height / 2;
   const color = getColor(node.colorIndex);
   const hasMerge = commit.parents.length > 1;
 
@@ -59,7 +60,7 @@ export const GraphCell = memo(function GraphCell({
   const passingLanes = getPassingLanes(index, commits, topology);
 
   return (
-    <svg width={width} height={CELL_HEIGHT} className="relative z-[1] flex-shrink-0">
+    <svg width={width} height={height} className="relative z-[1] flex-shrink-0">
       {/* 1. Draw passing-through vertical lines */}
       {passingLanes.map((pl) => (
         <line
@@ -67,7 +68,7 @@ export const GraphCell = memo(function GraphCell({
           x1={getLaneX(pl.lane)}
           y1={0}
           x2={getLaneX(pl.lane)}
-          y2={CELL_HEIGHT}
+          y2={height}
           stroke={getColor(pl.colorIndex)}
           strokeWidth={2}
         />
@@ -132,18 +133,18 @@ export const GraphCell = memo(function GraphCell({
               x1={fromX}
               y1={nodeY + NODE_RADIUS}
               x2={toX}
-              y2={CELL_HEIGHT}
+              y2={height}
               stroke={connColor}
               strokeWidth={2}
             />
           );
         } else {
           // Different lane - curve from node to target lane
-          const midY = nodeY + NODE_RADIUS + 6;
+          const midY = nodeY + NODE_RADIUS + 4;
           return (
             <path
               key={`parent-${idx}`}
-              d={`M ${fromX} ${nodeY + NODE_RADIUS} L ${fromX} ${midY} Q ${fromX} ${CELL_HEIGHT * 0.75} ${toX} ${CELL_HEIGHT}`}
+              d={`M ${fromX} ${nodeY + NODE_RADIUS} L ${fromX} ${midY} Q ${fromX} ${height * 0.75} ${toX} ${height}`}
               stroke={connColor}
               strokeWidth={2}
               fill="none"
