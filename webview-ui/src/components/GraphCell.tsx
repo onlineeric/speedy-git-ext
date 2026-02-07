@@ -59,6 +59,10 @@ export const GraphCell = memo(function GraphCell({
   // Get lanes that pass through this row
   const passingLanes = getPassingLanes(index, commits, topology);
 
+  const hasIncomingFromOwnLane = node.incomingConnections.some(
+    (incoming) => incoming.fromLane === node.lane
+  );
+
   return (
     <svg width={width} height={height} className="relative z-[1] flex-shrink-0">
       {/* 1. Draw passing-through vertical lines */}
@@ -108,7 +112,7 @@ export const GraphCell = memo(function GraphCell({
       })}
 
       {/* 3. Draw line from top to node on this commit's lane (if has same-lane children above) */}
-      {node.hasConnectionFromAbove && node.incomingConnections.length === 0 && (
+      {node.hasConnectionFromAbove && !hasIncomingFromOwnLane && (
         <line
           x1={nodeX}
           y1={0}
@@ -139,6 +143,22 @@ export const GraphCell = memo(function GraphCell({
             />
           );
         } else {
+          if (!hasMerge) {
+            // For regular branch commits, keep child row straight and let the parent row
+            // render the split curve via incomingConnections (matches Git Graph style).
+            return (
+              <line
+                key={`parent-${idx}`}
+                x1={fromX}
+                y1={nodeY + NODE_RADIUS}
+                x2={fromX}
+                y2={height}
+                stroke={connColor}
+                strokeWidth={2}
+              />
+            );
+          }
+
           // Different lane - curve from node to target lane
           const midY = nodeY + NODE_RADIUS + 4;
           return (

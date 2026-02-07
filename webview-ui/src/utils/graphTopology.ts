@@ -67,12 +67,6 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
   const laneColors = new Map<number, number>();
   let nextColorIndex = 0;
 
-  // Track incoming connections for each commit (from children above)
-  const incomingConnections = new Map<string, { fromLane: number; colorIndex: number }[]>();
-
-  // Track parent hashes that have a same-lane child connecting down to them
-  const hasConnectionFromAboveSet = new Set<string>();
-
   // Track which commit hash reserved each parent (for re-reservation when lower lane claims it)
   const reservedByHash = new Map<string, string>();
 
@@ -127,8 +121,7 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
         if (existingLane !== undefined && existingLane !== assignedLane) {
           if (assignedLane < existingLane) {
             // Lower lane takes priority - re-reserve parent here
-            reReserveParent(parentHash, assignedLane, existingLane, colorIndex, activeLanes, reservedLane, reservedByHash, nodes, laneColors);
-            hasConnectionFromAboveSet.add(parentHash);
+            reReserveParent(parentHash, assignedLane, existingLane, activeLanes, reservedLane, reservedByHash, nodes);
             parentConnections.push({
               parentHash,
               fromLane: assignedLane,
@@ -137,11 +130,12 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
             });
           } else {
             // Parent already reserved on lower lane - draw connection to that lane
+            const childColor = colorIndex;
             parentConnections.push({
               parentHash,
               fromLane: assignedLane,
               toLane: existingLane,
-              colorIndex: laneColors.get(existingLane) ?? colorIndex,
+              colorIndex: childColor,
             });
           }
         } else {
@@ -149,7 +143,6 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
           activeLanes[assignedLane] = parentHash;
           reservedLane.set(parentHash, assignedLane);
           reservedByHash.set(parentHash, hash);
-          hasConnectionFromAboveSet.add(parentHash);
           parentConnections.push({
             parentHash,
             fromLane: assignedLane,
@@ -173,8 +166,7 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
           if (existingLane !== undefined && existingLane !== assignedLane) {
             if (assignedLane < existingLane) {
               // Lower lane takes priority - re-reserve parent here
-              reReserveParent(parentHash, assignedLane, existingLane, colorIndex, activeLanes, reservedLane, reservedByHash, nodes, laneColors);
-              hasConnectionFromAboveSet.add(parentHash);
+              reReserveParent(parentHash, assignedLane, existingLane, activeLanes, reservedLane, reservedByHash, nodes);
               parentConnections.push({
                 parentHash,
                 fromLane: assignedLane,
@@ -183,11 +175,12 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
               });
             } else {
               // Already reserved on lower lane, connect to that lane
+              const childColor = colorIndex;
               parentConnections.push({
                 parentHash,
                 fromLane: assignedLane,
                 toLane: existingLane,
-                colorIndex: laneColors.get(existingLane) ?? colorIndex,
+                colorIndex: childColor,
               });
             }
           } else {
@@ -195,7 +188,6 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
             activeLanes[assignedLane] = parentHash;
             reservedLane.set(parentHash, assignedLane);
             reservedByHash.set(parentHash, hash);
-            hasConnectionFromAboveSet.add(parentHash);
             parentConnections.push({
               parentHash,
               fromLane: assignedLane,
@@ -214,8 +206,6 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
               toLane: existingLane,
               colorIndex: parentColor,
             });
-            // Record incoming connection for the parent commit (from the lane the line passes through)
-            addIncomingConnection(incomingConnections, parentHash, existingLane, parentColor);
           } else {
             // Find adjacent lane for branch (prefer lane next to current)
             let branchLane = findAdjacentLane(activeLanes, assignedLane);
@@ -238,8 +228,6 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
               toLane: branchLane,
               colorIndex: branchColor,
             });
-            // Record incoming connection for the parent commit (from the branch lane, not the merge commit's lane)
-            addIncomingConnection(incomingConnections, parentHash, branchLane, branchColor);
           }
         }
       }
@@ -250,10 +238,14 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
       lane: assignedLane,
       colorIndex,
       parentConnections,
-      incomingConnections: incomingConnections.get(hash) || [],
-      hasConnectionFromAbove: hasConnectionFromAboveSet.has(hash),
+      incomingConnections: [],
+      hasConnectionFromAbove: false,
     });
   }
+
+  // Build incoming connections from finalized parent connections so rendering
+  // remains correct even when lane reservations are re-written later.
+  buildIncomingConnections(commits, nodes, commitIndexByHash);
 
   // Calculate max lanes
   let maxLanes = 1;
@@ -268,6 +260,50 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
   const passingLanesByRow = computePassingLanes(commits, nodes, commitIndexByHash);
 
   return { nodes, maxLanes, passingLanesByRow, commitIndexByHash };
+}
+
+function buildIncomingConnections(
+  commits: Commit[],
+  nodes: Map<string, CommitNode>,
+  commitIndexByHash: Map<string, number>
+) {
+  const incomingByHash = new Map<string, { fromLane: number; colorIndex: number }[]>();
+  const hasSameLaneIncoming = new Set<string>();
+
+  for (const commit of commits) {
+    const node = nodes.get(commit.hash);
+    if (!node) continue;
+
+    const isMergeCommit = commit.parents.length > 1;
+
+    for (const conn of node.parentConnections) {
+      if (!commitIndexByHash.has(conn.parentHash)) continue;
+
+      const parentNode = nodes.get(conn.parentHash);
+      if (!parentNode) continue;
+
+      let incomingLane: number;
+      if (conn.fromLane === conn.toLane) {
+        incomingLane = conn.toLane;
+      } else if (isMergeCommit) {
+        // Merge rows already bend onto toLane on the child row.
+        incomingLane = conn.toLane;
+      } else {
+        // Regular branch rows bend on the parent row.
+        incomingLane = conn.fromLane;
+      }
+
+      addIncomingConnection(incomingByHash, conn.parentHash, incomingLane, conn.colorIndex);
+      if (incomingLane === parentNode.lane) {
+        hasSameLaneIncoming.add(conn.parentHash);
+      }
+    }
+  }
+
+  for (const [hash, node] of nodes) {
+    node.incomingConnections = incomingByHash.get(hash) || [];
+    node.hasConnectionFromAbove = hasSameLaneIncoming.has(hash);
+  }
 }
 
 /**
@@ -309,12 +345,21 @@ function computePassingLanes(
 
     // Add new connections from this commit to activeConnections
     if (node) {
+      const isMergeCommit = commit.parents.length > 1;
+
       for (const conn of node.parentConnections) {
         const parentIndex = commitIndexByHash.get(conn.parentHash);
         if (parentIndex !== undefined && parentIndex > i) {
-          const laneConnections = activeConnections.get(conn.toLane) || [];
+          const continuationLane =
+            conn.fromLane === conn.toLane
+              ? conn.toLane
+              : isMergeCommit
+              ? conn.toLane
+              : conn.fromLane;
+
+          const laneConnections = activeConnections.get(continuationLane) || [];
           laneConnections.push({ colorIndex: conn.colorIndex, endRowIndex: parentIndex });
-          activeConnections.set(conn.toLane, laneConnections);
+          activeConnections.set(continuationLane, laneConnections);
         }
       }
     }
@@ -342,12 +387,10 @@ function reReserveParent(
   parentHash: string,
   newLane: number,
   oldLane: number,
-  newColorIndex: number,
   activeLanes: (string | null)[],
   reservedLane: Map<string, number>,
   reservedByHash: Map<string, string>,
   nodes: Map<string, CommitNode>,
-  laneColors: Map<number, number>,
 ) {
   // Free old lane and reserve on the new (lower) lane
   activeLanes[oldLane] = null;
@@ -362,7 +405,6 @@ function reReserveParent(
       for (const conn of previousNode.parentConnections) {
         if (conn.parentHash === parentHash && conn.toLane === oldLane) {
           conn.toLane = newLane;
-          conn.colorIndex = laneColors.get(newLane) ?? newColorIndex;
           break;
         }
       }
