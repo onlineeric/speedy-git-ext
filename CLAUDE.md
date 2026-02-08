@@ -1,6 +1,8 @@
-# CLAUDE.md
+# Project Agent Instructions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance for AI coding agents (Claude Code, Codex CLI, etc.) when working in this repository.
+
+(If you are Claude Code, this is your CLAUDE.md. If you are Codex CLI or other AI coding agents, this is loaded via AGENTS.md.)
 
 ## Build & Development Commands
 
