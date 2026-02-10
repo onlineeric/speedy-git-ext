@@ -63,7 +63,7 @@ export const CommitRow = memo(function CommitRow({
               className={`px-1.5 py-0.5 text-xs rounded ${getRefStyle(ref.type)}`}
               title={ref.remote ? `${ref.remote}/${ref.name}` : ref.name}
             >
-              {ref.type === 'head' && ref.name !== 'HEAD' ? ref.name : ref.type === 'remote' ? ref.name : ref.name}
+              {ref.remote ? `${ref.remote}/${ref.name}` : ref.name}
             </span>
           ))}
           {commit.refs.length > 3 && (
