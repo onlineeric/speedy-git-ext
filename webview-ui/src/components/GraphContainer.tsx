@@ -7,8 +7,13 @@ const ROW_HEIGHT = 28;
 const OVERSCAN = 10;
 const LANE_WIDTH = 16;
 
-export function GraphContainer() {
-  const { commits, topology, selectedCommit, setSelectedCommit } = useGraphStore();
+interface GraphContainerProps {
+  selectedCommit: string | undefined;
+  onSelectCommit: (hash: string | undefined) => void;
+}
+
+export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContainerProps) {
+  const { commits, topology } = useGraphStore();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
@@ -29,7 +34,6 @@ export function GraphContainer() {
     );
   }
 
-  // Calculate graph cell width based on max lanes
   const graphWidth = Math.max(LANE_WIDTH * (topology.maxLanes + 1), 40);
 
   return (
@@ -55,7 +59,7 @@ export function GraphContainer() {
               graphWidth={graphWidth}
               rowHeight={ROW_HEIGHT}
               isSelected={isSelected}
-              onClick={() => setSelectedCommit(commit.hash)}
+              onClick={() => onSelectCommit(commit.hash)}
               style={{
                 position: 'absolute',
                 top: 0,

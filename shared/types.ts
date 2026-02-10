@@ -45,3 +45,38 @@ export interface GraphFilters {
   author?: string;
   maxCount: number;
 }
+
+export interface FileChange {
+  path: string;
+  oldPath?: string;
+  status: FileChangeStatus;
+  additions?: number;
+  deletions?: number;
+}
+
+export type FileChangeStatus =
+  | 'added'
+  | 'modified'
+  | 'deleted'
+  | 'renamed'
+  | 'copied'
+  | 'untracked'
+  | 'unknown';
+
+export interface CommitDetails {
+  hash: string;
+  abbreviatedHash: string;
+  parents: string[];
+  author: string;
+  authorEmail: string;
+  authorDate: number;
+  committer: string;
+  committerEmail: string;
+  committerDate: number;
+  subject: string;
+  body: string;
+  files: FileChange[];
+  stats: { additions: number; deletions: number };
+}
+
+export type DetailsPanelPosition = 'bottom' | 'right';

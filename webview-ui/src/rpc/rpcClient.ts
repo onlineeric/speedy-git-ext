@@ -17,7 +17,6 @@ class RpcClient {
   };
 
   initialize() {
-    // Prevent duplicate initialization
     if (this.initialized) return;
     this.initialized = true;
 
@@ -43,11 +42,17 @@ class RpcClient {
       case 'branches':
         store.setBranches(message.payload.branches);
         break;
+      case 'commitDetails':
+        store.setCommitDetails(message.payload.details);
+        break;
       case 'loading':
         store.setLoading(message.payload.loading);
         break;
       case 'error':
         store.setError(message.payload.error.message);
+        break;
+      case 'success':
+        store.setSuccessMessage(message.payload.message);
         break;
     }
   }
@@ -62,6 +67,30 @@ class RpcClient {
 
   getBranches() {
     this.send({ type: 'getBranches', payload: {} });
+  }
+
+  getCommitDetails(hash: string) {
+    this.send({ type: 'getCommitDetails', payload: { hash } });
+  }
+
+  checkoutBranch(name: string, remote?: string) {
+    this.send({ type: 'checkoutBranch', payload: { name, remote } });
+  }
+
+  fetch(remote?: string, prune?: boolean) {
+    this.send({ type: 'fetch', payload: { remote, prune } });
+  }
+
+  copyToClipboard(text: string) {
+    this.send({ type: 'copyToClipboard', payload: { text } });
+  }
+
+  openDiff(hash: string, filePath: string, parentHash?: string) {
+    this.send({ type: 'openDiff', payload: { hash, filePath, parentHash } });
+  }
+
+  openFile(hash: string, filePath: string) {
+    this.send({ type: 'openFile', payload: { hash, filePath } });
   }
 
   refresh() {
