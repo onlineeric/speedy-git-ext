@@ -33,8 +33,15 @@ export function App() {
     <div className="flex flex-col h-full">
       <ControlBar />
       {error && (
-        <div className="px-4 py-2 text-[var(--vscode-errorForeground)] bg-[var(--vscode-inputValidation-errorBackground)]">
-          {error}
+        <div className="flex items-center justify-between px-4 py-2 text-[var(--vscode-errorForeground)] bg-[var(--vscode-inputValidation-errorBackground)]">
+          <span>{error}</span>
+          <button
+            className="ml-2 px-1 hover:opacity-70 cursor-pointer text-[var(--vscode-errorForeground)]"
+            onClick={() => useGraphStore.getState().setError(undefined)}
+            title="Dismiss"
+          >
+            ✕
+          </button>
         </div>
       )}
       {successMessage && (

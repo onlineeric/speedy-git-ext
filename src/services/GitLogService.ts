@@ -34,6 +34,9 @@ export class GitLogService {
       args.push(`--author=${filters.author}`);
     }
 
+    // Separate revisions from paths to avoid ambiguous argument errors
+    args.push('--');
+
     const result = await this.executor.execute({
       args,
       cwd: this.workspacePath,

@@ -9,25 +9,33 @@ export class GitBranchService {
   }
 
   async checkout(name: string, remote?: string): Promise<Result<string>> {
-    const args = ['checkout'];
-
-    if (remote) {
-      // Checking out a remote branch creates a local tracking branch
-      args.push('-b', name, `${remote}/${name}`);
-    } else {
-      args.push(name);
-    }
-
+    // Always use `git checkout <name>` first.
+    // Git automatically creates a local tracking branch if only one remote matches.
     const result = await this.executor.execute({
-      args,
+      args: ['checkout', name],
       cwd: this.workspacePath,
     });
 
-    if (!result.success) {
-      return result;
+    if (result.success) {
+      return ok(`Checked out '${name}'`);
     }
 
-    return ok(`Checked out '${name}'`);
+    // If a simple checkout failed and a remote was specified,
+    // try explicitly creating a tracking branch (e.g. when multiple remotes have the same branch name)
+    if (remote) {
+      const trackResult = await this.executor.execute({
+        args: ['checkout', '-b', name, `${remote}/${name}`],
+        cwd: this.workspacePath,
+      });
+
+      if (trackResult.success) {
+        return ok(`Checked out '${name}' tracking ${remote}/${name}`);
+      }
+
+      return trackResult;
+    }
+
+    return result;
   }
 
   async fetch(remote?: string, prune?: boolean): Promise<Result<string>> {
