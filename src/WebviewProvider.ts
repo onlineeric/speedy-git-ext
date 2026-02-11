@@ -37,7 +37,15 @@ export class WebviewProvider {
     this.panel.webview.html = this.getWebviewContent(this.panel.webview);
 
     this.panel.webview.onDidReceiveMessage(
-      (message: RequestMessage) => this.handleMessage(message),
+      (message: RequestMessage) => {
+        this.handleMessage(message).catch((error) => {
+          console.error('[SpeedyGit] Error handling message:', message.type, error);
+          this.postMessage({
+            type: 'error',
+            payload: { error: { message: String(error) } },
+          });
+        });
+      },
       undefined,
       this.context.subscriptions
     );

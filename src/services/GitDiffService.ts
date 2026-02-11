@@ -4,13 +4,9 @@ import type { CommitDetails, FileChange, FileChangeStatus } from '../../shared/t
 
 const NULL_CHAR = '\x00';
 
-/** Format for git show: full commit metadata with null-byte separators */
-const SHOW_FORMAT = [
-  '%H', '%h', '%P',
-  '%an', '%ae', '%at',
-  '%cn', '%ce', '%ct',
-  '%s', '%b',
-].join(NULL_CHAR);
+/** Format for git show: full commit metadata with %x00 (git's null-byte placeholder) as separators.
+ *  We use %x00 instead of literal \x00 because Node.js spawn rejects args containing null bytes. */
+const SHOW_FORMAT = '%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x00%s%x00%b';
 
 export class GitDiffService {
   private executor: GitExecutor;
@@ -84,6 +80,21 @@ export class GitDiffService {
     }
 
     return ok(result.value.stdout);
+  }
+
+  async openExternalDirDiff(hash: string, parentHash?: string): Promise<Result<string>> {
+    const parent = parentHash ?? `${hash}~1`;
+    const result = await this.executor.execute({
+      args: ['difftool', '--dir-diff', '--no-prompt', parent, hash],
+      cwd: this.workspacePath,
+      timeout: 60000,
+    });
+
+    if (!result.success) {
+      return result;
+    }
+
+    return ok('External diff tool opened');
   }
 
   async getUncommittedDetails(): Promise<Result<FileChange[]>> {

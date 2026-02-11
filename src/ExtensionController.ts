@@ -3,12 +3,14 @@ import { WebviewProvider } from './WebviewProvider.js';
 import { GitLogService } from './services/GitLogService.js';
 import { GitDiffService } from './services/GitDiffService.js';
 import { GitBranchService } from './services/GitBranchService.js';
+import { GitShowContentProvider } from './GitShowContentProvider.js';
 
 export class ExtensionController {
   private webviewProvider: WebviewProvider | undefined;
   private gitLogService: GitLogService | undefined;
   private gitDiffService: GitDiffService | undefined;
   private gitBranchService: GitBranchService | undefined;
+  private contentProviderRegistration: vscode.Disposable | undefined;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -31,6 +33,16 @@ export class ExtensionController {
       this.gitBranchService = new GitBranchService(workspacePath);
     }
 
+    // Register git-show:// content provider for diff view
+    if (!this.contentProviderRegistration) {
+      const provider = new GitShowContentProvider(this.gitDiffService);
+      this.contentProviderRegistration = vscode.workspace.registerTextDocumentContentProvider(
+        'git-show',
+        provider
+      );
+      this.context.subscriptions.push(this.contentProviderRegistration);
+    }
+
     if (!this.webviewProvider) {
       this.webviewProvider = new WebviewProvider(
         this.context,
@@ -46,6 +58,8 @@ export class ExtensionController {
   dispose() {
     this.webviewProvider?.dispose();
     this.webviewProvider = undefined;
+    this.contentProviderRegistration?.dispose();
+    this.contentProviderRegistration = undefined;
     this.gitLogService = undefined;
     this.gitDiffService = undefined;
     this.gitBranchService = undefined;
