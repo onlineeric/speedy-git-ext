@@ -36,5 +36,6 @@ export type GitErrorCode =
   | 'NOT_A_REPOSITORY'
   | 'COMMAND_FAILED'
   | 'PARSE_ERROR'
+  | 'VALIDATION_ERROR'
   | 'TIMEOUT'
   | 'UNKNOWN';

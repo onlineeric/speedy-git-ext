@@ -14,6 +14,10 @@ export function ControlBar() {
     rpcClient.refresh();
   };
 
+  const handleFetch = () => {
+    rpcClient.fetch(undefined, true);
+  };
+
   const localBranches = branches.filter((b) => !b.remote);
   const remoteBranches = branches.filter((b) => b.remote);
 
@@ -45,6 +49,14 @@ export function ControlBar() {
           </optgroup>
         )}
       </select>
+
+      <button
+        onClick={handleFetch}
+        className="px-3 py-1 text-sm bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] rounded hover:bg-[var(--vscode-button-secondaryHoverBackground)] focus:outline-none"
+        title="Fetch all remotes"
+      >
+        Fetch
+      </button>
 
       <button
         onClick={handleRefresh}
