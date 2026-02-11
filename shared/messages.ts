@@ -22,16 +22,22 @@ export type ResponseMessage =
 
 export type Message = RequestMessage | ResponseMessage;
 
+/** Compile-time exhaustive maps — adding a union member without updating these causes a TS error. */
+const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
+  getCommits: true, getBranches: true, getCommitDetails: true,
+  checkoutBranch: true, fetch: true, copyToClipboard: true,
+  openDiff: true, openFile: true, refresh: true,
+};
+
+const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
+  commits: true, branches: true, commitDetails: true,
+  error: true, loading: true, success: true,
+};
+
 export function isRequestMessage(msg: Message): msg is RequestMessage {
-  const requestTypes = [
-    'getCommits', 'getBranches', 'getCommitDetails',
-    'checkoutBranch', 'fetch', 'copyToClipboard',
-    'openDiff', 'openFile', 'refresh',
-  ];
-  return requestTypes.includes(msg.type);
+  return msg.type in REQUEST_TYPES;
 }
 
 export function isResponseMessage(msg: Message): msg is ResponseMessage {
-  const responseTypes = ['commits', 'branches', 'commitDetails', 'error', 'loading', 'success'];
-  return responseTypes.includes(msg.type);
+  return msg.type in RESPONSE_TYPES;
 }

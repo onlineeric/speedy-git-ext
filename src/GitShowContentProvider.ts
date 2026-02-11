@@ -13,12 +13,17 @@ export class GitShowContentProvider implements vscode.TextDocumentContentProvide
     const filePath = uri.path.slice(1); // Remove leading '/'
 
     if (!hash || !filePath) {
-      return '';
+      throw new Error(`Invalid git-show URI: missing ${!hash ? 'hash' : 'file path'}`);
     }
 
     const result = await this.gitDiffService.getCommitFile(hash, filePath);
     if (!result.success) {
-      return '';
+      // Return empty for "file not found at revision" — expected in diff views
+      // (e.g., left side of a newly added file, right side of a deleted file)
+      if (result.error.code === 'COMMAND_FAILED') {
+        return '';
+      }
+      throw new Error(`Failed to read ${filePath} at ${hash.slice(0, 7)}: ${result.error.message}`);
     }
 
     return result.value;

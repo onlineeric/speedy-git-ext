@@ -1,5 +1,6 @@
 import { GitExecutor } from './GitExecutor.js';
 import { type Result, ok } from '../../shared/errors.js';
+import { validateRefName } from '../utils/gitValidation.js';
 
 export class GitBranchService {
   private executor: GitExecutor;
@@ -9,6 +10,13 @@ export class GitBranchService {
   }
 
   async checkout(name: string, remote?: string): Promise<Result<string>> {
+    const nameCheck = validateRefName(name);
+    if (!nameCheck.success) return nameCheck;
+    if (remote) {
+      const remoteCheck = validateRefName(remote);
+      if (!remoteCheck.success) return remoteCheck;
+    }
+
     // Always use `git checkout <name>` first.
     // Git automatically creates a local tracking branch if only one remote matches.
     const result = await this.executor.execute({
@@ -39,6 +47,11 @@ export class GitBranchService {
   }
 
   async fetch(remote?: string, prune?: boolean): Promise<Result<string>> {
+    if (remote) {
+      const remoteCheck = validateRefName(remote);
+      if (!remoteCheck.success) return remoteCheck;
+    }
+
     const args = ['fetch'];
 
     if (remote) {

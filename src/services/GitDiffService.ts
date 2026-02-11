@@ -1,6 +1,7 @@
 import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { CommitDetails, FileChange, FileChangeStatus } from '../../shared/types.js';
+import { validateHash, validateFilePath } from '../utils/gitValidation.js';
 
 const NULL_CHAR = '\x00';
 
@@ -16,6 +17,9 @@ export class GitDiffService {
   }
 
   async getCommitDetails(hash: string): Promise<Result<CommitDetails>> {
+    const hashCheck = validateHash(hash);
+    if (!hashCheck.success) return hashCheck;
+
     // Get commit metadata
     const metaResult = await this.executor.execute({
       args: ['show', '--format=' + SHOW_FORMAT, '--no-patch', hash],
@@ -37,9 +41,9 @@ export class GitDiffService {
       return filesResult;
     }
 
-    // Get stats (additions/deletions)
+    // Get stats (additions/deletions) — use -z for correct rename path parsing
     const statsResult = await this.executor.execute({
-      args: ['diff-tree', '--numstat', '-r', '--root', hash],
+      args: ['diff-tree', '--numstat', '-r', '--root', '-z', hash],
       cwd: this.workspacePath,
     });
 
@@ -55,6 +59,9 @@ export class GitDiffService {
   }
 
   async getDiffNameStatus(hash: string): Promise<Result<FileChange[]>> {
+    const hashCheck = validateHash(hash);
+    if (!hashCheck.success) return hashCheck;
+
     // --root handles initial commit (no parent)
     const result = await this.executor.execute({
       args: ['diff-tree', '--no-commit-id', '-r', '--name-status', '--root', '-z', hash],
@@ -70,6 +77,11 @@ export class GitDiffService {
   }
 
   async getCommitFile(hash: string, filePath: string): Promise<Result<string>> {
+    const hashCheck = validateHash(hash);
+    if (!hashCheck.success) return hashCheck;
+    const pathCheck = validateFilePath(filePath);
+    if (!pathCheck.success) return pathCheck;
+
     const result = await this.executor.execute({
       args: ['show', `${hash}:${filePath}`],
       cwd: this.workspacePath,
@@ -83,6 +95,13 @@ export class GitDiffService {
   }
 
   async openExternalDirDiff(hash: string, parentHash?: string): Promise<Result<string>> {
+    const hashCheck = validateHash(hash);
+    if (!hashCheck.success) return hashCheck;
+    if (parentHash) {
+      const parentCheck = validateHash(parentHash);
+      if (!parentCheck.success) return parentCheck;
+    }
+
     const parent = parentHash ?? `${hash}~1`;
     const result = await this.executor.execute({
       args: ['difftool', '--dir-diff', '--no-prompt', parent, hash],
@@ -123,13 +142,12 @@ export class GitDiffService {
     }
     if (unstagedResult.success) {
       const unstaged = parseDiffNameStatus(unstagedResult.value.stdout);
-      // Avoid duplicates with staged - unstaged takes precedence
-      const stagedPaths = new Set(files.map((f) => f.path));
-      for (const f of unstaged) {
-        if (!stagedPaths.has(f.path)) {
-          files.push(f);
-        }
-      }
+      // Unstaged takes precedence over staged (represents current working tree state)
+      const unstagedPaths = new Set(unstaged.map((f) => f.path));
+      const merged = files.filter((f) => !unstagedPaths.has(f.path));
+      merged.push(...unstaged);
+      files.length = 0;
+      files.push(...merged);
     }
     if (untrackedResult.success) {
       const untrackedPaths = untrackedResult.value.stdout
@@ -214,27 +232,55 @@ function mapStatusCode(code: string): FileChangeStatus {
   }
 }
 
+/**
+ * Parses `git diff-tree --numstat -z` output.
+ * With -z the format is: "adds\tdels\0path\0" for normal files,
+ * and "adds\tdels\0oldpath\0newpath\0" for renames/copies.
+ * The first entry is the commit hash line (no tabs), which we skip.
+ */
 function parseNumstat(output: string, files: FileChange[]): { additions: number; deletions: number } {
   let totalAdditions = 0;
   let totalDeletions = 0;
 
-  const lines = output.trim().split('\n').filter(Boolean);
-  const fileMap = new Map(files.map((f) => [f.path, f]));
+  // Build lookup by both path and oldPath for renames
+  const fileMap = new Map<string, FileChange>();
+  for (const f of files) {
+    fileMap.set(f.path, f);
+    if (f.oldPath) {
+      fileMap.set(f.oldPath, f);
+    }
+  }
 
-  for (const line of lines) {
-    const parts = line.split('\t');
-    if (parts.length < 3) continue;
+  const parts = output.split(NULL_CHAR);
+  let i = 0;
+  while (i < parts.length) {
+    const statPart = parts[i];
+    if (!statPart) { i++; continue; }
 
-    const [addStr, delStr, filePath] = parts;
+    const tabParts = statPart.split('\t');
+    if (tabParts.length < 2) { i++; continue; }
+
+    const addStr = tabParts[0];
+    const delStr = tabParts[1];
     // Binary files show '-' for additions/deletions
     const additions = addStr === '-' ? 0 : parseInt(addStr, 10);
     const deletions = delStr === '-' ? 0 : parseInt(delStr, 10);
 
+    // The file path follows as the next null-separated field(s)
+    const filePath = parts[i + 1] ?? '';
+
+    // For renames/copies, check if there's a second path
+    const file = fileMap.get(filePath);
+    if (file && (file.status === 'renamed' || file.status === 'copied')) {
+      // Skip the extra path field for renames/copies
+      i += 3;
+    } else {
+      i += 2;
+    }
+
     totalAdditions += additions;
     totalDeletions += deletions;
 
-    // Attach stats to individual file
-    const file = fileMap.get(filePath);
     if (file) {
       file.additions = additions;
       file.deletions = deletions;
