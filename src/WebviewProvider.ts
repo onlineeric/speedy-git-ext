@@ -1,13 +1,18 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import type { RequestMessage, ResponseMessage } from '../shared/messages.js';
 import type { GitLogService } from './services/GitLogService.js';
+import type { GitDiffService } from './services/GitDiffService.js';
+import type { GitBranchService } from './services/GitBranchService.js';
 
 export class WebviewProvider {
   private panel: vscode.WebviewPanel | undefined;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly gitLogService: GitLogService
+    private readonly gitLogService: GitLogService,
+    private readonly gitDiffService: GitDiffService,
+    private readonly gitBranchService: GitBranchService
   ) {}
 
   async show() {
@@ -32,7 +37,15 @@ export class WebviewProvider {
     this.panel.webview.html = this.getWebviewContent(this.panel.webview);
 
     this.panel.webview.onDidReceiveMessage(
-      (message: RequestMessage) => this.handleMessage(message),
+      (message: RequestMessage) => {
+        this.handleMessage(message).catch((error) => {
+          console.error('[SpeedyGit] Error handling message:', message.type, error);
+          this.postMessage({
+            type: 'error',
+            payload: { error: { message: String(error) } },
+          });
+        });
+      },
       undefined,
       this.context.subscriptions
     );
@@ -71,11 +84,105 @@ export class WebviewProvider {
         }
         break;
       }
+      case 'getCommitDetails': {
+        const result = await this.gitDiffService.getCommitDetails(message.payload.hash);
+        if (result.success) {
+          this.postMessage({ type: 'commitDetails', payload: { details: result.value } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'checkoutBranch': {
+        const result = await this.gitBranchService.checkout(
+          message.payload.name,
+          message.payload.remote
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          // Refresh after checkout
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'fetch': {
+        const result = await this.gitBranchService.fetch(
+          message.payload.remote,
+          message.payload.prune
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'copyToClipboard': {
+        await vscode.env.clipboard.writeText(message.payload.text);
+        this.postMessage({ type: 'success', payload: { message: 'Copied to clipboard' } });
+        break;
+      }
+      case 'openDiff': {
+        await this.openDiffEditor(message.payload.hash, message.payload.filePath, message.payload.parentHash);
+        break;
+      }
+      case 'openFile': {
+        await this.openFileAtRevision(message.payload.hash, message.payload.filePath);
+        break;
+      }
       case 'refresh': {
         await this.sendInitialData();
         break;
       }
     }
+  }
+
+  private async openDiffEditor(hash: string, filePath: string, parentHash?: string) {
+    const workspacePath = this.getWorkspacePath();
+    if (!workspacePath) return;
+
+    // Validate path stays within repo
+    const resolvedPath = path.resolve(workspacePath, filePath);
+    if (!resolvedPath.startsWith(workspacePath)) return;
+
+    const parent = parentHash ?? `${hash}~1`;
+    const leftUri = vscode.Uri.parse(`git-show://${parent}/${filePath}?${parent}`);
+    const rightUri = vscode.Uri.parse(`git-show://${hash}/${filePath}?${hash}`);
+
+    const title = `${filePath} (${hash.slice(0, 7)})`;
+
+    try {
+      await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
+    } catch {
+      // Fallback: open the file directly if diff fails (e.g., newly added file)
+      await this.openFileAtRevision(hash, filePath);
+    }
+  }
+
+  private async openFileAtRevision(hash: string, filePath: string) {
+    const workspacePath = this.getWorkspacePath();
+    if (!workspacePath) return;
+
+    const resolvedPath = path.resolve(workspacePath, filePath);
+    if (!resolvedPath.startsWith(workspacePath)) return;
+
+    const uri = vscode.Uri.parse(`git-show://${hash}/${filePath}?${hash}`);
+
+    try {
+      const doc = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(doc, { preview: true });
+    } catch {
+      // File might not exist at this revision
+      vscode.window.showWarningMessage(`Could not open ${filePath} at revision ${hash.slice(0, 7)}`);
+    }
+  }
+
+  private getWorkspacePath(): string | undefined {
+    const folders = vscode.workspace.workspaceFolders;
+    return folders?.[0]?.uri.fsPath;
   }
 
   private postMessage(message: ResponseMessage) {

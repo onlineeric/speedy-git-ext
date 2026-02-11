@@ -26,29 +26,34 @@ This is a VS Code extension with a **backend** (Node.js, extension host) and **f
 ### Backend (`src/`)
 
 - **extension.ts** → Entry point, registers `speedyGit.showGraph` command
-- **ExtensionController.ts** → Orchestrates WebviewProvider and GitLogService lifecycle
-- **WebviewProvider.ts** → Creates webview panel, handles bidirectional message passing, serves initial data
+- **ExtensionController.ts** → Orchestrates WebviewProvider and all service lifecycles
+- **WebviewProvider.ts** → Creates webview panel, handles bidirectional message passing, serves initial data, opens diff/file editors
 - **services/GitExecutor.ts** → Spawns git processes with timeout (30s), returns `Result<T, GitError>`
 - **services/GitLogService.ts** → Parses git log (null-byte separated format), branches, current branch. Default 500 commits max
+- **services/GitDiffService.ts** → Commit details, file changes (diff-tree), file content at revision, uncommitted changes
+- **services/GitBranchService.ts** → Checkout branches (local/remote), fetch remotes
 - **utils/gitParsers.ts** → Parsers for git log output lines, refs (%D), branch list
 
 Built with **esbuild** → `dist/extension.js` (CommonJS, node18, externalizes `vscode`)
 
 ### Frontend (`webview-ui/src/`)
 
-- **App.tsx** → Root: ControlBar + GraphContainer, loading/error states
+- **App.tsx** → Root: ControlBar + GraphContainer + CommitDetailsPanel, layout switches between bottom/right panel position
 - **GraphContainer.tsx** → Virtual scrolling via `@tanstack/react-virtual` (ROW_HEIGHT: 28px, OVERSCAN: 10)
-- **CommitRow.tsx** → Renders graph cell + commit metadata (memoized)
+- **CommitRow.tsx** → Renders graph cell + commit metadata (memoized), wraps rows in CommitContextMenu, refs in BranchContextMenu
 - **GraphCell.tsx** → SVG git graph rendering (LANE_WIDTH: 16px, 8 cycling colors)
-- **stores/graphStore.ts** → Zustand store: commits, branches, topology, filters, selectedCommit
-- **rpc/rpcClient.ts** → Singleton for webview↔extension communication via `acquireVsCodeApi()`
+- **CommitDetailsPanel.tsx** → Resizable panel (bottom or right) showing commit metadata + file changes with diff links
+- **CommitContextMenu.tsx** → Radix UI context menu: Copy Hash, Copy Short Hash, Copy Message
+- **BranchContextMenu.tsx** → Radix UI context menu: Checkout branch, Copy branch/tag name
+- **stores/graphStore.ts** → Zustand store: commits, branches, topology, filters, selectedCommit, commitDetails, detailsPanelPosition
+- **rpc/rpcClient.ts** → Singleton for webview↔extension communication via `acquireVsCodeApi()`, handles all Phase 1+2 message types
 - **utils/graphTopology.ts** → Core graph algorithm (~470 lines): assigns lanes/colors, computes connections, pre-computes passing lanes for O(1) render lookup
 
 Built with **Vite** + React plugin → `dist/webview/`
 
 ### Shared Types (`shared/`)
 
-- **types.ts** → Commit, Branch, RefInfo, GraphState, GraphFilters
+- **types.ts** → Commit, Branch, RefInfo, GraphState, GraphFilters, CommitDetails, FileChange, DetailsPanelPosition
 - **messages.ts** → RequestMessage/ResponseMessage types with type guards
 - **errors.ts** → Result<T,E> monad, GitError class, GitErrorCode enum
 
