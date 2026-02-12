@@ -11,11 +11,11 @@ export function ControlBar() {
   };
 
   const handleRefresh = () => {
-    rpcClient.refresh();
+    rpcClient.refresh(filters);
   };
 
   const handleFetch = () => {
-    rpcClient.fetch(undefined, true);
+    rpcClient.fetch(undefined, true, filters);
   };
 
   const localBranches = branches.filter((b) => !b.remote);

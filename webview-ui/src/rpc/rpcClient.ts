@@ -77,8 +77,8 @@ class RpcClient {
     this.send({ type: 'checkoutBranch', payload: { name, remote } });
   }
 
-  fetch(remote?: string, prune?: boolean) {
-    this.send({ type: 'fetch', payload: { remote, prune } });
+  fetch(remote?: string, prune?: boolean, filters?: Partial<{ branch?: string; author?: string; maxCount: number }>) {
+    this.send({ type: 'fetch', payload: { remote, prune, filters } });
   }
 
   copyToClipboard(text: string) {
@@ -93,8 +93,8 @@ class RpcClient {
     this.send({ type: 'openFile', payload: { hash, filePath } });
   }
 
-  refresh() {
-    this.send({ type: 'refresh', payload: {} });
+  refresh(filters?: Partial<{ branch?: string; author?: string; maxCount: number }>) {
+    this.send({ type: 'refresh', payload: { filters } });
   }
 }
 

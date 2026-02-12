@@ -58,8 +58,8 @@ export class WebviewProvider {
     await this.sendInitialData();
   }
 
-  private async sendInitialData() {
-    await this.handleMessage({ type: 'getCommits', payload: {} });
+  private async sendInitialData(filters?: Partial<import('../shared/types.js').GraphFilters>) {
+    await this.handleMessage({ type: 'getCommits', payload: { filters } });
     await this.handleMessage({ type: 'getBranches', payload: {} });
   }
 
@@ -116,7 +116,7 @@ export class WebviewProvider {
         );
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
-          await this.sendInitialData();
+          await this.sendInitialData(message.payload.filters);
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }
@@ -136,7 +136,7 @@ export class WebviewProvider {
         break;
       }
       case 'refresh': {
-        await this.sendInitialData();
+        await this.sendInitialData(message.payload.filters);
         break;
       }
     }
