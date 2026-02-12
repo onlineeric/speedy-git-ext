@@ -4,9 +4,10 @@ import { rpcClient } from './rpc/rpcClient';
 import { ControlBar } from './components/ControlBar';
 import { GraphContainer } from './components/GraphContainer';
 import { CommitDetailsPanel } from './components/CommitDetailsPanel';
+import { ToastContainer } from './components/ToastContainer';
 
 export function App() {
-  const { loading, error, successMessage, detailsPanelOpen, detailsPanelPosition } = useGraphStore();
+  const { loading, detailsPanelOpen, detailsPanelPosition } = useGraphStore();
 
   useEffect(() => {
     rpcClient.initialize();
@@ -32,23 +33,6 @@ export function App() {
   return (
     <div className="flex flex-col h-full">
       <ControlBar />
-      {error && (
-        <div className="flex items-center justify-between px-4 py-2 text-[var(--vscode-errorForeground)] bg-[var(--vscode-inputValidation-errorBackground)]">
-          <span>{error}</span>
-          <button
-            className="ml-2 px-1 hover:opacity-70 cursor-pointer text-[var(--vscode-errorForeground)]"
-            onClick={() => useGraphStore.getState().setError(undefined)}
-            title="Dismiss"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-      {successMessage && (
-        <div className="px-4 py-1 text-xs text-[var(--vscode-terminal-ansiGreen)] bg-[var(--vscode-editor-background)]">
-          {successMessage}
-        </div>
-      )}
       <div className={`flex-1 overflow-hidden flex ${isBottom ? 'flex-col' : 'flex-row'}`}>
         <div className="flex-1 overflow-hidden">
           {loading ? (
@@ -64,6 +48,7 @@ export function App() {
         </div>
         {showPanel && <CommitDetailsPanel />}
       </div>
+      <ToastContainer />
     </div>
   );
 }
