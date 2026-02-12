@@ -1,6 +1,5 @@
 import { GitError, type Result, err } from '../../shared/errors.js';
 
-const HEX_HASH_RE = /^[0-9a-f]{4,40}$/i;
 const HASH_WITH_PARENT_RE = /^[0-9a-f]{4,40}(~\d+)?$/i;
 
 /** Validates that a string looks like a git commit hash (hex, 4–40 chars, optional ~N suffix). */

@@ -208,7 +208,7 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
             });
           } else {
             // Find adjacent lane for branch (prefer lane next to current)
-            let branchLane = findAdjacentLane(activeLanes, assignedLane);
+            const branchLane = findAdjacentLane(activeLanes, assignedLane);
             if (branchLane === activeLanes.length) {
               activeLanes.push(null);
             }

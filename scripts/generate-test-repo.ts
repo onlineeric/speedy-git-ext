@@ -396,7 +396,7 @@ class GeneratorContext {
     this.tips.set(target, sourceTip);
   }
 
-  addTag(name: string, branch: string, phase: number): void {
+  addTag(name: string, branch: string, _phase: number): void {
     const tip = this.tips.get(branch);
     if (tip === undefined) {
       throw new Error(`addTag: branch "${branch}" has no tip`);

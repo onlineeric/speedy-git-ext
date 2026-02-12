@@ -64,7 +64,7 @@ export class GitExecutor {
       process.on('close', (code) => {
         const elapsed = Date.now() - startTime;
         if (code !== 0) {
-          this.log.error(`Git command failed: ${cmdString} — stderr: ${stderr.trim()}`);
+          this.log.info(`Git command exited with non-zero code: ${cmdString} — stderr: ${stderr.trim()}`);
           if (stderr.includes('not a git repository')) {
             safeResolve(
               err(
