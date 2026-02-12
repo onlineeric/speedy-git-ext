@@ -82,7 +82,10 @@ class FastImportStreamBuilder {
     from?: number;
     merges?: number[];
     deleteAll?: boolean;
-    fileOps?: Array<{ path: string; blobMark: number }>;
+    fileOps?: Array<
+      | { type: "M"; blobMark: number; path: string }
+      | { type: "D"; path: string }
+    >;
   }): number {
     const mark = opts.mark !== false ? this.nextMark() : 0;
     this.writeln(`commit ${opts.ref}`);
@@ -107,7 +110,11 @@ class FastImportStreamBuilder {
     }
     if (opts.fileOps) {
       for (const op of opts.fileOps) {
-        this.writeln(`M 100644 :${op.blobMark} ${op.path}`);
+        if (op.type === "D") {
+          this.writeln(`D ${op.path}`);
+        } else {
+          this.writeln(`M 100644 :${op.blobMark} ${op.path}`);
+        }
       }
     }
     this.writeln("");
@@ -220,12 +227,543 @@ const FEATURES = [
 ] as const;
 
 // ---------------------------------------------------------------------------
+// Folder structure constants & path generator
+// ---------------------------------------------------------------------------
+
+const BRANCH_DIRS: Record<string, readonly string[]> = {
+  main: ["src/", "src/utils/", "docs/", "config/"],
+  dev: ["src/", "src/services/", "src/utils/", "tests/"],
+  auth: ["src/services/auth/", "src/middleware/", "tests/auth/"],
+  ui: ["src/components/", "src/components/common/", "src/styles/", "tests/ui/"],
+  api: ["src/routes/", "src/services/api/", "src/middleware/", "tests/api/"],
+  dash: [
+    "src/components/dashboard/",
+    "src/services/",
+    "tests/dashboard/",
+  ],
+  login: ["src/services/auth/", "src/middleware/", "tests/"],
+  perf: ["src/utils/", "src/services/", "benchmarks/"],
+  i18n: ["src/i18n/", "src/utils/", "locales/", "tests/i18n/"],
+  orphan: ["docs/", "docs/api/", "docs/guides/"],
+};
+
+const FILE_STEMS = [
+  "index",
+  "utils",
+  "helpers",
+  "constants",
+  "types",
+  "service",
+  "controller",
+  "middleware",
+  "config",
+  "handler",
+  "validator",
+  "transformer",
+  "logger",
+  "factory",
+  "adapter",
+  "provider",
+  "context",
+  "hook",
+  "store",
+  "reducer",
+] as const;
+
+/** Extensions with cumulative weights (out of 100) for weighted random pick */
+const FILE_EXTENSIONS: Array<{ ext: string; cumWeight: number }> = [
+  { ext: ".ts", cumWeight: 40 },
+  { ext: ".js", cumWeight: 55 },
+  { ext: ".css", cumWeight: 65 },
+  { ext: ".html", cumWeight: 70 },
+  { ext: ".json", cumWeight: 80 },
+  { ext: ".md", cumWeight: 90 },
+  { ext: ".test.ts", cumWeight: 100 },
+];
+
+function pickExtension(rng: SeededRandom): string {
+  const r = rng.int(1, 100);
+  for (const { ext, cumWeight } of FILE_EXTENSIONS) {
+    if (r <= cumWeight) return ext;
+  }
+  return ".ts";
+}
+
+function generatePath(
+  branchAbbrev: string,
+  existingFiles: Map<string, number>,
+  rng: SeededRandom,
+): string {
+  const dirs = BRANCH_DIRS[branchAbbrev] ?? BRANCH_DIRS["main"];
+  const dir = rng.pick(dirs);
+  const stem = rng.pick(FILE_STEMS);
+  const ext = pickExtension(rng);
+  let path = `${dir}${stem}${ext}`;
+  let suffix = 2;
+  while (existingFiles.has(path)) {
+    path = `${dir}${stem}${suffix}${ext}`;
+    suffix++;
+  }
+  return path;
+}
+
+// ---------------------------------------------------------------------------
+// BranchFileState — tracks which files exist on each branch
+// ---------------------------------------------------------------------------
+
+class BranchFileState {
+  /** branch → (filePath → contentVersion) */
+  private state = new Map<string, Map<string, number>>();
+
+  getFiles(branch: string): Map<string, number> {
+    let files = this.state.get(branch);
+    if (!files) {
+      files = new Map();
+      this.state.set(branch, files);
+    }
+    return files;
+  }
+
+  addOrModify(branch: string, path: string, version: number): void {
+    this.getFiles(branch).set(path, version);
+  }
+
+  remove(branch: string, path: string): void {
+    this.getFiles(branch).delete(path);
+  }
+
+  fork(source: string, target: string): void {
+    const sourceFiles = this.getFiles(source);
+    this.state.set(target, new Map(sourceFiles));
+  }
+
+  merge(source: string, target: string): void {
+    const sourceFiles = this.getFiles(source);
+    const targetFiles = this.getFiles(target);
+    for (const [path, version] of sourceFiles) {
+      if (!targetFiles.has(path) || targetFiles.get(path)! < version) {
+        targetFiles.set(path, version);
+      }
+    }
+  }
+
+  pickExisting(branch: string, rng: SeededRandom): string | undefined {
+    const files = this.getFiles(branch);
+    if (files.size === 0) return undefined;
+    const keys = Array.from(files.keys());
+    return rng.pick(keys);
+  }
+
+  pickForDeletion(branch: string, rng: SeededRandom): string | undefined {
+    const files = this.getFiles(branch);
+    if (files.size < 5) return undefined;
+    const keys = Array.from(files.keys());
+    return rng.pick(keys);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// FileContentGenerator — generates realistic multi-line file content
+// ---------------------------------------------------------------------------
+
+function generateFileContent(
+  path: string,
+  version: number,
+  rng: SeededRandom,
+): string {
+  const ext = path.includes(".test.ts")
+    ? ".test.ts"
+    : path.substring(path.lastIndexOf("."));
+  const baseName = path
+    .substring(path.lastIndexOf("/") + 1)
+    .replace(/\.\w+$/, "")
+    .replace(/\d+$/, "");
+
+  switch (ext) {
+    case ".ts":
+      return generateTsContent(baseName, version, rng);
+    case ".js":
+      return generateJsContent(baseName, version, rng);
+    case ".css":
+      return generateCssContent(baseName, version, rng);
+    case ".html":
+      return generateHtmlContent(baseName, version, rng);
+    case ".json":
+      return generateJsonContent(baseName, version, rng);
+    case ".md":
+      return generateMdContent(baseName, version, rng);
+    case ".test.ts":
+      return generateTestTsContent(baseName, version, rng);
+    default:
+      return generateTsContent(baseName, version, rng);
+  }
+}
+
+function generateTsContent(
+  name: string,
+  version: number,
+  rng: SeededRandom,
+): string {
+  const className = name.charAt(0).toUpperCase() + name.slice(1);
+  const imports = [
+    `import { Logger } from '../utils/logger';`,
+    `import { Config } from '../config';`,
+  ];
+  if (version > 1) imports.push(`import { validate } from '../utils/helpers';`);
+  if (version > 2)
+    imports.push(`import { EventEmitter } from 'node:events';`);
+
+  const methods = [
+    `  /** Initialize ${name} v${version} */`,
+    `  async initialize(): Promise<void> {`,
+    `    this.logger.info('Initializing ${className}');`,
+    ...(version > 1 ? [`    validate(this.config);`] : []),
+    `    this.isReady = true;`,
+    `  }`,
+    "",
+    `  async process(input: string): Promise<string> {`,
+    `    if (!this.isReady) throw new Error('Not initialized');`,
+    ...(version > 2
+      ? [`    this.emit('processing', input);`]
+      : []),
+    `    const result = input.trim().toLowerCase();`,
+    ...Array.from({ length: rng.int(1, 4) }, (_, i) =>
+      `    const step${i + 1} = result + '_${name}_${version}';`,
+    ),
+    `    return result;`,
+    `  }`,
+  ];
+
+  if (version > 1) {
+    methods.push(
+      "",
+      `  dispose(): void {`,
+      `    this.isReady = false;`,
+      `    this.logger.info('Disposed ${className}');`,
+      `  }`,
+    );
+  }
+
+  return [
+    ...imports,
+    "",
+    `export interface ${className}Options {`,
+    `  timeout: number;`,
+    `  retries: number;`,
+    ...(version > 1 ? [`  verbose: boolean;`] : []),
+    `}`,
+    "",
+    `export class ${className} {`,
+    `  private logger = new Logger('${className}');`,
+    `  private config: ${className}Options;`,
+    `  private isReady = false;`,
+    "",
+    `  constructor(config: ${className}Options) {`,
+    `    this.config = config;`,
+    `  }`,
+    "",
+    ...methods,
+    `}`,
+    "",
+  ].join("\n");
+}
+
+function generateJsContent(
+  name: string,
+  version: number,
+  rng: SeededRandom,
+): string {
+  const lines = [
+    `'use strict';`,
+    "",
+    `const { createLogger } = require('./logger');`,
+  ];
+  if (version > 1) lines.push(`const { validate } = require('./helpers');`);
+  lines.push(
+    "",
+    `const logger = createLogger('${name}');`,
+    "",
+    `function create${name.charAt(0).toUpperCase() + name.slice(1)}(options) {`,
+    `  const state = { initialized: false, version: ${version} };`,
+    "",
+  );
+  for (let i = 0; i < rng.int(2, 5); i++) {
+    lines.push(`  const param${i} = options.param${i} || 'default_${i}';`);
+  }
+  lines.push(
+    "",
+    `  return {`,
+    `    init() { state.initialized = true; logger.info('${name} ready'); },`,
+    `    process(data) {`,
+    `      if (!state.initialized) throw new Error('Not ready');`,
+    ...(version > 1 ? [`      validate(data);`] : []),
+    `      return data;`,
+    `    },`,
+    `  };`,
+    `}`,
+    "",
+    `module.exports = { create${name.charAt(0).toUpperCase() + name.slice(1)} };`,
+    "",
+  );
+  return lines.join("\n");
+}
+
+function generateCssContent(
+  name: string,
+  version: number,
+  rng: SeededRandom,
+): string {
+  const selectors = [
+    `.${name}-container`,
+    `.${name}-header`,
+    `.${name}-content`,
+    `.${name}-footer`,
+  ];
+  const lines: string[] = [`/* ${name} styles v${version} */`, ""];
+  for (const sel of selectors.slice(0, rng.int(2, 4))) {
+    lines.push(`${sel} {`);
+    lines.push(`  display: flex;`);
+    lines.push(`  padding: ${rng.int(4, 24)}px;`);
+    if (version > 1) lines.push(`  gap: ${rng.int(4, 16)}px;`);
+    lines.push(`  color: #${rng.int(100000, 999999)};`);
+    lines.push(`}`, "");
+  }
+  if (version > 1) {
+    lines.push(
+      `@media (max-width: 768px) {`,
+      `  .${name}-container { flex-direction: column; }`,
+      `}`,
+      "",
+    );
+  }
+  return lines.join("\n");
+}
+
+function generateHtmlContent(
+  name: string,
+  version: number,
+  _rng: SeededRandom,
+): string {
+  return [
+    `<!DOCTYPE html>`,
+    `<html lang="en">`,
+    `<head>`,
+    `  <meta charset="UTF-8">`,
+    `  <meta name="viewport" content="width=device-width, initial-scale=1.0">`,
+    `  <title>${name} - v${version}</title>`,
+    `  <link rel="stylesheet" href="./${name}.css">`,
+    `</head>`,
+    `<body>`,
+    `  <div id="app">`,
+    `    <header class="${name}-header">`,
+    `      <h1>${name}</h1>`,
+    `    </header>`,
+    `    <main class="${name}-content">`,
+    ...(version > 1
+      ? [`      <section class="${name}-details">`, `        <p>Version ${version}</p>`, `      </section>`]
+      : [`      <p>Welcome to ${name}</p>`]),
+    `    </main>`,
+    `  </div>`,
+    `  <script src="./${name}.js"></script>`,
+    `</body>`,
+    `</html>`,
+    "",
+  ].join("\n");
+}
+
+function generateJsonContent(
+  name: string,
+  version: number,
+  rng: SeededRandom,
+): string {
+  const config: Record<string, unknown> = {
+    name,
+    version,
+    enabled: true,
+    timeout: rng.int(1000, 30000),
+    retries: rng.int(1, 5),
+  };
+  if (version > 1) {
+    config["logging"] = { level: "info", format: "json" };
+  }
+  if (version > 2) {
+    config["features"] = { caching: true, compression: version > 3 };
+  }
+  return JSON.stringify(config, null, 2) + "\n";
+}
+
+function generateMdContent(
+  name: string,
+  version: number,
+  rng: SeededRandom,
+): string {
+  const lines = [
+    `# ${name.charAt(0).toUpperCase() + name.slice(1)}`,
+    "",
+    `> Version ${version}`,
+    "",
+    `## Overview`,
+    "",
+    `The ${name} module provides core functionality for the application.`,
+    "",
+    `## Usage`,
+    "",
+    "```typescript",
+    `import { ${name} } from './${name}';`,
+    `const instance = new ${name}();`,
+    "```",
+    "",
+  ];
+  if (version > 1) {
+    lines.push(
+      `## API Reference`,
+      "",
+      ...Array.from({ length: rng.int(2, 4) }, (_, i) =>
+        `- \`method${i + 1}()\` — performs operation ${i + 1}`,
+      ),
+      "",
+    );
+  }
+  if (version > 2) {
+    lines.push(`## Changelog`, "", `- v${version}: Updated implementation`, "");
+  }
+  return lines.join("\n");
+}
+
+function generateTestTsContent(
+  name: string,
+  version: number,
+  rng: SeededRandom,
+): string {
+  const className = name.charAt(0).toUpperCase() + name.slice(1);
+  const lines = [
+    `import { describe, it, expect, beforeEach } from 'vitest';`,
+    `import { ${className} } from './${name}';`,
+    "",
+    `describe('${className}', () => {`,
+    `  let instance: ${className};`,
+    "",
+    `  beforeEach(() => {`,
+    `    instance = new ${className}({ timeout: 5000, retries: 3${version > 1 ? ", verbose: false" : ""} });`,
+    `  });`,
+    "",
+    `  it('should initialize correctly', async () => {`,
+    `    await instance.initialize();`,
+    `    expect(instance).toBeDefined();`,
+    `  });`,
+    "",
+  ];
+  for (let i = 0; i < rng.int(1, 3); i++) {
+    lines.push(
+      `  it('should handle case ${i + 1} (v${version})', async () => {`,
+      `    await instance.initialize();`,
+      `    const result = await instance.process('test_${i}');`,
+      `    expect(result).toBeTruthy();`,
+      `  });`,
+      "",
+    );
+  }
+  if (version > 1) {
+    lines.push(
+      `  it('should dispose properly', () => {`,
+      `    instance.dispose();`,
+      `  });`,
+      "",
+    );
+  }
+  lines.push(`});`, "");
+  return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// planCommitOps — decides file operations for a commit
+// ---------------------------------------------------------------------------
+
+type FileOp =
+  | { action: "add"; path: string }
+  | { action: "modify"; path: string }
+  | { action: "delete"; path: string };
+
+function planCommitOps(
+  branchAbbrev: string,
+  fileState: BranchFileState,
+  branch: string,
+  rng: SeededRandom,
+  mode: "normal" | "merge" | "squash" | "orphan",
+): FileOp[] {
+  const existingFiles = fileState.getFiles(branch);
+  const ops: FileOp[] = [];
+
+  if (mode === "orphan") {
+    const count = rng.int(1, 3);
+    for (let i = 0; i < count; i++) {
+      ops.push({ action: "add", path: generatePath(branchAbbrev, existingFiles, rng) });
+    }
+    return ops;
+  }
+
+  if (mode === "squash") {
+    const count = rng.int(1, 3);
+    for (let i = 0; i < count; i++) {
+      ops.push({ action: "add", path: generatePath(branchAbbrev, existingFiles, rng) });
+    }
+    return ops;
+  }
+
+  if (mode === "merge") {
+    ops.push({ action: "add", path: generatePath(branchAbbrev, existingFiles, rng) });
+    const extraMods = rng.int(0, 2);
+    for (let i = 0; i < extraMods; i++) {
+      const existing = fileState.pickExisting(branch, rng);
+      if (existing) ops.push({ action: "modify", path: existing });
+    }
+    return ops;
+  }
+
+  // Normal commit
+  const r = rng.next();
+  let fileCount: number;
+  if (r < 0.3) fileCount = 1;
+  else if (r < 0.6) fileCount = 2;
+  else if (r < 0.85) fileCount = 3;
+  else fileCount = rng.int(4, 5);
+
+  for (let i = 0; i < fileCount; i++) {
+    if (existingFiles.size < 3) {
+      ops.push({ action: "add", path: generatePath(branchAbbrev, existingFiles, rng) });
+      continue;
+    }
+    const actionRoll = rng.next();
+    if (actionRoll < 0.5) {
+      ops.push({ action: "add", path: generatePath(branchAbbrev, existingFiles, rng) });
+    } else if (actionRoll < 0.9) {
+      const existing = fileState.pickExisting(branch, rng);
+      if (existing) {
+        ops.push({ action: "modify", path: existing });
+      } else {
+        ops.push({ action: "add", path: generatePath(branchAbbrev, existingFiles, rng) });
+      }
+    } else {
+      const toDelete = fileState.pickForDeletion(branch, rng);
+      if (toDelete) {
+        ops.push({ action: "delete", path: toDelete });
+      } else {
+        ops.push({ action: "add", path: generatePath(branchAbbrev, existingFiles, rng) });
+      }
+    }
+  }
+
+  return ops;
+}
+
+// ---------------------------------------------------------------------------
 // GeneratorContext — mutable state across phases
 // ---------------------------------------------------------------------------
 
 class GeneratorContext {
   readonly stream: FastImportStreamBuilder;
   readonly rng: SeededRandom;
+  readonly fileState: BranchFileState;
 
   /** branch name → latest commit mark */
   private tips = new Map<string, number>();
@@ -236,6 +774,7 @@ class GeneratorContext {
   constructor() {
     this.stream = new FastImportStreamBuilder();
     this.rng = new SeededRandom(42);
+    this.fileState = new BranchFileState();
   }
 
   private nextTimestamp(): number {
@@ -285,6 +824,43 @@ class GeneratorContext {
     return this.commitCount;
   }
 
+  private buildFileOps(
+    branch: string,
+    mode: "normal" | "merge" | "squash" | "orphan",
+  ): Array<
+    | { type: "M"; blobMark: number; path: string }
+    | { type: "D"; path: string }
+  > {
+    const abbrev = this.branchAbbrev(branch);
+    const ops = planCommitOps(abbrev, this.fileState, branch, this.rng, mode);
+    const fileOps: Array<
+      | { type: "M"; blobMark: number; path: string }
+      | { type: "D"; path: string }
+    > = [];
+
+    for (const op of ops) {
+      if (op.action === "add") {
+        const version = 1;
+        const content = generateFileContent(op.path, version, this.rng);
+        const blobMark = this.stream.blob(content);
+        fileOps.push({ type: "M", blobMark, path: op.path });
+        this.fileState.addOrModify(branch, op.path, version);
+      } else if (op.action === "modify") {
+        const currentVersion = this.fileState.getFiles(branch).get(op.path) ?? 1;
+        const newVersion = currentVersion + 1;
+        const content = generateFileContent(op.path, newVersion, this.rng);
+        const blobMark = this.stream.blob(content);
+        fileOps.push({ type: "M", blobMark, path: op.path });
+        this.fileState.addOrModify(branch, op.path, newVersion);
+      } else {
+        fileOps.push({ type: "D", path: op.path });
+        this.fileState.remove(branch, op.path);
+      }
+    }
+
+    return fileOps;
+  }
+
   addCommit(
     branch: string,
     phase: number,
@@ -299,9 +875,7 @@ class GeneratorContext {
     const msg = message ?? this.generateMessage(prefix);
     const finalMsg = message ? `${prefix}: ${message}` : msg;
 
-    const blobMark = this.stream.blob(
-      `${branch} commit ${seq} at ${ts}\n${finalMsg}\n`,
-    );
+    const fileOps = this.buildFileOps(branch, "normal");
 
     const from = this.tips.get(branch);
     const commitMark = this.stream.commit({
@@ -311,7 +885,7 @@ class GeneratorContext {
       timestamp: ts,
       message: finalMsg,
       from,
-      fileOps: [{ path: `${abbrev}/file-${seq}.txt`, blobMark }],
+      fileOps,
     });
 
     this.tips.set(branch, commitMark);
@@ -333,7 +907,11 @@ class GeneratorContext {
     const prefix = `P${phase}-${abbrev}-${seq}`;
     const finalMsg = `${prefix}: ${message}`;
 
-    const blobMark = this.stream.blob(`Merge into ${target} at ${ts}\n`);
+    for (const src of sources) {
+      this.fileState.merge(src, target);
+    }
+
+    const fileOps = this.buildFileOps(target, "merge");
 
     const from = this.tips.get(target);
     const mergeMarks = sources
@@ -348,7 +926,7 @@ class GeneratorContext {
       message: finalMsg,
       from,
       merges: mergeMarks,
-      fileOps: [{ path: `${abbrev}/merge-${seq}.txt`, blobMark }],
+      fileOps,
     });
 
     this.tips.set(target, commitMark);
@@ -369,7 +947,7 @@ class GeneratorContext {
     const prefix = `P${phase}-${abbrev}-${seq}`;
     const finalMsg = `${prefix}: ${message}`;
 
-    const blobMark = this.stream.blob(`Squash merge into ${target}\n`);
+    const fileOps = this.buildFileOps(target, "squash");
 
     const from = this.tips.get(target);
     const commitMark = this.stream.commit({
@@ -379,7 +957,7 @@ class GeneratorContext {
       timestamp: ts,
       message: finalMsg,
       from,
-      fileOps: [{ path: `${abbrev}/squash-${seq}.txt`, blobMark }],
+      fileOps,
     });
 
     this.tips.set(target, commitMark);
@@ -394,6 +972,7 @@ class GeneratorContext {
     }
     this.stream.reset(`refs/heads/${target}`, sourceTip);
     this.tips.set(target, sourceTip);
+    this.fileState.fork(source, target);
   }
 
   addTag(name: string, branch: string, _phase: number): void {
@@ -424,9 +1003,7 @@ class GeneratorContext {
     const prefix = `P${phase}-${abbrev}-${seq}`;
     const finalMsg = `${prefix}: ${message}`;
 
-    const blobMark = this.stream.blob(
-      `${branch} orphan commit ${seq} at ${ts}\n`,
-    );
+    const fileOps = this.buildFileOps(branch, "orphan");
 
     const commitMark = this.stream.commit({
       ref: `refs/heads/${branch}`,
@@ -435,7 +1012,7 @@ class GeneratorContext {
       timestamp: ts,
       message: finalMsg,
       deleteAll: true,
-      fileOps: [{ path: `${abbrev}/file-${seq}.txt`, blobMark }],
+      fileOps,
     });
 
     this.tips.set(branch, commitMark);
