@@ -1,4 +1,5 @@
 import { spawn } from 'child_process';
+import type { LogOutputChannel } from 'vscode';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
 
 export interface GitExecOptions {
@@ -13,8 +14,13 @@ export interface GitExecResult {
 }
 
 export class GitExecutor {
+  constructor(private readonly log: LogOutputChannel) {}
+
   async execute(options: GitExecOptions): Promise<Result<GitExecResult>> {
     const { args, cwd, timeout = 30000 } = options;
+    const cmdString = `git ${args.join(' ')}`;
+    this.log.debug(`Executing: ${cmdString}`);
+    const startTime = Date.now();
 
     return new Promise((resolve) => {
       const process = spawn('git', args, {
@@ -35,12 +41,13 @@ export class GitExecutor {
 
       const timeoutId = setTimeout(() => {
         process.kill();
+        this.log.error(`Git command timed out after ${timeout}ms: ${cmdString}`);
         safeResolve(
           err(
             new GitError(
               `Git command timed out after ${timeout}ms`,
               'TIMEOUT',
-              `git ${args.join(' ')}`
+              cmdString
             )
           )
         );
@@ -55,14 +62,16 @@ export class GitExecutor {
       });
 
       process.on('close', (code) => {
+        const elapsed = Date.now() - startTime;
         if (code !== 0) {
+          this.log.error(`Git command failed: ${cmdString} — stderr: ${stderr.trim()}`);
           if (stderr.includes('not a git repository')) {
             safeResolve(
               err(
                 new GitError(
                   'Not a git repository',
                   'NOT_A_REPOSITORY',
-                  `git ${args.join(' ')}`,
+                  cmdString,
                   stderr
                 )
               )
@@ -73,24 +82,26 @@ export class GitExecutor {
                 new GitError(
                   `Git command failed with code ${code}`,
                   'COMMAND_FAILED',
-                  `git ${args.join(' ')}`,
+                  cmdString,
                   stderr
                 )
               )
             );
           }
         } else {
+          this.log.debug(`Git command completed in ${elapsed}ms`);
           safeResolve(ok({ stdout, stderr }));
         }
       });
 
       process.on('error', (error) => {
+        this.log.error(`Git command error: ${cmdString} — ${error.message}`);
         safeResolve(
           err(
             new GitError(
               error.message,
               'UNKNOWN',
-              `git ${args.join(' ')}`
+              cmdString
             )
           )
         );

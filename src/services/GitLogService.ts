@@ -1,3 +1,4 @@
+import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { parseCommitLine, parseBranchLine } from '../utils/gitParsers.js';
 import { type Result, ok } from '../../shared/errors.js';
@@ -9,11 +10,15 @@ const LOG_FORMAT = '%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D';
 export class GitLogService {
   private executor: GitExecutor;
 
-  constructor(private readonly workspacePath: string) {
-    this.executor = new GitExecutor();
+  constructor(
+    private readonly workspacePath: string,
+    private readonly log: LogOutputChannel
+  ) {
+    this.executor = new GitExecutor(log);
   }
 
   async getCommits(filters?: Partial<GraphFilters>): Promise<Result<Commit[]>> {
+    this.log.info('Fetching commits');
     const maxCount = filters?.maxCount ?? 500;
     const args = ['log'];
 
@@ -60,6 +65,7 @@ export class GitLogService {
   }
 
   async getBranches(): Promise<Result<Branch[]>> {
+    this.log.info('Fetching branches');
     // Use null byte separators for reliable parsing
     const result = await this.executor.execute({
       args: ['branch', '-a', '--format=%(refname:short)%00%(HEAD)%00%(objectname:short)'],
@@ -84,6 +90,7 @@ export class GitLogService {
   }
 
   async getCurrentBranch(): Promise<Result<string>> {
+    this.log.info('Getting current branch');
     const result = await this.executor.execute({
       args: ['rev-parse', '--abbrev-ref', 'HEAD'],
       cwd: this.workspacePath,

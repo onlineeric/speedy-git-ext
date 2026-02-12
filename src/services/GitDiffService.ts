@@ -1,3 +1,4 @@
+import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { CommitDetails, FileChange, FileChangeStatus } from '../../shared/types.js';
@@ -12,11 +13,15 @@ const SHOW_FORMAT = '%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x0
 export class GitDiffService {
   private executor: GitExecutor;
 
-  constructor(private readonly workspacePath: string) {
-    this.executor = new GitExecutor();
+  constructor(
+    private readonly workspacePath: string,
+    private readonly log: LogOutputChannel
+  ) {
+    this.executor = new GitExecutor(log);
   }
 
   async getCommitDetails(hash: string): Promise<Result<CommitDetails>> {
+    this.log.info(`Getting commit details for ${hash.slice(0, 7)}`);
     const hashCheck = validateHash(hash);
     if (!hashCheck.success) return hashCheck;
 
@@ -117,6 +122,7 @@ export class GitDiffService {
   }
 
   async getUncommittedDetails(): Promise<Result<FileChange[]>> {
+    this.log.info('Getting uncommitted changes');
     // Staged changes
     const stagedResult = await this.executor.execute({
       args: ['diff', '--cached', '--name-status', '-z'],
