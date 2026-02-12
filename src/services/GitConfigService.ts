@@ -1,11 +1,15 @@
+import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { type Result, ok } from '../../shared/errors.js';
 
 export class GitConfigService {
   private executor: GitExecutor;
 
-  constructor(private readonly workspacePath: string) {
-    this.executor = new GitExecutor();
+  constructor(
+    private readonly workspacePath: string,
+    log: LogOutputChannel
+  ) {
+    this.executor = new GitExecutor(log);
   }
 
   async getConfig(key: string, scope?: 'local' | 'global'): Promise<Result<string>> {

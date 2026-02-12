@@ -1,3 +1,4 @@
+import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { CommitDetails, FileChange, FileChangeStatus } from '../../shared/types.js';
@@ -12,11 +13,15 @@ const SHOW_FORMAT = '%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x0
 export class GitDiffService {
   private executor: GitExecutor;
 
-  constructor(private readonly workspacePath: string) {
-    this.executor = new GitExecutor();
+  constructor(
+    private readonly workspacePath: string,
+    private readonly log: LogOutputChannel
+  ) {
+    this.executor = new GitExecutor(log);
   }
 
   async getCommitDetails(hash: string): Promise<Result<CommitDetails>> {
+    this.log.info(`Getting commit details for ${hash.slice(0, 7)}`);
     const hashCheck = validateHash(hash);
     if (!hashCheck.success) return hashCheck;
 
@@ -35,15 +40,21 @@ export class GitDiffService {
       return err(new GitError('Failed to parse commit metadata', 'PARSE_ERROR'));
     }
 
+    const isMerge = meta.parents.length > 1;
+
     // Get file changes with stats
-    const filesResult = await this.getDiffNameStatus(hash);
+    const filesResult = await this.getDiffNameStatus(hash, isMerge);
     if (!filesResult.success) {
       return filesResult;
     }
 
     // Get stats (additions/deletions) — use -z for correct rename path parsing
+    // For merge commits, diff against first parent explicitly
+    const numstatArgs = isMerge
+      ? ['diff-tree', '--numstat', '-r', '-z', `${hash}^1`, hash]
+      : ['diff-tree', '--numstat', '-r', '--root', '-z', hash];
     const statsResult = await this.executor.execute({
-      args: ['diff-tree', '--numstat', '-r', '--root', '-z', hash],
+      args: numstatArgs,
       cwd: this.workspacePath,
     });
 
@@ -58,13 +69,18 @@ export class GitDiffService {
     });
   }
 
-  async getDiffNameStatus(hash: string): Promise<Result<FileChange[]>> {
+  async getDiffNameStatus(hash: string, isMerge = false): Promise<Result<FileChange[]>> {
     const hashCheck = validateHash(hash);
     if (!hashCheck.success) return hashCheck;
 
-    // --root handles initial commit (no parent)
+    // For merge commits, diff against first parent explicitly (hash^1..hash)
+    // because diff-tree's default combined diff shows empty for clean merges.
+    // For non-merge commits, --root handles the initial commit (no parent).
+    const args = isMerge
+      ? ['diff-tree', '--no-commit-id', '-r', '--name-status', '-z', `${hash}^1`, hash]
+      : ['diff-tree', '--no-commit-id', '-r', '--name-status', '--root', '-z', hash];
     const result = await this.executor.execute({
-      args: ['diff-tree', '--no-commit-id', '-r', '--name-status', '--root', '-z', hash],
+      args,
       cwd: this.workspacePath,
     });
 
@@ -117,6 +133,7 @@ export class GitDiffService {
   }
 
   async getUncommittedDetails(): Promise<Result<FileChange[]>> {
+    this.log.info('Getting uncommitted changes');
     // Staged changes
     const stagedResult = await this.executor.execute({
       args: ['diff', '--cached', '--name-status', '-z'],

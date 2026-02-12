@@ -4,7 +4,12 @@ import { ExtensionController } from './ExtensionController.js';
 let controller: ExtensionController | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
-  controller = new ExtensionController(context);
+  const log = vscode.window.createOutputChannel('Speedy Git', { log: true });
+  context.subscriptions.push(log);
+
+  log.info('Extension activated');
+
+  controller = new ExtensionController(context, log);
 
   const showGraphCommand = vscode.commands.registerCommand('speedyGit.showGraph', () => {
     controller?.showGraph();

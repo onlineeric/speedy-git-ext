@@ -12,7 +12,10 @@ export class ExtensionController {
   private gitBranchService: GitBranchService | undefined;
   private contentProviderRegistration: vscode.Disposable | undefined;
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly log: vscode.LogOutputChannel
+  ) {}
 
   async showGraph() {
     const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -22,15 +25,16 @@ export class ExtensionController {
     }
 
     const workspacePath = workspaceFolders[0].uri.fsPath;
+    this.log.info('Showing git graph');
 
     if (!this.gitLogService) {
-      this.gitLogService = new GitLogService(workspacePath);
+      this.gitLogService = new GitLogService(workspacePath, this.log);
     }
     if (!this.gitDiffService) {
-      this.gitDiffService = new GitDiffService(workspacePath);
+      this.gitDiffService = new GitDiffService(workspacePath, this.log);
     }
     if (!this.gitBranchService) {
-      this.gitBranchService = new GitBranchService(workspacePath);
+      this.gitBranchService = new GitBranchService(workspacePath, this.log);
     }
 
     // Register git-show:// content provider for diff view
@@ -48,7 +52,8 @@ export class ExtensionController {
         this.context,
         this.gitLogService,
         this.gitDiffService,
-        this.gitBranchService
+        this.gitBranchService,
+        this.log
       );
     }
 
