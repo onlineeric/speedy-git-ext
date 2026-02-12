@@ -12,7 +12,8 @@ export class WebviewProvider {
     private readonly context: vscode.ExtensionContext,
     private readonly gitLogService: GitLogService,
     private readonly gitDiffService: GitDiffService,
-    private readonly gitBranchService: GitBranchService
+    private readonly gitBranchService: GitBranchService,
+    private readonly log: vscode.LogOutputChannel
   ) {}
 
   async show() {
@@ -39,7 +40,7 @@ export class WebviewProvider {
     this.panel.webview.onDidReceiveMessage(
       (message: RequestMessage) => {
         this.handleMessage(message).catch((error) => {
-          console.error('[SpeedyGit] Error handling message:', message.type, error);
+          this.log.error(`Error handling message: ${message.type} — ${error}`);
           this.postMessage({
             type: 'error',
             payload: { error: { message: String(error) } },
@@ -57,12 +58,13 @@ export class WebviewProvider {
     await this.sendInitialData();
   }
 
-  private async sendInitialData() {
-    await this.handleMessage({ type: 'getCommits', payload: {} });
+  private async sendInitialData(filters?: Partial<import('../shared/types.js').GraphFilters>) {
+    await this.handleMessage({ type: 'getCommits', payload: { filters } });
     await this.handleMessage({ type: 'getBranches', payload: {} });
   }
 
   private async handleMessage(message: RequestMessage) {
+    this.log.debug(`Received message: ${message.type}`);
     switch (message.type) {
       case 'getCommits': {
         this.postMessage({ type: 'loading', payload: { loading: true } });
@@ -114,7 +116,7 @@ export class WebviewProvider {
         );
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
-          await this.sendInitialData();
+          await this.sendInitialData(message.payload.filters);
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }
@@ -134,7 +136,7 @@ export class WebviewProvider {
         break;
       }
       case 'refresh': {
-        await this.sendInitialData();
+        await this.sendInitialData(message.payload.filters);
         break;
       }
     }
@@ -157,7 +159,7 @@ export class WebviewProvider {
     try {
       await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
     } catch {
-      // Fallback: open the file directly if diff fails (e.g., newly added file)
+      this.log.warn(`Diff editor failed, falling back to file view: ${filePath}`);
       await this.openFileAtRevision(hash, filePath);
     }
   }

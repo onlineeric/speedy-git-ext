@@ -1,3 +1,4 @@
+import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { type Result, ok } from '../../shared/errors.js';
 import { validateRefName } from '../utils/gitValidation.js';
@@ -5,11 +6,15 @@ import { validateRefName } from '../utils/gitValidation.js';
 export class GitBranchService {
   private executor: GitExecutor;
 
-  constructor(private readonly workspacePath: string) {
-    this.executor = new GitExecutor();
+  constructor(
+    private readonly workspacePath: string,
+    private readonly log: LogOutputChannel
+  ) {
+    this.executor = new GitExecutor(log);
   }
 
   async checkout(name: string, remote?: string): Promise<Result<string>> {
+    this.log.info(`Checkout branch: ${name}${remote ? ` (remote: ${remote})` : ''}`);
     const nameCheck = validateRefName(name);
     if (!nameCheck.success) return nameCheck;
     if (remote) {
@@ -47,6 +52,7 @@ export class GitBranchService {
   }
 
   async fetch(remote?: string, prune?: boolean): Promise<Result<string>> {
+    this.log.info(`Fetch remote: ${remote ?? 'all'}${prune ? ' (prune)' : ''}`);
     if (remote) {
       const remoteCheck = validateRefName(remote);
       if (!remoteCheck.success) return remoteCheck;

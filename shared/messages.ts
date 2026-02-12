@@ -6,11 +6,11 @@ export type RequestMessage =
   | { type: 'getBranches'; payload: Record<string, never> }
   | { type: 'getCommitDetails'; payload: { hash: string } }
   | { type: 'checkoutBranch'; payload: { name: string; remote?: string } }
-  | { type: 'fetch'; payload: { remote?: string; prune?: boolean } }
+  | { type: 'fetch'; payload: { remote?: string; prune?: boolean; filters?: Partial<GraphFilters> } }
   | { type: 'copyToClipboard'; payload: { text: string } }
   | { type: 'openDiff'; payload: { hash: string; filePath: string; parentHash?: string } }
   | { type: 'openFile'; payload: { hash: string; filePath: string } }
-  | { type: 'refresh'; payload: Record<string, never> };
+  | { type: 'refresh'; payload: { filters?: Partial<GraphFilters> } };
 
 export type ResponseMessage =
   | { type: 'commits'; payload: { commits: Commit[] } }

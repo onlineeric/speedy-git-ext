@@ -8,8 +8,16 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["SCM Providers", "Visualization"],
-  "keywords": ["git", "graph", "visualization", "scm"],
+  "categories": [
+    "SCM Providers",
+    "Visualization"
+  ],
+  "keywords": [
+    "git",
+    "graph",
+    "visualization",
+    "scm"
+  ],
   "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
@@ -39,17 +47,21 @@
     "watch": "concurrently \"pnpm run watch:ext\" \"pnpm run watch:webview\"",
     "watch:ext": "node esbuild.config.mjs --watch",
     "watch:webview": "cd webview-ui && pnpm run dev",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "generate-test-repo": "tsx scripts/generate-test-repo.ts"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "concurrently": "^8.2.2",
     "esbuild": "^0.20.0",
+    "eslint": "^9.39.2",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "tsx": "^4.19.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^8.55.0"
   },
   "packageManager": "pnpm@10.28.2"
 }
