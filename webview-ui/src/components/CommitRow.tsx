@@ -4,6 +4,7 @@ import type { GraphTopology } from '../utils/graphTopology';
 import { GraphCell } from './GraphCell';
 import { CommitContextMenu } from './CommitContextMenu';
 import { BranchContextMenu } from './BranchContextMenu';
+import { StashContextMenu } from './StashContextMenu';
 import { formatRelativeDate } from '../utils/formatDate';
 
 interface CommitRowProps {
@@ -29,67 +30,85 @@ export const CommitRow = memo(function CommitRow({
   onClick,
   style,
 }: CommitRowProps) {
+  const isStash = commit.refs.some((r) => r.type === 'stash');
+  const stashIndex = isStash ? parseStashIndex(commit.refs) : -1;
+
   const bgClass = isSelected
     ? 'bg-[var(--vscode-list-activeSelectionBackground)]'
     : index % 2 === 0
     ? 'bg-transparent'
     : 'bg-[var(--vscode-list-hoverBackground)]/30';
 
+  const row = (
+    <div
+      className={`flex items-center gap-2 px-2 cursor-pointer hover:bg-[var(--vscode-list-hoverBackground)] ${bgClass}`}
+      style={style}
+      onClick={onClick}
+    >
+      <GraphCell
+        commit={commit}
+        commits={commits}
+        index={index}
+        topology={topology}
+        width={graphWidth}
+        height={rowHeight}
+      />
+
+      <span
+        className="w-16 flex-shrink-0 font-mono text-xs text-[var(--vscode-textLink-foreground)]"
+        title={commit.hash}
+      >
+        {commit.abbreviatedHash}
+      </span>
+
+      {commit.refs.length > 0 && (
+        <div className="flex gap-1 flex-shrink-0">
+          {commit.refs.slice(0, 3).map((ref) => (
+            <BranchContextMenu key={`${ref.type}-${ref.name}`} refInfo={ref} commitHash={commit.hash}>
+              <span
+                className={`px-1.5 py-0.5 text-xs rounded ${getRefStyle(ref.type)}`}
+                title={ref.remote ? `${ref.remote}/${ref.name}` : ref.name}
+              >
+                {ref.remote ? `${ref.remote}/${ref.name}` : ref.name}
+              </span>
+            </BranchContextMenu>
+          ))}
+          {commit.refs.length > 3 && (
+            <span className="px-1 text-xs text-[var(--vscode-descriptionForeground)]">
+              +{commit.refs.length - 3}
+            </span>
+          )}
+        </div>
+      )}
+
+      <span
+        className={`flex-1 truncate text-sm ${isStash ? 'italic text-[var(--vscode-descriptionForeground)]' : ''}`}
+        title={commit.subject}
+      >
+        {commit.subject}
+      </span>
+
+      <span className="w-28 flex-shrink-0 text-xs text-[var(--vscode-descriptionForeground)] truncate" title={commit.author}>
+        {commit.author}
+      </span>
+
+      <span className="w-24 flex-shrink-0 text-xs text-[var(--vscode-descriptionForeground)] text-right">
+        {formatRelativeDate(commit.authorDate)}
+      </span>
+    </div>
+  );
+
+  if (isStash) {
+    return (
+      <StashContextMenu commit={commit} stashIndex={stashIndex}>
+        {row}
+      </StashContextMenu>
+    );
+  }
+
   return (
     <CommitContextMenu commit={commit}>
-      <div
-        className={`flex items-center gap-2 px-2 cursor-pointer hover:bg-[var(--vscode-list-hoverBackground)] ${bgClass}`}
-        style={style}
-        onClick={onClick}
-      >
-        <GraphCell
-          commit={commit}
-          commits={commits}
-          index={index}
-          topology={topology}
-          width={graphWidth}
-          height={rowHeight}
-        />
-
-        <span
-          className="w-16 flex-shrink-0 font-mono text-xs text-[var(--vscode-textLink-foreground)]"
-          title={commit.hash}
-        >
-          {commit.abbreviatedHash}
-        </span>
-
-        {commit.refs.length > 0 && (
-          <div className="flex gap-1 flex-shrink-0">
-            {commit.refs.slice(0, 3).map((ref) => (
-              <BranchContextMenu key={`${ref.type}-${ref.name}`} refInfo={ref}>
-                <span
-                  className={`px-1.5 py-0.5 text-xs rounded ${getRefStyle(ref.type)}`}
-                  title={ref.remote ? `${ref.remote}/${ref.name}` : ref.name}
-                >
-                  {ref.remote ? `${ref.remote}/${ref.name}` : ref.name}
-                </span>
-              </BranchContextMenu>
-            ))}
-            {commit.refs.length > 3 && (
-              <span className="px-1 text-xs text-[var(--vscode-descriptionForeground)]">
-                +{commit.refs.length - 3}
-              </span>
-            )}
-          </div>
-        )}
-
-        <span className="flex-1 truncate text-sm" title={commit.subject}>
-          {commit.subject}
-        </span>
-
-        <span className="w-28 flex-shrink-0 text-xs text-[var(--vscode-descriptionForeground)] truncate" title={commit.author}>
-          {commit.author}
-        </span>
-
-        <span className="w-24 flex-shrink-0 text-xs text-[var(--vscode-descriptionForeground)] text-right">
-          {formatRelativeDate(commit.authorDate)}
-        </span>
-      </div>
+      {row}
     </CommitContextMenu>
   );
 });
@@ -104,7 +123,19 @@ function getRefStyle(type: string): string {
       return 'bg-blue-700/60 text-blue-100';
     case 'tag':
       return 'bg-yellow-700/60 text-yellow-100';
+    case 'stash':
+      return 'bg-purple-700/60 text-purple-100';
     default:
       return 'bg-gray-700/60 text-gray-100';
   }
+}
+
+function parseStashIndex(refs: Commit['refs']): number {
+  for (const ref of refs) {
+    if (ref.type === 'stash') {
+      const match = ref.name.match(/\{(\d+)\}/);
+      if (match) return parseInt(match[1], 10);
+    }
+  }
+  return 0;
 }

@@ -2,7 +2,7 @@ import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 
 export function ControlBar() {
-  const { branches, filters, setFilters, commits } = useGraphStore();
+  const { branches, filters, setFilters, mergedCommits, loading } = useGraphStore();
 
   const handleBranchChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const branch = e.target.value || undefined;
@@ -18,8 +18,19 @@ export function ControlBar() {
     rpcClient.fetch(undefined, true, filters);
   };
 
+  const handlePull = () => {
+    rpcClient.pull();
+  };
+
+  const handlePush = () => {
+    rpcClient.push();
+  };
+
   const localBranches = branches.filter((b) => !b.remote);
   const remoteBranches = branches.filter((b) => b.remote);
+
+  const buttonSecondaryClass =
+    'px-3 py-1 text-sm bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] rounded hover:bg-[var(--vscode-button-secondaryHoverBackground)] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed';
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)]">
@@ -52,10 +63,29 @@ export function ControlBar() {
 
       <button
         onClick={handleFetch}
-        className="px-3 py-1 text-sm bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] rounded hover:bg-[var(--vscode-button-secondaryHoverBackground)] focus:outline-none"
+        disabled={loading}
+        className={buttonSecondaryClass}
         title="Fetch all remotes"
       >
         Fetch
+      </button>
+
+      <button
+        onClick={handlePull}
+        disabled={loading}
+        className={buttonSecondaryClass}
+        title="Pull from remote"
+      >
+        Pull
+      </button>
+
+      <button
+        onClick={handlePush}
+        disabled={loading}
+        className={buttonSecondaryClass}
+        title="Push to remote"
+      >
+        Push
       </button>
 
       <button
@@ -67,7 +97,7 @@ export function ControlBar() {
       </button>
 
       <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)]">
-        {commits.length} commits
+        {mergedCommits.length} commits
       </span>
     </div>
   );

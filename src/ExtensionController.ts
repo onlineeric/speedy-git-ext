@@ -3,6 +3,9 @@ import { WebviewProvider } from './WebviewProvider.js';
 import { GitLogService } from './services/GitLogService.js';
 import { GitDiffService } from './services/GitDiffService.js';
 import { GitBranchService } from './services/GitBranchService.js';
+import { GitRemoteService } from './services/GitRemoteService.js';
+import { GitTagService } from './services/GitTagService.js';
+import { GitStashService } from './services/GitStashService.js';
 import { GitShowContentProvider } from './GitShowContentProvider.js';
 
 export class ExtensionController {
@@ -10,6 +13,9 @@ export class ExtensionController {
   private gitLogService: GitLogService | undefined;
   private gitDiffService: GitDiffService | undefined;
   private gitBranchService: GitBranchService | undefined;
+  private gitRemoteService: GitRemoteService | undefined;
+  private gitTagService: GitTagService | undefined;
+  private gitStashService: GitStashService | undefined;
   private contentProviderRegistration: vscode.Disposable | undefined;
 
   constructor(
@@ -36,6 +42,15 @@ export class ExtensionController {
     if (!this.gitBranchService) {
       this.gitBranchService = new GitBranchService(workspacePath, this.log);
     }
+    if (!this.gitRemoteService) {
+      this.gitRemoteService = new GitRemoteService(workspacePath, this.log);
+    }
+    if (!this.gitTagService) {
+      this.gitTagService = new GitTagService(workspacePath, this.log);
+    }
+    if (!this.gitStashService) {
+      this.gitStashService = new GitStashService(workspacePath, this.log);
+    }
 
     // Register git-show:// content provider for diff view
     if (!this.contentProviderRegistration) {
@@ -53,6 +68,9 @@ export class ExtensionController {
         this.gitLogService,
         this.gitDiffService,
         this.gitBranchService,
+        this.gitRemoteService,
+        this.gitTagService,
+        this.gitStashService,
         this.log
       );
     }
@@ -68,5 +86,8 @@ export class ExtensionController {
     this.gitLogService = undefined;
     this.gitDiffService = undefined;
     this.gitBranchService = undefined;
+    this.gitRemoteService = undefined;
+    this.gitTagService = undefined;
+    this.gitStashService = undefined;
   }
 }

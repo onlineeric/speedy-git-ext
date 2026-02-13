@@ -4,6 +4,9 @@ import type { RequestMessage, ResponseMessage } from '../shared/messages.js';
 import type { GitLogService } from './services/GitLogService.js';
 import type { GitDiffService } from './services/GitDiffService.js';
 import type { GitBranchService } from './services/GitBranchService.js';
+import type { GitRemoteService } from './services/GitRemoteService.js';
+import type { GitTagService } from './services/GitTagService.js';
+import type { GitStashService } from './services/GitStashService.js';
 
 export class WebviewProvider {
   private panel: vscode.WebviewPanel | undefined;
@@ -13,6 +16,9 @@ export class WebviewProvider {
     private readonly gitLogService: GitLogService,
     private readonly gitDiffService: GitDiffService,
     private readonly gitBranchService: GitBranchService,
+    private readonly gitRemoteService: GitRemoteService,
+    private readonly gitTagService: GitTagService,
+    private readonly gitStashService: GitStashService,
     private readonly log: vscode.LogOutputChannel
   ) {}
 
@@ -61,6 +67,7 @@ export class WebviewProvider {
   private async sendInitialData(filters?: Partial<import('../shared/types.js').GraphFilters>) {
     await this.handleMessage({ type: 'getCommits', payload: { filters } });
     await this.handleMessage({ type: 'getBranches', payload: {} });
+    await this.handleMessage({ type: 'getStashes', payload: {} });
   }
 
   private async handleMessage(message: RequestMessage) {
@@ -102,7 +109,6 @@ export class WebviewProvider {
         );
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
-          // Refresh after checkout
           await this.sendInitialData();
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
@@ -137,6 +143,224 @@ export class WebviewProvider {
       }
       case 'refresh': {
         await this.sendInitialData(message.payload.filters);
+        break;
+      }
+      // Branch ops
+      case 'createBranch': {
+        const result = await this.gitBranchService.createBranch(
+          message.payload.name,
+          message.payload.startPoint
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'renameBranch': {
+        const result = await this.gitBranchService.renameBranch(
+          message.payload.oldName,
+          message.payload.newName
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'deleteBranch': {
+        const result = await this.gitBranchService.deleteBranch(
+          message.payload.name,
+          message.payload.force
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'deleteRemoteBranch': {
+        const result = await this.gitBranchService.deleteRemoteBranch(
+          message.payload.remote,
+          message.payload.name
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'mergeBranch': {
+        const result = await this.gitBranchService.merge(
+          message.payload.branch,
+          message.payload.noFastForward,
+          message.payload.squash
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      // Remote ops
+      case 'push': {
+        const result = await this.gitRemoteService.push(
+          message.payload.remote,
+          message.payload.branch,
+          message.payload.setUpstream,
+          message.payload.force
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'pull': {
+        const result = await this.gitRemoteService.pull(
+          message.payload.remote,
+          message.payload.branch,
+          message.payload.rebase
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'getRemotes': {
+        const result = await this.gitRemoteService.getRemotes();
+        if (result.success) {
+          this.postMessage({ type: 'remotes', payload: { remotes: result.value } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'addRemote': {
+        const result = await this.gitRemoteService.addRemote(
+          message.payload.name,
+          message.payload.url
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'removeRemote': {
+        const result = await this.gitRemoteService.removeRemote(message.payload.name);
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'editRemote': {
+        const result = await this.gitRemoteService.editRemote(
+          message.payload.name,
+          message.payload.newUrl
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      // Tag ops
+      case 'createTag': {
+        const result = await this.gitTagService.createTag(
+          message.payload.name,
+          message.payload.hash,
+          message.payload.message
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'deleteTag': {
+        const result = await this.gitTagService.deleteTag(message.payload.name);
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'pushTag': {
+        const result = await this.gitTagService.pushTag(
+          message.payload.name,
+          message.payload.remote
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      // Stash ops
+      case 'getStashes': {
+        const result = await this.gitStashService.getStashes();
+        if (result.success) {
+          this.postMessage({ type: 'stashes', payload: { stashes: result.value } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'applyStash': {
+        const result = await this.gitStashService.applyStash(message.payload.index);
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'popStash': {
+        const result = await this.gitStashService.popStash(message.payload.index);
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'dropStash': {
+        const result = await this.gitStashService.dropStash(message.payload.index);
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
         break;
       }
     }

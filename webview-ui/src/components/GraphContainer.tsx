@@ -13,7 +13,7 @@ interface GraphContainerProps {
 }
 
 export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContainerProps) {
-  const { commits, topology } = useGraphStore();
+  const { mergedCommits: commits, topology } = useGraphStore();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
