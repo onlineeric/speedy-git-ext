@@ -33,7 +33,8 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
     rpcClient.copyToClipboard(displayName);
   };
 
-  const isLocalBranch = refInfo.type === 'branch' || refInfo.type === 'head';
+  const isCurrentBranch = refInfo.type === 'head';
+  const isLocalBranch = refInfo.type === 'branch' || isCurrentBranch;
   const isRemoteBranch = refInfo.type === 'remote';
   const isBranch = isLocalBranch || isRemoteBranch;
   const isTag = refInfo.type === 'tag';
@@ -45,7 +46,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
         <ContextMenu.Portal>
           <ContextMenu.Content className="min-w-[160px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
-            {isBranch && (
+            {isBranch && !isCurrentBranch && (
               <ContextMenu.Item className={menuItemClass} onSelect={handleCheckout}>
                 Checkout {refInfo.name}
               </ContextMenu.Item>
@@ -62,10 +63,14 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                 <ContextMenu.Item className={menuItemClass} onSelect={() => rpcClient.push(undefined, refInfo.name)}>
                   Push Branch
                 </ContextMenu.Item>
-                <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
-                <ContextMenu.Item className={dangerItemClass} onSelect={() => setDeleteConfirmOpen(true)}>
-                  Delete Branch
-                </ContextMenu.Item>
+                {!isCurrentBranch && (
+                  <>
+                    <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                    <ContextMenu.Item className={dangerItemClass} onSelect={() => setDeleteConfirmOpen(true)}>
+                      Delete Branch
+                    </ContextMenu.Item>
+                  </>
+                )}
               </>
             )}
 

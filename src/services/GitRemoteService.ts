@@ -28,7 +28,10 @@ export class GitRemoteService {
     const args = ['push'];
     if (setUpstream) args.push('-u');
     if (force) args.push('--force-with-lease');
-    if (remote) args.push(remote);
+    // When a branch is specified, a remote is required (git treats the first
+    // positional arg as the remote). Default to 'origin' if not provided.
+    const effectiveRemote = remote ?? (branch ? 'origin' : undefined);
+    if (effectiveRemote) args.push(effectiveRemote);
     if (branch) args.push(branch);
 
     const result = await this.executor.execute({
@@ -53,7 +56,8 @@ export class GitRemoteService {
 
     const args = ['pull'];
     if (rebase) args.push('--rebase');
-    if (remote) args.push(remote);
+    const effectiveRemote = remote ?? (branch ? 'origin' : undefined);
+    if (effectiveRemote) args.push(effectiveRemote);
     if (branch) args.push(branch);
 
     const result = await this.executor.execute({
