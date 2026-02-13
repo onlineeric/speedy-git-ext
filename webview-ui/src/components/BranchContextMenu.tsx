@@ -54,9 +54,11 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
 
             {isLocalBranch && (
               <>
-                <ContextMenu.Item className={menuItemClass} onSelect={() => setMergeConfirmOpen(true)}>
-                  Merge into Current Branch
-                </ContextMenu.Item>
+                {!isCurrentBranch && (
+                  <ContextMenu.Item className={menuItemClass} onSelect={() => setMergeConfirmOpen(true)}>
+                    Merge into Current Branch
+                  </ContextMenu.Item>
+                )}
                 <ContextMenu.Item className={menuItemClass} onSelect={() => setRenameOpen(true)}>
                   Rename Branch...
                 </ContextMenu.Item>
