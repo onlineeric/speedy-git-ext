@@ -18,14 +18,6 @@ export function ControlBar() {
     rpcClient.fetch(undefined, true, filters);
   };
 
-  const handlePull = () => {
-    rpcClient.pull();
-  };
-
-  const handlePush = () => {
-    rpcClient.push();
-  };
-
   const localBranches = branches.filter((b) => !b.remote);
   const remoteBranches = branches.filter((b) => b.remote);
 
@@ -68,24 +60,6 @@ export function ControlBar() {
         title="Fetch all remotes"
       >
         Fetch
-      </button>
-
-      <button
-        onClick={handlePull}
-        disabled={loading}
-        className={buttonSecondaryClass}
-        title="Pull from remote"
-      >
-        Pull
-      </button>
-
-      <button
-        onClick={handlePush}
-        disabled={loading}
-        className={buttonSecondaryClass}
-        title="Push to remote"
-      >
-        Push
       </button>
 
       <button
