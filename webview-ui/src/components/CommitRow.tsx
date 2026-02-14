@@ -5,6 +5,8 @@ import { GraphCell } from './GraphCell';
 import { CommitContextMenu } from './CommitContextMenu';
 import { BranchContextMenu } from './BranchContextMenu';
 import { StashContextMenu } from './StashContextMenu';
+import { OverflowRefsBadge } from './OverflowRefsBadge';
+import { getRefStyle } from '../utils/refStyle';
 import { formatRelativeDate } from '../utils/formatDate';
 
 interface CommitRowProps {
@@ -14,6 +16,7 @@ interface CommitRowProps {
   topology: GraphTopology;
   graphWidth: number;
   rowHeight: number;
+  maxVisibleRefs?: number;
   isSelected: boolean;
   onClick: () => void;
   style: React.CSSProperties;
@@ -26,6 +29,7 @@ export const CommitRow = memo(function CommitRow({
   topology,
   graphWidth,
   rowHeight,
+  maxVisibleRefs = 3,
   isSelected,
   onClick,
   style,
@@ -63,7 +67,7 @@ export const CommitRow = memo(function CommitRow({
 
       {commit.refs.length > 0 && (
         <div className="flex gap-1 flex-shrink-0">
-          {commit.refs.slice(0, 3).map((ref) => (
+          {commit.refs.slice(0, maxVisibleRefs).map((ref) => (
             <BranchContextMenu key={`${ref.type}-${ref.name}`} refInfo={ref} commitHash={commit.hash}>
               <span
                 className={`px-1.5 py-0.5 text-xs rounded ${getRefStyle(ref.type)}`}
@@ -73,11 +77,10 @@ export const CommitRow = memo(function CommitRow({
               </span>
             </BranchContextMenu>
           ))}
-          {commit.refs.length > 3 && (
-            <span className="px-1 text-xs text-[var(--vscode-descriptionForeground)]">
-              +{commit.refs.length - 3}
-            </span>
-          )}
+          <OverflowRefsBadge
+            hiddenRefs={commit.refs.slice(maxVisibleRefs)}
+            commitHash={commit.hash}
+          />
         </div>
       )}
 
@@ -112,23 +115,6 @@ export const CommitRow = memo(function CommitRow({
     </CommitContextMenu>
   );
 });
-
-function getRefStyle(type: string): string {
-  switch (type) {
-    case 'head':
-      return 'bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]';
-    case 'branch':
-      return 'bg-green-700/60 text-green-100';
-    case 'remote':
-      return 'bg-blue-700/60 text-blue-100';
-    case 'tag':
-      return 'bg-yellow-700/60 text-yellow-100';
-    case 'stash':
-      return 'bg-purple-700/60 text-purple-100';
-    default:
-      return 'bg-gray-700/60 text-gray-100';
-  }
-}
 
 function parseStashIndex(refs: Commit['refs']): number {
   for (const ref of refs) {

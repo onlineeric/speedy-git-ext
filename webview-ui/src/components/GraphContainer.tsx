@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useGraphStore } from '../stores/graphStore';
 import { CommitRow } from './CommitRow';
@@ -12,9 +12,28 @@ interface GraphContainerProps {
   onSelectCommit: (hash: string | undefined) => void;
 }
 
+function computeMaxVisibleRefs(width: number): number {
+  if (width < 700) return 2;
+  if (width < 900) return 3;
+  if (width < 1200) return 5;
+  return 7;
+}
+
 export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContainerProps) {
-  const { mergedCommits: commits, topology } = useGraphStore();
+  const { mergedCommits: commits, topology, maxVisibleRefs, setMaxVisibleRefs } = useGraphStore();
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? 0;
+      setMaxVisibleRefs(computeMaxVisibleRefs(width));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [setMaxVisibleRefs]);
 
   const virtualizer = useVirtualizer({
     count: commits.length,
@@ -58,6 +77,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
               topology={topology}
               graphWidth={graphWidth}
               rowHeight={ROW_HEIGHT}
+              maxVisibleRefs={maxVisibleRefs}
               isSelected={isSelected}
               onClick={() => onSelectCommit(commit.hash)}
               style={{

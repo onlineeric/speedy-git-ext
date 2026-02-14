@@ -17,6 +17,7 @@ interface GraphStore {
   remotes: RemoteInfo[];
   stashes: StashEntry[];
   mergedCommits: Commit[];
+  maxVisibleRefs: number;
   setCommits: (commits: Commit[]) => void;
   setBranches: (branches: Branch[]) => void;
   setSelectedCommit: (hash: string | undefined) => void;
@@ -29,6 +30,7 @@ interface GraphStore {
   setFilters: (filters: Partial<GraphFilters>) => void;
   setRemotes: (remotes: RemoteInfo[]) => void;
   setStashes: (stashes: StashEntry[]) => void;
+  setMaxVisibleRefs: (count: number) => void;
 }
 
 const emptyTopology: GraphTopology = {
@@ -95,6 +97,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   remotes: [],
   stashes: [],
   mergedCommits: [],
+  maxVisibleRefs: 3,
   setCommits: (commits) => {
     const stashes = get().stashes;
     const mergedCommits = mergeStashesIntoCommits(commits, stashes);
@@ -136,4 +139,5 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const topology = calculateTopology(mergedCommits);
     set({ stashes, mergedCommits, topology });
   },
+  setMaxVisibleRefs: (count) => set({ maxVisibleRefs: count }),
 }));
