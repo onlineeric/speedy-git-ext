@@ -5,10 +5,9 @@ import { getRefStyle } from '../utils/refStyle';
 
 interface OverflowRefsBadgeProps {
   hiddenRefs: RefInfo[];
-  commitHash: string;
 }
 
-export function OverflowRefsBadge({ hiddenRefs, commitHash }: OverflowRefsBadgeProps) {
+export function OverflowRefsBadge({ hiddenRefs }: OverflowRefsBadgeProps) {
   if (hiddenRefs.length === 0) return null;
 
   return (
@@ -37,7 +36,7 @@ export function OverflowRefsBadge({ hiddenRefs, commitHash }: OverflowRefsBadgeP
           }}
         >
           {hiddenRefs.map((ref) => (
-            <BranchContextMenu key={`${ref.type}-${ref.name}`} refInfo={ref} commitHash={commitHash}>
+            <BranchContextMenu key={`${ref.type}-${ref.name}`} refInfo={ref}>
               <span
                 className={`px-1.5 py-0.5 text-xs rounded ${getRefStyle(ref.type)}`}
                 title={ref.remote ? `${ref.remote}/${ref.name}` : ref.name}

@@ -68,7 +68,7 @@ export const CommitRow = memo(function CommitRow({
       {commit.refs.length > 0 && (
         <div className="flex gap-1 flex-shrink-0">
           {commit.refs.slice(0, maxVisibleRefs).map((ref) => (
-            <BranchContextMenu key={`${ref.type}-${ref.name}`} refInfo={ref} commitHash={commit.hash}>
+            <BranchContextMenu key={`${ref.type}-${ref.name}`} refInfo={ref}>
               <span
                 className={`px-1.5 py-0.5 text-xs rounded ${getRefStyle(ref.type)}`}
                 title={ref.remote ? `${ref.remote}/${ref.name}` : ref.name}
@@ -79,7 +79,6 @@ export const CommitRow = memo(function CommitRow({
           ))}
           <OverflowRefsBadge
             hiddenRefs={commit.refs.slice(maxVisibleRefs)}
-            commitHash={commit.hash}
           />
         </div>
       )}

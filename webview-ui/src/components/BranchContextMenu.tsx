@@ -7,7 +7,6 @@ import { InputDialog } from './InputDialog';
 
 interface BranchContextMenuProps {
   refInfo: RefInfo;
-  commitHash?: string;
   children: React.ReactNode;
 }
 

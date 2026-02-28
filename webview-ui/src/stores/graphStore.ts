@@ -54,10 +54,10 @@ function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[]): Comm
   const stashInsertions: { index: number; commit: Commit }[] = [];
   for (const stash of stashes) {
     const parentIndex = commitIndexByHash.get(stash.parentHash);
-    const insertIndex = parentIndex !== undefined ? parentIndex : 0;
+    if (parentIndex === undefined) continue; // parent not in current view — skip
 
     stashInsertions.push({
-      index: insertIndex,
+      index: parentIndex,
       commit: {
         hash: stash.hash,
         abbreviatedHash: stash.hash.slice(0, 7),

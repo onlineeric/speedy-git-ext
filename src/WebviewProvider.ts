@@ -61,13 +61,15 @@ export class WebviewProvider {
       this.panel = undefined;
     });
 
-    await this.sendInitialData();
+    await this.sendInitialData(undefined, true);
   }
 
-  private async sendInitialData(filters?: Partial<import('../shared/types.js').GraphFilters>) {
+  private async sendInitialData(filters?: Partial<import('../shared/types.js').GraphFilters>, includeStashes = false) {
     await this.handleMessage({ type: 'getCommits', payload: { filters } });
     await this.handleMessage({ type: 'getBranches', payload: {} });
-    await this.handleMessage({ type: 'getStashes', payload: {} });
+    if (includeStashes) {
+      await this.handleMessage({ type: 'getStashes', payload: {} });
+    }
   }
 
   private async handleMessage(message: RequestMessage) {
@@ -142,7 +144,7 @@ export class WebviewProvider {
         break;
       }
       case 'refresh': {
-        await this.sendInitialData(message.payload.filters);
+        await this.sendInitialData(message.payload.filters, true);
         break;
       }
       // Branch ops
@@ -337,7 +339,7 @@ export class WebviewProvider {
         const result = await this.gitStashService.applyStash(message.payload.index);
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
-          await this.sendInitialData();
+          await this.sendInitialData(undefined, true);
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }
@@ -347,7 +349,7 @@ export class WebviewProvider {
         const result = await this.gitStashService.popStash(message.payload.index);
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
-          await this.sendInitialData();
+          await this.sendInitialData(undefined, true);
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }
@@ -357,7 +359,7 @@ export class WebviewProvider {
         const result = await this.gitStashService.dropStash(message.payload.index);
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
-          await this.sendInitialData();
+          await this.sendInitialData(undefined, true);
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }
