@@ -67,6 +67,7 @@ export class WebviewProvider {
   private async sendInitialData(filters?: Partial<import('../shared/types.js').GraphFilters>, includeStashes = false) {
     await this.handleMessage({ type: 'getCommits', payload: { filters } });
     await this.handleMessage({ type: 'getBranches', payload: {} });
+    await this.handleMessage({ type: 'getRemotes', payload: {} });
     if (includeStashes) {
       await this.handleMessage({ type: 'getStashes', payload: {} });
     }
@@ -260,6 +261,7 @@ export class WebviewProvider {
         );
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.gitBranchService.fetch(message.payload.name);
           await this.sendInitialData();
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
