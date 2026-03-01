@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { RefInfo } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
+import { useGraphStore } from '../stores/graphStore';
 import { ConfirmDialog } from './ConfirmDialog';
 import { InputDialog } from './InputDialog';
 
@@ -19,6 +20,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false);
+  const { loading } = useGraphStore();
 
   const displayName = refInfo.remote
     ? `${refInfo.remote}/${refInfo.name}`
@@ -64,6 +66,15 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                 <ContextMenu.Item className={menuItemClass} onSelect={() => rpcClient.push(undefined, refInfo.name)}>
                   Push Branch
                 </ContextMenu.Item>
+                {isCurrentBranch && (
+                  <ContextMenu.Item
+                    className={menuItemClass}
+                    onSelect={() => rpcClient.pull()}
+                    disabled={loading}
+                  >
+                    Pull Branch
+                  </ContextMenu.Item>
+                )}
                 {!isCurrentBranch && (
                   <>
                     <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />

@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
+import { RemoteManagementDialog } from './RemoteManagementDialog';
 
 export function ControlBar() {
   const { branches, filters, setFilters, mergedCommits, loading } = useGraphStore();
+  const [remoteDialogOpen, setRemoteDialogOpen] = useState(false);
 
   const handleBranchChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const branch = e.target.value || undefined;
@@ -63,6 +66,14 @@ export function ControlBar() {
       </button>
 
       <button
+        onClick={() => setRemoteDialogOpen(true)}
+        className={buttonSecondaryClass}
+        title="Manage remotes"
+      >
+        Manage Remotes...
+      </button>
+
+      <button
         onClick={handleRefresh}
         className="px-3 py-1 text-sm bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] rounded hover:bg-[var(--vscode-button-hoverBackground)] focus:outline-none"
         title="Refresh"
@@ -73,6 +84,8 @@ export function ControlBar() {
       <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)]">
         {mergedCommits.length} commits
       </span>
+
+      <RemoteManagementDialog open={remoteDialogOpen} onClose={() => setRemoteDialogOpen(false)} />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { Commit } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { InputDialog } from './InputDialog';
+import { TagCreationDialog } from './TagCreationDialog';
 
 interface CommitContextMenuProps {
   commit: Commit;
@@ -68,17 +69,10 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
         validate={(v) => v.startsWith('-') ? 'Branch name cannot start with -' : undefined}
       />
 
-      <InputDialog
+      <TagCreationDialog
         open={createTagOpen}
-        onSubmit={(name) => {
-          setCreateTagOpen(false);
-          rpcClient.createTag(name, commit.hash);
-        }}
-        onCancel={() => setCreateTagOpen(false)}
-        title="Create Tag"
-        label="Tag name"
-        placeholder="v1.0.0"
-        validate={(v) => v.startsWith('-') ? 'Tag name cannot start with -' : undefined}
+        commit={commit}
+        onClose={() => setCreateTagOpen(false)}
       />
     </>
   );
