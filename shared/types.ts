@@ -80,3 +80,17 @@ export interface CommitDetails {
 }
 
 export type DetailsPanelPosition = 'bottom' | 'right';
+
+export interface RemoteInfo {
+  name: string;
+  fetchUrl: string;
+  pushUrl: string;
+}
+
+export interface StashEntry {
+  index: number;
+  hash: string;
+  parentHash: string;
+  message: string;
+  date: number;
+}
