@@ -94,3 +94,5 @@ export interface StashEntry {
   message: string;
   date: number;
 }
+
+export type ResetMode = 'soft' | 'mixed' | 'hard';

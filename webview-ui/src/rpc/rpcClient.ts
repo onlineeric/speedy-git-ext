@@ -1,4 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
+import type { ResetMode } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 
 declare const acquireVsCodeApi: () => {
@@ -177,6 +178,11 @@ class RpcClient {
 
   dropStash(index: number) {
     this.send({ type: 'dropStash', payload: { index } });
+  }
+
+  // History ops
+  resetBranch(hash: string, mode: ResetMode) {
+    this.send({ type: 'resetBranch', payload: { hash, mode } });
   }
 }
 

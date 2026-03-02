@@ -7,6 +7,7 @@ import type { GitBranchService } from './services/GitBranchService.js';
 import type { GitRemoteService } from './services/GitRemoteService.js';
 import type { GitTagService } from './services/GitTagService.js';
 import type { GitStashService } from './services/GitStashService.js';
+import type { GitHistoryService } from './services/GitHistoryService.js';
 
 export class WebviewProvider {
   private panel: vscode.WebviewPanel | undefined;
@@ -19,6 +20,7 @@ export class WebviewProvider {
     private readonly gitRemoteService: GitRemoteService,
     private readonly gitTagService: GitTagService,
     private readonly gitStashService: GitStashService,
+    private readonly gitHistoryService: GitHistoryService,
     private readonly log: vscode.LogOutputChannel
   ) {}
 
@@ -362,6 +364,20 @@ export class WebviewProvider {
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
           await this.sendInitialData(undefined, true);
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      // History ops
+      case 'resetBranch': {
+        const result = await this.gitHistoryService.reset(
+          message.payload.hash,
+          message.payload.mode
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }
