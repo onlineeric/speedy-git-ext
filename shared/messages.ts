@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode } from './types.js';
 import type { GitError } from './errors.js';
 
 export type RequestMessage =
@@ -32,7 +32,9 @@ export type RequestMessage =
   | { type: 'getStashes'; payload: Record<string, never> }
   | { type: 'applyStash'; payload: { index: number } }
   | { type: 'popStash'; payload: { index: number } }
-  | { type: 'dropStash'; payload: { index: number } };
+  | { type: 'dropStash'; payload: { index: number } }
+  // History ops
+  | { type: 'resetBranch'; payload: { hash: string; mode: ResetMode } };
 
 export type ResponseMessage =
   | { type: 'commits'; payload: { commits: Commit[] } }
@@ -57,6 +59,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   removeRemote: true, editRemote: true,
   createTag: true, deleteTag: true, pushTag: true,
   getStashes: true, applyStash: true, popStash: true, dropStash: true,
+  resetBranch: true,
 };
 
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
