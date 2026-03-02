@@ -6,6 +6,7 @@ import { GitBranchService } from './services/GitBranchService.js';
 import { GitRemoteService } from './services/GitRemoteService.js';
 import { GitTagService } from './services/GitTagService.js';
 import { GitStashService } from './services/GitStashService.js';
+import { GitHistoryService } from './services/GitHistoryService.js';
 import { GitShowContentProvider } from './GitShowContentProvider.js';
 
 export class ExtensionController {
@@ -16,6 +17,7 @@ export class ExtensionController {
   private gitRemoteService: GitRemoteService | undefined;
   private gitTagService: GitTagService | undefined;
   private gitStashService: GitStashService | undefined;
+  private gitHistoryService: GitHistoryService | undefined;
   private contentProviderRegistration: vscode.Disposable | undefined;
 
   constructor(
@@ -51,6 +53,9 @@ export class ExtensionController {
     if (!this.gitStashService) {
       this.gitStashService = new GitStashService(workspacePath, this.log);
     }
+    if (!this.gitHistoryService) {
+      this.gitHistoryService = new GitHistoryService(workspacePath, this.log);
+    }
 
     // Register git-show:// content provider for diff view
     if (!this.contentProviderRegistration) {
@@ -71,6 +76,7 @@ export class ExtensionController {
         this.gitRemoteService,
         this.gitTagService,
         this.gitStashService,
+        this.gitHistoryService,
         this.log
       );
     }
@@ -89,5 +95,6 @@ export class ExtensionController {
     this.gitRemoteService = undefined;
     this.gitTagService = undefined;
     this.gitStashService = undefined;
+    this.gitHistoryService = undefined;
   }
 }
