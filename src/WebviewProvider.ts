@@ -8,6 +8,7 @@ import type { GitRemoteService } from './services/GitRemoteService.js';
 import type { GitTagService } from './services/GitTagService.js';
 import type { GitStashService } from './services/GitStashService.js';
 import type { GitHistoryService } from './services/GitHistoryService.js';
+import type { GitCherryPickService } from './services/GitCherryPickService.js';
 
 export class WebviewProvider {
   private panel: vscode.WebviewPanel | undefined;
@@ -21,6 +22,7 @@ export class WebviewProvider {
     private readonly gitTagService: GitTagService,
     private readonly gitStashService: GitStashService,
     private readonly gitHistoryService: GitHistoryService,
+    private readonly gitCherryPickService: GitCherryPickService,
     private readonly log: vscode.LogOutputChannel
   ) {}
 
@@ -72,6 +74,10 @@ export class WebviewProvider {
     await this.handleMessage({ type: 'getRemotes', payload: {} });
     if (includeStashes) {
       await this.handleMessage({ type: 'getStashes', payload: {} });
+    }
+    const cherryPickStateResult = this.gitCherryPickService.getCherryPickState();
+    if (cherryPickStateResult.success) {
+      this.postMessage({ type: 'cherryPickState', payload: { state: cherryPickStateResult.value } });
     }
   }
 
@@ -380,6 +386,47 @@ export class WebviewProvider {
           await this.sendInitialData();
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      // Cherry-pick ops
+      case 'cherryPick': {
+        const result = await this.gitCherryPickService.cherryPick(
+          message.payload.hashes,
+          message.payload.options
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+          this.postMessage({ type: 'cherryPickState', payload: { state: 'idle' } });
+        } else if (result.error.code === 'CHERRY_PICK_CONFLICT') {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+          this.postMessage({ type: 'cherryPickState', payload: { state: 'in-progress' } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'abortCherryPick': {
+        const result = await this.gitCherryPickService.abortCherryPick();
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+          this.postMessage({ type: 'cherryPickState', payload: { state: 'idle' } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'continueCherryPick': {
+        const result = await this.gitCherryPickService.continueCherryPick();
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+          this.postMessage({ type: 'cherryPickState', payload: { state: 'idle' } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+          this.postMessage({ type: 'cherryPickState', payload: { state: 'in-progress' } });
         }
         break;
       }

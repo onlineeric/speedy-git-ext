@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Commit, Branch, CommitDetails, DetailsPanelPosition, GraphFilters, RemoteInfo, StashEntry } from '@shared/types';
+import type { Commit, Branch, CommitDetails, DetailsPanelPosition, GraphFilters, RemoteInfo, StashEntry, CherryPickOptions } from '@shared/types';
 import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
 
 interface GraphStore {
@@ -18,6 +18,12 @@ interface GraphStore {
   stashes: StashEntry[];
   mergedCommits: Commit[];
   maxVisibleRefs: number;
+  // Cherry-pick state
+  cherryPickInProgress: boolean;
+  cherryPickOptions: CherryPickOptions;
+  // Multi-select state
+  selectedCommits: string[];
+  lastClickedHash: string | undefined;
   setCommits: (commits: Commit[]) => void;
   setBranches: (branches: Branch[]) => void;
   setSelectedCommit: (hash: string | undefined) => void;
@@ -31,6 +37,13 @@ interface GraphStore {
   setRemotes: (remotes: RemoteInfo[]) => void;
   setStashes: (stashes: StashEntry[]) => void;
   setMaxVisibleRefs: (count: number) => void;
+  setCherryPickInProgress: (inProgress: boolean) => void;
+  setCherryPickOptions: (options: CherryPickOptions) => void;
+  setSelectedCommits: (hashes: string[]) => void;
+  setSelectionAnchor: (hash: string | undefined) => void;
+  toggleSelectedCommit: (hash: string) => void;
+  selectCommitRange: (toHash: string) => void;
+  clearSelectedCommits: () => void;
 }
 
 const emptyTopology: GraphTopology = {
@@ -98,11 +111,15 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   stashes: [],
   mergedCommits: [],
   maxVisibleRefs: 3,
+  cherryPickInProgress: false,
+  cherryPickOptions: { appendSourceRef: false, noCommit: false },
+  selectedCommits: [],
+  lastClickedHash: undefined,
   setCommits: (commits) => {
     const stashes = get().stashes;
     const mergedCommits = mergeStashesIntoCommits(commits, stashes);
     const topology = calculateTopology(mergedCommits);
-    set({ commits, mergedCommits, topology });
+    set({ commits, mergedCommits, topology, selectedCommits: [], lastClickedHash: undefined });
   },
   setBranches: (branches) => set({ branches }),
   setSelectedCommit: (selectedCommit) => set({ selectedCommit }),
@@ -140,4 +157,30 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     set({ stashes, mergedCommits, topology });
   },
   setMaxVisibleRefs: (count) => set({ maxVisibleRefs: count }),
+  setCherryPickInProgress: (cherryPickInProgress) => set({ cherryPickInProgress }),
+  setCherryPickOptions: (cherryPickOptions) => set({ cherryPickOptions }),
+  setSelectedCommits: (selectedCommits) => set({ selectedCommits }),
+  setSelectionAnchor: (lastClickedHash) => set({ lastClickedHash }),
+  toggleSelectedCommit: (hash) => set((state) => {
+    const exists = state.selectedCommits.includes(hash);
+    const selectedCommits = exists
+      ? state.selectedCommits.filter((h) => h !== hash)
+      : [...state.selectedCommits, hash];
+    return { selectedCommits, lastClickedHash: hash };
+  }),
+  selectCommitRange: (toHash) => set((state) => {
+    const { lastClickedHash, mergedCommits } = state;
+    if (!lastClickedHash) {
+      return { selectedCommits: [toHash], lastClickedHash: toHash };
+    }
+    const fromIndex = mergedCommits.findIndex((c) => c.hash === lastClickedHash);
+    const toIndex = mergedCommits.findIndex((c) => c.hash === toHash);
+    if (fromIndex === -1 || toIndex === -1) {
+      return { selectedCommits: [toHash], lastClickedHash: toHash };
+    }
+    const [start, end] = fromIndex <= toIndex ? [fromIndex, toIndex] : [toIndex, fromIndex];
+    const selectedCommits = mergedCommits.slice(start, end + 1).map((c) => c.hash);
+    return { selectedCommits };
+  }),
+  clearSelectedCommits: () => set({ selectedCommits: [], lastClickedHash: undefined }),
 }));
