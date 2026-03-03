@@ -1,5 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { ResetMode } from '@shared/types';
+import type { CherryPickOptions, ResetMode } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 
 declare const acquireVsCodeApi: () => {
@@ -60,6 +60,9 @@ class RpcClient {
         break;
       case 'stashes':
         store.setStashes(message.payload.stashes);
+        break;
+      case 'cherryPickState':
+        store.setCherryPickInProgress(message.payload.state === 'in-progress');
         break;
     }
   }
@@ -183,6 +186,19 @@ class RpcClient {
   // History ops
   resetBranch(hash: string, mode: ResetMode) {
     this.send({ type: 'resetBranch', payload: { hash, mode } });
+  }
+
+  // Cherry-pick ops
+  cherryPick(hashes: string[], options: CherryPickOptions) {
+    this.send({ type: 'cherryPick', payload: { hashes, options } });
+  }
+
+  abortCherryPick() {
+    this.send({ type: 'abortCherryPick', payload: {} });
+  }
+
+  continueCherryPick() {
+    this.send({ type: 'continueCherryPick', payload: {} });
   }
 }
 

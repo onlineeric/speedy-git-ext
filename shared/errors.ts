@@ -38,4 +38,5 @@ export type GitErrorCode =
   | 'PARSE_ERROR'
   | 'VALIDATION_ERROR'
   | 'TIMEOUT'
+  | 'CHERRY_PICK_CONFLICT'
   | 'UNKNOWN';
