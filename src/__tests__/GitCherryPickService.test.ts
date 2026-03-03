@@ -101,10 +101,10 @@ describe('GitCherryPickService', () => {
 
     it('omits -x flag when noCommit is true even if appendSourceRef is true', async () => {
       const executeSpy = vi.spyOn(service['executor'], 'execute')
-        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
         .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } });
 
       await service.cherryPick(['abc1234'], { appendSourceRef: true, noCommit: true });
+      expect(executeSpy).toHaveBeenCalledTimes(1);
       expect(executeSpy).toHaveBeenLastCalledWith(
         expect.objectContaining({ args: ['cherry-pick', '--no-commit', 'abc1234'] })
       );
@@ -129,6 +129,20 @@ describe('GitCherryPickService', () => {
           error: new GitError('Git command failed with code 1', 'COMMAND_FAILED', 'git cherry-pick abc1234', 'CONFLICT'),
         });
       vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      const result = await service.cherryPick(['abc1234'], defaultOptions);
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error.code).toBe('CHERRY_PICK_CONFLICT');
+    });
+
+    it('detects conflict via stderr fallback when CHERRY_PICK_HEAD is not yet visible', async () => {
+      vi.spyOn(service['executor'], 'execute')
+        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } }) // isDirtyWorkingTree
+        .mockResolvedValueOnce({
+          success: false,
+          error: new GitError('Git command failed with code 1', 'COMMAND_FAILED', 'git cherry-pick abc1234', 'CONFLICT (content): Merge conflict in file.txt'),
+        });
+      vi.mocked(fs.existsSync).mockReturnValue(false);
 
       const result = await service.cherryPick(['abc1234'], defaultOptions);
       expect(result.success).toBe(false);
@@ -188,7 +202,7 @@ describe('GitCherryPickService', () => {
 
       await service.continueCherryPick();
       expect(executeSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ args: expect.arrayContaining(['cherry-pick', '--continue']) })
+        expect.objectContaining({ args: ['cherry-pick', '--continue'] })
       );
     });
 

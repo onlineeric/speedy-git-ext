@@ -27,6 +27,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
   const toggleSelectedCommit = useGraphStore((s) => s.toggleSelectedCommit);
   const selectCommitRange = useGraphStore((s) => s.selectCommitRange);
   const clearSelectedCommits = useGraphStore((s) => s.clearSelectedCommits);
+  const setSelectionAnchor = useGraphStore((s) => s.setSelectionAnchor);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,6 +59,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
       toggleSelectedCommit(hash);
     } else {
       clearSelectedCommits();
+      setSelectionAnchor(hash);
       onSelectCommit(hash);
     }
   };

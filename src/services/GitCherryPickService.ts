@@ -38,13 +38,17 @@ export class GitCherryPickService {
       if (!hashCheck.success) return hashCheck;
     }
 
-    const dirtyCheck = await this.isDirtyWorkingTree();
-    if (!dirtyCheck.success) return dirtyCheck;
-    if (dirtyCheck.value) {
-      return err(new GitError(
-        'Working tree has uncommitted changes. Commit, stash, or discard them before cherry-picking.',
-        'COMMAND_FAILED'
-      ));
+    // `--no-commit` can be used on top of existing local changes, so only enforce
+    // a clean tree for the default commit-producing cherry-pick flow.
+    if (!options.noCommit) {
+      const dirtyCheck = await this.isDirtyWorkingTree();
+      if (!dirtyCheck.success) return dirtyCheck;
+      if (dirtyCheck.value) {
+        return err(new GitError(
+          'Working tree has uncommitted changes. Commit, stash, or discard them before cherry-picking.',
+          'COMMAND_FAILED'
+        ));
+      }
     }
 
     const args = ['cherry-pick'];
@@ -69,7 +73,7 @@ export class GitCherryPickService {
           'COMMAND_FAILED'
         ));
       }
-      if (fs.existsSync(this.cherryPickHeadPath)) {
+      if (fs.existsSync(this.cherryPickHeadPath) || this.isConflictStderr(stderr)) {
         return err(new GitError(
           'Cherry-pick paused due to conflict. Resolve conflicts in the Source Control panel, then continue.',
           'CHERRY_PICK_CONFLICT'
@@ -95,10 +99,14 @@ export class GitCherryPickService {
   async continueCherryPick(): Promise<Result<string>> {
     this.log.info('Continue cherry-pick');
     const result = await this.executor.execute({
-      args: ['cherry-pick', '--continue', '--no-edit'],
+      args: ['cherry-pick', '--continue'],
       cwd: this.workspacePath,
     });
     if (!result.success) return result;
     return ok('Cherry-pick continued successfully.');
+  }
+
+  private isConflictStderr(stderr: string): boolean {
+    return stderr.includes('CONFLICT') || stderr.toLowerCase().includes('merge conflict');
   }
 }

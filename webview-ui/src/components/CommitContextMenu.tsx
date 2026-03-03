@@ -19,6 +19,10 @@ const menuItemClass =
 const menuItemDisabledClass =
   'px-3 py-1.5 text-sm text-[var(--vscode-disabledForeground)] cursor-not-allowed outline-none';
 
+function isStashPseudoCommit(commit: Commit): boolean {
+  return commit.refs.some((ref) => ref.type === 'stash');
+}
+
 function buildResetDescription(
   mode: ResetMode | null,
   hasRemote: boolean,
@@ -95,7 +99,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
     // Sort selected hashes oldest-first using mergedCommits order (newest-first → reverse)
     const hashSet = new Set(cherryPickCommits.map((c) => c.hash));
     const orderedHashes = mergedCommits
-      .filter((c) => hashSet.has(c.hash))
+      .filter((c) => hashSet.has(c.hash) && !isStashPseudoCommit(c))
       .map((c) => c.hash)
       .reverse();
     rpcClient.cherryPick(orderedHashes, options);

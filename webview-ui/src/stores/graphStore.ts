@@ -40,6 +40,7 @@ interface GraphStore {
   setCherryPickInProgress: (inProgress: boolean) => void;
   setCherryPickOptions: (options: CherryPickOptions) => void;
   setSelectedCommits: (hashes: string[]) => void;
+  setSelectionAnchor: (hash: string | undefined) => void;
   toggleSelectedCommit: (hash: string) => void;
   selectCommitRange: (toHash: string) => void;
   clearSelectedCommits: () => void;
@@ -159,6 +160,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setCherryPickInProgress: (cherryPickInProgress) => set({ cherryPickInProgress }),
   setCherryPickOptions: (cherryPickOptions) => set({ cherryPickOptions }),
   setSelectedCommits: (selectedCommits) => set({ selectedCommits }),
+  setSelectionAnchor: (lastClickedHash) => set({ lastClickedHash }),
   toggleSelectedCommit: (hash) => set((state) => {
     const exists = state.selectedCommits.includes(hash);
     const selectedCommits = exists

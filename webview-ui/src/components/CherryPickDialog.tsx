@@ -13,6 +13,7 @@ interface CherryPickDialogProps {
 export function CherryPickDialog({ open, commits, onConfirm, onCancel }: CherryPickDialogProps) {
   const setCherryPickOptions = useGraphStore((s) => s.setCherryPickOptions);
   const mergedCommits = useGraphStore((s) => s.mergedCommits);
+  const cherryPickOptions = useGraphStore((s) => s.cherryPickOptions);
 
   const [appendSourceRef, setAppendSourceRef] = useState(false);
   const [noCommit, setNoCommit] = useState(false);
@@ -20,14 +21,13 @@ export function CherryPickDialog({ open, commits, onConfirm, onCancel }: CherryP
 
   const isSingleMergeCommit = commits.length === 1 && commits[0].parents.length > 1;
 
-  // Read the stored options snapshot when the dialog opens; reset mainlineParent
+  // Load the latest stored options when the dialog opens; always reset mainlineParent
   useEffect(() => {
     if (!open) return;
-    const { cherryPickOptions } = useGraphStore.getState();
     setAppendSourceRef(cherryPickOptions.appendSourceRef);
     setNoCommit(cherryPickOptions.noCommit);
     setMainlineParent(1);
-  }, [open]);
+  }, [open, cherryPickOptions]);
 
   const handleConfirm = () => {
     const options: CherryPickOptions = {
