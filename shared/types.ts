@@ -96,3 +96,11 @@ export interface StashEntry {
 }
 
 export type ResetMode = 'soft' | 'mixed' | 'hard';
+
+export interface CherryPickOptions {
+  appendSourceRef: boolean;
+  noCommit: boolean;
+  mainlineParent?: number;  // 1-indexed; required when cherry-picking a merge commit (-m flag)
+}
+
+export type CherryPickState = 'idle' | 'in-progress';

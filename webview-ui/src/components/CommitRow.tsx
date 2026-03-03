@@ -18,7 +18,8 @@ interface CommitRowProps {
   rowHeight: number;
   maxVisibleRefs?: number;
   isSelected: boolean;
-  onClick: () => void;
+  isMultiSelected?: boolean;
+  onClick: (e: React.MouseEvent) => void;
   style: React.CSSProperties;
 }
 
@@ -31,6 +32,7 @@ export const CommitRow = memo(function CommitRow({
   rowHeight,
   maxVisibleRefs = 3,
   isSelected,
+  isMultiSelected = false,
   onClick,
   style,
 }: CommitRowProps) {
@@ -39,6 +41,8 @@ export const CommitRow = memo(function CommitRow({
 
   const bgClass = isSelected
     ? 'bg-[var(--vscode-list-activeSelectionBackground)]'
+    : isMultiSelected
+    ? 'bg-[var(--vscode-list-inactiveSelectionBackground)]'
     : index % 2 === 0
     ? 'bg-transparent'
     : 'bg-[var(--vscode-list-hoverBackground)]/30';

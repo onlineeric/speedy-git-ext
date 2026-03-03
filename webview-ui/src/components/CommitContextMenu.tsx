@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import type { Commit, ResetMode } from '@shared/types';
+import type { Commit, CherryPickOptions, ResetMode } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { ConfirmDialog } from './ConfirmDialog';
 import { InputDialog } from './InputDialog';
 import { TagCreationDialog } from './TagCreationDialog';
+import { CherryPickDialog } from './CherryPickDialog';
 
 interface CommitContextMenuProps {
   commit: Commit;
@@ -14,6 +15,9 @@ interface CommitContextMenuProps {
 
 const menuItemClass =
   'px-3 py-1.5 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
+
+const menuItemDisabledClass =
+  'px-3 py-1.5 text-sm text-[var(--vscode-disabledForeground)] cursor-not-allowed outline-none';
 
 function buildResetDescription(
   mode: ResetMode | null,
@@ -34,15 +38,30 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
   const [createBranchOpen, setCreateBranchOpen] = useState(false);
   const [createTagOpen, setCreateTagOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [cherryPickOpen, setCherryPickOpen] = useState(false);
   const [pendingResetMode, setPendingResetMode] = useState<ResetMode | null>(null);
+  const [cherryPickCommits, setCherryPickCommits] = useState<Commit[]>([]);
 
   const branches = useGraphStore((s) => s.branches);
+  const selectedCommits = useGraphStore((s) => s.selectedCommits);
+  const mergedCommits = useGraphStore((s) => s.mergedCommits);
+  const clearSelectedCommits = useGraphStore((s) => s.clearSelectedCommits);
+
   const currentLocalBranch = branches.find((b) => b.current && !b.remote) ?? null;
   const hasRemoteUpstream =
     currentLocalBranch !== null &&
     branches.some((b) => b.name === currentLocalBranch.name && !!b.remote);
   const showReset =
     currentLocalBranch !== null && commit.hash !== currentLocalBranch.hash;
+
+  const isHeadCommit = commit.hash === currentLocalBranch?.hash;
+  const isMergeCommit = commit.parents.length > 1;
+
+  const isMultiSelectActive =
+    selectedCommits.length > 1 && selectedCommits.includes(commit.hash);
+
+  const hasSelectedMergeCommit = isMultiSelectActive &&
+    mergedCommits.some((c) => selectedCommits.includes(c.hash) && c.parents.length > 1);
 
   const handleCopyHash = () => {
     rpcClient.copyToClipboard(commit.hash);
@@ -65,6 +84,24 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
     }
   };
 
+  const openCherryPickDialog = (commits: Commit[], clearSelection = false) => {
+    if (clearSelection) clearSelectedCommits();
+    setCherryPickCommits(commits);
+    setCherryPickOpen(true);
+  };
+
+  const handleCherryPickConfirm = (options: CherryPickOptions) => {
+    setCherryPickOpen(false);
+    // Sort selected hashes oldest-first using mergedCommits order (newest-first → reverse)
+    const hashSet = new Set(cherryPickCommits.map((c) => c.hash));
+    const orderedHashes = mergedCommits
+      .filter((c) => hashSet.has(c.hash))
+      .map((c) => c.hash)
+      .reverse();
+    rpcClient.cherryPick(orderedHashes, options);
+    clearSelectedCommits();
+  };
+
   return (
     <>
       <ContextMenu.Root>
@@ -78,6 +115,53 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
               Create Tag Here...
             </ContextMenu.Item>
             <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+            {/* Cherry-pick items */}
+            {!isHeadCommit && (
+              <>
+                {isMergeCommit ? (
+                  // Single merge commit — enable with parent selection in dialog
+                  <ContextMenu.Item
+                    className={menuItemClass}
+                    onSelect={() => openCherryPickDialog([commit])}
+                  >
+                    Cherry-Pick Commit
+                  </ContextMenu.Item>
+                ) : isMultiSelectActive && !hasSelectedMergeCommit ? (
+                  // Multi-select, no merge commits
+                  <ContextMenu.Item
+                    className={menuItemClass}
+                    onSelect={() => openCherryPickDialog(mergedCommits.filter((c) => selectedCommits.includes(c.hash)))}
+                  >
+                    Cherry-Pick Selected Commits ({selectedCommits.length})
+                  </ContextMenu.Item>
+                ) : isMultiSelectActive && hasSelectedMergeCommit ? (
+                  // Multi-select includes merge commits — keep disabled
+                  <ContextMenu.Item
+                    className={menuItemDisabledClass}
+                    disabled
+                    title="Selection contains merge commits. Cherry-pick merge commits individually."
+                  >
+                    Cherry-Pick Selected Commits ({selectedCommits.length})
+                  </ContextMenu.Item>
+                ) : selectedCommits.length > 1 ? (
+                  // Right-clicked an unselected commit while multi-select is active
+                  <ContextMenu.Item
+                    className={menuItemClass}
+                    onSelect={() => openCherryPickDialog([commit], true)}
+                  >
+                    Cherry-Pick Commit
+                  </ContextMenu.Item>
+                ) : (
+                  <ContextMenu.Item
+                    className={menuItemClass}
+                    onSelect={() => openCherryPickDialog([commit])}
+                  >
+                    Cherry-Pick Commit
+                  </ContextMenu.Item>
+                )}
+                <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+              </>
+            )}
             <ContextMenu.Item className={menuItemClass} onSelect={handleCopyHash}>
               Copy Commit Hash
             </ContextMenu.Item>
@@ -149,6 +233,13 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
         description={buildResetDescription(pendingResetMode, hasRemoteUpstream, currentLocalBranch?.name)}
         confirmLabel={pendingResetMode === 'hard' ? 'Discard Changes' : 'Reset'}
         variant={pendingResetMode === 'hard' ? 'danger' : 'warning'}
+      />
+
+      <CherryPickDialog
+        open={cherryPickOpen}
+        commits={cherryPickCommits}
+        onConfirm={handleCherryPickConfirm}
+        onCancel={() => setCherryPickOpen(false)}
       />
     </>
   );

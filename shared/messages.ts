@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, CherryPickOptions, CherryPickState } from './types.js';
 import type { GitError } from './errors.js';
 
 export type RequestMessage =
@@ -34,7 +34,11 @@ export type RequestMessage =
   | { type: 'popStash'; payload: { index: number } }
   | { type: 'dropStash'; payload: { index: number } }
   // History ops
-  | { type: 'resetBranch'; payload: { hash: string; mode: ResetMode } };
+  | { type: 'resetBranch'; payload: { hash: string; mode: ResetMode } }
+  // Cherry-pick ops
+  | { type: 'cherryPick'; payload: { hashes: string[]; options: CherryPickOptions } }
+  | { type: 'abortCherryPick'; payload: Record<string, never> }
+  | { type: 'continueCherryPick'; payload: Record<string, never> };
 
 export type ResponseMessage =
   | { type: 'commits'; payload: { commits: Commit[] } }
@@ -44,7 +48,8 @@ export type ResponseMessage =
   | { type: 'loading'; payload: { loading: boolean } }
   | { type: 'success'; payload: { message: string } }
   | { type: 'remotes'; payload: { remotes: RemoteInfo[] } }
-  | { type: 'stashes'; payload: { stashes: StashEntry[] } };
+  | { type: 'stashes'; payload: { stashes: StashEntry[] } }
+  | { type: 'cherryPickState'; payload: { state: CherryPickState } };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -60,12 +65,13 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   createTag: true, deleteTag: true, pushTag: true,
   getStashes: true, applyStash: true, popStash: true, dropStash: true,
   resetBranch: true,
+  cherryPick: true, abortCherryPick: true, continueCherryPick: true,
 };
 
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commits: true, branches: true, commitDetails: true,
   error: true, loading: true, success: true,
-  remotes: true, stashes: true,
+  remotes: true, stashes: true, cherryPickState: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {
