@@ -8,6 +8,7 @@ import { GitTagService } from './services/GitTagService.js';
 import { GitStashService } from './services/GitStashService.js';
 import { GitHistoryService } from './services/GitHistoryService.js';
 import { GitCherryPickService } from './services/GitCherryPickService.js';
+import { GitRebaseService } from './services/GitRebaseService.js';
 import { GitShowContentProvider } from './GitShowContentProvider.js';
 
 export class ExtensionController {
@@ -20,6 +21,7 @@ export class ExtensionController {
   private gitStashService: GitStashService | undefined;
   private gitHistoryService: GitHistoryService | undefined;
   private gitCherryPickService: GitCherryPickService | undefined;
+  private gitRebaseService: GitRebaseService | undefined;
   private contentProviderRegistration: vscode.Disposable | undefined;
 
   constructor(
@@ -61,6 +63,9 @@ export class ExtensionController {
     if (!this.gitCherryPickService) {
       this.gitCherryPickService = new GitCherryPickService(workspacePath, this.log);
     }
+    if (!this.gitRebaseService) {
+      this.gitRebaseService = new GitRebaseService(workspacePath, this.log);
+    }
 
     // Register git-show:// content provider for diff view
     if (!this.contentProviderRegistration) {
@@ -83,6 +88,7 @@ export class ExtensionController {
         this.gitStashService,
         this.gitHistoryService,
         this.gitCherryPickService,
+        this.gitRebaseService,
         this.log
       );
     }
@@ -103,5 +109,6 @@ export class ExtensionController {
     this.gitStashService = undefined;
     this.gitHistoryService = undefined;
     this.gitCherryPickService = undefined;
+    this.gitRebaseService = undefined;
   }
 }
