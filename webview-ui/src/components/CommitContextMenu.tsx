@@ -70,6 +70,13 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
     }
   }, [awaitingRebaseEntries, pendingRebaseEntries]);
 
+  // Cleanup stale pending entries if this component unmounts while awaiting
+  useEffect(() => {
+    return () => {
+      useGraphStore.getState().setPendingRebaseEntries(undefined);
+    };
+  }, []);
+
   const currentLocalBranch = branches.find((b) => b.current && !b.remote) ?? null;
   const hasRemoteUpstream =
     currentLocalBranch !== null &&
@@ -218,7 +225,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
                 Start Interactive Rebase from Here
               </ContextMenu.Item>
             )}
-            {(canRebase || canRebase) && (
+            {canRebase && (
               <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
             )}
             <ContextMenu.Item className={menuItemClass} onSelect={handleCopyHash}>

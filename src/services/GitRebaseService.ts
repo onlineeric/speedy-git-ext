@@ -6,13 +6,14 @@ import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { InteractiveRebaseConfig, RebaseConflictInfo, RebaseEntry, RebaseState } from '../../shared/types.js';
-import { validateHash } from '../utils/gitValidation.js';
+import { validateHash, validateRefName } from '../utils/gitValidation.js';
 import { isConflictStderr } from '../utils/gitParsers.js';
 
 export class GitRebaseService {
   private executor: GitExecutor;
   private readonly rebaseMergeDir: string;
   private readonly rebaseApplyDir: string;
+  private activeTmpDir: string | null = null;
 
   constructor(
     private readonly workspacePath: string,
@@ -84,9 +85,8 @@ export class GitRebaseService {
   }
 
   async rebase(targetRef: string, ignoreDate = false): Promise<Result<string>> {
-    if (!targetRef || targetRef.startsWith('-')) {
-      return err(new GitError(`Invalid targetRef: ${targetRef}`, 'VALIDATION_ERROR'));
-    }
+    const refCheck = validateRefName(targetRef);
+    if (!refCheck.success) return refCheck;
 
     this.log.info(`Rebase onto: ${targetRef}${ignoreDate ? ' (--ignore-date)' : ''}`);
     const args = ['rebase', targetRef];
@@ -117,37 +117,41 @@ export class GitRebaseService {
     const tmpDir = path.join(os.tmpdir(), `speedy-rebase-${crypto.randomUUID()}`);
     fs.mkdirSync(tmpDir, { recursive: true });
 
-    try {
-      this.writeTempScripts(tmpDir, config);
+    this.writeTempScripts(tmpDir, config);
 
-      const sequenceEditor = path.join(tmpDir, 'sequence-editor.sh');
-      const messageEditor = path.join(tmpDir, 'editor.sh');
+    const sequenceEditor = path.join(tmpDir, 'sequence-editor.sh');
+    const messageEditor = path.join(tmpDir, 'editor.sh');
+    const todoPath = path.join(tmpDir, 'todo.txt');
+    const counterPath = path.join(tmpDir, 'counter.txt');
 
-      this.log.info(`Interactive rebase from: ${config.baseHash}`);
-      const result = await this.executor.execute({
-        args: ['rebase', '-i', config.baseHash],
-        cwd: this.workspacePath,
-        env: {
-          GIT_SEQUENCE_EDITOR: sequenceEditor,
-          GIT_EDITOR: messageEditor,
-        },
-      });
+    this.log.info(`Interactive rebase from: ${config.baseHash}`);
+    const result = await this.executor.execute({
+      args: ['rebase', '-i', config.baseHash],
+      cwd: this.workspacePath,
+      env: {
+        GIT_SEQUENCE_EDITOR: sequenceEditor,
+        GIT_EDITOR: messageEditor,
+        SPEEDY_TODO_FILE: todoPath,
+        SPEEDY_REBASE_DIR: tmpDir,
+        SPEEDY_COUNTER_FILE: counterPath,
+      },
+    });
 
-      if (!result.success) {
-        const stderr = result.error.stderr ?? '';
-        if (this.isRebaseConflict(stderr)) {
-          return err(new GitError(
-            'Rebase paused due to conflict. Resolve conflicts in the Source Control panel, then continue.',
-            'REBASE_CONFLICT'
-          ));
-        }
-        return result;
+    if (!result.success) {
+      const stderr = result.error.stderr ?? '';
+      if (this.isRebaseConflict(stderr)) {
+        this.activeTmpDir = tmpDir;
+        return err(new GitError(
+          'Rebase paused due to conflict. Resolve conflicts in the Source Control panel, then continue.',
+          'REBASE_CONFLICT'
+        ));
       }
-
-      return ok('Interactive rebase completed successfully.');
-    } finally {
-      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+      this.deleteTmpDir(tmpDir);
+      return result;
     }
+
+    this.deleteTmpDir(tmpDir);
+    return ok('Interactive rebase completed successfully.');
   }
 
   async abortRebase(): Promise<Result<string>> {
@@ -157,15 +161,19 @@ export class GitRebaseService {
       cwd: this.workspacePath,
     });
     if (!result.success) return result;
+    this.cleanupActiveTmpDir();
     return ok('Rebase aborted.');
   }
 
   async continueRebase(): Promise<Result<string>> {
     this.log.info('Continue rebase');
+    const editorEnv = this.activeTmpDir
+      ? { GIT_EDITOR: path.join(this.activeTmpDir, 'editor.sh') }
+      : { GIT_EDITOR: 'true' };
     const result = await this.executor.execute({
       args: ['rebase', '--continue'],
       cwd: this.workspacePath,
-      env: { GIT_EDITOR: 'true' },
+      env: editorEnv,
     });
     if (!result.success) {
       const stderr = result.error.stderr ?? '';
@@ -177,15 +185,20 @@ export class GitRebaseService {
       }
       return result;
     }
+    this.cleanupActiveTmpDir();
     return ok('Rebase continued successfully.');
   }
 
   async getConflictInfo(): Promise<Result<RebaseConflictInfo>> {
-    const stoppedShaPath = path.join(this.rebaseMergeDir, 'stopped-sha');
     let conflictCommitHash = '';
-    try {
-      conflictCommitHash = fs.readFileSync(stoppedShaPath, 'utf-8').trim();
-    } catch { /* file absent — rebase stopped on unknown commit */ }
+    // Try rebase-merge first (interactive rebase)
+    const stoppedShaPath = path.join(this.rebaseMergeDir, 'stopped-sha');
+    try { conflictCommitHash = fs.readFileSync(stoppedShaPath, 'utf-8').trim(); } catch { /* try rebase-apply */ }
+    // Fallback: rebase-apply (standard rebase, git >= 2.25)
+    if (!conflictCommitHash) {
+      const originalCommitPath = path.join(this.rebaseApplyDir, 'original-commit');
+      try { conflictCommitHash = fs.readFileSync(originalCommitPath, 'utf-8').trim(); } catch { /* unavailable */ }
+    }
 
     const [statusResult, logResult] = await Promise.all([
       this.executor.execute({ args: ['status', '--short'], cwd: this.workspacePath }),
@@ -215,8 +228,8 @@ export class GitRebaseService {
     const todoPath = path.join(tmpDir, 'todo.txt');
     fs.writeFileSync(todoPath, todoLines.join('\n') + '\n', 'utf-8');
 
-    // Sequence editor: copy our todo.txt to the file git passes
-    const seqEditor = `#!/bin/sh\ncp "${todoPath}" "$1"\n`;
+    // Sequence editor: copy our todo.txt to the file git passes — uses env var to avoid path injection
+    const seqEditor = '#!/bin/sh\ncp "$SPEEDY_TODO_FILE" "$1"\n';
     const seqEditorPath = path.join(tmpDir, 'sequence-editor.sh');
     fs.writeFileSync(seqEditorPath, seqEditor, { mode: 0o755 });
 
@@ -239,18 +252,29 @@ export class GitRebaseService {
     const counterPath = path.join(tmpDir, 'counter.txt');
     fs.writeFileSync(counterPath, '0', 'utf-8');
 
-    // Editor script: reads message-N.txt → $1, increments counter
+    // Editor script: reads message-N.txt → $1, increments counter — uses env vars to avoid path injection
     const editorScript = [
       '#!/bin/sh',
-      `COUNTER=$(cat "${counterPath}")`,
-      `MSG_FILE="${tmpDir}/message-$COUNTER.txt"`,
+      'COUNTER=$(cat "$SPEEDY_COUNTER_FILE")',
+      'MSG_FILE="${SPEEDY_REBASE_DIR}/message-${COUNTER}.txt"',
       'if [ -f "$MSG_FILE" ]; then',
       '  cp "$MSG_FILE" "$1"',
       'fi',
-      `echo $((COUNTER + 1)) > "${counterPath}"`,
+      'echo $((COUNTER + 1)) > "$SPEEDY_COUNTER_FILE"',
     ].join('\n') + '\n';
     const editorPath = path.join(tmpDir, 'editor.sh');
     fs.writeFileSync(editorPath, editorScript, { mode: 0o755 });
+  }
+
+  private cleanupActiveTmpDir(): void {
+    if (this.activeTmpDir) {
+      this.deleteTmpDir(this.activeTmpDir);
+      this.activeTmpDir = null;
+    }
+  }
+
+  private deleteTmpDir(dir: string): void {
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
   }
 
   private isRebaseConflict(stderr: string): boolean {

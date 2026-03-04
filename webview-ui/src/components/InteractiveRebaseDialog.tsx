@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   DndContext,
@@ -80,6 +80,7 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, onClos
   const [squashMessages, setSquashMessages] = useState<SquashGroupMessage[]>([]);
   const [allDropWarningShown, setAllDropWarningShown] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const lastStep2EntriesRef = useRef<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -112,17 +113,23 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, onClos
     const allDropped = entries.every((e) => e.action === 'drop');
     if (allDropped && !allDropWarningShown) {
       setAllDropWarningShown(true);
-      setValidationError('All commits will be dropped from this branch. Click Next again to confirm, or change some actions.');
+      setValidationError('Warning: all commits will be dropped. Your branch will be reset to the base commit with no new history. Click Next again to proceed.');
       return;
     }
 
-    const computed = buildSquashMessages(entries);
-    const hasSquashGroups = computed.length > 0;
+    const entriesKey = JSON.stringify(entries);
+    const entriesChanged = entriesKey !== lastStep2EntriesRef.current;
 
-    setSquashMessages(computed);
+    let activeSquashMessages = squashMessages;
+    if (entriesChanged || squashMessages.length === 0) {
+      activeSquashMessages = buildSquashMessages(entries);
+      setSquashMessages(activeSquashMessages);
+      lastStep2EntriesRef.current = entriesKey;
+    }
+
     setValidationError(null);
     setAllDropWarningShown(false);
-    setStep(hasSquashGroups ? 2 : 3);
+    setStep(activeSquashMessages.length > 0 ? 2 : 3);
   };
 
   const handleSquashMessageChange = (leadHash: string, message: string) => {

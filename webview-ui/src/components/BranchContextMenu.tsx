@@ -7,14 +7,6 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { InputDialog } from './InputDialog';
 import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 
-// Returns true if ancestorHash appears before descendantHash in the commits list
-// (commits list is newest-first, so ancestor has a HIGHER index)
-function isAncestorInList(ancestorHash: string, descendantHash: string, commits: { hash: string }[]): boolean {
-  const ancestorIdx = commits.findIndex((c) => c.hash === ancestorHash);
-  const descendantIdx = commits.findIndex((c) => c.hash === descendantHash);
-  if (ancestorIdx === -1 || descendantIdx === -1) return false;
-  return ancestorIdx > descendantIdx;
-}
 
 interface BranchContextMenuProps {
   refInfo: RefInfo;
@@ -56,18 +48,15 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
   const isStash = refInfo.type === 'stash';
 
   // Standard rebase: show only for non-current branches/remotes/tags that aren't already ancestors of HEAD
-  const currentLocalBranch = branches.find((b) => b.current && !b.remote) ?? null;
   const targetBranch = branches.find((b) => b.name === refInfo.name && b.remote === refInfo.remote);
   const targetHash = targetBranch?.hash;
-  const headHash = currentLocalBranch?.hash;
   const canRebaseOnto =
     !isCurrentBranch &&
     !rebaseInProgress &&
     !loading &&
     isBranch &&
     !!targetHash &&
-    !!headHash &&
-    !isAncestorInList(targetHash, headHash, mergedCommits);
+    !mergedCommits.some((c) => c.hash === targetHash);
 
   const handleRebaseConfirm = (ignoreDate: boolean) => {
     setRebaseConfirmOpen(false);

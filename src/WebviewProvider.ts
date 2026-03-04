@@ -85,15 +85,13 @@ export class WebviewProvider {
     const rebaseStateResult = this.gitRebaseService.getRebaseState();
     if (rebaseStateResult.success) {
       if (rebaseStateResult.value.state === 'in-progress') {
-        // Fetch full conflict info asynchronously
-        this.gitRebaseService.getConflictInfo().then((conflictResult) => {
-          this.postMessage({
-            type: 'rebaseState',
-            payload: {
-              state: 'in-progress',
-              conflictInfo: conflictResult.success ? conflictResult.value : rebaseStateResult.value.conflictInfo,
-            },
-          });
+        const conflictResult = await this.gitRebaseService.getConflictInfo();
+        this.postMessage({
+          type: 'rebaseState',
+          payload: {
+            state: 'in-progress',
+            conflictInfo: conflictResult.success ? conflictResult.value : rebaseStateResult.value.conflictInfo,
+          },
         });
       } else {
         this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
@@ -479,6 +477,17 @@ export class WebviewProvider {
         break;
       }
       case 'interactiveRebase': {
+        const dirtyCheckIR = await this.gitRebaseService.isDirtyWorkingTree();
+        if (!dirtyCheckIR.success) {
+          this.postMessage({ type: 'error', payload: { error: dirtyCheckIR.error } });
+          this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+          break;
+        }
+        if (dirtyCheckIR.value) {
+          this.postMessage({ type: 'error', payload: { error: { message: 'Working tree has uncommitted changes. Commit, stash, or discard them before rebasing.' } } });
+          this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+          break;
+        }
         const iRebaseResult = await this.gitRebaseService.interactiveRebase(message.payload.config);
         if (iRebaseResult.success) {
           this.postMessage({ type: 'success', payload: { message: iRebaseResult.value } });
