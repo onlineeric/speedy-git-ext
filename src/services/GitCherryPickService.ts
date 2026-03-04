@@ -5,6 +5,7 @@ import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { CherryPickOptions, CherryPickState } from '../../shared/types.js';
 import { validateHash } from '../utils/gitValidation.js';
+import { isConflictStderr } from '../utils/gitParsers.js';
 
 export class GitCherryPickService {
   private executor: GitExecutor;
@@ -73,7 +74,7 @@ export class GitCherryPickService {
           'COMMAND_FAILED'
         ));
       }
-      if (fs.existsSync(this.cherryPickHeadPath) || this.isConflictStderr(stderr)) {
+      if (fs.existsSync(this.cherryPickHeadPath) || isConflictStderr(stderr)) {
         return err(new GitError(
           'Cherry-pick paused due to conflict. Resolve conflicts in the Source Control panel, then continue.',
           'CHERRY_PICK_CONFLICT'
@@ -106,7 +107,4 @@ export class GitCherryPickService {
     return ok('Cherry-pick continued successfully.');
   }
 
-  private isConflictStderr(stderr: string): boolean {
-    return stderr.includes('CONFLICT') || stderr.toLowerCase().includes('merge conflict');
-  }
 }

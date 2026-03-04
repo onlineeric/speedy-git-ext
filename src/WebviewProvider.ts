@@ -9,6 +9,7 @@ import type { GitTagService } from './services/GitTagService.js';
 import type { GitStashService } from './services/GitStashService.js';
 import type { GitHistoryService } from './services/GitHistoryService.js';
 import type { GitCherryPickService } from './services/GitCherryPickService.js';
+import type { GitRebaseService } from './services/GitRebaseService.js';
 
 export class WebviewProvider {
   private panel: vscode.WebviewPanel | undefined;
@@ -23,6 +24,7 @@ export class WebviewProvider {
     private readonly gitStashService: GitStashService,
     private readonly gitHistoryService: GitHistoryService,
     private readonly gitCherryPickService: GitCherryPickService,
+    private readonly gitRebaseService: GitRebaseService,
     private readonly log: vscode.LogOutputChannel
   ) {}
 
@@ -78,6 +80,24 @@ export class WebviewProvider {
     const cherryPickStateResult = this.gitCherryPickService.getCherryPickState();
     if (cherryPickStateResult.success) {
       this.postMessage({ type: 'cherryPickState', payload: { state: cherryPickStateResult.value } });
+    }
+
+    const rebaseStateResult = this.gitRebaseService.getRebaseState();
+    if (rebaseStateResult.success) {
+      if (rebaseStateResult.value.state === 'in-progress') {
+        // Fetch full conflict info asynchronously
+        this.gitRebaseService.getConflictInfo().then((conflictResult) => {
+          this.postMessage({
+            type: 'rebaseState',
+            payload: {
+              state: 'in-progress',
+              conflictInfo: conflictResult.success ? conflictResult.value : rebaseStateResult.value.conflictInfo,
+            },
+          });
+        });
+      } else {
+        this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+      }
     }
   }
 
@@ -427,6 +447,94 @@ export class WebviewProvider {
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
           this.postMessage({ type: 'cherryPickState', payload: { state: 'in-progress' } });
+        }
+        break;
+      }
+      // Rebase ops
+      case 'rebase': {
+        const dirtyCheck = await this.gitRebaseService.isDirtyWorkingTree();
+        if (!dirtyCheck.success) {
+          this.postMessage({ type: 'error', payload: { error: dirtyCheck.error } });
+          this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+          break;
+        }
+        if (dirtyCheck.value) {
+          this.postMessage({ type: 'error', payload: { error: { message: 'Working tree has uncommitted changes. Commit, stash, or discard them before rebasing.' } } });
+          this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+          break;
+        }
+        const rebaseResult = await this.gitRebaseService.rebase(message.payload.targetRef, message.payload.ignoreDate);
+        if (rebaseResult.success) {
+          this.postMessage({ type: 'success', payload: { message: rebaseResult.value } });
+          await this.sendInitialData();
+          this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+        } else if (rebaseResult.error.code === 'REBASE_CONFLICT') {
+          this.postMessage({ type: 'error', payload: { error: rebaseResult.error } });
+          const conflictInfo = await this.gitRebaseService.getConflictInfo();
+          this.postMessage({ type: 'rebaseState', payload: { state: 'in-progress', conflictInfo: conflictInfo.success ? conflictInfo.value : undefined } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: rebaseResult.error } });
+          this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+        }
+        break;
+      }
+      case 'interactiveRebase': {
+        const iRebaseResult = await this.gitRebaseService.interactiveRebase(message.payload.config);
+        if (iRebaseResult.success) {
+          this.postMessage({ type: 'success', payload: { message: iRebaseResult.value } });
+          await this.sendInitialData();
+          this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+        } else if (iRebaseResult.error.code === 'REBASE_CONFLICT') {
+          this.postMessage({ type: 'error', payload: { error: iRebaseResult.error } });
+          const conflictInfo = await this.gitRebaseService.getConflictInfo();
+          this.postMessage({ type: 'rebaseState', payload: { state: 'in-progress', conflictInfo: conflictInfo.success ? conflictInfo.value : undefined } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: iRebaseResult.error } });
+          this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+        }
+        break;
+      }
+      case 'getRebaseCommits': {
+        const dirtyCheckRC = await this.gitRebaseService.isDirtyWorkingTree();
+        if (!dirtyCheckRC.success) {
+          this.postMessage({ type: 'error', payload: { error: dirtyCheckRC.error } });
+          break;
+        }
+        if (dirtyCheckRC.value) {
+          this.postMessage({ type: 'error', payload: { error: { message: 'Working tree has uncommitted changes. Commit, stash, or discard them before rebasing.' } } });
+          break;
+        }
+        const commitsResult = await this.gitRebaseService.getRebaseCommits(message.payload.baseHash);
+        if (commitsResult.success) {
+          this.postMessage({ type: 'rebaseCommits', payload: { entries: commitsResult.value } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: commitsResult.error } });
+        }
+        break;
+      }
+      case 'abortRebase': {
+        const abortResult = await this.gitRebaseService.abortRebase();
+        if (abortResult.success) {
+          this.postMessage({ type: 'success', payload: { message: abortResult.value } });
+          await this.sendInitialData();
+          this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: abortResult.error } });
+        }
+        break;
+      }
+      case 'continueRebase': {
+        const continueResult = await this.gitRebaseService.continueRebase();
+        if (continueResult.success) {
+          this.postMessage({ type: 'success', payload: { message: continueResult.value } });
+          await this.sendInitialData();
+          this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+        } else if (continueResult.error.code === 'REBASE_CONFLICT') {
+          this.postMessage({ type: 'error', payload: { error: continueResult.error } });
+          const conflictInfo = await this.gitRebaseService.getConflictInfo();
+          this.postMessage({ type: 'rebaseState', payload: { state: 'in-progress', conflictInfo: conflictInfo.success ? conflictInfo.value : undefined } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: continueResult.error } });
         }
         break;
       }

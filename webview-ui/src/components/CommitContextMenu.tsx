@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import type { Commit, CherryPickOptions, ResetMode } from '@shared/types';
+import type { Commit, CherryPickOptions, ResetMode, RebaseEntry } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { ConfirmDialog } from './ConfirmDialog';
 import { InputDialog } from './InputDialog';
 import { TagCreationDialog } from './TagCreationDialog';
 import { CherryPickDialog } from './CherryPickDialog';
+import { InteractiveRebaseDialog } from './InteractiveRebaseDialog';
+import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 
 interface CommitContextMenuProps {
   commit: Commit;
@@ -45,11 +47,28 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
   const [cherryPickOpen, setCherryPickOpen] = useState(false);
   const [pendingResetMode, setPendingResetMode] = useState<ResetMode | null>(null);
   const [cherryPickCommits, setCherryPickCommits] = useState<Commit[]>([]);
+  const [rebaseOntoConfirmOpen, setRebaseOntoConfirmOpen] = useState(false);
+  const [interactiveRebaseOpen, setInteractiveRebaseOpen] = useState(false);
+  const [interactiveRebaseEntries, setInteractiveRebaseEntries] = useState<RebaseEntry[]>([]);
+  const [awaitingRebaseEntries, setAwaitingRebaseEntries] = useState(false);
 
   const branches = useGraphStore((s) => s.branches);
   const selectedCommits = useGraphStore((s) => s.selectedCommits);
   const mergedCommits = useGraphStore((s) => s.mergedCommits);
   const clearSelectedCommits = useGraphStore((s) => s.clearSelectedCommits);
+  const rebaseInProgress = useGraphStore((s) => s.rebaseInProgress);
+  const pendingRebaseEntries = useGraphStore((s) => s.pendingRebaseEntries);
+  const loading = useGraphStore((s) => s.loading);
+
+  // Watch for pending rebase entries (from getRebaseCommits response)
+  useEffect(() => {
+    if (awaitingRebaseEntries && pendingRebaseEntries !== undefined) {
+      setInteractiveRebaseEntries(pendingRebaseEntries);
+      useGraphStore.getState().setPendingRebaseEntries(undefined);
+      setAwaitingRebaseEntries(false);
+      setInteractiveRebaseOpen(true);
+    }
+  }, [awaitingRebaseEntries, pendingRebaseEntries]);
 
   const currentLocalBranch = branches.find((b) => b.current && !b.remote) ?? null;
   const hasRemoteUpstream =
@@ -60,6 +79,20 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
 
   const isHeadCommit = commit.hash === currentLocalBranch?.hash;
   const isMergeCommit = commit.parents.length > 1;
+
+  // Rebase actions: hidden for HEAD, disabled during loading or when rebase in progress
+  const canRebase = !isHeadCommit && !rebaseInProgress && !loading && !!currentLocalBranch;
+
+  const handleRebaseOntoCommitConfirm = (ignoreDate: boolean) => {
+    setRebaseOntoConfirmOpen(false);
+    useGraphStore.getState().setLoading(true);
+    rpcClient.rebase(commit.hash, ignoreDate);
+  };
+
+  const handleStartInteractiveRebase = () => {
+    setAwaitingRebaseEntries(true);
+    rpcClient.getRebaseCommits(commit.hash);
+  };
 
   const isMultiSelectActive =
     selectedCommits.length > 1 && selectedCommits.includes(commit.hash);
@@ -166,6 +199,28 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
                 <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
               </>
             )}
+            {/* Rebase items */}
+            {canRebase && (
+              <>
+                <ContextMenu.Item
+                  className={menuItemClass}
+                  onSelect={() => setRebaseOntoConfirmOpen(true)}
+                >
+                  Rebase Current Branch onto This Commit
+                </ContextMenu.Item>
+              </>
+            )}
+            {canRebase && (
+              <ContextMenu.Item
+                className={menuItemClass}
+                onSelect={handleStartInteractiveRebase}
+              >
+                Start Interactive Rebase from Here
+              </ContextMenu.Item>
+            )}
+            {(canRebase || canRebase) && (
+              <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+            )}
             <ContextMenu.Item className={menuItemClass} onSelect={handleCopyHash}>
               Copy Commit Hash
             </ContextMenu.Item>
@@ -245,6 +300,28 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
         onConfirm={handleCherryPickConfirm}
         onCancel={() => setCherryPickOpen(false)}
       />
+
+      {/* Rebase onto commit confirmation */}
+      <RebaseConfirmDialog
+        open={rebaseOntoConfirmOpen}
+        onConfirm={handleRebaseOntoCommitConfirm}
+        onCancel={() => setRebaseOntoConfirmOpen(false)}
+        title="Rebase Current Branch onto Commit"
+        description={`Rebase the current branch onto commit ${commit.abbreviatedHash}? This will rewrite commit history. Pushed commits will require a force-push.`}
+      />
+
+      {/* Interactive rebase dialog */}
+      {interactiveRebaseOpen && (
+        <InteractiveRebaseDialog
+          open={interactiveRebaseOpen}
+          baseHash={commit.hash}
+          initialEntries={interactiveRebaseEntries}
+          onClose={() => {
+            setInteractiveRebaseOpen(false);
+            setInteractiveRebaseEntries([]);
+          }}
+        />
+      )}
     </>
   );
 }

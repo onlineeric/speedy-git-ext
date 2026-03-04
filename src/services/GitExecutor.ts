@@ -6,6 +6,7 @@ export interface GitExecOptions {
   args: string[];
   cwd: string;
   timeout?: number;
+  env?: Record<string, string>;
 }
 
 export interface GitExecResult {
@@ -17,15 +18,18 @@ export class GitExecutor {
   constructor(private readonly log: LogOutputChannel) {}
 
   async execute(options: GitExecOptions): Promise<Result<GitExecResult>> {
-    const { args, cwd, timeout = 30000 } = options;
+    const { args, cwd, timeout = 30000, env } = options;
     const cmdString = `git ${args.join(' ')}`;
     this.log.debug(`Executing: ${cmdString}`);
     const startTime = Date.now();
 
+    const spawnEnv = env ? { ...process.env, ...env } : undefined;
+
     return new Promise((resolve) => {
-      const process = spawn('git', args, {
+      const gitProcess = spawn('git', args, {
         cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
+        env: spawnEnv,
       });
 
       let stdout = '';
@@ -40,7 +44,7 @@ export class GitExecutor {
       };
 
       const timeoutId = setTimeout(() => {
-        process.kill();
+        gitProcess.kill();
         this.log.error(`Git command timed out after ${timeout}ms: ${cmdString}`);
         safeResolve(
           err(
@@ -53,15 +57,15 @@ export class GitExecutor {
         );
       }, timeout);
 
-      process.stdout?.on('data', (data: Buffer) => {
+      gitProcess.stdout?.on('data', (data: Buffer) => {
         stdout += data.toString();
       });
 
-      process.stderr?.on('data', (data: Buffer) => {
+      gitProcess.stderr?.on('data', (data: Buffer) => {
         stderr += data.toString();
       });
 
-      process.on('close', (code) => {
+      gitProcess.on('close',(code) => {
         const elapsed = Date.now() - startTime;
         if (code !== 0) {
           this.log.info(`Git command exited with non-zero code: ${cmdString} — stderr: ${stderr.trim()}`);
@@ -94,7 +98,7 @@ export class GitExecutor {
         }
       });
 
-      process.on('error', (error) => {
+      gitProcess.on('error',(error) => {
         this.log.error(`Git command error: ${cmdString} — ${error.message}`);
         safeResolve(
           err(

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Commit, Branch, CommitDetails, DetailsPanelPosition, GraphFilters, RemoteInfo, StashEntry, CherryPickOptions } from '@shared/types';
+import type { Commit, Branch, CommitDetails, DetailsPanelPosition, GraphFilters, RemoteInfo, StashEntry, CherryPickOptions, RebaseConflictInfo, RebaseEntry } from '@shared/types';
 import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
 
 interface GraphStore {
@@ -21,6 +21,11 @@ interface GraphStore {
   // Cherry-pick state
   cherryPickInProgress: boolean;
   cherryPickOptions: CherryPickOptions;
+  // Rebase state (conflict-paused, not execution loading)
+  rebaseInProgress: boolean;
+  rebaseConflictInfo: RebaseConflictInfo | undefined;
+  // Pending rebase entries (populated by rebaseCommits response; consumed by InteractiveRebaseDialog)
+  pendingRebaseEntries: RebaseEntry[] | undefined;
   // Multi-select state
   selectedCommits: string[];
   lastClickedHash: string | undefined;
@@ -39,6 +44,9 @@ interface GraphStore {
   setMaxVisibleRefs: (count: number) => void;
   setCherryPickInProgress: (inProgress: boolean) => void;
   setCherryPickOptions: (options: CherryPickOptions) => void;
+  setRebaseInProgress: (inProgress: boolean) => void;
+  setRebaseConflictInfo: (info: RebaseConflictInfo | undefined) => void;
+  setPendingRebaseEntries: (entries: RebaseEntry[] | undefined) => void;
   setSelectedCommits: (hashes: string[]) => void;
   setSelectionAnchor: (hash: string | undefined) => void;
   toggleSelectedCommit: (hash: string) => void;
@@ -113,6 +121,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   maxVisibleRefs: 3,
   cherryPickInProgress: false,
   cherryPickOptions: { appendSourceRef: false, noCommit: false },
+  rebaseInProgress: false,
+  rebaseConflictInfo: undefined,
+  pendingRebaseEntries: undefined,
   selectedCommits: [],
   lastClickedHash: undefined,
   setCommits: (commits) => {
@@ -159,6 +170,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setMaxVisibleRefs: (count) => set({ maxVisibleRefs: count }),
   setCherryPickInProgress: (cherryPickInProgress) => set({ cherryPickInProgress }),
   setCherryPickOptions: (cherryPickOptions) => set({ cherryPickOptions }),
+  setRebaseInProgress: (rebaseInProgress) => set({ rebaseInProgress }),
+  setRebaseConflictInfo: (rebaseConflictInfo) => set({ rebaseConflictInfo }),
+  setPendingRebaseEntries: (pendingRebaseEntries) => set({ pendingRebaseEntries }),
   setSelectedCommits: (selectedCommits) => set({ selectedCommits }),
   setSelectionAnchor: (lastClickedHash) => set({ lastClickedHash }),
   toggleSelectedCommit: (hash) => set((state) => {

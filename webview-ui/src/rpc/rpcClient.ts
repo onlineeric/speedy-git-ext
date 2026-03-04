@@ -1,5 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, ResetMode } from '@shared/types';
+import type { CherryPickOptions, InteractiveRebaseConfig, ResetMode } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 
 declare const acquireVsCodeApi: () => {
@@ -63,6 +63,14 @@ class RpcClient {
         break;
       case 'cherryPickState':
         store.setCherryPickInProgress(message.payload.state === 'in-progress');
+        break;
+      case 'rebaseState':
+        store.setLoading(false);
+        store.setRebaseInProgress(message.payload.state === 'in-progress');
+        store.setRebaseConflictInfo(message.payload.conflictInfo);
+        break;
+      case 'rebaseCommits':
+        store.setPendingRebaseEntries(message.payload.entries);
         break;
     }
   }
@@ -199,6 +207,27 @@ class RpcClient {
 
   continueCherryPick() {
     this.send({ type: 'continueCherryPick', payload: {} });
+  }
+
+  // Rebase ops
+  rebase(targetRef: string, ignoreDate?: boolean) {
+    this.send({ type: 'rebase', payload: { targetRef, ignoreDate } });
+  }
+
+  getRebaseCommits(baseHash: string) {
+    this.send({ type: 'getRebaseCommits', payload: { baseHash } });
+  }
+
+  interactiveRebase(config: InteractiveRebaseConfig) {
+    this.send({ type: 'interactiveRebase', payload: { config } });
+  }
+
+  abortRebase() {
+    this.send({ type: 'abortRebase', payload: {} });
+  }
+
+  continueRebase() {
+    this.send({ type: 'continueRebase', payload: {} });
   }
 }
 
