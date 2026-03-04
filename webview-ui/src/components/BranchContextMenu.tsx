@@ -5,6 +5,16 @@ import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { ConfirmDialog } from './ConfirmDialog';
 import { InputDialog } from './InputDialog';
+import { RebaseConfirmDialog } from './RebaseConfirmDialog';
+
+// Returns true if ancestorHash appears before descendantHash in the commits list
+// (commits list is newest-first, so ancestor has a HIGHER index)
+function isAncestorInList(ancestorHash: string, descendantHash: string, commits: { hash: string }[]): boolean {
+  const ancestorIdx = commits.findIndex((c) => c.hash === ancestorHash);
+  const descendantIdx = commits.findIndex((c) => c.hash === descendantHash);
+  if (ancestorIdx === -1 || descendantIdx === -1) return false;
+  return ancestorIdx > descendantIdx;
+}
 
 interface BranchContextMenuProps {
   refInfo: RefInfo;
@@ -20,7 +30,11 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false);
-  const { loading } = useGraphStore();
+  const [rebaseConfirmOpen, setRebaseConfirmOpen] = useState(false);
+  const loading = useGraphStore((s) => s.loading);
+  const branches = useGraphStore((s) => s.branches);
+  const mergedCommits = useGraphStore((s) => s.mergedCommits);
+  const rebaseInProgress = useGraphStore((s) => s.rebaseInProgress);
 
   const displayName = refInfo.remote
     ? `${refInfo.remote}/${refInfo.name}`
@@ -41,6 +55,26 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
   const isTag = refInfo.type === 'tag';
   const isStash = refInfo.type === 'stash';
 
+  // Standard rebase: show only for non-current branches/remotes/tags that aren't already ancestors of HEAD
+  const currentLocalBranch = branches.find((b) => b.current && !b.remote) ?? null;
+  const targetBranch = branches.find((b) => b.name === refInfo.name && b.remote === refInfo.remote);
+  const targetHash = targetBranch?.hash;
+  const headHash = currentLocalBranch?.hash;
+  const canRebaseOnto =
+    !isCurrentBranch &&
+    !rebaseInProgress &&
+    !loading &&
+    isBranch &&
+    !!targetHash &&
+    !!headHash &&
+    !isAncestorInList(targetHash, headHash, mergedCommits);
+
+  const handleRebaseConfirm = (ignoreDate: boolean) => {
+    setRebaseConfirmOpen(false);
+    useGraphStore.getState().setLoading(true);
+    rpcClient.rebase(displayName, ignoreDate);
+  };
+
   return (
     <>
       <ContextMenu.Root>
@@ -50,6 +84,15 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
             {isBranch && !isCurrentBranch && (
               <ContextMenu.Item className={menuItemClass} onSelect={handleCheckout}>
                 Checkout {refInfo.name}
+              </ContextMenu.Item>
+            )}
+
+            {canRebaseOnto && (
+              <ContextMenu.Item
+                className={menuItemClass}
+                onSelect={() => setRebaseConfirmOpen(true)}
+              >
+                Rebase Current Branch onto This
               </ContextMenu.Item>
             )}
 
@@ -171,6 +214,15 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         description={`Merge '${refInfo.name}' into the current branch?`}
         confirmLabel="Merge"
         variant="warning"
+      />
+
+      {/* Rebase confirmation */}
+      <RebaseConfirmDialog
+        open={rebaseConfirmOpen}
+        onConfirm={handleRebaseConfirm}
+        onCancel={() => setRebaseConfirmOpen(false)}
+        title="Rebase Current Branch"
+        description={`Rebase the current branch onto '${displayName}'? This will rewrite commit history. Pushed commits will require a force-push.`}
       />
     </>
   );

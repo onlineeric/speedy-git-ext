@@ -104,3 +104,32 @@ export interface CherryPickOptions {
 }
 
 export type CherryPickState = 'idle' | 'in-progress';
+
+export type RebaseAction = 'pick' | 'squash' | 'fixup' | 'drop' | 'reword';
+
+export interface RebaseEntry {
+  hash: string;
+  abbreviatedHash: string;
+  subject: string;
+  action: RebaseAction;
+  rewordMessage?: string;
+}
+
+export interface SquashGroupMessage {
+  groupLeadHash: string;
+  combinedMessage: string;
+}
+
+export interface InteractiveRebaseConfig {
+  baseHash: string;
+  entries: RebaseEntry[];
+  squashMessages: SquashGroupMessage[];
+}
+
+export type RebaseState = 'idle' | 'in-progress';
+
+export interface RebaseConflictInfo {
+  conflictedFiles: string[];
+  conflictCommitHash: string;
+  conflictCommitMessage: string;
+}

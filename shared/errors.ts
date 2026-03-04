@@ -39,4 +39,5 @@ export type GitErrorCode =
   | 'VALIDATION_ERROR'
   | 'TIMEOUT'
   | 'CHERRY_PICK_CONFLICT'
+  | 'REBASE_CONFLICT'
   | 'UNKNOWN';

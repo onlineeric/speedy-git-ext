@@ -7,3 +7,4 @@ export { GitRemoteService } from './GitRemoteService.js';
 export { GitTagService } from './GitTagService.js';
 export { GitStashService } from './GitStashService.js';
 export { GitCherryPickService } from './GitCherryPickService.js';
+export { GitRebaseService } from './GitRebaseService.js';

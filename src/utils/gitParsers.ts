@@ -2,6 +2,10 @@ import type { Commit, Branch, RefInfo } from '../../shared/types.js';
 
 const NULL_CHAR = '\x00';
 
+export function isConflictStderr(stderr: string): boolean {
+  return stderr.includes('CONFLICT') || stderr.toLowerCase().includes('merge conflict');
+}
+
 export function parseCommitLine(line: string): Commit | null {
   const parts = line.split(NULL_CHAR);
   if (parts.length < 7) {

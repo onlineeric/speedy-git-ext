@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useGraphStore } from '../stores/graphStore';
 import { CommitRow } from './CommitRow';
 import { CherryPickConflictBanner } from './CherryPickConflictBanner';
+import { RebaseConflictBanner } from './RebaseConflictBanner';
 
 const ROW_HEIGHT = 28;
 const OVERSCAN = 10;
@@ -68,6 +69,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
     return (
       <div className="flex flex-col h-full">
         <CherryPickConflictBanner />
+        <RebaseConflictBanner />
         <div className="flex items-center justify-center flex-1 text-[var(--vscode-descriptionForeground)]">
           No commits found
         </div>
@@ -80,6 +82,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <CherryPickConflictBanner />
+      <RebaseConflictBanner />
       <div
         ref={containerRef}
         className="flex-1 overflow-auto"
