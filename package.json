@@ -2,12 +2,17 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "0.1.0",
-  "publisher": "speedy-git",
+  "version": "0.2.0",
+  "publisher": "onlineeric",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/onlineeric/speedy-git-ext"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
+  "icon": "resources/speedy-git-ext-icon-256.png",
   "categories": [
     "SCM Providers",
     "Visualization"
@@ -24,7 +29,7 @@
     "commands": [
       {
         "command": "speedyGit.showGraph",
-        "title": "Show Git Graph",
+        "title": "Show Speedy Git Graph",
         "category": "Speedy Git"
       }
     ],
@@ -56,6 +61,7 @@
     "@eslint/js": "^9.39.2",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.7.1",
     "concurrently": "^8.2.2",
     "esbuild": "^0.20.0",
     "eslint": "^9.39.2",
