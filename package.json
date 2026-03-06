@@ -2,7 +2,7 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "onlineeric",
   "license": "MIT",
   "repository": {
@@ -40,6 +40,17 @@
           "when": "workspaceFolderCount > 0"
         }
       ]
+    },
+    "configuration": {
+      "title": "Speedy Git",
+      "properties": {
+        "speedyGit.batchCommitSize": {
+          "type": "number",
+          "default": 500,
+          "minimum": 1,
+          "markdownDescription": "Number of commits to load per batch in the Git graph panel. Lower values give faster initial load; higher values reduce scroll-triggered fetches for large repositories."
+        }
+      }
     }
   },
   "scripts": {

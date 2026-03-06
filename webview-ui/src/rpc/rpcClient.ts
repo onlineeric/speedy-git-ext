@@ -39,7 +39,17 @@ class RpcClient {
     switch (message.type) {
       case 'commits':
         store.setCommits(message.payload.commits);
+        this.firePrefetch();
         break;
+      case 'commitsAppended': {
+        if (message.payload.generation !== store.fetchGeneration) break;
+        store.appendCommits(message.payload.commits);
+        store.setHasMore(message.payload.hasMore);
+        store.setPrefetching(false);
+        // Catch-up is handled by GraphContainer's useEffect which re-runs when
+        // lastBatchStartIndex or prefetching changes.
+        break;
+      }
       case 'branches':
         store.setBranches(message.payload.branches);
         break;
@@ -51,6 +61,10 @@ class RpcClient {
         break;
       case 'error':
         store.setError(message.payload.error.message);
+        break;
+      case 'prefetchError':
+        store.setError(message.payload.error.message);
+        store.setPrefetching(false);
         break;
       case 'success':
         store.setSuccessMessage(message.payload.message);
@@ -228,6 +242,24 @@ class RpcClient {
 
   continueRebase() {
     this.send({ type: 'continueRebase', payload: {} });
+  }
+
+  // Settings
+  openSettings() {
+    this.send({ type: 'openSettings', payload: {} });
+  }
+
+  // Pagination
+  loadMoreCommits(skip: number, generation: number, filters: { branch?: string; author?: string }) {
+    this.send({ type: 'loadMoreCommits', payload: { skip, generation, filters } });
+  }
+
+  firePrefetch() {
+    const store = useGraphStore.getState();
+    if (!store.hasMore || store.prefetching) return;
+    store.setPrefetching(true);
+    const { branch, author } = store.filters;
+    this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branch, author });
   }
 }
 
