@@ -44,7 +44,10 @@ export type RequestMessage =
   | { type: 'interactiveRebase'; payload: { config: InteractiveRebaseConfig } }
   | { type: 'getRebaseCommits'; payload: { baseHash: string } }
   | { type: 'abortRebase'; payload: Record<string, never> }
-  | { type: 'continueRebase'; payload: Record<string, never> };
+  | { type: 'continueRebase'; payload: Record<string, never> }
+  // Pagination & settings
+  | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branch?: string; author?: string } } }
+  | { type: 'openSettings'; payload: Record<string, never> };
 
 export type ResponseMessage =
   | { type: 'commits'; payload: { commits: Commit[] } }
@@ -57,7 +60,8 @@ export type ResponseMessage =
   | { type: 'stashes'; payload: { stashes: StashEntry[] } }
   | { type: 'cherryPickState'; payload: { state: CherryPickState } }
   | { type: 'rebaseState'; payload: { state: RebaseState; conflictInfo?: RebaseConflictInfo } }
-  | { type: 'rebaseCommits'; payload: { entries: RebaseEntry[] } };
+  | { type: 'rebaseCommits'; payload: { entries: RebaseEntry[] } }
+  | { type: 'commitsAppended'; payload: { commits: Commit[]; hasMore: boolean; generation: number } };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -76,13 +80,14 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   cherryPick: true, abortCherryPick: true, continueCherryPick: true,
   rebase: true, interactiveRebase: true, getRebaseCommits: true,
   abortRebase: true, continueRebase: true,
+  loadMoreCommits: true, openSettings: true,
 };
 
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commits: true, branches: true, commitDetails: true,
   error: true, loading: true, success: true,
   remotes: true, stashes: true, cherryPickState: true,
-  rebaseState: true, rebaseCommits: true,
+  rebaseState: true, rebaseCommits: true, commitsAppended: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {

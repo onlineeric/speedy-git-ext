@@ -104,13 +104,44 @@ export class WebviewProvider {
     switch (message.type) {
       case 'getCommits': {
         this.postMessage({ type: 'loading', payload: { loading: true } });
-        const result = await this.gitLogService.getCommits(message.payload.filters);
+        const batchSize = this.getBatchSize();
+        const result = await this.gitLogService.getCommits({ ...message.payload.filters, maxCount: batchSize });
         if (result.success) {
           this.postMessage({ type: 'commits', payload: { commits: result.value } });
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }
         this.postMessage({ type: 'loading', payload: { loading: false } });
+        break;
+      }
+      case 'loadMoreCommits': {
+        const batchSize = this.getBatchSize();
+        const { skip, generation, filters } = message.payload;
+        const result = await this.gitLogService.getCommits({ ...filters, maxCount: batchSize, skip });
+        if (result.success) {
+          this.postMessage({
+            type: 'commitsAppended',
+            payload: { commits: result.value, hasMore: result.value.length >= batchSize, generation },
+          });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+          vscode.window.showErrorMessage('Failed to load commits', 'Retry').then(async (choice) => {
+            if (choice !== 'Retry') return;
+            const retryResult = await this.gitLogService.getCommits({ ...filters, maxCount: batchSize, skip });
+            if (retryResult.success) {
+              this.postMessage({
+                type: 'commitsAppended',
+                payload: { commits: retryResult.value, hasMore: retryResult.value.length >= batchSize, generation },
+              });
+            } else {
+              this.postMessage({ type: 'error', payload: { error: retryResult.error } });
+            }
+          });
+        }
+        break;
+      }
+      case 'openSettings': {
+        await vscode.commands.executeCommand('workbench.action.openSettings', 'speedyGit');
         break;
       }
       case 'getBranches': {
@@ -622,6 +653,10 @@ export class WebviewProvider {
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
+  }
+
+  private getBatchSize(): number {
+    return vscode.workspace.getConfiguration('speedyGit').get<number>('batchCommitSize', 500);
   }
 
   dispose() {

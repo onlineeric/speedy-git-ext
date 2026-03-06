@@ -29,6 +29,9 @@ export class GitLogService {
       args.push('--all');
     }
 
+    if (filters?.skip && filters.skip > 0) {
+      args.push(`--skip=${filters.skip}`);
+    }
     args.push(
       `--max-count=${maxCount}`,
       `--format=${LOG_FORMAT}`,

@@ -85,6 +85,15 @@ export function ControlBar() {
         {mergedCommits.length} commits
       </span>
 
+      <button
+        onClick={() => rpcClient.openSettings()}
+        aria-label="Open extension settings"
+        className={buttonSecondaryClass}
+        title="Extension settings"
+      >
+        ⚙
+      </button>
+
       <RemoteManagementDialog open={remoteDialogOpen} onClose={() => setRemoteDialogOpen(false)} />
     </div>
   );
