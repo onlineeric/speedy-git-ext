@@ -44,6 +44,7 @@ export interface GraphFilters {
   branch?: string;
   author?: string;
   maxCount: number;
+  skip?: number;
 }
 
 export interface FileChange {

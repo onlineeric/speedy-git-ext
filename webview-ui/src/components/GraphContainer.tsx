@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useGraphStore } from '../stores/graphStore';
+import { rpcClient } from '../rpc/rpcClient';
 import { CommitRow } from './CommitRow';
 import { CherryPickConflictBanner } from './CherryPickConflictBanner';
 import { RebaseConflictBanner } from './RebaseConflictBanner';
@@ -23,6 +24,9 @@ function computeMaxVisibleRefs(width: number): number {
 
 export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContainerProps) {
   const { mergedCommits: commits, topology, maxVisibleRefs, setMaxVisibleRefs } = useGraphStore();
+  const prefetching = useGraphStore((s) => s.prefetching);
+  const hasMore = useGraphStore((s) => s.hasMore);
+  const lastBatchStartIndex = useGraphStore((s) => s.lastBatchStartIndex);
   const selectedCommits = useGraphStore((s) => s.selectedCommits);
   const selectedCommitsSet = useMemo(() => new Set(selectedCommits), [selectedCommits]);
   const toggleSelectedCommit = useGraphStore((s) => s.toggleSelectedCommit);
@@ -52,6 +56,13 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
 
   const virtualItems = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
+
+  useEffect(() => {
+    if (!hasMore || prefetching) return;
+    if (virtualizer.range && virtualizer.range.endIndex >= lastBatchStartIndex) {
+      rpcClient.firePrefetch();
+    }
+  }, [virtualizer.range?.endIndex, lastBatchStartIndex, prefetching, hasMore]);
 
   const handleCommitClick = (hash: string, e: React.MouseEvent) => {
     if (e.shiftKey) {
@@ -122,6 +133,11 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
           })}
         </div>
       </div>
+      {prefetching && (
+        <div className="flex items-center justify-center py-2 text-xs text-[var(--vscode-descriptionForeground)]">
+          Loading…
+        </div>
+      )}
     </div>
   );
 }

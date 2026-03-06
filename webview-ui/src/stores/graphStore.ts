@@ -29,6 +29,11 @@ interface GraphStore {
   // Multi-select state
   selectedCommits: string[];
   lastClickedHash: string | undefined;
+  // Pagination state
+  hasMore: boolean;
+  prefetching: boolean;
+  fetchGeneration: number;
+  lastBatchStartIndex: number;
   setCommits: (commits: Commit[]) => void;
   setBranches: (branches: Branch[]) => void;
   setSelectedCommit: (hash: string | undefined) => void;
@@ -52,6 +57,10 @@ interface GraphStore {
   toggleSelectedCommit: (hash: string) => void;
   selectCommitRange: (toHash: string) => void;
   clearSelectedCommits: () => void;
+  // Pagination actions
+  appendCommits: (newCommits: Commit[]) => void;
+  setHasMore: (has: boolean) => void;
+  setPrefetching: (v: boolean) => void;
 }
 
 const emptyTopology: GraphTopology = {
@@ -101,6 +110,11 @@ function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[]): Comm
   return merged;
 }
 
+function computeMergedTopology(commits: Commit[], stashes: StashEntry[]): { mergedCommits: Commit[]; topology: GraphTopology } {
+  const mergedCommits = mergeStashesIntoCommits(commits, stashes);
+  return { mergedCommits, topology: calculateTopology(mergedCommits) };
+}
+
 export const useGraphStore = create<GraphStore>((set, get) => ({
   commits: [],
   branches: [],
@@ -126,11 +140,23 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   pendingRebaseEntries: undefined,
   selectedCommits: [],
   lastClickedHash: undefined,
+  hasMore: true,
+  prefetching: false,
+  fetchGeneration: 0,
+  lastBatchStartIndex: 0,
   setCommits: (commits) => {
-    const stashes = get().stashes;
-    const mergedCommits = mergeStashesIntoCommits(commits, stashes);
-    const topology = calculateTopology(mergedCommits);
-    set({ commits, mergedCommits, topology, selectedCommits: [], lastClickedHash: undefined });
+    const { mergedCommits, topology } = computeMergedTopology(commits, get().stashes);
+    set({
+      commits,
+      mergedCommits,
+      topology,
+      selectedCommits: [],
+      lastClickedHash: undefined,
+      hasMore: true,
+      prefetching: false,
+      fetchGeneration: get().fetchGeneration + 1,
+      lastBatchStartIndex: 0,
+    });
   },
   setBranches: (branches) => set({ branches }),
   setSelectedCommit: (selectedCommit) => set({ selectedCommit }),
@@ -162,9 +188,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setFilters: (filters) => set((state) => ({ filters: { ...state.filters, ...filters } })),
   setRemotes: (remotes) => set({ remotes }),
   setStashes: (stashes) => {
-    const commits = get().commits;
-    const mergedCommits = mergeStashesIntoCommits(commits, stashes);
-    const topology = calculateTopology(mergedCommits);
+    const { mergedCommits, topology } = computeMergedTopology(get().commits, stashes);
     set({ stashes, mergedCommits, topology });
   },
   setMaxVisibleRefs: (count) => set({ maxVisibleRefs: count }),
@@ -197,4 +221,12 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     return { selectedCommits };
   }),
   clearSelectedCommits: () => set({ selectedCommits: [], lastClickedHash: undefined }),
+  appendCommits: (newCommits) => {
+    const { commits, stashes } = get();
+    const allCommits = [...commits, ...newCommits];
+    const { mergedCommits, topology } = computeMergedTopology(allCommits, stashes);
+    set({ commits: allCommits, mergedCommits, topology, lastBatchStartIndex: commits.length });
+  },
+  setHasMore: (hasMore) => set({ hasMore }),
+  setPrefetching: (prefetching) => set({ prefetching }),
 }));
