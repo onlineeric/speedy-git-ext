@@ -61,7 +61,8 @@ export type ResponseMessage =
   | { type: 'cherryPickState'; payload: { state: CherryPickState } }
   | { type: 'rebaseState'; payload: { state: RebaseState; conflictInfo?: RebaseConflictInfo } }
   | { type: 'rebaseCommits'; payload: { entries: RebaseEntry[] } }
-  | { type: 'commitsAppended'; payload: { commits: Commit[]; hasMore: boolean; generation: number } };
+  | { type: 'commitsAppended'; payload: { commits: Commit[]; hasMore: boolean; generation: number } }
+  | { type: 'prefetchError'; payload: { error: GitError | { message: string } } };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -87,7 +88,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commits: true, branches: true, commitDetails: true,
   error: true, loading: true, success: true,
   remotes: true, stashes: true, cherryPickState: true,
-  rebaseState: true, rebaseCommits: true, commitsAppended: true,
+  rebaseState: true, rebaseCommits: true, commitsAppended: true, prefetchError: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {

@@ -61,6 +61,9 @@ class RpcClient {
         break;
       case 'error':
         store.setError(message.payload.error.message);
+        break;
+      case 'prefetchError':
+        store.setError(message.payload.error.message);
         store.setPrefetching(false);
         break;
       case 'success':

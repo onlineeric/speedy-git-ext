@@ -124,7 +124,7 @@ export class WebviewProvider {
             payload: { commits: result.value, hasMore: result.value.length >= batchSize, generation },
           });
         } else {
-          this.postMessage({ type: 'error', payload: { error: result.error } });
+          this.postMessage({ type: 'prefetchError', payload: { error: result.error } });
           vscode.window.showErrorMessage('Failed to load commits', 'Retry').then(async (choice) => {
             if (choice !== 'Retry') return;
             const retryResult = await this.gitLogService.getCommits({ ...filters, maxCount: batchSize, skip });
@@ -134,7 +134,7 @@ export class WebviewProvider {
                 payload: { commits: retryResult.value, hasMore: retryResult.value.length >= batchSize, generation },
               });
             } else {
-              this.postMessage({ type: 'error', payload: { error: retryResult.error } });
+              this.postMessage({ type: 'prefetchError', payload: { error: retryResult.error } });
             }
           });
         }
