@@ -65,7 +65,7 @@
     "watch:webview": "cd webview-ui && pnpm run dev",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "generate-test-repo": "tsx scripts/generate-test-repo.ts",
+    "generate-test-repo": "tsx scripts/main.ts",
     "test": "vitest run"
   },
   "devDependencies": {
