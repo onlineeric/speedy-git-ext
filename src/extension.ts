@@ -15,7 +15,14 @@ export function activate(context: vscode.ExtensionContext) {
     controller?.showGraph();
   });
 
-  context.subscriptions.push(showGraphCommand);
+  const openForRepoCommand = vscode.commands.registerCommand(
+    'speedyGit.openForRepo',
+    (sourceControl: vscode.SourceControl) => {
+      controller?.openForRepo(sourceControl);
+    }
+  );
+
+  context.subscriptions.push(showGraphCommand, openForRepoCommand);
   context.subscriptions.push({
     dispose: () => {
       controller?.dispose();

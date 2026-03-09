@@ -27,6 +27,7 @@ export function App() {
     []
   );
 
+  const isLoadingRepo = useGraphStore((s) => s.isLoadingRepo);
   const isBottom = detailsPanelPosition === 'bottom';
   const showPanel = detailsPanelOpen;
 
@@ -34,7 +35,7 @@ export function App() {
     <div className="flex flex-col h-full">
       <ControlBar />
       <div className={`flex-1 overflow-hidden flex ${isBottom ? 'flex-col' : 'flex-row'}`}>
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden relative">
           {loading ? (
             <div className="flex items-center justify-center h-full text-[var(--vscode-descriptionForeground)]">
               Loading commits...
@@ -44,6 +45,15 @@ export function App() {
               selectedCommit={selectedCommit}
               onSelectCommit={handleCommitSelect}
             />
+          )}
+          {isLoadingRepo && (
+            <div
+              aria-busy="true"
+              className="absolute inset-0 flex items-center justify-center"
+              style={{ background: 'var(--vscode-editor-background)', opacity: 0.7 }}
+            >
+              <span className="text-sm text-[var(--vscode-descriptionForeground)]">Switching repository…</span>
+            </div>
           )}
         </div>
         {showPanel && <CommitDetailsPanel />}
