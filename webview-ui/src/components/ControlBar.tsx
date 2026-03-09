@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { RemoteManagementDialog } from './RemoteManagementDialog';
+import { RepoSelector } from './RepoSelector';
 
 export function ControlBar() {
-  const { branches, filters, setFilters, mergedCommits, loading } = useGraphStore();
+  const { branches, filters, setFilters, mergedCommits, loading, totalLoadedWithoutFilter } = useGraphStore();
   const [remoteDialogOpen, setRemoteDialogOpen] = useState(false);
 
   const handleBranchChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -29,6 +30,8 @@ export function ControlBar() {
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)]">
+      <RepoSelector />
+
       <select
         value={filters.branch ?? ''}
         onChange={handleBranchChange}
@@ -82,7 +85,7 @@ export function ControlBar() {
       </button>
 
       <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)]">
-        {mergedCommits.length} commits
+        {totalLoadedWithoutFilter !== null ? totalLoadedWithoutFilter : mergedCommits.length} loaded commits
       </span>
 
       <button

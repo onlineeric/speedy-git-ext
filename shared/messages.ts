@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, CherryPickOptions, CherryPickState, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, CherryPickOptions, CherryPickState, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo } from './types.js';
 import type { GitError } from './errors.js';
 
 export type RequestMessage =
@@ -47,10 +47,11 @@ export type RequestMessage =
   | { type: 'continueRebase'; payload: Record<string, never> }
   // Pagination & settings
   | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branch?: string; author?: string } } }
-  | { type: 'openSettings'; payload: Record<string, never> };
+  | { type: 'openSettings'; payload: Record<string, never> }
+  | { type: 'switchRepo'; payload: { repoPath: string } };
 
 export type ResponseMessage =
-  | { type: 'commits'; payload: { commits: Commit[] } }
+  | { type: 'commits'; payload: { commits: Commit[]; branches?: Branch[]; hasMore?: boolean; totalLoadedWithoutFilter?: number } }
   | { type: 'branches'; payload: { branches: Branch[] } }
   | { type: 'commitDetails'; payload: { details: CommitDetails } }
   | { type: 'error'; payload: { error: GitError | { message: string } } }
@@ -61,8 +62,9 @@ export type ResponseMessage =
   | { type: 'cherryPickState'; payload: { state: CherryPickState } }
   | { type: 'rebaseState'; payload: { state: RebaseState; conflictInfo?: RebaseConflictInfo } }
   | { type: 'rebaseCommits'; payload: { entries: RebaseEntry[] } }
-  | { type: 'commitsAppended'; payload: { commits: Commit[]; hasMore: boolean; generation: number } }
-  | { type: 'prefetchError'; payload: { error: GitError | { message: string } } };
+  | { type: 'commitsAppended'; payload: { commits: Commit[]; hasMore: boolean; generation: number; totalLoadedWithoutFilter?: number } }
+  | { type: 'prefetchError'; payload: { error: GitError | { message: string } } }
+  | { type: 'repoList'; payload: { repos: RepoInfo[]; activeRepoPath: string } };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -81,14 +83,14 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   cherryPick: true, abortCherryPick: true, continueCherryPick: true,
   rebase: true, interactiveRebase: true, getRebaseCommits: true,
   abortRebase: true, continueRebase: true,
-  loadMoreCommits: true, openSettings: true,
+  loadMoreCommits: true, openSettings: true, switchRepo: true,
 };
 
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commits: true, branches: true, commitDetails: true,
   error: true, loading: true, success: true,
   remotes: true, stashes: true, cherryPickState: true,
-  rebaseState: true, rebaseCommits: true, commitsAppended: true, prefetchError: true,
+  rebaseState: true, rebaseCommits: true, commitsAppended: true, prefetchError: true, repoList: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {
