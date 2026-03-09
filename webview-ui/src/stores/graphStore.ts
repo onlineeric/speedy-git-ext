@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Commit, Branch, CommitDetails, DetailsPanelPosition, GraphFilters, RemoteInfo, StashEntry, CherryPickOptions, RebaseConflictInfo, RebaseEntry } from '@shared/types';
+import type { Commit, Branch, CommitDetails, DetailsPanelPosition, GraphFilters, RemoteInfo, StashEntry, CherryPickOptions, RebaseConflictInfo, RebaseEntry, RepoInfo } from '@shared/types';
 import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
 
 interface GraphStore {
@@ -34,6 +34,12 @@ interface GraphStore {
   prefetching: boolean;
   fetchGeneration: number;
   lastBatchStartIndex: number;
+  // Commit counter
+  totalLoadedWithoutFilter: number;
+  // Repository navigation
+  repos: RepoInfo[];
+  activeRepoPath: string;
+  isLoadingRepo: boolean;
   setCommits: (commits: Commit[]) => void;
   setBranches: (branches: Branch[]) => void;
   setSelectedCommit: (hash: string | undefined) => void;
@@ -58,9 +64,14 @@ interface GraphStore {
   selectCommitRange: (toHash: string) => void;
   clearSelectedCommits: () => void;
   // Pagination actions
-  appendCommits: (newCommits: Commit[]) => void;
+  appendCommits: (newCommits: Commit[], totalLoadedWithoutFilter?: number) => void;
   setHasMore: (has: boolean) => void;
   setPrefetching: (v: boolean) => void;
+  setTotalLoadedWithoutFilter: (n: number) => void;
+  // Repository navigation actions
+  setRepos: (repos: RepoInfo[], activeRepoPath: string) => void;
+  setActiveRepo: (repoPath: string) => void;
+  setIsLoadingRepo: (v: boolean) => void;
 }
 
 const emptyTopology: GraphTopology = {
@@ -144,6 +155,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   prefetching: false,
   fetchGeneration: 0,
   lastBatchStartIndex: 0,
+  totalLoadedWithoutFilter: 0,
+  repos: [],
+  activeRepoPath: '',
+  isLoadingRepo: false,
   setCommits: (commits) => {
     const { mergedCommits, topology } = computeMergedTopology(commits, get().stashes);
     set({
@@ -221,12 +236,40 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     return { selectedCommits };
   }),
   clearSelectedCommits: () => set({ selectedCommits: [], lastClickedHash: undefined }),
-  appendCommits: (newCommits) => {
-    const { commits, stashes } = get();
+  appendCommits: (newCommits, totalLoadedWithoutFilter) => {
+    const { commits, stashes, filters, totalLoadedWithoutFilter: existingTotal } = get();
     const allCommits = [...commits, ...newCommits];
     const { mergedCommits, topology } = computeMergedTopology(allCommits, stashes);
-    set({ commits: allCommits, mergedCommits, topology, lastBatchStartIndex: commits.length });
+    const hasFilter = !!(filters.branch || filters.author);
+    set({
+      commits: allCommits,
+      mergedCommits,
+      topology,
+      lastBatchStartIndex: commits.length,
+      ...((!hasFilter && totalLoadedWithoutFilter !== undefined)
+        ? { totalLoadedWithoutFilter: existingTotal + totalLoadedWithoutFilter }
+        : {}),
+    });
   },
   setHasMore: (hasMore) => set({ hasMore }),
   setPrefetching: (prefetching) => set({ prefetching }),
+  setTotalLoadedWithoutFilter: (totalLoadedWithoutFilter) => set({ totalLoadedWithoutFilter }),
+  setRepos: (repos, activeRepoPath) => {
+    const { activeRepoPath: prevPath, filters } = get();
+    const repoChanged = prevPath !== '' && prevPath !== activeRepoPath;
+    set({
+      repos,
+      activeRepoPath,
+      // Reset branch/author filter when switching repos; preserve maxCount
+      ...(repoChanged ? { filters: { maxCount: filters.maxCount } } : {}),
+    });
+  },
+  setActiveRepo: (repoPath) => {
+    set({ isLoadingRepo: true });
+    // rpcClient will be called from the component — we dispatch via import to avoid circular deps
+    import('../rpc/rpcClient').then(({ rpcClient }) => {
+      rpcClient.send({ type: 'switchRepo', payload: { repoPath } });
+    });
+  },
+  setIsLoadingRepo: (isLoadingRepo) => set({ isLoadingRepo }),
 }));

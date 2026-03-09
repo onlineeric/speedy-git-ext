@@ -39,17 +39,24 @@ class RpcClient {
     switch (message.type) {
       case 'commits':
         store.setCommits(message.payload.commits);
+        if (message.payload.totalLoadedWithoutFilter !== undefined) {
+          store.setTotalLoadedWithoutFilter(message.payload.totalLoadedWithoutFilter);
+        }
+        store.setIsLoadingRepo(false);
         this.firePrefetch();
         break;
       case 'commitsAppended': {
         if (message.payload.generation !== store.fetchGeneration) break;
-        store.appendCommits(message.payload.commits);
+        store.appendCommits(message.payload.commits, message.payload.totalLoadedWithoutFilter);
         store.setHasMore(message.payload.hasMore);
         store.setPrefetching(false);
         // Catch-up is handled by GraphContainer's useEffect which re-runs when
         // lastBatchStartIndex or prefetching changes.
         break;
       }
+      case 'repoList':
+        store.setRepos(message.payload.repos, message.payload.activeRepoPath);
+        break;
       case 'branches':
         store.setBranches(message.payload.branches);
         break;

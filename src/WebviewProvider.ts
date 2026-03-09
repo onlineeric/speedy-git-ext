@@ -10,23 +10,74 @@ import type { GitStashService } from './services/GitStashService.js';
 import type { GitHistoryService } from './services/GitHistoryService.js';
 import type { GitCherryPickService } from './services/GitCherryPickService.js';
 import type { GitRebaseService } from './services/GitRebaseService.js';
+import type { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
+import type { RepoInfo } from '../shared/types.js';
 
 export class WebviewProvider {
   private panel: vscode.WebviewPanel | undefined;
+  /** Incremented on each repo switch to discard stale commit responses */
+  private fetchGeneration = 0;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly gitLogService: GitLogService,
-    private readonly gitDiffService: GitDiffService,
-    private readonly gitBranchService: GitBranchService,
-    private readonly gitRemoteService: GitRemoteService,
-    private readonly gitTagService: GitTagService,
-    private readonly gitStashService: GitStashService,
-    private readonly gitHistoryService: GitHistoryService,
-    private readonly gitCherryPickService: GitCherryPickService,
-    private readonly gitRebaseService: GitRebaseService,
-    private readonly log: vscode.LogOutputChannel
+    private gitLogService: GitLogService,
+    private gitDiffService: GitDiffService,
+    private gitBranchService: GitBranchService,
+    private gitRemoteService: GitRemoteService,
+    private gitTagService: GitTagService,
+    private gitStashService: GitStashService,
+    private gitHistoryService: GitHistoryService,
+    private gitCherryPickService: GitCherryPickService,
+    private gitRebaseService: GitRebaseService,
+    private readonly log: vscode.LogOutputChannel,
+    private readonly gitRepoDiscoveryService?: GitRepoDiscoveryService
   ) {}
+
+  /** Callback invoked when the user switches repos; updates services before commits are fetched */
+  private onSwitchRepo: ((repoPath: string) => void) | undefined;
+
+  /** Register the callback that reinitializes services for a new repo path */
+  setSwitchRepoHandler(handler: (repoPath: string) => void) {
+    this.onSwitchRepo = handler;
+  }
+
+  /** Replace all services when the active repo changes */
+  updateServices(
+    gitLogService: GitLogService,
+    gitDiffService: GitDiffService,
+    gitBranchService: GitBranchService,
+    gitRemoteService: GitRemoteService,
+    gitTagService: GitTagService,
+    gitStashService: GitStashService,
+    gitHistoryService: GitHistoryService,
+    gitCherryPickService: GitCherryPickService,
+    gitRebaseService: GitRebaseService
+  ) {
+    this.gitLogService = gitLogService;
+    this.gitDiffService = gitDiffService;
+    this.gitBranchService = gitBranchService;
+    this.gitRemoteService = gitRemoteService;
+    this.gitTagService = gitTagService;
+    this.gitStashService = gitStashService;
+    this.gitHistoryService = gitHistoryService;
+    this.gitCherryPickService = gitCherryPickService;
+    this.gitRebaseService = gitRebaseService;
+  }
+
+  /** Returns true if the webview panel is currently open */
+  isPanelOpen(): boolean {
+    return this.panel !== undefined;
+  }
+
+  /** Reload all data for the current active repo (use after a repo switch when panel is already open) */
+  async reload() {
+    await this.sendInitialData(undefined, true);
+  }
+
+  /** Push an updated repo list to the webview */
+  sendRepoList(repos: RepoInfo[], activeRepoPath: string) {
+    this.postMessage({ type: 'repoList', payload: { repos, activeRepoPath } });
+  }
 
   async show() {
     if (this.panel) {
@@ -45,6 +96,12 @@ export class WebviewProvider {
           vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview'),
         ],
       }
+    );
+
+    this.panel.iconPath = vscode.Uri.joinPath(
+      this.context.extensionUri,
+      'resources',
+      'speedy-git-ext-icon-128.png'
     );
 
     this.panel.webview.html = this.getWebviewContent(this.panel.webview);
@@ -66,6 +123,14 @@ export class WebviewProvider {
     this.panel.onDidDispose(() => {
       this.panel = undefined;
     });
+
+    // Send repo list first so the dropdown is populated before commits arrive
+    if (this.gitRepoDiscoveryService) {
+      this.sendRepoList(
+        this.gitRepoDiscoveryService.getRepos(),
+        this.gitRepoDiscoveryService.getActiveRepoPath()
+      );
+    }
 
     await this.sendInitialData(undefined, true);
   }
@@ -107,7 +172,13 @@ export class WebviewProvider {
         const batchSize = this.getBatchSize();
         const result = await this.gitLogService.getCommits({ ...message.payload.filters, maxCount: batchSize });
         if (result.success) {
-          this.postMessage({ type: 'commits', payload: { commits: result.value } });
+          this.postMessage({
+            type: 'commits',
+            payload: {
+              commits: result.value.commits,
+              totalLoadedWithoutFilter: result.value.totalLoadedWithoutFilter,
+            },
+          });
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }
@@ -121,7 +192,12 @@ export class WebviewProvider {
         if (result.success) {
           this.postMessage({
             type: 'commitsAppended',
-            payload: { commits: result.value, hasMore: result.value.length >= batchSize, generation },
+            payload: {
+              commits: result.value.commits,
+              hasMore: result.value.commits.length >= batchSize,
+              generation,
+              totalLoadedWithoutFilter: result.value.totalLoadedWithoutFilter,
+            },
           });
         } else {
           this.postMessage({ type: 'prefetchError', payload: { error: result.error } });
@@ -131,7 +207,12 @@ export class WebviewProvider {
             if (retryResult.success) {
               this.postMessage({
                 type: 'commitsAppended',
-                payload: { commits: retryResult.value, hasMore: retryResult.value.length >= batchSize, generation },
+                payload: {
+                  commits: retryResult.value.commits,
+                  hasMore: retryResult.value.commits.length >= batchSize,
+                  generation,
+                  totalLoadedWithoutFilter: retryResult.value.totalLoadedWithoutFilter,
+                },
               });
             } else {
               this.postMessage({ type: 'prefetchError', payload: { error: retryResult.error } });
@@ -576,6 +657,48 @@ export class WebviewProvider {
         } else {
           this.postMessage({ type: 'error', payload: { error: continueResult.error } });
         }
+        break;
+      }
+      case 'switchRepo': {
+        const { repoPath } = message.payload;
+        const discovery = this.gitRepoDiscoveryService;
+        if (!discovery) break;
+
+        const knownRepo = discovery.getRepos().find((r) => r.path === repoPath);
+        if (!knownRepo) {
+          this.postMessage({ type: 'error', payload: { error: { message: `Repository not found: ${repoPath}` } } });
+          break;
+        }
+
+        this.fetchGeneration++;
+        const currentGeneration = this.fetchGeneration;
+
+        discovery.setActiveRepo(repoPath);
+
+        // Reinitialize services so gitLogService points to the new repo
+        this.onSwitchRepo?.(repoPath);
+
+        // Send updated repo list immediately so the dropdown reflects the switch
+        this.sendRepoList(discovery.getRepos(), discovery.getActiveRepoPath());
+
+        // Load commits for new repo; discard if generation has advanced
+        this.postMessage({ type: 'loading', payload: { loading: true } });
+        const batchSize = this.getBatchSize();
+        const result = await this.gitLogService.getCommits({ maxCount: batchSize });
+        if (currentGeneration !== this.fetchGeneration) break; // stale
+
+        if (result.success) {
+          this.postMessage({
+            type: 'commits',
+            payload: {
+              commits: result.value.commits,
+              totalLoadedWithoutFilter: result.value.totalLoadedWithoutFilter,
+            },
+          });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        this.postMessage({ type: 'loading', payload: { loading: false } });
         break;
       }
     }

@@ -4,6 +4,11 @@ import { parseCommitLine, parseBranchLine } from '../utils/gitParsers.js';
 import { type Result, ok } from '../../shared/errors.js';
 import type { Commit, Branch, GraphFilters } from '../../shared/types.js';
 
+export interface CommitsResult {
+  commits: Commit[];
+  totalLoadedWithoutFilter?: number;
+}
+
 // Git format placeholder %x00 outputs a null byte - used as field separator
 const LOG_FORMAT = '%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D';
 
@@ -17,7 +22,7 @@ export class GitLogService {
     this.executor = new GitExecutor(log);
   }
 
-  async getCommits(filters?: Partial<GraphFilters>): Promise<Result<Commit[]>> {
+  async getCommits(filters?: Partial<GraphFilters>): Promise<Result<CommitsResult>> {
     this.log.info('Fetching commits');
     const maxCount = filters?.maxCount ?? 500;
     const args = ['log'];
@@ -64,7 +69,11 @@ export class GitLogService {
       }
     }
 
-    return ok(commits);
+    const hasFilter = !!(filters?.branch || filters?.author);
+    return ok({
+      commits,
+      totalLoadedWithoutFilter: hasFilter ? undefined : commits.length,
+    });
   }
 
   async getBranches(): Promise<Result<Branch[]>> {

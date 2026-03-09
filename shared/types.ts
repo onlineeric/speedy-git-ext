@@ -1,3 +1,16 @@
+export interface RepoInfo {
+  /** Absolute filesystem path to the repository root */
+  path: string;
+  /** Raw folder name (basename of path) */
+  name: string;
+  /**
+   * Display label shown in the dropdown.
+   * Equals `name` when unique; equals relative path from workspace root
+   * when two repos share the same folder name.
+   */
+  displayName: string;
+}
+
 export interface Commit {
   hash: string;
   abbreviatedHash: string;

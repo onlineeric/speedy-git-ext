@@ -2,7 +2,7 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "onlineeric",
   "license": "MIT",
   "repository": {
@@ -12,7 +12,7 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "icon": "resources/speedy-git-ext-icon-256.png",
+  "icon": "resources/speedy-git-ext-icon-128.png",
   "categories": [
     "SCM Providers",
     "Visualization"
@@ -23,7 +23,7 @@
     "visualization",
     "scm"
   ],
-  "activationEvents": [],
+  "activationEvents": ["*"],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -31,6 +31,12 @@
         "command": "speedyGit.showGraph",
         "title": "Show Speedy Git Graph",
         "category": "Speedy Git"
+      },
+      {
+        "command": "speedyGit.openForRepo",
+        "title": "Open in Speedy Git",
+        "category": "Speedy Git",
+        "icon": "$(zap)"
       }
     ],
     "menus": {
@@ -38,6 +44,13 @@
         {
           "command": "speedyGit.showGraph",
           "when": "workspaceFolderCount > 0"
+        }
+      ],
+      "scm/title": [
+        {
+          "when": "scmProvider == git",
+          "command": "speedyGit.openForRepo",
+          "group": "navigation"
         }
       ]
     },
