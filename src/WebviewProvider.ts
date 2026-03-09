@@ -685,7 +685,10 @@ export class WebviewProvider {
         this.postMessage({ type: 'loading', payload: { loading: true } });
         const batchSize = this.getBatchSize();
         const result = await this.gitLogService.getCommits({ maxCount: batchSize });
-        if (currentGeneration !== this.fetchGeneration) break; // stale
+        if (currentGeneration !== this.fetchGeneration) {
+          this.postMessage({ type: 'loading', payload: { loading: false } });
+          break; // stale — newer switch in flight
+        }
 
         if (result.success) {
           this.postMessage({

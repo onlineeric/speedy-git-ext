@@ -43,7 +43,13 @@ export class GitRepoDiscoveryService implements vscode.Disposable {
           const paths = gitApi.repositories.map((r: any) => r.rootUri.fsPath);
           this._repos = this.buildRepoList(paths);
           if (!this._repos.find((r) => r.path === this._activeRepoPath)) {
+            const removedName = path.basename(this._activeRepoPath);
             this._activeRepoPath = this._repos[0]?.path ?? '';
+            if (this._repos.length > 0) {
+              vscode.window.showInformationMessage(
+                `Speedy Git: Repository "${removedName}" was removed. Switched to "${this._repos[0].displayName}".`
+              );
+            }
           }
           this._onDidChangeRepos.fire(this._repos);
         })

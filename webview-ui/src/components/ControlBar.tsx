@@ -85,7 +85,7 @@ export function ControlBar() {
       </button>
 
       <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)]">
-        {totalLoadedWithoutFilter > 0 ? totalLoadedWithoutFilter : mergedCommits.length} loaded commits
+        {totalLoadedWithoutFilter !== null ? totalLoadedWithoutFilter : mergedCommits.length} loaded commits
       </span>
 
       <button

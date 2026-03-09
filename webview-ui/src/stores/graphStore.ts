@@ -34,8 +34,8 @@ interface GraphStore {
   prefetching: boolean;
   fetchGeneration: number;
   lastBatchStartIndex: number;
-  // Commit counter
-  totalLoadedWithoutFilter: number;
+  // Commit counter — null means not yet received from backend
+  totalLoadedWithoutFilter: number | null;
   // Repository navigation
   repos: RepoInfo[];
   activeRepoPath: string;
@@ -67,7 +67,7 @@ interface GraphStore {
   appendCommits: (newCommits: Commit[], totalLoadedWithoutFilter?: number) => void;
   setHasMore: (has: boolean) => void;
   setPrefetching: (v: boolean) => void;
-  setTotalLoadedWithoutFilter: (n: number) => void;
+  setTotalLoadedWithoutFilter: (n: number | null) => void;
   // Repository navigation actions
   setRepos: (repos: RepoInfo[], activeRepoPath: string) => void;
   setActiveRepo: (repoPath: string) => void;
@@ -155,7 +155,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   prefetching: false,
   fetchGeneration: 0,
   lastBatchStartIndex: 0,
-  totalLoadedWithoutFilter: 0,
+  totalLoadedWithoutFilter: null,
   repos: [],
   activeRepoPath: '',
   isLoadingRepo: false,
@@ -247,7 +247,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       topology,
       lastBatchStartIndex: commits.length,
       ...((!hasFilter && totalLoadedWithoutFilter !== undefined)
-        ? { totalLoadedWithoutFilter: existingTotal + totalLoadedWithoutFilter }
+        ? { totalLoadedWithoutFilter: (existingTotal ?? 0) + totalLoadedWithoutFilter }
         : {}),
     });
   },
@@ -260,8 +260,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     set({
       repos,
       activeRepoPath,
-      // Reset branch/author filter when switching repos; preserve maxCount
-      ...(repoChanged ? { filters: { maxCount: filters.maxCount } } : {}),
+      // Reset branch/author filter and commit counter when switching repos; preserve maxCount
+      ...(repoChanged ? { filters: { maxCount: filters.maxCount }, totalLoadedWithoutFilter: null } : {}),
     });
   },
   setActiveRepo: (repoPath) => {
@@ -269,6 +269,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     // rpcClient will be called from the component — we dispatch via import to avoid circular deps
     import('../rpc/rpcClient').then(({ rpcClient }) => {
       rpcClient.send({ type: 'switchRepo', payload: { repoPath } });
+    }).catch(() => {
+      set({ isLoadingRepo: false });
     });
   },
   setIsLoadingRepo: (isLoadingRepo) => set({ isLoadingRepo }),
