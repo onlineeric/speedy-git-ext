@@ -9,10 +9,12 @@ interface GraphCellProps {
   topology: GraphTopology;
   width: number;
   height: number;
+  isHeadCommit?: boolean;
 }
 
 const LANE_WIDTH = 16;
 const NODE_RADIUS = 4;
+const HEAD_NODE_RADIUS = 6;
 
 const COLORS = [
   '#4ec9b0', // teal
@@ -40,13 +42,14 @@ export const GraphCell = memo(function GraphCell({
   topology,
   width,
   height,
+  isHeadCommit = false,
 }: GraphCellProps) {
   const node = topology.nodes.get(commit.hash);
 
   if (!node) {
     return (
       <svg width={width} height={height} className="relative z-[1] flex-shrink-0">
-        <circle cx={LANE_WIDTH / 2} cy={height / 2} r={NODE_RADIUS} fill="#888" />
+        <circle cx={LANE_WIDTH / 2} cy={height / 2} r={isHeadCommit ? HEAD_NODE_RADIUS : NODE_RADIUS} fill="#888" />
       </svg>
     );
   }
@@ -177,7 +180,7 @@ export const GraphCell = memo(function GraphCell({
       <circle
         cx={nodeX}
         cy={nodeY}
-        r={NODE_RADIUS}
+        r={isHeadCommit ? HEAD_NODE_RADIUS : NODE_RADIUS}
         fill={hasMerge ? 'transparent' : color}
         stroke={color}
         strokeWidth={2}

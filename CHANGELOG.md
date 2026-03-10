@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 - None yet.
 
+## [0.5.0] - 2026-03-10
+
+### Added
+- Branch labels now display a branch icon, making it instantly clear whether a label is a local branch, remote branch, or merged local+remote pair.
+- Tag labels now display a tag icon for quick visual identification.
+- When a local branch and its remote counterpart (`origin/<name>`) share the same commit, they are merged into a single label (e.g., `main ⇄ origin`) instead of two separate labels, reducing visual clutter for tracked branches.
+- When a local branch matches multiple remotes, all remote host names are listed in one merged label (e.g., `main ⇄ origin, upstream`); full qualified names are available on hover.
+- The currently checked-out commit (HEAD) is highlighted with a visually larger graph node dot for immediate identification in long commit lists.
+- A HEAD indicator icon appears as the first element on the checked-out commit's row, before any branch/tag labels and the commit message.
+- HEAD visual indicators (enlarged dot and icon) update automatically after checkout operations, including detached HEAD state.
+
 ## [0.4.0] - 2026-03-10
 
 ### Added

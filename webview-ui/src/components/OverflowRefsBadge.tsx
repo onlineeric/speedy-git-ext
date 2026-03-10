@@ -1,10 +1,11 @@
 import * as Popover from '@radix-ui/react-popover';
-import type { RefInfo } from '@shared/types';
+import type { DisplayRef } from '../types/displayRefs';
 import { BranchContextMenu } from './BranchContextMenu';
-import { getRefStyle } from '../utils/refStyle';
+import { RefLabel } from './RefLabel';
+import { displayRefToRefInfo } from '../utils/mergeRefs';
 
 interface OverflowRefsBadgeProps {
-  hiddenRefs: RefInfo[];
+  hiddenRefs: DisplayRef[];
 }
 
 export function OverflowRefsBadge({ hiddenRefs }: OverflowRefsBadgeProps) {
@@ -28,23 +29,24 @@ export function OverflowRefsBadge({ hiddenRefs }: OverflowRefsBadgeProps) {
           className="max-w-xs rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50 flex flex-wrap gap-1 p-2"
           onClick={(e) => e.stopPropagation()}
           onPointerDownOutside={(e) => {
-            // Don't close if interacting with a context menu or dialog
             const target = e.target as HTMLElement;
-            if (target.closest('[data-radix-menu-content]') || target.closest('[role="alertdialog"]') || target.closest('[role="dialog"]')) {
+            if (
+              target.closest('[data-radix-menu-content]') ||
+              target.closest('[role="alertdialog"]') ||
+              target.closest('[role="dialog"]')
+            ) {
               e.preventDefault();
             }
           }}
         >
-          {hiddenRefs.map((ref) => (
-            <BranchContextMenu key={`${ref.type}-${ref.name}`} refInfo={ref}>
-              <span
-                className={`px-1.5 py-0.5 text-xs rounded ${getRefStyle(ref.type)}`}
-                title={ref.remote ? `${ref.remote}/${ref.name}` : ref.name}
-              >
-                {ref.remote ? `${ref.remote}/${ref.name}` : ref.name}
-              </span>
-            </BranchContextMenu>
-          ))}
+          {hiddenRefs.map((displayRef) => {
+            const key = displayRef.localName ?? displayRef.remoteName ?? displayRef.tagName ?? displayRef.stashRef;
+            return (
+              <BranchContextMenu key={key} refInfo={displayRefToRefInfo(displayRef)}>
+                <RefLabel displayRef={displayRef} />
+              </BranchContextMenu>
+            );
+          })}
           <Popover.Arrow className="fill-[var(--vscode-menu-border)]" />
         </Popover.Content>
       </Popover.Portal>
