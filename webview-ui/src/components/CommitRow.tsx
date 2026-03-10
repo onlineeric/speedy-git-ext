@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import type { Commit } from '@shared/types';
 import type { GraphTopology } from '../utils/graphTopology';
 import { GraphCell } from './GraphCell';
@@ -6,7 +6,9 @@ import { CommitContextMenu } from './CommitContextMenu';
 import { BranchContextMenu } from './BranchContextMenu';
 import { StashContextMenu } from './StashContextMenu';
 import { OverflowRefsBadge } from './OverflowRefsBadge';
-import { getRefStyle } from '../utils/refStyle';
+import { RefLabel } from './RefLabel';
+import { HeadIcon } from './icons';
+import { mergeRefs, displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
 import { formatRelativeDate } from '../utils/formatDate';
 
 interface CommitRowProps {
@@ -39,6 +41,8 @@ export const CommitRow = memo(function CommitRow({
   const isStash = commit.refs.some((r) => r.type === 'stash');
   const stashIndex = isStash ? parseStashIndex(commit.refs) : -1;
 
+  const { isHead, displayRefs } = useMemo(() => mergeRefs(commit.refs), [commit.refs]);
+
   const bgClass = isSelected
     ? 'bg-[var(--vscode-list-activeSelectionBackground)]'
     : isMultiSelected
@@ -46,6 +50,9 @@ export const CommitRow = memo(function CommitRow({
     : index % 2 === 0
     ? 'bg-transparent'
     : 'bg-[var(--vscode-list-hoverBackground)]/30';
+
+  const visibleRefs = displayRefs.slice(0, maxVisibleRefs);
+  const overflowRefs = displayRefs.slice(maxVisibleRefs);
 
   const row = (
     <div
@@ -60,6 +67,7 @@ export const CommitRow = memo(function CommitRow({
         topology={topology}
         width={graphWidth}
         height={rowHeight}
+        isHeadCommit={isHead}
       />
 
       <span
@@ -69,21 +77,17 @@ export const CommitRow = memo(function CommitRow({
         {commit.abbreviatedHash}
       </span>
 
-      {commit.refs.length > 0 && (
-        <div className="flex gap-1 flex-shrink-0">
-          {commit.refs.slice(0, maxVisibleRefs).map((ref) => (
-            <BranchContextMenu key={`${ref.type}-${ref.name}`} refInfo={ref}>
-              <span
-                className={`px-1.5 py-0.5 text-xs rounded ${getRefStyle(ref.type)}`}
-                title={ref.remote ? `${ref.remote}/${ref.name}` : ref.name}
-              >
-                {ref.remote ? `${ref.remote}/${ref.name}` : ref.name}
-              </span>
+      {(isHead || displayRefs.length > 0) && (
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {isHead && (
+            <HeadIcon className="text-[var(--vscode-badge-foreground)] flex-shrink-0" />
+          )}
+          {visibleRefs.map((displayRef) => (
+            <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)}>
+              <RefLabel displayRef={displayRef} />
             </BranchContextMenu>
           ))}
-          <OverflowRefsBadge
-            hiddenRefs={commit.refs.slice(maxVisibleRefs)}
-          />
+          <OverflowRefsBadge hiddenRefs={overflowRefs} />
         </div>
       )}
 
