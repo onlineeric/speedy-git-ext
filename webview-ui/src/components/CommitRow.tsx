@@ -8,7 +8,7 @@ import { StashContextMenu } from './StashContextMenu';
 import { OverflowRefsBadge } from './OverflowRefsBadge';
 import { RefLabel } from './RefLabel';
 import { HeadIcon } from './icons';
-import { mergeRefs, displayRefToRefInfo } from '../utils/mergeRefs';
+import { mergeRefs, displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
 import { formatRelativeDate } from '../utils/formatDate';
 
 interface CommitRowProps {
@@ -82,14 +82,11 @@ export const CommitRow = memo(function CommitRow({
           {isHead && (
             <HeadIcon className="text-[var(--vscode-badge-foreground)] flex-shrink-0" />
           )}
-          {visibleRefs.map((displayRef) => {
-            const key = displayRef.localName ?? displayRef.remoteName ?? displayRef.tagName ?? displayRef.stashRef;
-            return (
-              <BranchContextMenu key={key} refInfo={displayRefToRefInfo(displayRef)}>
-                <RefLabel displayRef={displayRef} />
-              </BranchContextMenu>
-            );
-          })}
+          {visibleRefs.map((displayRef) => (
+            <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)}>
+              <RefLabel displayRef={displayRef} />
+            </BranchContextMenu>
+          ))}
           <OverflowRefsBadge hiddenRefs={overflowRefs} />
         </div>
       )}

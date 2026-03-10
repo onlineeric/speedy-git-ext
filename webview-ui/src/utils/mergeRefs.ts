@@ -62,20 +62,29 @@ export function mergeRefs(refs: RefInfo[]): MergeRefsResult {
   }
 
   for (const tag of tags) {
-    displayRefs.push({
-      type: 'tag',
-      tagName: tag.name,
-    });
+    displayRefs.push({ type: 'tag', tagName: tag.name });
   }
 
   for (const stash of stashes) {
-    displayRefs.push({
-      type: 'stash',
-      stashRef: stash.name,
-    });
+    displayRefs.push({ type: 'stash', stashRef: stash.name });
   }
 
   return { isHead, displayRefs };
+}
+
+/**
+ * Returns a stable, unique React key for a DisplayRef.
+ * Prefixes with the type to avoid collisions between e.g. a branch and tag
+ * that share the same name on the same commit.
+ */
+export function displayRefKey(displayRef: DisplayRef): string {
+  switch (displayRef.type) {
+    case 'local-branch':  return `local-branch-${displayRef.localName}`;
+    case 'remote-branch': return `remote-branch-${displayRef.remoteName}`;
+    case 'merged-branch': return `merged-branch-${displayRef.localName}`;
+    case 'tag':           return `tag-${displayRef.tagName}`;
+    case 'stash':         return `stash-${displayRef.stashRef}`;
+  }
 }
 
 /**
@@ -86,20 +95,20 @@ export function mergeRefs(refs: RefInfo[]): MergeRefsResult {
 export function displayRefToRefInfo(displayRef: DisplayRef): RefInfo {
   switch (displayRef.type) {
     case 'local-branch':
-      return { type: 'branch', name: displayRef.localName! };
+      return { type: 'branch', name: displayRef.localName };
     case 'merged-branch':
-      return { type: 'branch', name: displayRef.localName! };
+      return { type: 'branch', name: displayRef.localName };
     case 'remote-branch': {
-      const slashIdx = displayRef.remoteName!.indexOf('/');
+      const slashIdx = displayRef.remoteName.indexOf('/');
       return {
         type: 'remote',
-        name: displayRef.remoteName!.slice(slashIdx + 1),
-        remote: displayRef.remoteName!.slice(0, slashIdx),
+        name: displayRef.remoteName.slice(slashIdx + 1),
+        remote: displayRef.remoteName.slice(0, slashIdx),
       };
     }
     case 'tag':
-      return { type: 'tag', name: displayRef.tagName! };
+      return { type: 'tag', name: displayRef.tagName };
     case 'stash':
-      return { type: 'stash', name: displayRef.stashRef! };
+      return { type: 'stash', name: displayRef.stashRef };
   }
 }

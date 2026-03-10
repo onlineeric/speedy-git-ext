@@ -28,32 +28,35 @@ export function RefLabel({ displayRef }: RefLabelProps) {
 function getRefLabel(displayRef: DisplayRef): string {
   switch (displayRef.type) {
     case 'local-branch':
-      return displayRef.localName!;
+      return displayRef.localName;
     case 'remote-branch':
-      return displayRef.remoteName!;
+      return displayRef.remoteName;
     case 'merged-branch': {
-      const remoteHosts = displayRef.remoteNames!.map((r) => r.slice(0, r.indexOf('/')));
+      const remoteHosts = displayRef.remoteNames.map((r) => {
+        const slashIdx = r.indexOf('/');
+        return slashIdx >= 0 ? r.slice(0, slashIdx) : r;
+      });
       return `${displayRef.localName} \u21c4 ${remoteHosts.join(', ')}`;
     }
     case 'tag':
-      return displayRef.tagName!;
+      return displayRef.tagName;
     case 'stash':
-      return displayRef.stashRef!;
+      return displayRef.stashRef;
   }
 }
 
 function getRefTitle(displayRef: DisplayRef): string {
   switch (displayRef.type) {
     case 'local-branch':
-      return displayRef.localName!;
+      return displayRef.localName;
     case 'remote-branch':
-      return displayRef.remoteName!;
+      return displayRef.remoteName;
     case 'merged-branch':
-      return `${displayRef.localName} \u21c4 ${displayRef.remoteNames!.join(', ')}`;
+      return `${displayRef.localName} \u21c4 ${displayRef.remoteNames.join(', ')}`;
     case 'tag':
-      return displayRef.tagName!;
+      return displayRef.tagName;
     case 'stash':
-      return displayRef.stashRef!;
+      return displayRef.stashRef;
   }
 }
 

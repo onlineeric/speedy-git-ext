@@ -2,7 +2,7 @@ import * as Popover from '@radix-ui/react-popover';
 import type { DisplayRef } from '../types/displayRefs';
 import { BranchContextMenu } from './BranchContextMenu';
 import { RefLabel } from './RefLabel';
-import { displayRefToRefInfo } from '../utils/mergeRefs';
+import { displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
 
 interface OverflowRefsBadgeProps {
   hiddenRefs: DisplayRef[];
@@ -39,14 +39,11 @@ export function OverflowRefsBadge({ hiddenRefs }: OverflowRefsBadgeProps) {
             }
           }}
         >
-          {hiddenRefs.map((displayRef) => {
-            const key = displayRef.localName ?? displayRef.remoteName ?? displayRef.tagName ?? displayRef.stashRef;
-            return (
-              <BranchContextMenu key={key} refInfo={displayRefToRefInfo(displayRef)}>
-                <RefLabel displayRef={displayRef} />
-              </BranchContextMenu>
-            );
-          })}
+          {hiddenRefs.map((displayRef) => (
+            <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)}>
+              <RefLabel displayRef={displayRef} />
+            </BranchContextMenu>
+          ))}
           <Popover.Arrow className="fill-[var(--vscode-menu-border)]" />
         </Popover.Content>
       </Popover.Portal>
