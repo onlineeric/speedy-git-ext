@@ -79,7 +79,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "generate-test-repo": "tsx scripts/main.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "package": "npx @vscode/vsce package",
+    "publish": "npx @vscode/vsce publish"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
