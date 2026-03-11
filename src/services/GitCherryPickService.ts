@@ -6,6 +6,7 @@ import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { CherryPickOptions, CherryPickState } from '../../shared/types.js';
 import { validateHash } from '../utils/gitValidation.js';
 import { isConflictStderr } from '../utils/gitParsers.js';
+import { isDirtyWorkingTree } from '../utils/gitQueries.js';
 
 export class GitCherryPickService {
   private executor: GitExecutor;
@@ -19,13 +20,8 @@ export class GitCherryPickService {
     this.cherryPickHeadPath = path.join(workspacePath, '.git', 'CHERRY_PICK_HEAD');
   }
 
-  async isDirtyWorkingTree(): Promise<Result<boolean>> {
-    const result = await this.executor.execute({
-      args: ['status', '--porcelain'],
-      cwd: this.workspacePath,
-    });
-    if (!result.success) return result;
-    return ok(result.value.stdout.trim().length > 0);
+  isDirtyWorkingTree(): Promise<Result<boolean>> {
+    return isDirtyWorkingTree(this.executor, this.workspacePath);
   }
 
   getCherryPickState(): Result<CherryPickState> {

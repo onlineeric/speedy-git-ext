@@ -73,6 +73,16 @@ export class GitStashService {
     return ok(`Popped stash@{${index}}`);
   }
 
+  async stash(): Promise<Result<string>> {
+    this.log.info('Stash changes');
+    const result = await this.executor.execute({
+      args: ['stash'],
+      cwd: this.workspacePath,
+    });
+    if (!result.success) return result;
+    return ok('Stashed changes');
+  }
+
   async dropStash(index: number): Promise<Result<string>> {
     this.log.info(`Drop stash@{${index}}`);
     if (index < 0 || !Number.isInteger(index)) {

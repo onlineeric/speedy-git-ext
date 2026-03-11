@@ -2,6 +2,7 @@ import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { type Result, ok } from '../../shared/errors.js';
 import { validateRefName } from '../utils/gitValidation.js';
+import { isDirtyWorkingTree } from '../utils/gitQueries.js';
 
 export class GitBranchService {
   private executor: GitExecutor;
@@ -144,13 +145,22 @@ export class GitBranchService {
     return ok(`Deleted remote branch '${remote}/${name}'`);
   }
 
-  async merge(branch: string, noFastForward?: boolean, squash?: boolean): Promise<Result<string>> {
-    this.log.info(`Merge branch: ${branch}${noFastForward ? ' --no-ff' : ''}${squash ? ' --squash' : ''}`);
+  isDirtyWorkingTree(): Promise<Result<boolean>> {
+    this.log.info('Check dirty working tree');
+    return isDirtyWorkingTree(this.executor, this.workspacePath);
+  }
+
+  async merge(branch: string, noFastForward?: boolean, squash?: boolean, noCommit?: boolean): Promise<Result<string>> {
+    this.log.info(`Merge branch: ${branch}${noFastForward ? ' --no-ff' : ''}${squash ? ' --squash' : ''}${noCommit ? ' --no-commit' : ''}`);
     const branchCheck = validateRefName(branch);
     if (!branchCheck.success) return branchCheck;
 
     const args = ['merge'];
-    if (noFastForward) args.push('--no-ff');
+    if (noCommit) {
+      args.push('--no-commit', '--no-ff');
+    } else if (noFastForward) {
+      args.push('--no-ff');
+    }
     if (squash) args.push('--squash');
     args.push(branch);
 

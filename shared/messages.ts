@@ -5,7 +5,7 @@ export type RequestMessage =
   | { type: 'getCommits'; payload: { filters?: Partial<GraphFilters> } }
   | { type: 'getBranches'; payload: Record<string, never> }
   | { type: 'getCommitDetails'; payload: { hash: string } }
-  | { type: 'checkoutBranch'; payload: { name: string; remote?: string } }
+  | { type: 'checkoutBranch'; payload: { name: string; remote?: string; pull?: boolean } }
   | { type: 'fetch'; payload: { remote?: string; prune?: boolean; filters?: Partial<GraphFilters> } }
   | { type: 'copyToClipboard'; payload: { text: string } }
   | { type: 'openDiff'; payload: { hash: string; filePath: string; parentHash?: string } }
@@ -16,7 +16,7 @@ export type RequestMessage =
   | { type: 'renameBranch'; payload: { oldName: string; newName: string } }
   | { type: 'deleteBranch'; payload: { name: string; force?: boolean } }
   | { type: 'deleteRemoteBranch'; payload: { remote: string; name: string } }
-  | { type: 'mergeBranch'; payload: { branch: string; noFastForward?: boolean; squash?: boolean } }
+  | { type: 'mergeBranch'; payload: { branch: string; noFastForward?: boolean; squash?: boolean; noCommit?: boolean } }
   // Remote ops
   | { type: 'push'; payload: { remote?: string; branch?: string; setUpstream?: boolean; force?: boolean } }
   | { type: 'pull'; payload: { remote?: string; branch?: string; rebase?: boolean } }
@@ -48,7 +48,9 @@ export type RequestMessage =
   // Pagination & settings
   | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branch?: string; author?: string } } }
   | { type: 'openSettings'; payload: Record<string, never> }
-  | { type: 'switchRepo'; payload: { repoPath: string } };
+  | { type: 'switchRepo'; payload: { repoPath: string } }
+  // Stash-and-checkout flow
+  | { type: 'stashAndCheckout'; payload: { name: string; remote?: string; pull?: boolean } };
 
 export type ResponseMessage =
   | { type: 'commits'; payload: { commits: Commit[]; branches?: Branch[]; hasMore?: boolean; totalLoadedWithoutFilter?: number } }
@@ -64,7 +66,9 @@ export type ResponseMessage =
   | { type: 'rebaseCommits'; payload: { entries: RebaseEntry[] } }
   | { type: 'commitsAppended'; payload: { commits: Commit[]; hasMore: boolean; generation: number; totalLoadedWithoutFilter?: number } }
   | { type: 'prefetchError'; payload: { error: GitError | { message: string } } }
-  | { type: 'repoList'; payload: { repos: RepoInfo[]; activeRepoPath: string } };
+  | { type: 'repoList'; payload: { repos: RepoInfo[]; activeRepoPath: string } }
+  | { type: 'checkoutNeedsStash'; payload: { name: string; pull?: boolean } }
+  | { type: 'checkoutPullFailed'; payload: { branch: string; error: { message: string } } };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -84,6 +88,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   rebase: true, interactiveRebase: true, getRebaseCommits: true,
   abortRebase: true, continueRebase: true,
   loadMoreCommits: true, openSettings: true, switchRepo: true,
+  stashAndCheckout: true,
 };
 
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
@@ -91,6 +96,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   error: true, loading: true, success: true,
   remotes: true, stashes: true, cherryPickState: true,
   rebaseState: true, rebaseCommits: true, commitsAppended: true, prefetchError: true, repoList: true,
+  checkoutNeedsStash: true, checkoutPullFailed: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {

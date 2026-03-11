@@ -7,6 +7,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 - None yet.
 
+## [0.6.0] - 2026-03-12
+
+### Added
+- Merge dialog now includes a "No commits, stage changes only" checkbox and a merge strategy toggle (Fast forward if possible / Create a new commit even if fast forward is possible) for full control over merge history.
+- Checking out a remote-only branch automatically creates a local tracking branch (e.g., `origin/branch-1` → `branch-1`) without requiring a dialog.
+- Checking out a branch that has both local and remote counterparts shows a dialog with a Pull / No pull toggle (Pull selected by default).
+- If `git pull` fails due to an unreachable remote during checkout, an error notification is shown with a "Checkout without pull" fallback action.
+- When initiating a checkout with uncommitted local changes that would be overwritten, the extension prompts to stash changes first; declining aborts the checkout with no changes made.
+- "Merge into Current Branch" and "Checkout Branch" context menu items are hidden when right-clicking the currently checked-out branch.
+
+### Fixed
+- Loaded commit count now resets correctly when the branch filter changes, ensuring infinite scroll resumes properly for the newly selected branch filter.
+
 ## [0.5.0] - 2026-03-10
 
 ### Added

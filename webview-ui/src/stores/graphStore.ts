@@ -36,6 +36,8 @@ interface GraphStore {
   lastBatchStartIndex: number;
   // Commit counter — null means not yet received from backend
   totalLoadedWithoutFilter: number | null;
+  // Stash-and-checkout pending state
+  pendingCheckout: { name: string; pull?: boolean } | null;
   // Repository navigation
   repos: RepoInfo[];
   activeRepoPath: string;
@@ -68,6 +70,7 @@ interface GraphStore {
   setHasMore: (has: boolean) => void;
   setPrefetching: (v: boolean) => void;
   setTotalLoadedWithoutFilter: (n: number | null) => void;
+  setPendingCheckout: (checkout: { name: string; pull?: boolean } | null) => void;
   // Repository navigation actions
   setRepos: (repos: RepoInfo[], activeRepoPath: string) => void;
   setActiveRepo: (repoPath: string) => void;
@@ -156,6 +159,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   fetchGeneration: 0,
   lastBatchStartIndex: 0,
   totalLoadedWithoutFilter: null,
+  pendingCheckout: null,
   repos: [],
   activeRepoPath: '',
   isLoadingRepo: false,
@@ -171,6 +175,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       prefetching: false,
       fetchGeneration: get().fetchGeneration + 1,
       lastBatchStartIndex: 0,
+      totalLoadedWithoutFilter: null,
     });
   },
   setBranches: (branches) => set({ branches }),
@@ -254,6 +259,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setHasMore: (hasMore) => set({ hasMore }),
   setPrefetching: (prefetching) => set({ prefetching }),
   setTotalLoadedWithoutFilter: (totalLoadedWithoutFilter) => set({ totalLoadedWithoutFilter }),
+  setPendingCheckout: (pendingCheckout) => set({ pendingCheckout }),
   setRepos: (repos, activeRepoPath) => {
     const { activeRepoPath: prevPath, filters } = get();
     const repoChanged = prevPath !== '' && prevPath !== activeRepoPath;
