@@ -1,5 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, InteractiveRebaseConfig, ResetMode } from '@shared/types';
+import type { CherryPickOptions, InteractiveRebaseConfig, MergeOptions, ResetMode } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 
 declare const acquireVsCodeApi: () => {
@@ -93,6 +93,12 @@ class RpcClient {
       case 'rebaseCommits':
         store.setPendingRebaseEntries(message.payload.entries);
         break;
+      case 'checkoutNeedsStash':
+        store.setPendingCheckout({ name: message.payload.name, pull: message.payload.pull });
+        break;
+      case 'checkoutPullFailed':
+        store.setError(`Checked out '${message.payload.branch}'. Pull failed: ${message.payload.error.message}`);
+        break;
     }
   }
 
@@ -153,8 +159,24 @@ class RpcClient {
     this.send({ type: 'deleteRemoteBranch', payload: { remote, name } });
   }
 
-  mergeBranch(branch: string, noFastForward?: boolean, squash?: boolean) {
-    this.send({ type: 'mergeBranch', payload: { branch, noFastForward, squash } });
+  mergeBranch(branch: string, options?: MergeOptions) {
+    this.send({
+      type: 'mergeBranch',
+      payload: {
+        branch,
+        noFastForward: options?.noFastForward,
+        noCommit: options?.noCommit,
+        squash: options?.squash,
+      },
+    });
+  }
+
+  checkoutBranchWithPull(name: string, pull: boolean) {
+    this.send({ type: 'checkoutBranch', payload: { name, pull } });
+  }
+
+  stashAndCheckout(name: string, pull?: boolean) {
+    this.send({ type: 'stashAndCheckout', payload: { name, pull } });
   }
 
   // Remote ops

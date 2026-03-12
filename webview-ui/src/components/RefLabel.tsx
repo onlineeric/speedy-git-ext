@@ -1,29 +1,33 @@
-import type { ReactNode } from 'react';
+import { forwardRef, type ReactNode } from 'react';
 import type { DisplayRef } from '../types/displayRefs';
 import { getRefStyle } from '../utils/refStyle';
 import { BranchIcon, TagIcon } from './icons';
 
-interface RefLabelProps {
+interface RefLabelProps extends React.HTMLAttributes<HTMLSpanElement> {
   displayRef: DisplayRef;
 }
 
 /** Renders a single ref badge with an icon and label text. */
-export function RefLabel({ displayRef }: RefLabelProps) {
-  const style = getRefStyle(displayRef.type);
-  const label = getRefLabel(displayRef);
-  const title = getRefTitle(displayRef);
-  const icon = getRefIcon(displayRef);
+export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
+  function RefLabel({ displayRef, className, ...rest }, ref) {
+    const style = getRefStyle(displayRef.type);
+    const label = getRefLabel(displayRef);
+    const title = getRefTitle(displayRef);
+    const icon = getRefIcon(displayRef);
 
-  return (
-    <span
-      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded ${style}`}
-      title={title}
-    >
-      {icon}
-      {label}
-    </span>
-  );
-}
+    return (
+      <span
+        ref={ref}
+        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded ${style}${className ? ` ${className}` : ''}`}
+        title={title}
+        {...rest}
+      >
+        {icon}
+        {label}
+      </span>
+    );
+  }
+);
 
 function getRefLabel(displayRef: DisplayRef): string {
   switch (displayRef.type) {

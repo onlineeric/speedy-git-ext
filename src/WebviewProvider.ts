@@ -244,16 +244,53 @@ export class WebviewProvider {
         break;
       }
       case 'checkoutBranch': {
-        const result = await this.gitBranchService.checkout(
-          message.payload.name,
-          message.payload.remote
-        );
-        if (result.success) {
-          this.postMessage({ type: 'success', payload: { message: result.value } });
-          await this.sendInitialData();
-        } else {
-          this.postMessage({ type: 'error', payload: { error: result.error } });
+        const dirtyCheckCO = await this.gitBranchService.isDirtyWorkingTree();
+        if (!dirtyCheckCO.success) {
+          this.postMessage({ type: 'error', payload: { error: dirtyCheckCO.error } });
+          break;
         }
+        if (dirtyCheckCO.value) {
+          this.postMessage({ type: 'checkoutNeedsStash', payload: { name: message.payload.name, pull: message.payload.pull } });
+          break;
+        }
+        const checkoutResult = await this.gitBranchService.checkout(message.payload.name, message.payload.remote);
+        if (!checkoutResult.success) {
+          this.postMessage({ type: 'error', payload: { error: checkoutResult.error } });
+          break;
+        }
+        if (message.payload.pull) {
+          const pullResult = await this.gitRemoteService.pull();
+          if (!pullResult.success) {
+            this.postMessage({ type: 'checkoutPullFailed', payload: { branch: message.payload.name, error: { message: pullResult.error.message } } });
+            await this.sendInitialData();
+            break;
+          }
+        }
+        this.postMessage({ type: 'success', payload: { message: checkoutResult.value } });
+        await this.sendInitialData();
+        break;
+      }
+      case 'stashAndCheckout': {
+        const stashResult = await this.gitStashService.stash();
+        if (!stashResult.success) {
+          this.postMessage({ type: 'error', payload: { error: stashResult.error } });
+          break;
+        }
+        const checkoutAfterStash = await this.gitBranchService.checkout(message.payload.name, message.payload.remote);
+        if (!checkoutAfterStash.success) {
+          this.postMessage({ type: 'error', payload: { error: checkoutAfterStash.error } });
+          break;
+        }
+        if (message.payload.pull) {
+          const pullAfterStash = await this.gitRemoteService.pull();
+          if (!pullAfterStash.success) {
+            this.postMessage({ type: 'checkoutPullFailed', payload: { branch: message.payload.name, error: { message: pullAfterStash.error.message } } });
+            await this.sendInitialData();
+            break;
+          }
+        }
+        this.postMessage({ type: 'success', payload: { message: checkoutAfterStash.value } });
+        await this.sendInitialData();
         break;
       }
       case 'fetch': {
@@ -343,7 +380,8 @@ export class WebviewProvider {
         const result = await this.gitBranchService.merge(
           message.payload.branch,
           message.payload.noFastForward,
-          message.payload.squash
+          message.payload.squash,
+          message.payload.noCommit
         );
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
