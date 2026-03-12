@@ -68,15 +68,18 @@ export class GitExecutor {
       gitProcess.on('close',(code) => {
         const elapsed = Date.now() - startTime;
         if (code !== 0) {
-          this.log.info(`Git command exited with non-zero code: ${cmdString} — stderr: ${stderr.trim()}`);
-          if (stderr.includes('not a git repository')) {
+          const stderrText = stderr.trim();
+          const stdoutText = stdout.trim();
+          const outputText = stderrText || stdoutText;
+          this.log.info(`Git command exited with non-zero code: ${cmdString} — output: ${outputText}`);
+          if (outputText.includes('not a git repository')) {
             safeResolve(
               err(
                 new GitError(
                   'Not a git repository',
                   'NOT_A_REPOSITORY',
                   cmdString,
-                  stderr
+                  outputText
                 )
               )
             );
@@ -84,10 +87,10 @@ export class GitExecutor {
             safeResolve(
               err(
                 new GitError(
-                  `Git command failed with code ${code}`,
+                  outputText || `Git command failed with code ${code}`,
                   'COMMAND_FAILED',
                   cmdString,
-                  stderr
+                  outputText
                 )
               )
             );

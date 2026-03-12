@@ -26,4 +26,17 @@ export class GitHistoryService {
     if (!result.success) return result;
     return ok(`Reset to ${targetHash.slice(0, 7)} (${mode})`);
   }
+
+  async isCommitPushed(hash: string): Promise<Result<boolean>> {
+    const hashCheck = validateHash(hash);
+    if (!hashCheck.success) return hashCheck;
+
+    const result = await this.executor.execute({
+      args: ['branch', '-r', '--contains', hash],
+      cwd: this.workspacePath,
+    });
+    if (!result.success) return result;
+
+    return ok(result.value.stdout.trim().length > 0);
+  }
 }

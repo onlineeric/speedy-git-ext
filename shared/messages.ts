@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, CherryPickOptions, CherryPickState, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo } from './types.js';
 import type { GitError } from './errors.js';
 
 export type RequestMessage =
@@ -39,12 +39,19 @@ export type RequestMessage =
   | { type: 'cherryPick'; payload: { hashes: string[]; options: CherryPickOptions } }
   | { type: 'abortCherryPick'; payload: Record<string, never> }
   | { type: 'continueCherryPick'; payload: Record<string, never> }
+  | { type: 'revert'; payload: { hash: string; mainlineParent?: number } }
+  | { type: 'continueRevert'; payload: Record<string, never> }
+  | { type: 'abortRevert'; payload: Record<string, never> }
   // Rebase ops
   | { type: 'rebase'; payload: { targetRef: string; ignoreDate?: boolean } }
   | { type: 'interactiveRebase'; payload: { config: InteractiveRebaseConfig } }
   | { type: 'getRebaseCommits'; payload: { baseHash: string } }
   | { type: 'abortRebase'; payload: Record<string, never> }
   | { type: 'continueRebase'; payload: Record<string, never> }
+  | { type: 'getSignatureInfo'; payload: { hash: string } }
+  | { type: 'dropCommit'; payload: { hash: string } }
+  | { type: 'isCommitPushed'; payload: { hash: string } }
+  | { type: 'getCommitParents'; payload: { hashes: string[] } }
   // Pagination & settings
   | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branch?: string; author?: string } } }
   | { type: 'openSettings'; payload: Record<string, never> }
@@ -62,12 +69,17 @@ export type ResponseMessage =
   | { type: 'remotes'; payload: { remotes: RemoteInfo[] } }
   | { type: 'stashes'; payload: { stashes: StashEntry[] } }
   | { type: 'cherryPickState'; payload: { state: CherryPickState } }
+  | { type: 'revertState'; payload: { state: RevertState } }
   | { type: 'rebaseState'; payload: { state: RebaseState; conflictInfo?: RebaseConflictInfo } }
   | { type: 'rebaseCommits'; payload: { entries: RebaseEntry[] } }
+  | { type: 'signatureInfo'; payload: { hash: string; signature: CommitSignatureInfo | null } }
+  | { type: 'commitPushedResult'; payload: { hash: string; pushed: boolean } }
+  | { type: 'commitParents'; payload: { parents: CommitParentInfo[] } }
   | { type: 'commitsAppended'; payload: { commits: Commit[]; hasMore: boolean; generation: number; totalLoadedWithoutFilter?: number } }
   | { type: 'prefetchError'; payload: { error: GitError | { message: string } } }
   | { type: 'repoList'; payload: { repos: RepoInfo[]; activeRepoPath: string } }
   | { type: 'checkoutNeedsStash'; payload: { name: string; pull?: boolean } }
+  | { type: 'deleteBranchNeedsForce'; payload: { name: string } }
   | { type: 'checkoutPullFailed'; payload: { branch: string; error: { message: string } } };
 
 export type Message = RequestMessage | ResponseMessage;
@@ -85,8 +97,10 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   getStashes: true, applyStash: true, popStash: true, dropStash: true,
   resetBranch: true,
   cherryPick: true, abortCherryPick: true, continueCherryPick: true,
+  revert: true, continueRevert: true, abortRevert: true,
   rebase: true, interactiveRebase: true, getRebaseCommits: true,
   abortRebase: true, continueRebase: true,
+  getSignatureInfo: true, dropCommit: true, isCommitPushed: true, getCommitParents: true,
   loadMoreCommits: true, openSettings: true, switchRepo: true,
   stashAndCheckout: true,
 };
@@ -94,9 +108,10 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commits: true, branches: true, commitDetails: true,
   error: true, loading: true, success: true,
-  remotes: true, stashes: true, cherryPickState: true,
-  rebaseState: true, rebaseCommits: true, commitsAppended: true, prefetchError: true, repoList: true,
-  checkoutNeedsStash: true, checkoutPullFailed: true,
+  remotes: true, stashes: true, cherryPickState: true, revertState: true,
+  rebaseState: true, rebaseCommits: true, signatureInfo: true, commitPushedResult: true, commitParents: true,
+  commitsAppended: true, prefetchError: true, repoList: true,
+  checkoutNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import type { RequestMessage, ResponseMessage } from '../shared/messages.js';
 import type { GitLogService } from './services/GitLogService.js';
 import type { GitDiffService } from './services/GitDiffService.js';
@@ -9,9 +10,13 @@ import type { GitTagService } from './services/GitTagService.js';
 import type { GitStashService } from './services/GitStashService.js';
 import type { GitHistoryService } from './services/GitHistoryService.js';
 import type { GitCherryPickService } from './services/GitCherryPickService.js';
+import type { GitRevertService } from './services/GitRevertService.js';
 import type { GitRebaseService } from './services/GitRebaseService.js';
+import type { GitSignatureService } from './services/GitSignatureService.js';
 import type { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
-import type { RepoInfo } from '../shared/types.js';
+import { GitExecutor } from './services/GitExecutor.js';
+import { GitError } from '../shared/errors.js';
+import type { RepoInfo, CommitParentInfo } from '../shared/types.js';
 
 export class WebviewProvider {
   private panel: vscode.WebviewPanel | undefined;
@@ -28,7 +33,9 @@ export class WebviewProvider {
     private gitStashService: GitStashService,
     private gitHistoryService: GitHistoryService,
     private gitCherryPickService: GitCherryPickService,
+    private gitRevertService: GitRevertService,
     private gitRebaseService: GitRebaseService,
+    private gitSignatureService: GitSignatureService,
     private readonly log: vscode.LogOutputChannel,
     private readonly gitRepoDiscoveryService?: GitRepoDiscoveryService
   ) {}
@@ -51,7 +58,9 @@ export class WebviewProvider {
     gitStashService: GitStashService,
     gitHistoryService: GitHistoryService,
     gitCherryPickService: GitCherryPickService,
-    gitRebaseService: GitRebaseService
+    gitRevertService: GitRevertService,
+    gitRebaseService: GitRebaseService,
+    gitSignatureService: GitSignatureService
   ) {
     this.gitLogService = gitLogService;
     this.gitDiffService = gitDiffService;
@@ -61,7 +70,9 @@ export class WebviewProvider {
     this.gitStashService = gitStashService;
     this.gitHistoryService = gitHistoryService;
     this.gitCherryPickService = gitCherryPickService;
+    this.gitRevertService = gitRevertService;
     this.gitRebaseService = gitRebaseService;
+    this.gitSignatureService = gitSignatureService;
   }
 
   /** Returns true if the webview panel is currently open */
@@ -161,6 +172,11 @@ export class WebviewProvider {
       } else {
         this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
       }
+    }
+
+    const revertStateResult = this.gitRevertService.getRevertState();
+    if (revertStateResult.success) {
+      this.postMessage({ type: 'revertState', payload: { state: revertStateResult.value } });
     }
   }
 
@@ -358,6 +374,8 @@ export class WebviewProvider {
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
           await this.sendInitialData();
+        } else if (result.error.code === 'BRANCH_NOT_FULLY_MERGED' && !message.payload.force) {
+          this.postMessage({ type: 'deleteBranchNeedsForce', payload: { name: message.payload.name } });
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }
@@ -598,6 +616,80 @@ export class WebviewProvider {
         }
         break;
       }
+      case 'getCommitParents': {
+        const workspacePath = this.getActiveRepoPath();
+        if (!workspacePath) {
+          this.postMessage({ type: 'error', payload: { error: { message: 'No active repository available.' } } });
+          break;
+        }
+
+        const executor = new GitExecutor(this.log);
+        const parents: CommitParentInfo[] = [];
+        for (const hash of message.payload.hashes) {
+          const result = await executor.execute({
+            args: ['log', '-1', '--format=%H%x00%h%x00%s', hash],
+            cwd: workspacePath,
+          });
+          if (!result.success) {
+            this.postMessage({ type: 'error', payload: { error: result.error } });
+            break;
+          }
+          const [fullHash, abbreviatedHash, ...subjectParts] = result.value.stdout.trim().split('\x00');
+          parents.push({
+            hash: fullHash,
+            abbreviatedHash,
+            subject: subjectParts.join('\x00'),
+          });
+        }
+        if (parents.length === message.payload.hashes.length) {
+          this.postMessage({ type: 'commitParents', payload: { parents } });
+        }
+        break;
+      }
+      case 'revert': {
+        const operationError = this.getOperationInProgressError();
+        if (operationError) {
+          this.postMessage({ type: 'error', payload: { error: operationError } });
+          this.postMessage({ type: 'revertState', payload: { state: 'idle' } });
+          break;
+        }
+        const result = await this.gitRevertService.revert(message.payload.hash, message.payload.mainlineParent);
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+          this.postMessage({ type: 'revertState', payload: { state: 'idle' } });
+        } else if (result.error.code === 'REVERT_CONFLICT') {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+          this.postMessage({ type: 'revertState', payload: { state: 'in-progress' } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+          this.postMessage({ type: 'revertState', payload: { state: 'idle' } });
+        }
+        break;
+      }
+      case 'continueRevert': {
+        const result = await this.gitRevertService.continueRevert();
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+          this.postMessage({ type: 'revertState', payload: { state: 'idle' } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+          this.postMessage({ type: 'revertState', payload: { state: 'in-progress' } });
+        }
+        break;
+      }
+      case 'abortRevert': {
+        const result = await this.gitRevertService.abortRevert();
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+          this.postMessage({ type: 'revertState', payload: { state: 'idle' } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
       // Rebase ops
       case 'rebase': {
         const dirtyCheck = await this.gitRebaseService.isDirtyWorkingTree();
@@ -697,6 +789,90 @@ export class WebviewProvider {
         }
         break;
       }
+      case 'getSignatureInfo': {
+        const result = await this.gitSignatureService.getSignatureInfo(message.payload.hash);
+        if (result.success) {
+          this.postMessage({
+            type: 'signatureInfo',
+            payload: { hash: message.payload.hash, signature: result.value },
+          });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+          this.postMessage({
+            type: 'signatureInfo',
+            payload: {
+              hash: message.payload.hash,
+              signature: {
+                status: 'unknown',
+                signer: '',
+                keyId: '',
+                fingerprint: '',
+                format: 'gpg',
+                verificationUnavailable: true,
+              },
+            },
+          });
+        }
+        break;
+      }
+      case 'isCommitPushed': {
+        const result = await this.gitHistoryService.isCommitPushed(message.payload.hash);
+        if (result.success) {
+          this.postMessage({
+            type: 'commitPushedResult',
+            payload: { hash: message.payload.hash, pushed: result.value },
+          });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'dropCommit': {
+        const operationError = this.getOperationInProgressError();
+        if (operationError) {
+          this.postMessage({ type: 'error', payload: { error: operationError } });
+          break;
+        }
+
+        const dirtyCheck = await this.gitRebaseService.isDirtyWorkingTree();
+        if (!dirtyCheck.success) {
+          this.postMessage({ type: 'error', payload: { error: dirtyCheck.error } });
+          break;
+        }
+        if (dirtyCheck.value) {
+          this.postMessage({ type: 'error', payload: { error: { message: 'Working tree has uncommitted changes. Commit, stash, or discard them before dropping a commit.' } } });
+          break;
+        }
+
+        const dropBaseHash = `${message.payload.hash}~1`;
+        const commitsResult = await this.gitRebaseService.getRebaseCommits(dropBaseHash);
+        if (!commitsResult.success) {
+          this.postMessage({ type: 'error', payload: { error: commitsResult.error } });
+          break;
+        }
+
+        const entries = commitsResult.value.map((entry) => ({
+          ...entry,
+          action: entry.hash === message.payload.hash ? 'drop' : 'pick',
+        }));
+        const result = await this.gitRebaseService.interactiveRebase({
+          baseHash: dropBaseHash,
+          entries,
+          squashMessages: [],
+        });
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: `Dropped ${message.payload.hash.slice(0, 7)} from the current branch.` } });
+          await this.sendInitialData();
+          this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+        } else if (result.error.code === 'REBASE_CONFLICT') {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+          const conflictInfo = await this.gitRebaseService.getConflictInfo();
+          this.postMessage({ type: 'rebaseState', payload: { state: 'in-progress', conflictInfo: conflictInfo.success ? conflictInfo.value : undefined } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
       case 'switchRepo': {
         const { repoPath } = message.payload;
         const discovery = this.gitRepoDiscoveryService;
@@ -788,6 +964,34 @@ export class WebviewProvider {
   private getWorkspacePath(): string | undefined {
     const folders = vscode.workspace.workspaceFolders;
     return folders?.[0]?.uri.fsPath;
+  }
+
+  private getActiveRepoPath(): string | undefined {
+    return this.gitRepoDiscoveryService?.getActiveRepoPath() ?? this.getWorkspacePath();
+  }
+
+  private getOperationInProgressError(): GitError | null {
+    const activeRepoPath = this.getActiveRepoPath();
+    const rebaseState = this.gitRebaseService.getRebaseState();
+    if (rebaseState.success && rebaseState.value.state === 'in-progress') {
+      return new GitError('Another git operation is already in progress (rebase). Finish it before starting this action.', 'OPERATION_IN_PROGRESS');
+    }
+
+    const cherryPickState = this.gitCherryPickService.getCherryPickState();
+    if (cherryPickState.success && cherryPickState.value === 'in-progress') {
+      return new GitError('Another git operation is already in progress (cherry-pick). Finish it before starting this action.', 'OPERATION_IN_PROGRESS');
+    }
+
+    const revertState = this.gitRevertService.getRevertState();
+    if (revertState.success && revertState.value === 'in-progress') {
+      return new GitError('Another git operation is already in progress (revert). Finish it before starting this action.', 'OPERATION_IN_PROGRESS');
+    }
+
+    if (activeRepoPath && fs.existsSync(path.join(activeRepoPath, '.git', 'MERGE_HEAD'))) {
+      return new GitError('Another git operation is already in progress (merge). Finish it before starting this action.', 'OPERATION_IN_PROGRESS');
+    }
+
+    return null;
   }
 
   private postMessage(message: ResponseMessage) {

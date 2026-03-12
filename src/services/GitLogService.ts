@@ -80,7 +80,7 @@ export class GitLogService {
     this.log.info('Fetching branches');
     // Use null byte separators for reliable parsing
     const result = await this.executor.execute({
-      args: ['branch', '-a', '--format=%(refname:short)%00%(HEAD)%00%(objectname:short)'],
+      args: ['branch', '-a', '--format=%(refname:short)%00%(HEAD)%00%(objectname)'],
       cwd: this.workspacePath,
     });
 

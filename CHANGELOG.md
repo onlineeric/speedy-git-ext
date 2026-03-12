@@ -7,6 +7,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 - None yet.
 
+## [0.7.0] - 2026-03-12
+
+### Added
+- Revert any commit via right-click context menu, creating a new commit that undoes the selected commit's changes without rewriting history.
+- Merge commit revert displays a parent selection dialog showing each parent's number, short hash, and commit message for precise undo targeting.
+- Revert conflict detection with "Abort Revert" and "Continue Revert" notification actions; conflict resolution uses VS Code's built-in merge editor.
+- Revert blocked with a warning when uncommitted changes exist, prompting the user to commit or stash first.
+- GPG and SSH commit signature verification displayed on-demand in the commit details panel when selecting a commit.
+- Signature status uses a simplified 4-level model: Good (green "Verified"), Bad (red "Invalid Signature"), Unknown (yellow "Unverified"), and None (no signature section shown).
+- Signature details show signer name, key ID, and signature format (GPG or SSH); data is cached within the session and cleared on graph refresh.
+- Graceful fallback ("Verification unavailable") when GPG or SSH verification tools are not installed on the system.
+- Drop any non-merge, non-root commit on the current branch via right-click "Drop Commit" context menu item.
+- Drop commit confirmation dialog warns about history rewriting; includes an additional force-push warning for already-pushed commits.
+- Drop commit uses interactive rebase under the hood with full conflict handling (Abort Rebase / Continue Rebase actions).
+- "Drop Commit" automatically disabled for merge commits, root commits, and commits not on the current branch.
+- Revert and drop operations blocked when another Git operation (rebase, merge, cherry-pick) is already in progress.
+
 ## [0.6.0] - 2026-03-12
 
 ### Added

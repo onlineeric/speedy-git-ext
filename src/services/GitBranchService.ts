@@ -1,8 +1,12 @@
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
-import { type Result, ok } from '../../shared/errors.js';
+import { GitError, type Result, err, ok } from '../../shared/errors.js';
 import { validateRefName } from '../utils/gitValidation.js';
 import { isDirtyWorkingTree } from '../utils/gitQueries.js';
+
+function isBranchNotFullyMerged(stderr: string | undefined): boolean {
+  return stderr?.includes('is not fully merged') ?? false;
+}
 
 export class GitBranchService {
   private executor: GitExecutor;
@@ -125,7 +129,19 @@ export class GitBranchService {
       args: ['branch', force ? '-D' : '-d', name],
       cwd: this.workspacePath,
     });
-    if (!result.success) return result;
+    if (!result.success) {
+      if (!force && isBranchNotFullyMerged(result.error.stderr)) {
+        return err(
+          new GitError(
+            `Branch '${name}' is not fully merged and requires force deletion.`,
+            'BRANCH_NOT_FULLY_MERGED',
+            result.error.command,
+            result.error.stderr
+          )
+        );
+      }
+      return result;
+    }
     return ok(`Deleted branch '${name}'`);
   }
 
