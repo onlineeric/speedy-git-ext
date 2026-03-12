@@ -111,6 +111,12 @@ export interface StashEntry {
 
 export type ResetMode = 'soft' | 'mixed' | 'hard';
 
+export interface MergeOptions {
+  noCommit: boolean;
+  noFastForward: boolean;
+  squash?: boolean;
+}
+
 export interface CherryPickOptions {
   appendSourceRef: boolean;
   noCommit: boolean;

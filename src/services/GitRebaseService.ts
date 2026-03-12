@@ -7,6 +7,7 @@ import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { InteractiveRebaseConfig, RebaseConflictInfo, RebaseEntry, RebaseState } from '../../shared/types.js';
 import { validateHash, validateRefName } from '../utils/gitValidation.js';
+import { isDirtyWorkingTree } from '../utils/gitQueries.js';
 import { isConflictStderr } from '../utils/gitParsers.js';
 
 export class GitRebaseService {
@@ -51,13 +52,8 @@ export class GitRebaseService {
     }
   }
 
-  async isDirtyWorkingTree(): Promise<Result<boolean>> {
-    const result = await this.executor.execute({
-      args: ['status', '--porcelain'],
-      cwd: this.workspacePath,
-    });
-    if (!result.success) return result;
-    return ok(result.value.stdout.trim().length > 0);
+  isDirtyWorkingTree(): Promise<Result<boolean>> {
+    return isDirtyWorkingTree(this.executor, this.workspacePath);
   }
 
   async getRebaseCommits(baseHash: string): Promise<Result<RebaseEntry[]>> {
