@@ -49,6 +49,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
   const mergedCommits = useGraphStore((s) => s.mergedCommits);
   const rebaseInProgress = useGraphStore((s) => s.rebaseInProgress);
   const pendingCheckout = useGraphStore((s) => s.pendingCheckout);
+  const pendingForceDeleteBranch = useGraphStore((s) => s.pendingForceDeleteBranch);
 
   const displayName = refInfo.remote
     ? `${refInfo.remote}/${refInfo.name}`
@@ -103,6 +104,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
 
   // pendingCheckout is for this branch (from checkoutNeedsStash response)
   const stashConfirmOpen = pendingCheckout !== null && pendingCheckout.name === refInfo.name;
+  const forceDeleteConfirmOpen = pendingForceDeleteBranch === refInfo.name;
 
   return (
     <>
@@ -218,6 +220,19 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
             : `Are you sure you want to delete branch '${refInfo.name}'?`
         }
         confirmLabel="Delete"
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        open={forceDeleteConfirmOpen}
+        onConfirm={() => {
+          useGraphStore.getState().setPendingForceDeleteBranch(null);
+          rpcClient.deleteBranch(refInfo.name, true);
+        }}
+        onCancel={() => useGraphStore.getState().setPendingForceDeleteBranch(null)}
+        title="Force Delete Branch"
+        description={`Branch '${refInfo.name}' is not fully merged. Force deleting it may permanently remove unmerged commits from this branch reference. Continue?`}
+        confirmLabel="Force Delete"
         variant="danger"
       />
 

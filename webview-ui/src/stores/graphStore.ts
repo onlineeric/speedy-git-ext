@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Commit, Branch, CommitDetails, DetailsPanelPosition, GraphFilters, RemoteInfo, StashEntry, CherryPickOptions, RebaseConflictInfo, RebaseEntry, RepoInfo } from '@shared/types';
+import type { Commit, Branch, CommitDetails, DetailsPanelPosition, GraphFilters, RemoteInfo, StashEntry, CherryPickOptions, RebaseConflictInfo, RebaseEntry, RepoInfo, CommitSignatureInfo } from '@shared/types';
 import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
 
 interface GraphStore {
@@ -24,6 +24,9 @@ interface GraphStore {
   // Rebase state (conflict-paused, not execution loading)
   rebaseInProgress: boolean;
   rebaseConflictInfo: RebaseConflictInfo | undefined;
+  revertInProgress: boolean;
+  signatureCache: Record<string, CommitSignatureInfo | null>;
+  signatureLoading: Record<string, boolean>;
   // Pending rebase entries (populated by rebaseCommits response; consumed by InteractiveRebaseDialog)
   pendingRebaseEntries: RebaseEntry[] | undefined;
   // Multi-select state
@@ -38,6 +41,7 @@ interface GraphStore {
   totalLoadedWithoutFilter: number | null;
   // Stash-and-checkout pending state
   pendingCheckout: { name: string; pull?: boolean } | null;
+  pendingForceDeleteBranch: string | null;
   // Repository navigation
   repos: RepoInfo[];
   activeRepoPath: string;
@@ -59,6 +63,10 @@ interface GraphStore {
   setCherryPickOptions: (options: CherryPickOptions) => void;
   setRebaseInProgress: (inProgress: boolean) => void;
   setRebaseConflictInfo: (info: RebaseConflictInfo | undefined) => void;
+  setRevertInProgress: (inProgress: boolean) => void;
+  setSignatureInfo: (hash: string, info: CommitSignatureInfo | null) => void;
+  clearSignatureCache: () => void;
+  setSignatureLoading: (hash: string, loading: boolean) => void;
   setPendingRebaseEntries: (entries: RebaseEntry[] | undefined) => void;
   setSelectedCommits: (hashes: string[]) => void;
   setSelectionAnchor: (hash: string | undefined) => void;
@@ -71,6 +79,7 @@ interface GraphStore {
   setPrefetching: (v: boolean) => void;
   setTotalLoadedWithoutFilter: (n: number | null) => void;
   setPendingCheckout: (checkout: { name: string; pull?: boolean } | null) => void;
+  setPendingForceDeleteBranch: (branchName: string | null) => void;
   // Repository navigation actions
   setRepos: (repos: RepoInfo[], activeRepoPath: string) => void;
   setActiveRepo: (repoPath: string) => void;
@@ -151,6 +160,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   cherryPickOptions: { appendSourceRef: false, noCommit: false },
   rebaseInProgress: false,
   rebaseConflictInfo: undefined,
+  revertInProgress: false,
+  signatureCache: {},
+  signatureLoading: {},
   pendingRebaseEntries: undefined,
   selectedCommits: [],
   lastClickedHash: undefined,
@@ -160,6 +172,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   lastBatchStartIndex: 0,
   totalLoadedWithoutFilter: null,
   pendingCheckout: null,
+  pendingForceDeleteBranch: null,
   repos: [],
   activeRepoPath: '',
   isLoadingRepo: false,
@@ -176,6 +189,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       fetchGeneration: get().fetchGeneration + 1,
       lastBatchStartIndex: 0,
       totalLoadedWithoutFilter: null,
+      signatureCache: {},
+      signatureLoading: {},
     });
   },
   setBranches: (branches) => set({ branches }),
@@ -216,6 +231,15 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setCherryPickOptions: (cherryPickOptions) => set({ cherryPickOptions }),
   setRebaseInProgress: (rebaseInProgress) => set({ rebaseInProgress }),
   setRebaseConflictInfo: (rebaseConflictInfo) => set({ rebaseConflictInfo }),
+  setRevertInProgress: (revertInProgress) => set({ revertInProgress }),
+  setSignatureInfo: (hash, info) => set((state) => ({
+    signatureCache: { ...state.signatureCache, [hash]: info },
+    signatureLoading: { ...state.signatureLoading, [hash]: false },
+  })),
+  clearSignatureCache: () => set({ signatureCache: {}, signatureLoading: {} }),
+  setSignatureLoading: (hash, loading) => set((state) => ({
+    signatureLoading: { ...state.signatureLoading, [hash]: loading },
+  })),
   setPendingRebaseEntries: (pendingRebaseEntries) => set({ pendingRebaseEntries }),
   setSelectedCommits: (selectedCommits) => set({ selectedCommits }),
   setSelectionAnchor: (lastClickedHash) => set({ lastClickedHash }),
@@ -260,6 +284,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setPrefetching: (prefetching) => set({ prefetching }),
   setTotalLoadedWithoutFilter: (totalLoadedWithoutFilter) => set({ totalLoadedWithoutFilter }),
   setPendingCheckout: (pendingCheckout) => set({ pendingCheckout }),
+  setPendingForceDeleteBranch: (pendingForceDeleteBranch) => set({ pendingForceDeleteBranch }),
   setRepos: (repos, activeRepoPath) => {
     const { activeRepoPath: prevPath, filters } = get();
     const repoChanged = prevPath !== '' && prevPath !== activeRepoPath;

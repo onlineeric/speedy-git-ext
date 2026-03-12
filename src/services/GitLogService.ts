@@ -80,7 +80,7 @@ export class GitLogService {
     this.log.info('Fetching branches');
     // Use null byte separators for reliable parsing
     const result = await this.executor.execute({
-      args: ['branch', '-a', '--format=%(refname:short)%00%(HEAD)%00%(objectname:short)'],
+      args: ['branch', '-a', '--format=%(refname:short)%00%(HEAD)%00%(objectname)'],
       cwd: this.workspacePath,
     });
 
@@ -99,6 +99,14 @@ export class GitLogService {
     }
 
     return ok(branches);
+  }
+
+  async verifyRef(ref: string): Promise<Result<boolean>> {
+    const result = await this.executor.execute({
+      args: ['rev-parse', '--verify', ref],
+      cwd: this.workspacePath,
+    });
+    return ok(result.success);
   }
 
   async getCurrentBranch(): Promise<Result<string>> {

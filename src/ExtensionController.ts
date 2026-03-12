@@ -8,7 +8,9 @@ import { GitTagService } from './services/GitTagService.js';
 import { GitStashService } from './services/GitStashService.js';
 import { GitHistoryService } from './services/GitHistoryService.js';
 import { GitCherryPickService } from './services/GitCherryPickService.js';
+import { GitRevertService } from './services/GitRevertService.js';
 import { GitRebaseService } from './services/GitRebaseService.js';
+import { GitSignatureService } from './services/GitSignatureService.js';
 import { GitShowContentProvider } from './GitShowContentProvider.js';
 import { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
 
@@ -22,7 +24,9 @@ export class ExtensionController {
   private gitStashService: GitStashService | undefined;
   private gitHistoryService: GitHistoryService | undefined;
   private gitCherryPickService: GitCherryPickService | undefined;
+  private gitRevertService: GitRevertService | undefined;
   private gitRebaseService: GitRebaseService | undefined;
+  private gitSignatureService: GitSignatureService | undefined;
   private contentProviderRegistration: vscode.Disposable | undefined;
   private gitRepoDiscoveryService: GitRepoDiscoveryService | undefined;
   private statusBarItem: vscode.StatusBarItem | undefined;
@@ -96,7 +100,9 @@ export class ExtensionController {
     this.gitStashService = new GitStashService(workspacePath, this.log);
     this.gitHistoryService = new GitHistoryService(workspacePath, this.log);
     this.gitCherryPickService = new GitCherryPickService(workspacePath, this.log);
+    this.gitRevertService = new GitRevertService(workspacePath, this.log);
     this.gitRebaseService = new GitRebaseService(workspacePath, this.log);
+    this.gitSignatureService = new GitSignatureService(workspacePath, this.log);
 
     if (this.webviewProvider) {
       this.webviewProvider.updateServices(
@@ -108,7 +114,9 @@ export class ExtensionController {
         this.gitStashService,
         this.gitHistoryService,
         this.gitCherryPickService,
-        this.gitRebaseService
+        this.gitRevertService,
+        this.gitRebaseService,
+        this.gitSignatureService
       );
     }
   }
@@ -154,8 +162,14 @@ export class ExtensionController {
     if (!this.gitCherryPickService) {
       this.gitCherryPickService = new GitCherryPickService(workspacePath, this.log);
     }
+    if (!this.gitRevertService) {
+      this.gitRevertService = new GitRevertService(workspacePath, this.log);
+    }
     if (!this.gitRebaseService) {
       this.gitRebaseService = new GitRebaseService(workspacePath, this.log);
+    }
+    if (!this.gitSignatureService) {
+      this.gitSignatureService = new GitSignatureService(workspacePath, this.log);
     }
 
     // Register git-show:// content provider for diff view
@@ -179,7 +193,9 @@ export class ExtensionController {
         this.gitStashService,
         this.gitHistoryService,
         this.gitCherryPickService,
+        this.gitRevertService,
         this.gitRebaseService,
+        this.gitSignatureService,
         this.log,
         this.gitRepoDiscoveryService
       );
@@ -222,7 +238,9 @@ export class ExtensionController {
     this.gitStashService = undefined;
     this.gitHistoryService = undefined;
     this.gitCherryPickService = undefined;
+    this.gitRevertService = undefined;
     this.gitRebaseService = undefined;
+    this.gitSignatureService = undefined;
     this.gitRepoDiscoveryService?.dispose();
     this.gitRepoDiscoveryService = undefined;
     this.statusBarItem?.dispose();

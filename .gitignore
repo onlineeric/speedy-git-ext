@@ -1,5 +1,10 @@
 node_modules/
 dist/
+build/
 *.vsix
 .vscode-test/
 test-repo/
+*.log
+.env*
+.DS_Store
+Thumbs.db

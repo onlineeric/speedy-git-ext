@@ -125,6 +125,27 @@ export interface CherryPickOptions {
 
 export type CherryPickState = 'idle' | 'in-progress';
 
+export type RevertState = 'idle' | 'in-progress';
+
+export type SignatureStatus = 'good' | 'bad' | 'unknown' | 'none';
+
+export type SignatureFormat = 'gpg' | 'ssh';
+
+export interface CommitSignatureInfo {
+  status: SignatureStatus;
+  signer: string;
+  keyId: string;
+  fingerprint: string;
+  format: SignatureFormat;
+  verificationUnavailable?: boolean;
+}
+
+export interface CommitParentInfo {
+  hash: string;
+  abbreviatedHash: string;
+  subject: string;
+}
+
 export type RebaseAction = 'pick' | 'squash' | 'fixup' | 'drop' | 'reword';
 
 export interface RebaseEntry {
