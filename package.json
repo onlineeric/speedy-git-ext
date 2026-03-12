@@ -80,8 +80,8 @@
     "typecheck": "tsc --noEmit",
     "generate-test-repo": "tsx scripts/main.ts",
     "test": "vitest run",
-    "package": "npx @vscode/vsce package",
-    "publish": "npx @vscode/vsce publish"
+    "ext:package": "npx @vscode/vsce package",
+    "ext:publish": "npx @vscode/vsce publish"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
