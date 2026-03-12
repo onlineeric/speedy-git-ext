@@ -1,5 +1,5 @@
-import { memo, useState, useCallback, useRef } from 'react';
-import type { CommitDetails, FileChange, DetailsPanelPosition } from '@shared/types';
+import { memo, useState, useCallback, useRef, useEffect } from 'react';
+import type { CommitDetails, FileChange, DetailsPanelPosition, CommitSignatureInfo } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { formatRelativeDate } from '../utils/formatDate';
@@ -22,11 +22,11 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
   const resizing = useRef(false);
 
   const handleResizeStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
+    (event: React.MouseEvent) => {
+      event.preventDefault();
       resizing.current = true;
 
-      const startPos = detailsPanelPosition === 'bottom' ? e.clientY : e.clientX;
+      const startPos = detailsPanelPosition === 'bottom' ? event.clientY : event.clientX;
       const startSize = detailsPanelPosition === 'bottom' ? bottomHeight : rightWidth;
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
@@ -85,7 +85,7 @@ function ResizeHandle({
   onMouseDown,
 }: {
   position: DetailsPanelPosition;
-  onMouseDown: (e: React.MouseEvent) => void;
+  onMouseDown: (event: React.MouseEvent) => void;
 }) {
   const isBottom = position === 'bottom';
   return (
@@ -93,7 +93,7 @@ function ResizeHandle({
       className={`flex-shrink-0 ${
         isBottom
           ? 'h-1 cursor-row-resize hover:bg-[var(--vscode-focusBorder)]'
-          : 'w-1 cursor-col-resize hover:bg-[var(--vscode-focusBorder)] absolute left-0 top-0 bottom-0 z-10'
+          : 'absolute bottom-0 left-0 top-0 z-10 w-1 cursor-col-resize hover:bg-[var(--vscode-focusBorder)]'
       }`}
       onMouseDown={onMouseDown}
     />
@@ -112,23 +112,23 @@ function PanelHeader({
   onTogglePosition: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--vscode-panel-border)] flex-shrink-0">
+    <div className="flex items-center gap-2 border-b border-[var(--vscode-panel-border)] px-3 py-1.5 flex-shrink-0">
       <span className="font-mono text-xs text-[var(--vscode-textLink-foreground)]">
         {details.abbreviatedHash}
       </span>
-      <span className="flex-1 text-sm truncate" title={details.subject}>
+      <span className="flex-1 truncate text-sm" title={details.subject}>
         {details.subject}
       </span>
       <button
         onClick={onTogglePosition}
-        className="px-1.5 py-0.5 text-xs text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] rounded"
+        className="rounded px-1.5 py-0.5 text-xs text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)]"
         title={`Move panel to ${position === 'bottom' ? 'right' : 'bottom'}`}
       >
         {position === 'bottom' ? '\u2b95' : '\u2b07'}
       </button>
       <button
         onClick={onClose}
-        className="px-1.5 py-0.5 text-xs text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] rounded"
+        className="rounded px-1.5 py-0.5 text-xs text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)]"
         title="Close panel"
       >
         \u2715
@@ -141,6 +141,7 @@ function PanelBody({ details }: { details: CommitDetails }) {
   return (
     <div className="flex-1 overflow-auto">
       <CommitMetadata details={details} />
+      <CommitSignatureSection hash={details.hash} />
       <FileChangesList details={details} />
     </div>
   );
@@ -148,12 +149,12 @@ function PanelBody({ details }: { details: CommitDetails }) {
 
 function CommitMetadata({ details }: { details: CommitDetails }) {
   return (
-    <div className="px-3 py-2 text-xs space-y-1 border-b border-[var(--vscode-panel-border)]">
+    <div className="space-y-1 border-b border-[var(--vscode-panel-border)] px-3 py-2 text-xs">
       <MetadataRow label="Hash" value={details.hash} mono copyable />
       {details.parents.length > 0 && (
         <MetadataRow
           label={details.parents.length > 1 ? 'Parents' : 'Parent'}
-          value={details.parents.map((p) => p.slice(0, 7)).join(', ')}
+          value={details.parents.map((parent) => parent.slice(0, 7)).join(', ')}
           mono
         />
       )}
@@ -170,7 +171,7 @@ function CommitMetadata({ details }: { details: CommitDetails }) {
       )}
       {details.body && (
         <div className="pt-1">
-          <span className="text-[var(--vscode-descriptionForeground)] whitespace-pre-wrap">
+          <span className="whitespace-pre-wrap text-[var(--vscode-descriptionForeground)]">
             {details.body}
           </span>
         </div>
@@ -214,10 +215,73 @@ function MetadataRow({
   );
 }
 
+function CommitSignatureSection({ hash }: { hash: string }) {
+  const signature = useGraphStore((state) => state.signatureCache[hash]);
+  const loading = useGraphStore((state) => !!state.signatureLoading[hash]);
+
+  useEffect(() => {
+    const store = useGraphStore.getState();
+    if (hash in store.signatureCache || store.signatureLoading[hash]) {
+      return;
+    }
+    rpcClient.getSignatureInfo(hash);
+  }, [hash]);
+
+  if (loading) {
+    return (
+      <div className="border-b border-[var(--vscode-panel-border)] px-3 py-2 text-xs text-[var(--vscode-descriptionForeground)]">
+        Loading signature verification...
+      </div>
+    );
+  }
+
+  if (!signature) {
+    return null;
+  }
+
+  const statusConfig = getSignatureStatusConfig(signature);
+
+  return (
+    <div className="space-y-1 border-b border-[var(--vscode-panel-border)] px-3 py-2 text-xs">
+      <div className="flex items-center gap-2">
+        <span className={statusConfig.className}>{statusConfig.label}</span>
+        <span className="uppercase text-[var(--vscode-descriptionForeground)]">
+          {signature.format}
+        </span>
+      </div>
+      {signature.verificationUnavailable ? (
+        <div className="text-[var(--vscode-descriptionForeground)]">Verification unavailable</div>
+      ) : (
+        <>
+          {signature.signer && <MetadataRow label="Signer" value={signature.signer} />}
+          {signature.keyId && <MetadataRow label="Key ID" value={signature.keyId} mono />}
+        </>
+      )}
+    </div>
+  );
+}
+
+function getSignatureStatusConfig(signature: CommitSignatureInfo): { label: string; className: string } {
+  if (signature.verificationUnavailable) {
+    return {
+      label: 'Verification Unavailable',
+      className: 'font-medium text-[var(--vscode-editorWarning-foreground)]',
+    };
+  }
+
+  switch (signature.status) {
+    case 'good':
+      return { label: 'Verified', className: 'font-medium text-green-400' };
+    case 'bad':
+      return { label: 'Invalid Signature', className: 'font-medium text-red-400' };
+    default:
+      return { label: 'Unverified', className: 'font-medium text-yellow-400' };
+  }
+}
+
 function FileChangesList({ details }: { details: CommitDetails }) {
   const handleFileClick = (file: FileChange) => {
     if (file.status === 'deleted') {
-      // For deleted files, show the file at parent revision
       const parentHash = details.parents[0];
       if (parentHash) {
         rpcClient.openFile(parentHash, file.path);
@@ -229,7 +293,7 @@ function FileChangesList({ details }: { details: CommitDetails }) {
 
   return (
     <div className="px-3 py-2">
-      <div className="flex items-center gap-2 mb-1">
+      <div className="mb-1 flex items-center gap-2">
         <span className="text-xs text-[var(--vscode-descriptionForeground)]">
           {details.files.length} file{details.files.length !== 1 ? 's' : ''} changed
         </span>
@@ -262,7 +326,7 @@ function FileChangeRow({
 }) {
   return (
     <div
-      className="flex items-center gap-2 px-1 py-0.5 text-xs rounded cursor-pointer hover:bg-[var(--vscode-list-hoverBackground)]"
+      className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-[var(--vscode-list-hoverBackground)]"
       onClick={onClick}
       title={file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}
     >
@@ -284,7 +348,7 @@ function FileStatusBadge({ status }: { status: FileChange['status'] }) {
   const config = getStatusConfig(status);
   return (
     <span
-      className={`w-4 h-4 flex items-center justify-center text-[10px] font-bold rounded ${config.className}`}
+      className={`flex h-4 w-4 items-center justify-center rounded text-[10px] font-bold ${config.className}`}
       title={config.label}
     >
       {config.letter}

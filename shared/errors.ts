@@ -35,9 +35,13 @@ export class GitError extends Error {
 export type GitErrorCode =
   | 'NOT_A_REPOSITORY'
   | 'COMMAND_FAILED'
+  | 'BRANCH_NOT_FULLY_MERGED'
   | 'PARSE_ERROR'
   | 'VALIDATION_ERROR'
   | 'TIMEOUT'
   | 'CHERRY_PICK_CONFLICT'
+  | 'REVERT_CONFLICT'
+  | 'REVERT_IN_PROGRESS'
   | 'REBASE_CONFLICT'
+  | 'OPERATION_IN_PROGRESS'
   | 'UNKNOWN';

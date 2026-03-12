@@ -1,5 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, InteractiveRebaseConfig, MergeOptions, ResetMode } from '@shared/types';
+import type { CherryPickOptions, InteractiveRebaseConfig, MergeOptions, ResetMode, CommitParentInfo } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 
 declare const acquireVsCodeApi: () => {
@@ -11,6 +11,10 @@ declare const acquireVsCodeApi: () => {
 class RpcClient {
   private vscode: ReturnType<typeof acquireVsCodeApi> | undefined;
   private initialized = false;
+  private nextRequestId = 1;
+  private pendingPushedChecks = new Map<string, { resolve: (pushed: boolean) => void; reject: (error: Error) => void }>();
+  private pendingParentLookups = new Map<number, { resolve: (parents: CommitParentInfo[]) => void; reject: (error: Error) => void }>();
+  private parentRequestIdByHash = new Map<string, number>();
 
   private messageHandler = (event: MessageEvent) => {
     const message = event.data as ResponseMessage;
@@ -31,6 +35,7 @@ class RpcClient {
   dispose() {
     window.removeEventListener('message', this.messageHandler);
     this.initialized = false;
+    this.rejectPendingLookups('RPC client disposed');
   }
 
   private handleMessage(message: ResponseMessage) {
@@ -68,6 +73,7 @@ class RpcClient {
         break;
       case 'error':
         store.setError(message.payload.error.message);
+        this.rejectPendingLookups(message.payload.error.message);
         break;
       case 'prefetchError':
         store.setError(message.payload.error.message);
@@ -85,6 +91,9 @@ class RpcClient {
       case 'cherryPickState':
         store.setCherryPickInProgress(message.payload.state === 'in-progress');
         break;
+      case 'revertState':
+        store.setRevertInProgress(message.payload.state === 'in-progress');
+        break;
       case 'rebaseState':
         store.setLoading(false);
         store.setRebaseInProgress(message.payload.state === 'in-progress');
@@ -93,8 +102,35 @@ class RpcClient {
       case 'rebaseCommits':
         store.setPendingRebaseEntries(message.payload.entries);
         break;
+      case 'signatureInfo':
+        store.setSignatureInfo(message.payload.hash, message.payload.signature);
+        break;
+      case 'commitPushedResult': {
+        const pending = this.pendingPushedChecks.get(message.payload.hash);
+        if (pending) {
+          pending.resolve(message.payload.pushed);
+          this.pendingPushedChecks.delete(message.payload.hash);
+        }
+        break;
+      }
+      case 'commitParents': {
+        const lookupKey = message.payload.parents.map((parent) => parent.hash).join(',');
+        const requestId = this.parentRequestIdByHash.get(lookupKey);
+        if (requestId !== undefined) {
+          const pending = this.pendingParentLookups.get(requestId);
+          if (pending) {
+            pending.resolve(message.payload.parents);
+            this.pendingParentLookups.delete(requestId);
+          }
+          this.parentRequestIdByHash.delete(lookupKey);
+        }
+        break;
+      }
       case 'checkoutNeedsStash':
         store.setPendingCheckout({ name: message.payload.name, pull: message.payload.pull });
+        break;
+      case 'deleteBranchNeedsForce':
+        store.setPendingForceDeleteBranch(message.payload.name);
         break;
       case 'checkoutPullFailed':
         store.setError(`Checked out '${message.payload.branch}'. Pull failed: ${message.payload.error.message}`);
@@ -252,6 +288,18 @@ class RpcClient {
     this.send({ type: 'continueCherryPick', payload: {} });
   }
 
+  revert(hash: string, mainlineParent?: number) {
+    this.send({ type: 'revert', payload: { hash, mainlineParent } });
+  }
+
+  continueRevert() {
+    this.send({ type: 'continueRevert', payload: {} });
+  }
+
+  abortRevert() {
+    this.send({ type: 'abortRevert', payload: {} });
+  }
+
   // Rebase ops
   rebase(targetRef: string, ignoreDate?: boolean) {
     this.send({ type: 'rebase', payload: { targetRef, ignoreDate } });
@@ -271,6 +319,48 @@ class RpcClient {
 
   continueRebase() {
     this.send({ type: 'continueRebase', payload: {} });
+  }
+
+  getSignatureInfo(hash: string) {
+    useGraphStore.getState().setSignatureLoading(hash, true);
+    this.send({ type: 'getSignatureInfo', payload: { hash } });
+  }
+
+  dropCommit(hash: string) {
+    this.send({ type: 'dropCommit', payload: { hash } });
+  }
+
+  isCommitPushed(hash: string): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+      this.pendingPushedChecks.set(hash, { resolve, reject });
+      this.send({ type: 'isCommitPushed', payload: { hash } });
+    });
+  }
+
+  getCommitParents(hashes: string[]): Promise<CommitParentInfo[]> {
+    const requestId = this.nextRequestId++;
+    // Also map by original hashes so the response can find this request
+    const originalKey = hashes.join(',');
+    return new Promise((resolve, reject) => {
+      this.pendingParentLookups.set(requestId, { resolve, reject });
+      this.parentRequestIdByHash.set(originalKey, requestId);
+      this.send({ type: 'getCommitParents', payload: { hashes } });
+    });
+  }
+
+  private rejectPendingLookups(message: string) {
+    const error = new Error(message);
+
+    for (const pending of this.pendingPushedChecks.values()) {
+      pending.reject(error);
+    }
+    this.pendingPushedChecks.clear();
+
+    for (const pending of this.pendingParentLookups.values()) {
+      pending.reject(error);
+    }
+    this.pendingParentLookups.clear();
+    this.parentRequestIdByHash.clear();
   }
 
   // Settings
