@@ -1,7 +1,7 @@
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { type Result, ok } from '../../shared/errors.js';
-import type { ResetMode } from '../../shared/types.js';
+import type { ResetMode, CommitParentInfo } from '../../shared/types.js';
 import { validateHash } from '../utils/gitValidation.js';
 
 export class GitHistoryService {
@@ -38,5 +38,29 @@ export class GitHistoryService {
     if (!result.success) return result;
 
     return ok(result.value.stdout.trim().length > 0);
+  }
+
+  async getCommitParents(hashes: string[]): Promise<Result<CommitParentInfo[]>> {
+    for (const hash of hashes) {
+      const hashCheck = validateHash(hash);
+      if (!hashCheck.success) return hashCheck;
+    }
+
+    const parents: CommitParentInfo[] = [];
+    for (const hash of hashes) {
+      const result = await this.executor.execute({
+        args: ['log', '-1', '--format=%H%x00%h%x00%s', hash, '--'],
+        cwd: this.workspacePath,
+      });
+      if (!result.success) return result;
+      const [fullHash, abbreviatedHash, ...subjectParts] = result.value.stdout.trim().split('\x00');
+      parents.push({
+        hash: fullHash,
+        abbreviatedHash,
+        subject: subjectParts.join('\x00'),
+      });
+    }
+
+    return ok(parents);
   }
 }

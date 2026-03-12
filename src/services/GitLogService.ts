@@ -101,6 +101,14 @@ export class GitLogService {
     return ok(branches);
   }
 
+  async verifyRef(ref: string): Promise<Result<boolean>> {
+    const result = await this.executor.execute({
+      args: ['rev-parse', '--verify', ref],
+      cwd: this.workspacePath,
+    });
+    return ok(result.success);
+  }
+
   async getCurrentBranch(): Promise<Result<string>> {
     this.log.info('Getting current branch');
     const result = await this.executor.execute({

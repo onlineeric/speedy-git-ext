@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as fs from 'fs';
 import type { RequestMessage, ResponseMessage } from '../shared/messages.js';
 import type { GitLogService } from './services/GitLogService.js';
 import type { GitDiffService } from './services/GitDiffService.js';
@@ -14,9 +13,8 @@ import type { GitRevertService } from './services/GitRevertService.js';
 import type { GitRebaseService } from './services/GitRebaseService.js';
 import type { GitSignatureService } from './services/GitSignatureService.js';
 import type { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
-import { GitExecutor } from './services/GitExecutor.js';
 import { GitError } from '../shared/errors.js';
-import type { RepoInfo, CommitParentInfo } from '../shared/types.js';
+import type { RepoInfo } from '../shared/types.js';
 
 export class WebviewProvider {
   private panel: vscode.WebviewPanel | undefined;
@@ -174,7 +172,7 @@ export class WebviewProvider {
       }
     }
 
-    const revertStateResult = this.gitRevertService.getRevertState();
+    const revertStateResult = await this.gitRevertService.getRevertState();
     if (revertStateResult.success) {
       this.postMessage({ type: 'revertState', payload: { state: revertStateResult.value } });
     }
@@ -617,37 +615,16 @@ export class WebviewProvider {
         break;
       }
       case 'getCommitParents': {
-        const workspacePath = this.getActiveRepoPath();
-        if (!workspacePath) {
-          this.postMessage({ type: 'error', payload: { error: { message: 'No active repository available.' } } });
-          break;
-        }
-
-        const executor = new GitExecutor(this.log);
-        const parents: CommitParentInfo[] = [];
-        for (const hash of message.payload.hashes) {
-          const result = await executor.execute({
-            args: ['log', '-1', '--format=%H%x00%h%x00%s', hash],
-            cwd: workspacePath,
-          });
-          if (!result.success) {
-            this.postMessage({ type: 'error', payload: { error: result.error } });
-            break;
-          }
-          const [fullHash, abbreviatedHash, ...subjectParts] = result.value.stdout.trim().split('\x00');
-          parents.push({
-            hash: fullHash,
-            abbreviatedHash,
-            subject: subjectParts.join('\x00'),
-          });
-        }
-        if (parents.length === message.payload.hashes.length) {
-          this.postMessage({ type: 'commitParents', payload: { parents } });
+        const parentsResult = await this.gitHistoryService.getCommitParents(message.payload.hashes);
+        if (parentsResult.success) {
+          this.postMessage({ type: 'commitParents', payload: { parents: parentsResult.value } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: parentsResult.error } });
         }
         break;
       }
       case 'revert': {
-        const operationError = this.getOperationInProgressError();
+        const operationError = await this.getOperationInProgressError();
         if (operationError) {
           this.postMessage({ type: 'error', payload: { error: operationError } });
           this.postMessage({ type: 'revertState', payload: { state: 'idle' } });
@@ -828,7 +805,7 @@ export class WebviewProvider {
         break;
       }
       case 'dropCommit': {
-        const operationError = this.getOperationInProgressError();
+        const operationError = await this.getOperationInProgressError();
         if (operationError) {
           this.postMessage({ type: 'error', payload: { error: operationError } });
           break;
@@ -853,7 +830,7 @@ export class WebviewProvider {
 
         const entries = commitsResult.value.map((entry) => ({
           ...entry,
-          action: entry.hash === message.payload.hash ? 'drop' : 'pick',
+          action: (entry.hash === message.payload.hash ? 'drop' : 'pick') as import('../shared/types.js').RebaseAction,
         }));
         const result = await this.gitRebaseService.interactiveRebase({
           baseHash: dropBaseHash,
@@ -966,12 +943,7 @@ export class WebviewProvider {
     return folders?.[0]?.uri.fsPath;
   }
 
-  private getActiveRepoPath(): string | undefined {
-    return this.gitRepoDiscoveryService?.getActiveRepoPath() ?? this.getWorkspacePath();
-  }
-
-  private getOperationInProgressError(): GitError | null {
-    const activeRepoPath = this.getActiveRepoPath();
+  private async getOperationInProgressError(): Promise<GitError | null> {
     const rebaseState = this.gitRebaseService.getRebaseState();
     if (rebaseState.success && rebaseState.value.state === 'in-progress') {
       return new GitError('Another git operation is already in progress (rebase). Finish it before starting this action.', 'OPERATION_IN_PROGRESS');
@@ -982,12 +954,13 @@ export class WebviewProvider {
       return new GitError('Another git operation is already in progress (cherry-pick). Finish it before starting this action.', 'OPERATION_IN_PROGRESS');
     }
 
-    const revertState = this.gitRevertService.getRevertState();
+    const revertState = await this.gitRevertService.getRevertState();
     if (revertState.success && revertState.value === 'in-progress') {
       return new GitError('Another git operation is already in progress (revert). Finish it before starting this action.', 'OPERATION_IN_PROGRESS');
     }
 
-    if (activeRepoPath && fs.existsSync(path.join(activeRepoPath, '.git', 'MERGE_HEAD'))) {
+    const mergeHeadCheck = await this.gitLogService.verifyRef('MERGE_HEAD');
+    if (mergeHeadCheck.success && mergeHeadCheck.value) {
       return new GitError('Another git operation is already in progress (merge). Finish it before starting this action.', 'OPERATION_IN_PROGRESS');
     }
 

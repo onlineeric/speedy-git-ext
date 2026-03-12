@@ -11,8 +11,10 @@ declare const acquireVsCodeApi: () => {
 class RpcClient {
   private vscode: ReturnType<typeof acquireVsCodeApi> | undefined;
   private initialized = false;
+  private nextRequestId = 1;
   private pendingPushedChecks = new Map<string, { resolve: (pushed: boolean) => void; reject: (error: Error) => void }>();
-  private pendingParentLookups = new Map<string, { resolve: (parents: CommitParentInfo[]) => void; reject: (error: Error) => void }>();
+  private pendingParentLookups = new Map<number, { resolve: (parents: CommitParentInfo[]) => void; reject: (error: Error) => void }>();
+  private parentRequestIdByHash = new Map<string, number>();
 
   private messageHandler = (event: MessageEvent) => {
     const message = event.data as ResponseMessage;
@@ -33,6 +35,7 @@ class RpcClient {
   dispose() {
     window.removeEventListener('message', this.messageHandler);
     this.initialized = false;
+    this.rejectPendingLookups('RPC client disposed');
   }
 
   private handleMessage(message: ResponseMessage) {
@@ -111,11 +114,15 @@ class RpcClient {
         break;
       }
       case 'commitParents': {
-        const key = message.payload.parents.map((parent) => parent.hash).join(',');
-        const pending = this.pendingParentLookups.get(key);
-        if (pending) {
-          pending.resolve(message.payload.parents);
-          this.pendingParentLookups.delete(key);
+        const lookupKey = message.payload.parents.map((parent) => parent.hash).join(',');
+        const requestId = this.parentRequestIdByHash.get(lookupKey);
+        if (requestId !== undefined) {
+          const pending = this.pendingParentLookups.get(requestId);
+          if (pending) {
+            pending.resolve(message.payload.parents);
+            this.pendingParentLookups.delete(requestId);
+          }
+          this.parentRequestIdByHash.delete(lookupKey);
         }
         break;
       }
@@ -331,9 +338,12 @@ class RpcClient {
   }
 
   getCommitParents(hashes: string[]): Promise<CommitParentInfo[]> {
-    const key = hashes.join(',');
+    const requestId = this.nextRequestId++;
+    // Also map by original hashes so the response can find this request
+    const originalKey = hashes.join(',');
     return new Promise((resolve, reject) => {
-      this.pendingParentLookups.set(key, { resolve, reject });
+      this.pendingParentLookups.set(requestId, { resolve, reject });
+      this.parentRequestIdByHash.set(originalKey, requestId);
       this.send({ type: 'getCommitParents', payload: { hashes } });
     });
   }
@@ -350,6 +360,7 @@ class RpcClient {
       pending.reject(error);
     }
     this.pendingParentLookups.clear();
+    this.parentRequestIdByHash.clear();
   }
 
   // Settings

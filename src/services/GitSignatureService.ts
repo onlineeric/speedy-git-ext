@@ -18,7 +18,7 @@ export class GitSignatureService {
 
   constructor(
     private readonly workspacePath: string,
-    private readonly log: LogOutputChannel
+    log: LogOutputChannel
   ) {
     this.executor = new GitExecutor(log);
   }
@@ -35,19 +35,6 @@ export class GitSignatureService {
 
     const signature = this.parseSignatureOutput(result.value.stdout);
     return ok(signature);
-  }
-
-  async isCommitPushed(hash: string): Promise<Result<boolean>> {
-    const hashCheck = validateHash(hash);
-    if (!hashCheck.success) return hashCheck;
-
-    const result = await this.executor.execute({
-      args: ['branch', '-r', '--contains', hash],
-      cwd: this.workspacePath,
-    });
-    if (!result.success) return result;
-
-    return ok(result.value.stdout.trim().length > 0);
   }
 
   private parseSignatureOutput(stdout: string): CommitSignatureInfo | null {

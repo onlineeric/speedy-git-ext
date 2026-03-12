@@ -1,5 +1,3 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
@@ -10,23 +8,33 @@ import { isDirtyWorkingTree } from '../utils/gitQueries.js';
 
 export class GitRevertService {
   private executor: GitExecutor;
-  private readonly revertHeadPath: string;
 
   constructor(
     private readonly workspacePath: string,
     private readonly log: LogOutputChannel
   ) {
     this.executor = new GitExecutor(log);
-    this.revertHeadPath = path.join(workspacePath, '.git', 'REVERT_HEAD');
   }
 
   isDirtyWorkingTree(): Promise<Result<boolean>> {
     return isDirtyWorkingTree(this.executor, this.workspacePath);
   }
 
-  getRevertState(): Result<RevertState> {
-    const state: RevertState = fs.existsSync(this.revertHeadPath) ? 'in-progress' : 'idle';
+  async getRevertState(): Promise<Result<RevertState>> {
+    const result = await this.executor.execute({
+      args: ['rev-parse', '--verify', 'REVERT_HEAD'],
+      cwd: this.workspacePath,
+    });
+    const state: RevertState = result.success ? 'in-progress' : 'idle';
     return ok(state);
+  }
+
+  private async isRevertInProgress(): Promise<boolean> {
+    const result = await this.executor.execute({
+      args: ['rev-parse', '--verify', 'REVERT_HEAD'],
+      cwd: this.workspacePath,
+    });
+    return result.success;
   }
 
   async revert(hash: string, mainlineParent?: number): Promise<Result<string>> {
@@ -42,7 +50,7 @@ export class GitRevertService {
       ));
     }
 
-    if (fs.existsSync(this.revertHeadPath)) {
+    if (await this.isRevertInProgress()) {
       return err(new GitError(
         'A revert is already in progress. Continue or abort it before starting another revert.',
         'REVERT_IN_PROGRESS'
@@ -65,7 +73,7 @@ export class GitRevertService {
           'COMMAND_FAILED'
         ));
       }
-      if (fs.existsSync(this.revertHeadPath) || isConflictStderr(errorDetail)) {
+      if (await this.isRevertInProgress() || isConflictStderr(errorDetail)) {
         return err(new GitError(
           'Revert paused due to conflict. Resolve conflicts in the Source Control panel, then continue.',
           'REVERT_CONFLICT'
