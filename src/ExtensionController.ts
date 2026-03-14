@@ -195,7 +195,7 @@ export class ExtensionController {
         this.gitRepoDiscoveryService,
         workspacePath
       );
-      this.webviewProvider.setSwitchRepoHandler((repoPath) => this.reinitServices(repoPath));
+      this.webviewProvider.setSwitchRepoHandler((repoPath) => this.switchActiveRepo(repoPath));
       this.webviewProvider.setSettingsProvider(() => this.readUserSettings());
       this.webviewProvider.setSubmoduleNavigationHandlers({
         getStack: () => [...this.submoduleStack],

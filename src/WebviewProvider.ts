@@ -970,9 +970,8 @@ export class WebviewProvider {
         this.fetchGeneration++;
         const currentGeneration = this.fetchGeneration;
 
-        discovery.setActiveRepo(repoPath);
-
-        // Reinitialize services so gitLogService points to the new repo
+        // Reinitialize services and clear submodule stack for the new repo
+        // (switchActiveRepo also calls discovery.setActiveRepo internally)
         this.onSwitchRepo?.(repoPath);
 
         // Send updated repo list immediately so the dropdown reflects the switch
