@@ -1,8 +1,9 @@
+import type { LogOutputChannel } from 'vscode';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GitCherryPickService } from '../services/GitCherryPickService.js';
 import { GitError } from '../../shared/errors.js';
 
-const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as any;
+const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as LogOutputChannel;
 
 const defaultOptions = { appendSourceRef: false, noCommit: false };
 

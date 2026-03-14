@@ -2,7 +2,7 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "0.7.0",
+  "version": "1.0.0",
   "publisher": "onlineeric",
   "license": "MIT",
   "repository": {
@@ -39,6 +39,14 @@
         "icon": "$(zap)"
       }
     ],
+    "keybindings": [
+      {
+        "command": "speedyGit.showGraph",
+        "key": "ctrl+shift+g",
+        "mac": "cmd+shift+g",
+        "when": "workspaceFolderCount > 0"
+      }
+    ],
     "menus": {
       "commandPalette": [
         {
@@ -62,6 +70,35 @@
           "default": 500,
           "minimum": 1,
           "markdownDescription": "Number of commits to load per batch in the Git graph panel. Lower values give faster initial load; higher values reduce scroll-triggered fetches for large repositories."
+        },
+        "speedyGit.graphColors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["#F44336", "#2196F3", "#4CAF50", "#FF9800", "#9C27B0", "#00BCD4", "#FF5722", "#8BC34A", "#3F51B5", "#FFEB3B"],
+          "markdownDescription": "Array of hex color strings used for graph branch lines. Colors cycle in order."
+        },
+        "speedyGit.dateFormat": {
+          "type": "string",
+          "enum": ["relative", "absolute"],
+          "default": "relative",
+          "markdownDescription": "Date display format. `relative` shows short relative times, `absolute` shows `YYYY-MM-DD HH:mm`."
+        },
+        "speedyGit.avatars.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show author avatars in the commit graph. Initials are used when an avatar is unavailable."
+        },
+        "speedyGit.showRemoteBranches": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show remote branch labels in the graph."
+        },
+        "speedyGit.showTags": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show tag labels in the graph."
         }
       }
     }

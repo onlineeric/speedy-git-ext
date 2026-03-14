@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import type { RequestMessage, ResponseMessage } from '../shared/messages.js';
+import type { GraphFilters, RepoInfo, SubmoduleNavEntry, UserSettings } from '../shared/types.js';
 import type { GitLogService } from './services/GitLogService.js';
 import type { GitDiffService } from './services/GitDiffService.js';
 import type { GitBranchService } from './services/GitBranchService.js';
@@ -12,14 +13,23 @@ import type { GitCherryPickService } from './services/GitCherryPickService.js';
 import type { GitRevertService } from './services/GitRevertService.js';
 import type { GitRebaseService } from './services/GitRebaseService.js';
 import type { GitSignatureService } from './services/GitSignatureService.js';
+import type { GitSubmoduleService } from './services/GitSubmoduleService.js';
 import type { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
 import { GitError } from '../shared/errors.js';
-import type { RepoInfo } from '../shared/types.js';
 
 export class WebviewProvider {
   private panel: vscode.WebviewPanel | undefined;
   /** Incremented on each repo switch to discard stale commit responses */
   private fetchGeneration = 0;
+  private currentRepoPath: string;
+  private getSettingsHandler: (() => UserSettings) | undefined;
+  private submoduleHandlers:
+    | {
+        getStack: () => SubmoduleNavEntry[];
+        openSubmodule: (submodulePath: string) => Promise<void> | void;
+        backToParentRepo: () => Promise<void> | void;
+      }
+    | undefined;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -34,9 +44,13 @@ export class WebviewProvider {
     private gitRevertService: GitRevertService,
     private gitRebaseService: GitRebaseService,
     private gitSignatureService: GitSignatureService,
+    private gitSubmoduleService: GitSubmoduleService,
     private readonly log: vscode.LogOutputChannel,
-    private readonly gitRepoDiscoveryService?: GitRepoDiscoveryService
-  ) {}
+    private readonly gitRepoDiscoveryService?: GitRepoDiscoveryService,
+    currentRepoPath?: string
+  ) {
+    this.currentRepoPath = currentRepoPath ?? this.getWorkspacePath() ?? '';
+  }
 
   /** Callback invoked when the user switches repos; updates services before commits are fetched */
   private onSwitchRepo: ((repoPath: string) => void) | undefined;
@@ -44,6 +58,18 @@ export class WebviewProvider {
   /** Register the callback that reinitializes services for a new repo path */
   setSwitchRepoHandler(handler: (repoPath: string) => void) {
     this.onSwitchRepo = handler;
+  }
+
+  setSettingsProvider(handler: () => UserSettings) {
+    this.getSettingsHandler = handler;
+  }
+
+  setSubmoduleNavigationHandlers(handlers: {
+    getStack: () => SubmoduleNavEntry[];
+    openSubmodule: (submodulePath: string) => Promise<void> | void;
+    backToParentRepo: () => Promise<void> | void;
+  }) {
+    this.submoduleHandlers = handlers;
   }
 
   /** Replace all services when the active repo changes */
@@ -58,7 +84,9 @@ export class WebviewProvider {
     gitCherryPickService: GitCherryPickService,
     gitRevertService: GitRevertService,
     gitRebaseService: GitRebaseService,
-    gitSignatureService: GitSignatureService
+    gitSignatureService: GitSignatureService,
+    gitSubmoduleService: GitSubmoduleService,
+    currentRepoPath: string
   ) {
     this.gitLogService = gitLogService;
     this.gitDiffService = gitDiffService;
@@ -71,6 +99,8 @@ export class WebviewProvider {
     this.gitRevertService = gitRevertService;
     this.gitRebaseService = gitRebaseService;
     this.gitSignatureService = gitSignatureService;
+    this.gitSubmoduleService = gitSubmoduleService;
+    this.currentRepoPath = currentRepoPath;
   }
 
   /** Returns true if the webview panel is currently open */
@@ -86,6 +116,10 @@ export class WebviewProvider {
   /** Push an updated repo list to the webview */
   sendRepoList(repos: RepoInfo[], activeRepoPath: string) {
     this.postMessage({ type: 'repoList', payload: { repos, activeRepoPath } });
+  }
+
+  sendSettingsData(settings: UserSettings) {
+    this.postMessage({ type: 'settingsData', payload: { settings } });
   }
 
   async show() {
@@ -144,10 +178,16 @@ export class WebviewProvider {
     await this.sendInitialData(undefined, true);
   }
 
-  private async sendInitialData(filters?: Partial<import('../shared/types.js').GraphFilters>, includeStashes = false) {
+  private async sendInitialData(filters?: Partial<GraphFilters>, includeStashes = false) {
+    const settings = this.getSettingsHandler?.();
+    if (settings) {
+      this.sendSettingsData(settings);
+    }
+
     await this.handleMessage({ type: 'getCommits', payload: { filters } });
     await this.handleMessage({ type: 'getBranches', payload: {} });
     await this.handleMessage({ type: 'getRemotes', payload: {} });
+    await this.handleMessage({ type: 'getSubmodules', payload: {} });
     if (includeStashes) {
       await this.handleMessage({ type: 'getStashes', payload: {} });
     }
@@ -175,6 +215,21 @@ export class WebviewProvider {
     const revertStateResult = await this.gitRevertService.getRevertState();
     if (revertStateResult.success) {
       this.postMessage({ type: 'revertState', payload: { state: revertStateResult.value } });
+    }
+  }
+
+  private async sendSubmodulesData() {
+    const result = await this.gitSubmoduleService.getSubmodules();
+    if (result.success) {
+      this.postMessage({
+        type: 'submodulesData',
+        payload: {
+          submodules: result.value,
+          stack: this.submoduleHandlers?.getStack() ?? [],
+        },
+      });
+    } else {
+      this.postMessage({ type: 'error', payload: { error: result.error } });
     }
   }
 
@@ -237,6 +292,17 @@ export class WebviewProvider {
       }
       case 'openSettings': {
         await vscode.commands.executeCommand('workbench.action.openSettings', 'speedyGit');
+        break;
+      }
+      case 'getSettings': {
+        const settings = this.getSettingsHandler?.();
+        if (settings) {
+          this.sendSettingsData(settings);
+        }
+        break;
+      }
+      case 'getSubmodules': {
+        await this.sendSubmodulesData();
         break;
       }
       case 'getBranches': {
@@ -850,6 +916,50 @@ export class WebviewProvider {
         }
         break;
       }
+      case 'openSubmodule': {
+        if (this.submoduleHandlers) {
+          await this.submoduleHandlers.openSubmodule(message.payload.submodulePath);
+          await this.sendInitialData(undefined, true);
+        }
+        break;
+      }
+      case 'backToParentRepo': {
+        if (this.submoduleHandlers) {
+          await this.submoduleHandlers.backToParentRepo();
+          await this.sendInitialData(undefined, true);
+        }
+        break;
+      }
+      case 'updateSubmodule': {
+        const result = await this.gitSubmoduleService.updateSubmodule(message.payload.submodulePath);
+        if (result.success) {
+          this.postMessage({ type: 'submoduleOperationResult', payload: { success: true } });
+          await this.sendSubmodulesData();
+          await this.sendInitialData(undefined, true);
+        } else {
+          this.postMessage({
+            type: 'submoduleOperationResult',
+            payload: { success: false, error: result.error.message },
+          });
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'initSubmodule': {
+        const result = await this.gitSubmoduleService.initSubmodule(message.payload.submodulePath);
+        if (result.success) {
+          this.postMessage({ type: 'submoduleOperationResult', payload: { success: true } });
+          await this.sendSubmodulesData();
+          await this.sendInitialData(undefined, true);
+        } else {
+          this.postMessage({
+            type: 'submoduleOperationResult',
+            payload: { success: false, error: result.error.message },
+          });
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
       case 'switchRepo': {
         const { repoPath } = message.payload;
         const discovery = this.gitRepoDiscoveryService;
@@ -864,35 +974,16 @@ export class WebviewProvider {
         this.fetchGeneration++;
         const currentGeneration = this.fetchGeneration;
 
-        discovery.setActiveRepo(repoPath);
-
-        // Reinitialize services so gitLogService points to the new repo
+        // Reinitialize services and clear submodule stack for the new repo
+        // (switchActiveRepo also calls discovery.setActiveRepo internally)
         this.onSwitchRepo?.(repoPath);
 
         // Send updated repo list immediately so the dropdown reflects the switch
         this.sendRepoList(discovery.getRepos(), discovery.getActiveRepoPath());
-
-        // Load commits for new repo; discard if generation has advanced
-        this.postMessage({ type: 'loading', payload: { loading: true } });
-        const batchSize = this.getBatchSize();
-        const result = await this.gitLogService.getCommits({ maxCount: batchSize });
         if (currentGeneration !== this.fetchGeneration) {
-          this.postMessage({ type: 'loading', payload: { loading: false } });
-          break; // stale — newer switch in flight
+          break;
         }
-
-        if (result.success) {
-          this.postMessage({
-            type: 'commits',
-            payload: {
-              commits: result.value.commits,
-              totalLoadedWithoutFilter: result.value.totalLoadedWithoutFilter,
-            },
-          });
-        } else {
-          this.postMessage({ type: 'error', payload: { error: result.error } });
-        }
-        this.postMessage({ type: 'loading', payload: { loading: false } });
+        await this.sendInitialData(undefined, true);
         break;
       }
     }
@@ -939,6 +1030,9 @@ export class WebviewProvider {
   }
 
   private getWorkspacePath(): string | undefined {
+    if (this.currentRepoPath) {
+      return this.currentRepoPath;
+    }
     const folders = vscode.workspace.workspaceFolders;
     return folders?.[0]?.uri.fsPath;
   }
@@ -985,7 +1079,7 @@ export class WebviewProvider {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src https://www.gravatar.com https://secure.gravatar.com;">
   <link rel="stylesheet" href="${styleUri}">
   <title>Speedy Git Graph</title>
 </head>
@@ -997,7 +1091,8 @@ export class WebviewProvider {
   }
 
   private getBatchSize(): number {
-    return vscode.workspace.getConfiguration('speedyGit').get<number>('batchCommitSize', 500);
+    return this.getSettingsHandler?.().batchCommitSize
+      ?? vscode.workspace.getConfiguration('speedyGit').get<number>('batchCommitSize', 500);
   }
 
   dispose() {

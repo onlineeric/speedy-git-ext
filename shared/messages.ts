@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry } from './types.js';
 import type { GitError } from './errors.js';
 
 export type RequestMessage =
@@ -56,6 +56,12 @@ export type RequestMessage =
   | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branch?: string; author?: string } } }
   | { type: 'openSettings'; payload: Record<string, never> }
   | { type: 'switchRepo'; payload: { repoPath: string } }
+  | { type: 'getSettings'; payload: Record<string, never> }
+  | { type: 'getSubmodules'; payload: Record<string, never> }
+  | { type: 'openSubmodule'; payload: { submodulePath: string } }
+  | { type: 'backToParentRepo'; payload: Record<string, never> }
+  | { type: 'updateSubmodule'; payload: { submodulePath: string } }
+  | { type: 'initSubmodule'; payload: { submodulePath: string } }
   // Stash-and-checkout flow
   | { type: 'stashAndCheckout'; payload: { name: string; remote?: string; pull?: boolean } };
 
@@ -80,7 +86,10 @@ export type ResponseMessage =
   | { type: 'repoList'; payload: { repos: RepoInfo[]; activeRepoPath: string } }
   | { type: 'checkoutNeedsStash'; payload: { name: string; pull?: boolean } }
   | { type: 'deleteBranchNeedsForce'; payload: { name: string } }
-  | { type: 'checkoutPullFailed'; payload: { branch: string; error: { message: string } } };
+  | { type: 'checkoutPullFailed'; payload: { branch: string; error: { message: string } } }
+  | { type: 'settingsData'; payload: { settings: UserSettings } }
+  | { type: 'submodulesData'; payload: { submodules: Submodule[]; stack: SubmoduleNavEntry[] } }
+  | { type: 'submoduleOperationResult'; payload: { success: boolean; error?: string } };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -102,6 +111,8 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   abortRebase: true, continueRebase: true,
   getSignatureInfo: true, dropCommit: true, isCommitPushed: true, getCommitParents: true,
   loadMoreCommits: true, openSettings: true, switchRepo: true,
+  getSettings: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
+  updateSubmodule: true, initSubmodule: true,
   stashAndCheckout: true,
 };
 
@@ -112,6 +123,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   rebaseState: true, rebaseCommits: true, signatureInfo: true, commitPushedResult: true, commitParents: true,
   commitsAppended: true, prefetchError: true, repoList: true,
   checkoutNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
+  settingsData: true, submodulesData: true, submoduleOperationResult: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {

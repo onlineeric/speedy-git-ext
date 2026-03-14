@@ -7,6 +7,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 - None yet.
 
+## [1.0.0] - 2026-03-14
+
+### Added
+- Customizable graph line colors via `speedyGit.graphColors` setting with a default 10-color Material Design palette; changes apply instantly without manual refresh.
+- Configurable date display format (`speedyGit.dateFormat`): choose between relative ("2 hours ago") and absolute ("2026-03-13 14:30") timestamps.
+- Author avatars fetched from Gravatar with generated-initials fallback when no Gravatar image is available; toggle visibility with `speedyGit.avatars.enabled`.
+- Settings to hide remote branch labels (`speedyGit.showRemoteBranches`) and tag labels (`speedyGit.showTags`) from the graph.
+- All settings changes propagate to the graph in real time — no manual refresh or reload required.
+- Invalid or empty settings values gracefully fall back to sensible defaults.
+- Client-side search widget (toolbar button or Ctrl/Cmd+F) that filters loaded commits by message text, commit hash, or author name with instant, debounced results.
+- Search match counter ("3 of 15") with Next/Previous navigation that auto-scrolls the virtual list to each match.
+- Keyboard navigation: arrow keys to move between commits, Enter to open commit details, Escape to close panels, R to refresh the graph.
+- All keyboard shortcuts registered through VS Code's keybinding system, fully customizable in the Keyboard Shortcuts editor.
+- Submodule status display in the parent repository graph showing each submodule's checked-out commit hash and clean/dirty state.
+- In-panel navigation from parent repository to submodule graph with a "Back to parent" breadcrumb — no extra panels opened.
+- "Update Submodule" context menu action to sync a submodule to the parent's recorded commit ref.
+- Detection of uninitialized submodules with an "Initialize Submodule" context menu action.
+
 ## [0.7.0] - 2026-03-12
 
 ### Added

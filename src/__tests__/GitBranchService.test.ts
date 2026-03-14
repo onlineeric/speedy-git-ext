@@ -1,7 +1,8 @@
+import type { LogOutputChannel } from 'vscode';
 import { describe, it, expect, vi } from 'vitest';
 import { GitBranchService } from '../services/GitBranchService.js';
 
-const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as any;
+const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as LogOutputChannel;
 
 describe('GitBranchService.deleteBranch', () => {
   it('classifies unmerged branch deletion failures so the UI can request force confirmation', async () => {

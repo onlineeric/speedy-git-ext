@@ -24,9 +24,12 @@ export function CherryPickDialog({ open, commits, onConfirm, onCancel }: CherryP
   // Load the latest stored options when the dialog opens; always reset mainlineParent
   useEffect(() => {
     if (!open) return;
-    setAppendSourceRef(cherryPickOptions.appendSourceRef);
-    setNoCommit(cherryPickOptions.noCommit);
-    setMainlineParent(1);
+    const timeout = window.setTimeout(() => {
+      setAppendSourceRef(cherryPickOptions.appendSourceRef);
+      setNoCommit(cherryPickOptions.noCommit);
+      setMainlineParent(1);
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [open, cherryPickOptions]);
 
   const handleConfirm = () => {

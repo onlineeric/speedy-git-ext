@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import path from 'node:path';
 import { WebviewProvider } from './WebviewProvider.js';
 import { GitLogService } from './services/GitLogService.js';
 import { GitDiffService } from './services/GitDiffService.js';
@@ -11,8 +12,10 @@ import { GitCherryPickService } from './services/GitCherryPickService.js';
 import { GitRevertService } from './services/GitRevertService.js';
 import { GitRebaseService } from './services/GitRebaseService.js';
 import { GitSignatureService } from './services/GitSignatureService.js';
+import { GitSubmoduleService } from './services/GitSubmoduleService.js';
 import { GitShowContentProvider } from './GitShowContentProvider.js';
 import { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
+import { DEFAULT_GRAPH_COLORS, DEFAULT_USER_SETTINGS, type SubmoduleNavEntry, type UserDateFormat, type UserSettings } from '../shared/types.js';
 
 export class ExtensionController {
   private webviewProvider: WebviewProvider | undefined;
@@ -27,15 +30,20 @@ export class ExtensionController {
   private gitRevertService: GitRevertService | undefined;
   private gitRebaseService: GitRebaseService | undefined;
   private gitSignatureService: GitSignatureService | undefined;
+  private gitSubmoduleService: GitSubmoduleService | undefined;
   private contentProviderRegistration: vscode.Disposable | undefined;
   private gitRepoDiscoveryService: GitRepoDiscoveryService | undefined;
   private statusBarItem: vscode.StatusBarItem | undefined;
+  private currentRepoPath: string | undefined;
+  private submoduleStack: SubmoduleNavEntry[] = [];
+  private submoduleNavigating = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly log: vscode.LogOutputChannel
   ) {
     this.initRepoDiscovery();
+    this.registerSettingsListener();
   }
 
   private initRepoDiscovery() {
@@ -87,11 +95,13 @@ export class ExtensionController {
 
   switchActiveRepo(repoPath: string) {
     if (!this.gitRepoDiscoveryService) return;
+    this.submoduleStack = [];
     this.gitRepoDiscoveryService.setActiveRepo(repoPath);
     this.reinitServices(repoPath);
   }
 
   private reinitServices(workspacePath: string) {
+    this.currentRepoPath = workspacePath;
     this.gitLogService = new GitLogService(workspacePath, this.log);
     this.gitDiffService = new GitDiffService(workspacePath, this.log);
     this.gitBranchService = new GitBranchService(workspacePath, this.log);
@@ -103,6 +113,7 @@ export class ExtensionController {
     this.gitRevertService = new GitRevertService(workspacePath, this.log);
     this.gitRebaseService = new GitRebaseService(workspacePath, this.log);
     this.gitSignatureService = new GitSignatureService(workspacePath, this.log);
+    this.gitSubmoduleService = new GitSubmoduleService(workspacePath, this.log);
 
     if (this.webviewProvider) {
       this.webviewProvider.updateServices(
@@ -116,9 +127,23 @@ export class ExtensionController {
         this.gitCherryPickService,
         this.gitRevertService,
         this.gitRebaseService,
-        this.gitSignatureService
+        this.gitSignatureService,
+        this.gitSubmoduleService,
+        workspacePath
       );
     }
+  }
+
+  private registerSettingsListener() {
+    this.context.subscriptions.push(
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (!this.didSpeedyGitSettingsChange(event)) {
+          return;
+        }
+
+        this.webviewProvider?.sendSettingsData(this.readUserSettings());
+      })
+    );
   }
 
   async showGraph() {
@@ -138,43 +163,13 @@ export class ExtensionController {
 
     this.log.info('Showing git graph');
 
-    if (!this.gitLogService) {
-      this.gitLogService = new GitLogService(workspacePath, this.log);
-    }
-    if (!this.gitDiffService) {
-      this.gitDiffService = new GitDiffService(workspacePath, this.log);
-    }
-    if (!this.gitBranchService) {
-      this.gitBranchService = new GitBranchService(workspacePath, this.log);
-    }
-    if (!this.gitRemoteService) {
-      this.gitRemoteService = new GitRemoteService(workspacePath, this.log);
-    }
-    if (!this.gitTagService) {
-      this.gitTagService = new GitTagService(workspacePath, this.log);
-    }
-    if (!this.gitStashService) {
-      this.gitStashService = new GitStashService(workspacePath, this.log);
-    }
-    if (!this.gitHistoryService) {
-      this.gitHistoryService = new GitHistoryService(workspacePath, this.log);
-    }
-    if (!this.gitCherryPickService) {
-      this.gitCherryPickService = new GitCherryPickService(workspacePath, this.log);
-    }
-    if (!this.gitRevertService) {
-      this.gitRevertService = new GitRevertService(workspacePath, this.log);
-    }
-    if (!this.gitRebaseService) {
-      this.gitRebaseService = new GitRebaseService(workspacePath, this.log);
-    }
-    if (!this.gitSignatureService) {
-      this.gitSignatureService = new GitSignatureService(workspacePath, this.log);
+    if (!this.gitLogService || this.currentRepoPath !== workspacePath) {
+      this.reinitServices(workspacePath);
     }
 
     // Register git-show:// content provider for diff view
     if (!this.contentProviderRegistration) {
-      const provider = new GitShowContentProvider(this.gitDiffService);
+      const provider = new GitShowContentProvider(this.gitDiffService!);
       this.contentProviderRegistration = vscode.workspace.registerTextDocumentContentProvider(
         'git-show',
         provider
@@ -185,21 +180,47 @@ export class ExtensionController {
     if (!this.webviewProvider) {
       this.webviewProvider = new WebviewProvider(
         this.context,
-        this.gitLogService,
-        this.gitDiffService,
-        this.gitBranchService,
-        this.gitRemoteService,
-        this.gitTagService,
-        this.gitStashService,
-        this.gitHistoryService,
-        this.gitCherryPickService,
-        this.gitRevertService,
-        this.gitRebaseService,
-        this.gitSignatureService,
+        this.gitLogService!,
+        this.gitDiffService!,
+        this.gitBranchService!,
+        this.gitRemoteService!,
+        this.gitTagService!,
+        this.gitStashService!,
+        this.gitHistoryService!,
+        this.gitCherryPickService!,
+        this.gitRevertService!,
+        this.gitRebaseService!,
+        this.gitSignatureService!,
+        this.gitSubmoduleService!,
         this.log,
-        this.gitRepoDiscoveryService
+        this.gitRepoDiscoveryService,
+        workspacePath
       );
-      this.webviewProvider.setSwitchRepoHandler((repoPath) => this.reinitServices(repoPath));
+      this.webviewProvider.setSwitchRepoHandler((repoPath) => this.switchActiveRepo(repoPath));
+      this.webviewProvider.setSettingsProvider(() => this.readUserSettings());
+      this.webviewProvider.setSubmoduleNavigationHandlers({
+        getStack: () => [...this.submoduleStack],
+        openSubmodule: async (submodulePath) => {
+          const repoPath = this.getCurrentRepoPath();
+          if (!repoPath) return;
+          this.submoduleStack = [
+            ...this.submoduleStack,
+            { repoPath, repoName: path.basename(repoPath) },
+          ];
+          this.reinitServices(path.resolve(repoPath, submodulePath));
+        },
+        backToParentRepo: async () => {
+          if (this.submoduleNavigating) return;
+          this.submoduleNavigating = true;
+          try {
+            const parent = this.submoduleStack.pop();
+            if (!parent) return;
+            this.reinitServices(parent.repoPath);
+          } finally {
+            this.submoduleNavigating = false;
+          }
+        },
+      });
     }
 
     await this.webviewProvider.show();
@@ -241,9 +262,72 @@ export class ExtensionController {
     this.gitRevertService = undefined;
     this.gitRebaseService = undefined;
     this.gitSignatureService = undefined;
+    this.gitSubmoduleService = undefined;
     this.gitRepoDiscoveryService?.dispose();
     this.gitRepoDiscoveryService = undefined;
     this.statusBarItem?.dispose();
     this.statusBarItem = undefined;
+    this.currentRepoPath = undefined;
+    this.submoduleStack = [];
   }
+
+  private getCurrentRepoPath(): string | undefined {
+    return this.currentRepoPath
+      ?? this.gitRepoDiscoveryService?.getActiveRepoPath()
+      ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  }
+
+  private didSpeedyGitSettingsChange(event: vscode.ConfigurationChangeEvent): boolean {
+    return [
+      'speedyGit.graphColors',
+      'speedyGit.dateFormat',
+      'speedyGit.avatars.enabled',
+      'speedyGit.showRemoteBranches',
+      'speedyGit.showTags',
+      'speedyGit.batchCommitSize',
+    ].some((section) => event.affectsConfiguration(section));
+  }
+
+  private readUserSettings(): UserSettings {
+    const config = vscode.workspace.getConfiguration('speedyGit');
+    const graphColors = this.normalizeGraphColors(
+      config.get<unknown>('graphColors', [...DEFAULT_USER_SETTINGS.graphColors])
+    );
+    const dateFormat = this.normalizeDateFormat(
+      config.get<string>('dateFormat', DEFAULT_USER_SETTINGS.dateFormat)
+    );
+    const batchCommitSize = this.normalizeBatchCommitSize(
+      config.get<number>('batchCommitSize', DEFAULT_USER_SETTINGS.batchCommitSize)
+    );
+
+    return {
+      graphColors,
+      dateFormat,
+      avatarsEnabled: config.get<boolean>('avatars.enabled', DEFAULT_USER_SETTINGS.avatarsEnabled),
+      showRemoteBranches: config.get<boolean>('showRemoteBranches', DEFAULT_USER_SETTINGS.showRemoteBranches),
+      showTags: config.get<boolean>('showTags', DEFAULT_USER_SETTINGS.showTags),
+      batchCommitSize,
+    };
+  }
+
+  private normalizeGraphColors(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+      return [...DEFAULT_GRAPH_COLORS];
+    }
+
+    const colors = value.filter((item): item is string => typeof item === 'string' && isHexColor(item));
+    return colors.length > 0 ? colors : [...DEFAULT_GRAPH_COLORS];
+  }
+
+  private normalizeDateFormat(value: string): UserDateFormat {
+    return value === 'absolute' ? 'absolute' : 'relative';
+  }
+
+  private normalizeBatchCommitSize(value: number): number {
+    return Number.isFinite(value) && value >= 1 ? value : DEFAULT_USER_SETTINGS.batchCommitSize;
+  }
+}
+
+function isHexColor(value: string): boolean {
+  return /^#(?:[0-9a-fA-F]{3}){1,2}$/.test(value);
 }
