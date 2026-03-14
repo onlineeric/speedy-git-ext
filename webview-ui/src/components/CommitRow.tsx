@@ -9,7 +9,9 @@ import { OverflowRefsBadge } from './OverflowRefsBadge';
 import { RefLabel } from './RefLabel';
 import { HeadIcon } from './icons';
 import { mergeRefs, displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
-import { formatRelativeDate } from '../utils/formatDate';
+import { formatAbsoluteDateTime, formatRelativeDate } from '../utils/formatDate';
+import { AuthorAvatar } from './AuthorAvatar';
+import { useGraphStore } from '../stores/graphStore';
 
 interface CommitRowProps {
   commit: Commit;
@@ -21,6 +23,8 @@ interface CommitRowProps {
   maxVisibleRefs?: number;
   isSelected: boolean;
   isMultiSelected?: boolean;
+  isSearchMatch?: boolean;
+  isCurrentSearchMatch?: boolean;
   onClick: (e: React.MouseEvent) => void;
   style: React.CSSProperties;
 }
@@ -35,18 +39,42 @@ export const CommitRow = memo(function CommitRow({
   maxVisibleRefs = 3,
   isSelected,
   isMultiSelected = false,
+  isSearchMatch = false,
+  isCurrentSearchMatch = false,
   onClick,
   style,
 }: CommitRowProps) {
+  const { avatarsEnabled, dateFormat, showRemoteBranches, showTags } = useGraphStore((state) => state.userSettings);
   const isStash = commit.refs.some((r) => r.type === 'stash');
   const stashIndex = isStash ? parseStashIndex(commit.refs) : -1;
 
-  const { isHead, displayRefs } = useMemo(() => mergeRefs(commit.refs), [commit.refs]);
+  const { isHead, displayRefs } = useMemo(() => {
+    const mergedRefs = mergeRefs(commit.refs);
+    return {
+      ...mergedRefs,
+      displayRefs: mergedRefs.displayRefs.flatMap((displayRef) => {
+        if (!showRemoteBranches && displayRef.type === 'remote-branch') {
+          return [];
+        }
+        if (!showRemoteBranches && displayRef.type === 'merged-branch') {
+          return [{ type: 'local-branch', localName: displayRef.localName } as const];
+        }
+        if (!showTags && displayRef.type === 'tag') {
+          return [];
+        }
+        return [displayRef];
+      }),
+    };
+  }, [commit.refs, showRemoteBranches, showTags]);
 
   const bgClass = isSelected
     ? 'bg-[var(--vscode-list-activeSelectionBackground)]'
     : isMultiSelected
     ? 'bg-[var(--vscode-list-inactiveSelectionBackground)]'
+    : isCurrentSearchMatch
+    ? 'bg-[var(--vscode-editor-findMatchHighlightBackground)]'
+    : isSearchMatch
+    ? 'bg-[var(--vscode-editor-findMatchBackground)]'
     : index % 2 === 0
     ? 'bg-transparent'
     : 'bg-[var(--vscode-list-hoverBackground)]/30';
@@ -98,12 +126,20 @@ export const CommitRow = memo(function CommitRow({
         {commit.subject}
       </span>
 
-      <span className="w-28 flex-shrink-0 text-xs text-[var(--vscode-descriptionForeground)] truncate" title={commit.author}>
-        {commit.author}
-      </span>
+      <div className="flex w-36 flex-shrink-0 items-center gap-2 overflow-hidden">
+        {avatarsEnabled && commit.author ? (
+          <AuthorAvatar author={commit.author} email={commit.authorEmail} />
+        ) : null}
+
+        <span className="truncate text-xs text-[var(--vscode-descriptionForeground)]" title={commit.author}>
+          {commit.author}
+        </span>
+      </div>
 
       <span className="w-24 flex-shrink-0 text-xs text-[var(--vscode-descriptionForeground)] text-right">
-        {formatRelativeDate(commit.authorDate)}
+        {dateFormat === 'absolute'
+          ? formatAbsoluteDateTime(commit.authorDate)
+          : formatRelativeDate(commit.authorDate)}
       </span>
     </div>
   );

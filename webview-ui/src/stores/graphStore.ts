@@ -1,5 +1,23 @@
 import { create } from 'zustand';
-import type { Commit, Branch, CommitDetails, DetailsPanelPosition, GraphFilters, RemoteInfo, StashEntry, CherryPickOptions, RebaseConflictInfo, RebaseEntry, RepoInfo, CommitSignatureInfo } from '@shared/types';
+import type {
+  Branch,
+  CherryPickOptions,
+  Commit,
+  CommitDetails,
+  CommitSignatureInfo,
+  DetailsPanelPosition,
+  GraphFilters,
+  RemoteInfo,
+  RebaseConflictInfo,
+  RebaseEntry,
+  RepoInfo,
+  SearchState,
+  StashEntry,
+  Submodule,
+  SubmoduleNavEntry,
+  UserSettings,
+} from '@shared/types';
+import { DEFAULT_USER_SETTINGS } from '@shared/types';
 import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
 
 interface GraphStore {
@@ -7,6 +25,7 @@ interface GraphStore {
   branches: Branch[];
   topology: GraphTopology;
   selectedCommit: string | undefined;
+  selectedCommitIndex: number;
   commitDetails: CommitDetails | undefined;
   detailsPanelOpen: boolean;
   detailsPanelPosition: DetailsPanelPosition;
@@ -18,37 +37,37 @@ interface GraphStore {
   stashes: StashEntry[];
   mergedCommits: Commit[];
   maxVisibleRefs: number;
-  // Cherry-pick state
   cherryPickInProgress: boolean;
   cherryPickOptions: CherryPickOptions;
-  // Rebase state (conflict-paused, not execution loading)
   rebaseInProgress: boolean;
   rebaseConflictInfo: RebaseConflictInfo | undefined;
   revertInProgress: boolean;
   signatureCache: Record<string, CommitSignatureInfo | null>;
   signatureLoading: Record<string, boolean>;
-  // Pending rebase entries (populated by rebaseCommits response; consumed by InteractiveRebaseDialog)
   pendingRebaseEntries: RebaseEntry[] | undefined;
-  // Multi-select state
   selectedCommits: string[];
   lastClickedHash: string | undefined;
-  // Pagination state
   hasMore: boolean;
   prefetching: boolean;
   fetchGeneration: number;
   lastBatchStartIndex: number;
-  // Commit counter — null means not yet received from backend
   totalLoadedWithoutFilter: number | null;
-  // Stash-and-checkout pending state
   pendingCheckout: { name: string; pull?: boolean } | null;
   pendingForceDeleteBranch: string | null;
-  // Repository navigation
   repos: RepoInfo[];
   activeRepoPath: string;
   isLoadingRepo: boolean;
+  userSettings: UserSettings;
+  pendingUserSettings: UserSettings | undefined;
+  searchState: SearchState;
+  submodules: Submodule[];
+  submoduleStack: SubmoduleNavEntry[];
   setCommits: (commits: Commit[]) => void;
+  appendCommits: (newCommits: Commit[], totalLoadedWithoutFilter?: number) => void;
   setBranches: (branches: Branch[]) => void;
   setSelectedCommit: (hash: string | undefined) => void;
+  selectCommit: (index: number) => void;
+  moveSelection: (delta: number) => void;
   setCommitDetails: (details: CommitDetails | undefined) => void;
   setDetailsPanelOpen: (open: boolean) => void;
   toggleDetailsPanelPosition: () => void;
@@ -73,17 +92,24 @@ interface GraphStore {
   toggleSelectedCommit: (hash: string) => void;
   selectCommitRange: (toHash: string) => void;
   clearSelectedCommits: () => void;
-  // Pagination actions
-  appendCommits: (newCommits: Commit[], totalLoadedWithoutFilter?: number) => void;
   setHasMore: (has: boolean) => void;
   setPrefetching: (v: boolean) => void;
   setTotalLoadedWithoutFilter: (n: number | null) => void;
   setPendingCheckout: (checkout: { name: string; pull?: boolean } | null) => void;
   setPendingForceDeleteBranch: (branchName: string | null) => void;
-  // Repository navigation actions
   setRepos: (repos: RepoInfo[], activeRepoPath: string) => void;
   setActiveRepo: (repoPath: string) => void;
   setIsLoadingRepo: (v: boolean) => void;
+  setUserSettings: (settings: UserSettings) => void;
+  openSearch: () => void;
+  closeSearch: () => void;
+  setSearchQuery: (query: string) => void;
+  setSearchMatches: (matchIndices: number[]) => void;
+  nextMatch: () => void;
+  prevMatch: () => void;
+  setSubmodules: (submodules: Submodule[], stack?: SubmoduleNavEntry[]) => void;
+  pushSubmodule: (entry: SubmoduleNavEntry) => void;
+  popSubmodule: () => void;
 }
 
 const emptyTopology: GraphTopology = {
@@ -91,6 +117,13 @@ const emptyTopology: GraphTopology = {
   maxLanes: 0,
   passingLanesByRow: new Map(),
   commitIndexByHash: new Map(),
+};
+
+const defaultSearchState: SearchState = {
+  isOpen: false,
+  query: '',
+  matchIndices: [],
+  currentMatchIndex: -1,
 };
 
 function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[]): Commit[] {
@@ -102,12 +135,10 @@ function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[]): Comm
     commitIndexByHash.set(merged[i].hash, i);
   }
 
-  // Insert stash pseudo-commits after their parent commit
-  // Process in reverse so insertion indices remain valid
   const stashInsertions: { index: number; commit: Commit }[] = [];
   for (const stash of stashes) {
     const parentIndex = commitIndexByHash.get(stash.parentHash);
-    if (parentIndex === undefined) continue; // parent not in current view — skip
+    if (parentIndex === undefined) continue;
 
     stashInsertions.push({
       index: parentIndex,
@@ -124,7 +155,6 @@ function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[]): Comm
     });
   }
 
-  // Sort insertions by index descending so splice doesn't shift later indices
   stashInsertions.sort((a, b) => b.index - a.index);
   for (const { index, commit } of stashInsertions) {
     merged.splice(index, 0, commit);
@@ -143,6 +173,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   branches: [],
   topology: emptyTopology,
   selectedCommit: undefined,
+  selectedCommitIndex: -1,
   commitDetails: undefined,
   detailsPanelOpen: false,
   detailsPanelPosition: 'bottom',
@@ -150,7 +181,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   error: undefined,
   successMessage: undefined,
   filters: {
-    maxCount: 500,
+    maxCount: DEFAULT_USER_SETTINGS.batchCommitSize,
   },
   remotes: [],
   stashes: [],
@@ -176,12 +207,24 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   repos: [],
   activeRepoPath: '',
   isLoadingRepo: false,
+  userSettings: { ...DEFAULT_USER_SETTINGS },
+  pendingUserSettings: undefined,
+  searchState: defaultSearchState,
+  submodules: [],
+  submoduleStack: [],
   setCommits: (commits) => {
     const { mergedCommits, topology } = computeMergedTopology(commits, get().stashes);
+    const selectedCommit = get().selectedCommit;
+    const selectedCommitIndex = selectedCommit
+      ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
+      : -1;
+
     set({
       commits,
       mergedCommits,
       topology,
+      selectedCommit: selectedCommitIndex >= 0 ? selectedCommit : undefined,
+      selectedCommitIndex,
       selectedCommits: [],
       lastClickedHash: undefined,
       hasMore: true,
@@ -193,8 +236,62 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       signatureLoading: {},
     });
   },
+  appendCommits: (newCommits, totalLoadedWithoutFilter) => {
+    const { commits, stashes, filters, totalLoadedWithoutFilter: existingTotal, selectedCommit } = get();
+    const allCommits = [...commits, ...newCommits];
+    const { mergedCommits, topology } = computeMergedTopology(allCommits, stashes);
+    const hasFilter = !!(filters.branch || filters.author);
+    const selectedCommitIndex = selectedCommit
+      ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
+      : -1;
+
+    set({
+      commits: allCommits,
+      mergedCommits,
+      topology,
+      selectedCommitIndex,
+      lastBatchStartIndex: commits.length,
+      ...((!hasFilter && totalLoadedWithoutFilter !== undefined)
+        ? { totalLoadedWithoutFilter: (existingTotal ?? 0) + totalLoadedWithoutFilter }
+        : {}),
+    });
+  },
   setBranches: (branches) => set({ branches }),
-  setSelectedCommit: (selectedCommit) => set({ selectedCommit }),
+  setSelectedCommit: (selectedCommit) => {
+    const index = selectedCommit
+      ? get().mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
+      : -1;
+    set({ selectedCommit, selectedCommitIndex: index });
+  },
+  selectCommit: (index) => {
+    const commits = get().mergedCommits;
+    if (index < 0 || index >= commits.length) {
+      set({ selectedCommit: undefined, selectedCommitIndex: -1 });
+      return;
+    }
+
+    const commit = commits[index];
+    set({
+      selectedCommit: commit.hash,
+      selectedCommitIndex: index,
+      lastClickedHash: commit.hash,
+      selectedCommits: [],
+    });
+  },
+  moveSelection: (delta) => {
+    const commits = get().mergedCommits;
+    if (commits.length === 0) return;
+
+    const currentIndex = get().selectedCommitIndex >= 0 ? get().selectedCommitIndex : 0;
+    const nextIndex = Math.max(0, Math.min(commits.length - 1, currentIndex + delta));
+    const commit = commits[nextIndex];
+    set({
+      selectedCommit: commit.hash,
+      selectedCommitIndex: nextIndex,
+      lastClickedHash: commit.hash,
+      selectedCommits: [],
+    });
+  },
   setCommitDetails: (commitDetails) => set({
     commitDetails,
     detailsPanelOpen: commitDetails !== undefined,
@@ -204,19 +301,27 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     set((state) => ({
       detailsPanelPosition: state.detailsPanelPosition === 'bottom' ? 'right' : 'bottom',
     })),
-  setLoading: (loading) => set({ loading }),
+  setLoading: (loading) => set((state) => {
+    if (!loading && state.pendingUserSettings) {
+      return {
+        loading,
+        userSettings: state.pendingUserSettings,
+        pendingUserSettings: undefined,
+        filters: { ...state.filters, maxCount: state.pendingUserSettings.batchCommitSize },
+      };
+    }
+    return { loading };
+  }),
   setError: (error) => set({ error }),
   setSuccessMessage: (successMessage) => {
     set({ successMessage });
-    // Auto-clear success message after 3 seconds
     if (successMessage) {
       setTimeout(() => {
-        set((state) => {
-          if (state.successMessage === successMessage) {
-            return { successMessage: undefined };
-          }
-          return {};
-        });
+        set((state) => (
+          state.successMessage === successMessage
+            ? { successMessage: undefined }
+            : {}
+        ));
       }, 3000);
     }
   },
@@ -224,7 +329,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setRemotes: (remotes) => set({ remotes }),
   setStashes: (stashes) => {
     const { mergedCommits, topology } = computeMergedTopology(get().commits, stashes);
-    set({ stashes, mergedCommits, topology });
+    const selectedCommit = get().selectedCommit;
+    const selectedCommitIndex = selectedCommit
+      ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
+      : -1;
+    set({ stashes, mergedCommits, topology, selectedCommitIndex });
   },
   setMaxVisibleRefs: (count) => set({ maxVisibleRefs: count }),
   setCherryPickInProgress: (cherryPickInProgress) => set({ cherryPickInProgress }),
@@ -246,7 +355,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   toggleSelectedCommit: (hash) => set((state) => {
     const exists = state.selectedCommits.includes(hash);
     const selectedCommits = exists
-      ? state.selectedCommits.filter((h) => h !== hash)
+      ? state.selectedCommits.filter((item) => item !== hash)
       : [...state.selectedCommits, hash];
     return { selectedCommits, lastClickedHash: hash };
   }),
@@ -255,31 +364,18 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     if (!lastClickedHash) {
       return { selectedCommits: [toHash], lastClickedHash: toHash };
     }
-    const fromIndex = mergedCommits.findIndex((c) => c.hash === lastClickedHash);
-    const toIndex = mergedCommits.findIndex((c) => c.hash === toHash);
+
+    const fromIndex = mergedCommits.findIndex((commit) => commit.hash === lastClickedHash);
+    const toIndex = mergedCommits.findIndex((commit) => commit.hash === toHash);
     if (fromIndex === -1 || toIndex === -1) {
       return { selectedCommits: [toHash], lastClickedHash: toHash };
     }
+
     const [start, end] = fromIndex <= toIndex ? [fromIndex, toIndex] : [toIndex, fromIndex];
-    const selectedCommits = mergedCommits.slice(start, end + 1).map((c) => c.hash);
+    const selectedCommits = mergedCommits.slice(start, end + 1).map((commit) => commit.hash);
     return { selectedCommits };
   }),
   clearSelectedCommits: () => set({ selectedCommits: [], lastClickedHash: undefined }),
-  appendCommits: (newCommits, totalLoadedWithoutFilter) => {
-    const { commits, stashes, filters, totalLoadedWithoutFilter: existingTotal } = get();
-    const allCommits = [...commits, ...newCommits];
-    const { mergedCommits, topology } = computeMergedTopology(allCommits, stashes);
-    const hasFilter = !!(filters.branch || filters.author);
-    set({
-      commits: allCommits,
-      mergedCommits,
-      topology,
-      lastBatchStartIndex: commits.length,
-      ...((!hasFilter && totalLoadedWithoutFilter !== undefined)
-        ? { totalLoadedWithoutFilter: (existingTotal ?? 0) + totalLoadedWithoutFilter }
-        : {}),
-    });
-  },
   setHasMore: (hasMore) => set({ hasMore }),
   setPrefetching: (prefetching) => set({ prefetching }),
   setTotalLoadedWithoutFilter: (totalLoadedWithoutFilter) => set({ totalLoadedWithoutFilter }),
@@ -291,13 +387,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     set({
       repos,
       activeRepoPath,
-      // Reset branch/author filter and commit counter when switching repos; preserve maxCount
       ...(repoChanged ? { filters: { maxCount: filters.maxCount }, totalLoadedWithoutFilter: null } : {}),
     });
   },
   setActiveRepo: (repoPath) => {
     set({ isLoadingRepo: true });
-    // rpcClient will be called from the component — we dispatch via import to avoid circular deps
     import('../rpc/rpcClient').then(({ rpcClient }) => {
       rpcClient.send({ type: 'switchRepo', payload: { repoPath } });
     }).catch(() => {
@@ -305,4 +399,61 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     });
   },
   setIsLoadingRepo: (isLoadingRepo) => set({ isLoadingRepo }),
+  setUserSettings: (settings) => set((state) => (
+    state.loading
+      ? { pendingUserSettings: settings }
+      : { userSettings: settings, pendingUserSettings: undefined, filters: { ...state.filters, maxCount: settings.batchCommitSize } }
+  )),
+  openSearch: () => set((state) => ({
+    searchState: {
+      ...state.searchState,
+      isOpen: true,
+    },
+  })),
+  closeSearch: () => set({
+    searchState: defaultSearchState,
+  }),
+  setSearchQuery: (query) => set((state) => ({
+    searchState: {
+      ...state.searchState,
+      query,
+    },
+  })),
+  setSearchMatches: (matchIndices) => set((state) => ({
+    searchState: {
+      ...state.searchState,
+      matchIndices,
+      currentMatchIndex: matchIndices.length > 0 ? 0 : -1,
+    },
+  })),
+  nextMatch: () => set((state) => {
+    const { matchIndices, currentMatchIndex } = state.searchState;
+    if (matchIndices.length === 0) return {};
+    return {
+      searchState: {
+        ...state.searchState,
+        currentMatchIndex: (currentMatchIndex + 1) % matchIndices.length,
+      },
+    };
+  }),
+  prevMatch: () => set((state) => {
+    const { matchIndices, currentMatchIndex } = state.searchState;
+    if (matchIndices.length === 0) return {};
+    return {
+      searchState: {
+        ...state.searchState,
+        currentMatchIndex: (currentMatchIndex - 1 + matchIndices.length) % matchIndices.length,
+      },
+    };
+  }),
+  setSubmodules: (submodules, stack) => set((state) => ({
+    submodules,
+    submoduleStack: stack ?? state.submoduleStack,
+  })),
+  pushSubmodule: (entry) => set((state) => ({
+    submoduleStack: [...state.submoduleStack, entry],
+  })),
+  popSubmodule: () => set((state) => ({
+    submoduleStack: state.submoduleStack.slice(0, -1),
+  })),
 }));

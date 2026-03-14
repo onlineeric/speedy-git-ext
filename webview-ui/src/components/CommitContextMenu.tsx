@@ -71,11 +71,15 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
 
   useEffect(() => {
     if (awaitingRebaseEntries && pendingRebaseEntries !== undefined) {
-      setInteractiveRebaseEntries(pendingRebaseEntries);
-      useGraphStore.getState().setPendingRebaseEntries(undefined);
-      setAwaitingRebaseEntries(false);
-      setInteractiveRebaseOpen(true);
+      const timeout = window.setTimeout(() => {
+        setInteractiveRebaseEntries(pendingRebaseEntries);
+        useGraphStore.getState().setPendingRebaseEntries(undefined);
+        setAwaitingRebaseEntries(false);
+        setInteractiveRebaseOpen(true);
+      }, 0);
+      return () => window.clearTimeout(timeout);
     }
+    return undefined;
   }, [awaitingRebaseEntries, pendingRebaseEntries]);
 
   useEffect(() => {

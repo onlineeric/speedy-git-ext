@@ -62,6 +62,9 @@ class RpcClient {
       case 'repoList':
         store.setRepos(message.payload.repos, message.payload.activeRepoPath);
         break;
+      case 'settingsData':
+        store.setUserSettings(message.payload.settings);
+        break;
       case 'branches':
         store.setBranches(message.payload.branches);
         break;
@@ -87,6 +90,16 @@ class RpcClient {
         break;
       case 'stashes':
         store.setStashes(message.payload.stashes);
+        break;
+      case 'submodulesData':
+        store.setSubmodules(message.payload.submodules, message.payload.stack);
+        break;
+      case 'submoduleOperationResult':
+        if (message.payload.success) {
+          store.setSuccessMessage('Submodule operation completed');
+        } else {
+          store.setError(message.payload.error ?? 'Submodule operation failed');
+        }
         break;
       case 'cherryPickState':
         store.setCherryPickInProgress(message.payload.state === 'in-progress');
@@ -366,6 +379,30 @@ class RpcClient {
   // Settings
   openSettings() {
     this.send({ type: 'openSettings', payload: {} });
+  }
+
+  getSettings() {
+    this.send({ type: 'getSettings', payload: {} });
+  }
+
+  getSubmodules() {
+    this.send({ type: 'getSubmodules', payload: {} });
+  }
+
+  openSubmodule(submodulePath: string) {
+    this.send({ type: 'openSubmodule', payload: { submodulePath } });
+  }
+
+  backToParentRepo() {
+    this.send({ type: 'backToParentRepo', payload: {} });
+  }
+
+  updateSubmodule(submodulePath: string) {
+    this.send({ type: 'updateSubmodule', payload: { submodulePath } });
+  }
+
+  initSubmodule(submodulePath: string) {
+    this.send({ type: 'initSubmodule', payload: { submodulePath } });
   }
 
   // Pagination

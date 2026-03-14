@@ -1,8 +1,9 @@
+import type { LogOutputChannel } from 'vscode';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GitError } from '../../shared/errors.js';
 import { GitRevertService } from '../services/GitRevertService.js';
 
-const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as any;
+const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as LogOutputChannel;
 
 describe('GitRevertService', () => {
   let service: GitRevertService;
