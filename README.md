@@ -1,41 +1,36 @@
 # Speedy Git Extension
 
-A performance-first Git visualization extension for VS Code, built for large repositories.
+Fast, practical Git history and history-editing inside VS Code.
 
-## Overview
+![Speedy Git Extension screenshot](./resources/speedy-git-screenshot.png)
 
-Speedy Git Extension provides an interactive Git history graph with a core goal: **extremely fast performance even for repositories with tens of thousands of commits**. It achieves this through virtual scrolling, a modular backend, and optimized Git command execution — so the UI stays responsive no matter how large your repo grows.
+Speedy Git is built for performance first.  
+It keeps large repositories responsive while you explore history, review commits, and run core Git operations from one panel.
 
-## Features
+## Major Features
 
-- Interactive Git history graph with branch visualization
-- Virtual scrolling — renders only visible rows, handles massive commit histories without slowdown
-- Commit details panel with file changes and diff viewer
-- Branch and tag labels with checkout support
-- Context menus for common Git operations
-- Resizable details panel (bottom or side layout)
+- Blazing-fast commit graph with virtual scrolling and batch prefetch for large repositories.
+- Branch, tag, and commit detail views with diff, icons, and clear HEAD/context indicators.
+- Rich Git operations:
+  - Create, rename, delete, and checkout branches.
+  - Merge strategy controls, pull, push, fetch, and remote tracking management.
+  - Reset (soft/mixed/hard), cherry-pick, rebase, revert, and commit drop.
+- Powerful UI flow: quick commit search/filter, keyboard shortcuts, and in-panel repo switching.
+- Submodule support with status, parent-to-submodule navigation, and update/init actions.
+- Personalization: theme-like graph colors, date format, avatars, and branch/tag visibility toggles.
+- Trust support: on-demand GPG/SSH signature verification in commit details.
+
+Try it if you want a cleaner way to browse and operate on big Git histories without leaving VS Code.
+
+## Quick start
+
+Open Speedy Git from VSCode left panel source control view:  
+![Speedy Git Icon](resources/source-control-screenshot.png)
+
+Open Speedy Git from VSCode bottom status bar:  
+![Speedy Git Status Bar](resources/status-bar-screenshot.png)
 
 ## Requirements
 
 - VS Code 1.80+
-- Git installed and available in PATH
-
-## Getting Started
-
-1. Open a Git repository in VS Code
-2. Run the command: **Speedy Git: Show Git Graph** (via Command Palette `Ctrl+Shift+P`)
-
-## Extension Settings
-
-No configuration required to get started. The extension works out of the box with any Git repository.
-
-## Technology
-
-- **Frontend**: React + TypeScript, virtual scrolling via `@tanstack/react-virtual`
-- **Backend**: Modular TypeScript services, optimized Git command execution
-- **State**: Zustand
-- **Build**: esbuild (backend), Vite (webview)
-
-## License
-
-MIT — see [LICENSE.md](LICENSE.md)
+- Git available in PATH
