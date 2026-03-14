@@ -29,7 +29,7 @@ export class GitSubmoduleService {
 
     if (!statusResult.success) {
       const stderr = statusResult.error.stderr ?? '';
-      if (stderr.includes('No such file or directory')) {
+      if (statusResult.error.code === 'COMMAND_FAILED' && stderr.includes('No such file or directory')) {
         return ok([]);
       }
       return statusResult;
@@ -49,7 +49,7 @@ export class GitSubmoduleService {
 
   async updateSubmodule(submodulePath: string): Promise<Result<string>> {
     const result = await this.executor.execute({
-      args: ['submodule', 'update', '--', submodulePath],
+      args: ['submodule', 'update', '--init', '--', submodulePath],
       cwd: this.workspacePath,
     });
 
@@ -62,7 +62,7 @@ export class GitSubmoduleService {
 
   async initSubmodule(submodulePath: string): Promise<Result<string>> {
     const result = await this.executor.execute({
-      args: ['submodule', 'init', '--', submodulePath],
+      args: ['submodule', 'update', '--init', '--', submodulePath],
       cwd: this.workspacePath,
     });
 

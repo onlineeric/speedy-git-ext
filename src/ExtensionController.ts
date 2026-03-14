@@ -36,6 +36,7 @@ export class ExtensionController {
   private statusBarItem: vscode.StatusBarItem | undefined;
   private currentRepoPath: string | undefined;
   private submoduleStack: SubmoduleNavEntry[] = [];
+  private submoduleNavigating = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -209,9 +210,15 @@ export class ExtensionController {
           this.reinitServices(path.resolve(repoPath, submodulePath));
         },
         backToParentRepo: async () => {
-          const parent = this.submoduleStack.pop();
-          if (!parent) return;
-          this.reinitServices(parent.repoPath);
+          if (this.submoduleNavigating) return;
+          this.submoduleNavigating = true;
+          try {
+            const parent = this.submoduleStack.pop();
+            if (!parent) return;
+            this.reinitServices(parent.repoPath);
+          } finally {
+            this.submoduleNavigating = false;
+          }
         },
       });
     }

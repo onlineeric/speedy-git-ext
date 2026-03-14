@@ -917,13 +917,17 @@ export class WebviewProvider {
         break;
       }
       case 'openSubmodule': {
-        await this.submoduleHandlers?.openSubmodule(message.payload.submodulePath);
-        await this.sendInitialData(undefined, true);
+        if (this.submoduleHandlers) {
+          await this.submoduleHandlers.openSubmodule(message.payload.submodulePath);
+          await this.sendInitialData(undefined, true);
+        }
         break;
       }
       case 'backToParentRepo': {
-        await this.submoduleHandlers?.backToParentRepo();
-        await this.sendInitialData(undefined, true);
+        if (this.submoduleHandlers) {
+          await this.submoduleHandlers.backToParentRepo();
+          await this.sendInitialData(undefined, true);
+        }
         break;
       }
       case 'updateSubmodule': {
@@ -1075,7 +1079,7 @@ export class WebviewProvider {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src https:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src https://www.gravatar.com https://secure.gravatar.com;">
   <link rel="stylesheet" href="${styleUri}">
   <title>Speedy Git Graph</title>
 </head>

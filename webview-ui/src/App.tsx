@@ -76,13 +76,9 @@ export function App() {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       moveSelection(1);
-      const nextIndex = Math.min(
-        mergedCommits.length - 1,
-        selectedCommitIndex >= 0 ? selectedCommitIndex + 1 : 0
-      );
-      const nextCommit = mergedCommits[nextIndex];
-      if (nextCommit) {
-        handleCommitSelect(nextCommit.hash);
+      const nextHash = useGraphStore.getState().selectedCommit;
+      if (nextHash) {
+        rpcClient.getCommitDetails(nextHash);
       }
       return;
     }
@@ -90,10 +86,9 @@ export function App() {
     if (event.key === 'ArrowUp') {
       event.preventDefault();
       moveSelection(-1);
-      const nextIndex = Math.max(0, selectedCommitIndex >= 0 ? selectedCommitIndex - 1 : 0);
-      const nextCommit = mergedCommits[nextIndex];
-      if (nextCommit) {
-        handleCommitSelect(nextCommit.hash);
+      const nextHash = useGraphStore.getState().selectedCommit;
+      if (nextHash) {
+        rpcClient.getCommitDetails(nextHash);
       }
       return;
     }
