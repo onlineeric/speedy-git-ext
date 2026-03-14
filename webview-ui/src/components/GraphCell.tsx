@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { Commit } from '@shared/types';
 import { type GraphTopology, getPassingLanes } from '../utils/graphTopology';
+import { useGraphStore } from '../stores/graphStore';
 
 interface GraphCellProps {
   commit: Commit;
@@ -16,19 +17,8 @@ const LANE_WIDTH = 16;
 const NODE_RADIUS = 4;
 const HEAD_NODE_RADIUS = 6;
 
-const COLORS = [
-  '#4ec9b0', // teal
-  '#ce9178', // orange
-  '#9cdcfe', // light blue
-  '#c586c0', // purple
-  '#dcdcaa', // yellow
-  '#4fc1ff', // cyan
-  '#d16969', // red
-  '#b5cea8', // green
-];
-
-function getColor(colorIndex: number): string {
-  return COLORS[colorIndex % COLORS.length];
+function getColor(colorIndex: number, colors: string[]): string {
+  return colors[colorIndex % colors.length];
 }
 
 function getLaneX(lane: number): number {
@@ -44,7 +34,9 @@ export const GraphCell = memo(function GraphCell({
   height,
   isHeadCommit = false,
 }: GraphCellProps) {
+  const graphColors = useGraphStore((state) => state.userSettings.graphColors);
   const node = topology.nodes.get(commit.hash);
+  const palette = graphColors.length > 0 ? graphColors : ['#4ec9b0'];
 
   if (!node) {
     return (
@@ -56,7 +48,7 @@ export const GraphCell = memo(function GraphCell({
 
   const nodeX = getLaneX(node.lane);
   const nodeY = height / 2;
-  const color = getColor(node.colorIndex);
+  const color = getColor(node.colorIndex, palette);
   const hasMerge = commit.parents.length > 1;
 
   // Get lanes that pass through this row
@@ -76,7 +68,7 @@ export const GraphCell = memo(function GraphCell({
           y1={0}
           x2={getLaneX(pl.lane)}
           y2={height}
-          stroke={getColor(pl.colorIndex)}
+          stroke={getColor(pl.colorIndex, palette)}
           strokeWidth={2}
         />
       ))}
@@ -85,7 +77,7 @@ export const GraphCell = memo(function GraphCell({
       {node.incomingConnections.map((incoming, idx) => {
         const fromX = getLaneX(incoming.fromLane);
         const toX = nodeX;
-        const incomingColor = getColor(incoming.colorIndex);
+        const incomingColor = getColor(incoming.colorIndex, palette);
 
         if (incoming.fromLane === node.lane) {
           // Same lane - straight line from top to node
@@ -130,7 +122,7 @@ export const GraphCell = memo(function GraphCell({
       {node.parentConnections.map((conn, idx) => {
         const fromX = getLaneX(conn.fromLane);
         const toX = getLaneX(conn.toLane);
-        const connColor = getColor(conn.colorIndex);
+        const connColor = getColor(conn.colorIndex, palette);
 
         if (conn.fromLane === conn.toLane) {
           // Same lane - straight line down

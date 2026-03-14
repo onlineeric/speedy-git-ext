@@ -10,3 +10,4 @@ export { GitCherryPickService } from './GitCherryPickService.js';
 export { GitRevertService } from './GitRevertService.js';
 export { GitRebaseService } from './GitRebaseService.js';
 export { GitSignatureService } from './GitSignatureService.js';
+export { GitSubmoduleService } from './GitSubmoduleService.js';

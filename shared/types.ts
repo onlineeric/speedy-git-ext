@@ -11,6 +11,61 @@ export interface RepoInfo {
   displayName: string;
 }
 
+export type UserDateFormat = 'relative' | 'absolute';
+
+export interface UserSettings {
+  graphColors: string[];
+  dateFormat: UserDateFormat;
+  avatarsEnabled: boolean;
+  showRemoteBranches: boolean;
+  showTags: boolean;
+  batchCommitSize: number;
+}
+
+export interface SearchState {
+  isOpen: boolean;
+  query: string;
+  matchIndices: number[];
+  currentMatchIndex: number;
+}
+
+export type SubmoduleStatus = 'clean' | 'dirty' | 'uninitialized';
+
+export interface Submodule {
+  path: string;
+  hash: string;
+  status: SubmoduleStatus;
+  describe: string;
+  url?: string;
+}
+
+export interface SubmoduleNavEntry {
+  repoPath: string;
+  repoName: string;
+}
+
+export const DEFAULT_GRAPH_COLORS = [
+  '#F44336',
+  '#2196F3',
+  '#4CAF50',
+  '#FF9800',
+  '#9C27B0',
+  '#00BCD4',
+  '#FF5722',
+  '#8BC34A',
+  '#3F51B5',
+  '#FFEB3B',
+] as const;
+
+export const DEFAULT_USER_SETTINGS: UserSettings = {
+  graphColors: [...DEFAULT_GRAPH_COLORS],
+  dateFormat: 'relative',
+  avatarsEnabled: true,
+  showRemoteBranches: true,
+  showTags: true,
+  batchCommitSize: 500,
+};
+
 export interface Commit {
   hash: string;
   abbreviatedHash: string;

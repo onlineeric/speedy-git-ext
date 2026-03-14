@@ -1,7 +1,8 @@
+import type { LogOutputChannel } from 'vscode';
 import { describe, it, expect, vi } from 'vitest';
 import { GitHistoryService } from '../services/GitHistoryService.js';
 
-const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as any;
+const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as LogOutputChannel;
 
 describe('GitHistoryService.reset', () => {
   it('executes git reset with correct args for mixed mode', async () => {

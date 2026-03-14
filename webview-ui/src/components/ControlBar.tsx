@@ -5,7 +5,7 @@ import { RemoteManagementDialog } from './RemoteManagementDialog';
 import { RepoSelector } from './RepoSelector';
 
 export function ControlBar() {
-  const { branches, filters, setFilters, mergedCommits, loading, totalLoadedWithoutFilter } = useGraphStore();
+  const { branches, filters, setFilters, mergedCommits, loading, totalLoadedWithoutFilter, searchState, openSearch, closeSearch } = useGraphStore();
   const [remoteDialogOpen, setRemoteDialogOpen] = useState(false);
 
   const handleBranchChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -82,6 +82,14 @@ export function ControlBar() {
         title="Refresh"
       >
         Refresh
+      </button>
+
+      <button
+        onClick={() => (searchState.isOpen ? closeSearch() : openSearch())}
+        className={buttonSecondaryClass}
+        title="Search commits"
+      >
+        Search
       </button>
 
       <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)]">

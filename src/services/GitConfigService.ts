@@ -83,4 +83,5 @@ export class GitConfigService {
     const version = result.value.stdout.trim().replace('git version ', '');
     return ok(version);
   }
+
 }
