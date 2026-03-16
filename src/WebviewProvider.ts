@@ -5,6 +5,7 @@ import type { GraphFilters, RepoInfo, SubmoduleNavEntry, UserSettings } from '..
 import type { GitLogService } from './services/GitLogService.js';
 import type { GitDiffService } from './services/GitDiffService.js';
 import type { GitBranchService } from './services/GitBranchService.js';
+import { isCheckoutConflict } from './services/GitBranchService.js';
 import type { GitRemoteService } from './services/GitRemoteService.js';
 import type { GitTagService } from './services/GitTagService.js';
 import type { GitStashService } from './services/GitStashService.js';
@@ -324,17 +325,12 @@ export class WebviewProvider {
         break;
       }
       case 'checkoutBranch': {
-        const dirtyCheckCO = await this.gitBranchService.isDirtyWorkingTree();
-        if (!dirtyCheckCO.success) {
-          this.postMessage({ type: 'error', payload: { error: dirtyCheckCO.error } });
-          break;
-        }
-        if (dirtyCheckCO.value) {
-          this.postMessage({ type: 'checkoutNeedsStash', payload: { name: message.payload.name, pull: message.payload.pull } });
-          break;
-        }
         const checkoutResult = await this.gitBranchService.checkout(message.payload.name, message.payload.remote);
         if (!checkoutResult.success) {
+          if (isCheckoutConflict(checkoutResult.error)) {
+            this.postMessage({ type: 'checkoutNeedsStash', payload: { name: message.payload.name, pull: message.payload.pull } });
+            break;
+          }
           this.postMessage({ type: 'error', payload: { error: checkoutResult.error } });
           break;
         }
@@ -351,17 +347,12 @@ export class WebviewProvider {
         break;
       }
       case 'checkoutCommit': {
-        const dirtyCheckCO = await this.gitBranchService.isDirtyWorkingTree();
-        if (!dirtyCheckCO.success) {
-          this.postMessage({ type: 'error', payload: { error: dirtyCheckCO.error } });
-          break;
-        }
-        if (dirtyCheckCO.value) {
-          this.postMessage({ type: 'checkoutCommitNeedsStash', payload: { hash: message.payload.hash } });
-          break;
-        }
         const checkoutResult = await this.gitBranchService.checkoutCommit(message.payload.hash);
         if (!checkoutResult.success) {
+          if (isCheckoutConflict(checkoutResult.error)) {
+            this.postMessage({ type: 'checkoutCommitNeedsStash', payload: { hash: message.payload.hash } });
+            break;
+          }
           this.postMessage({ type: 'error', payload: { error: checkoutResult.error } });
           void vscode.window.showErrorMessage(checkoutResult.error.message);
           break;
