@@ -63,7 +63,38 @@ Built with **Vite** + React plugin → `dist/webview/`
 
 ## Key Design Decisions
 
+- Our project is Performance First Principles. We aim to provide a fast, responsive, and efficient user experience.
 - Extension backend uses esbuild (fast, CJS for Node); webview uses Vite (ESM, React)
 - Graph topology computed in the webview (frontend), not the backend
 - TypeScript strict mode with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`
 - Uses `Result<T, E>` pattern instead of throwing exceptions in git operations
+
+## Coding Preferences / Guidelines
+
+### Code Quality
+
+- Write clean, readable, self-documenting code with clear naming, human-readaable, easy to understand, easy to maintain.
+- Follow single responsibility principle; keep classes, functions and files small and focused
+- DRY: extract reusable logic into shared functions, components, or libraries
+- Prefer explicit over implicit; avoid clever or cryptic solutions
+- Use purpose-built libraries (e.g., `cheerio` for HTML, `date-fns` for dates) instead of manual implementations.
+- Refactor when needed to improve structure and readability
+- Use TypeScript types to document intent and catch errors early
+
+### Package Selection
+
+- Prefer popular, battle-tested packages over manual implementations
+- Avoid regex for parsing structured data (HTML, JSON, XML), use purpose-built libraries instead.
+- When choosing packages, prefer: active maintenance, TypeScript support, readable API
+
+### Restrictions
+
+- **Packages**: NEVER auto-install; provide install commands for me to run manually
+- **Git**: NEVER commit, branch, or merge; only readonly operations (`git log`, `git status`, `git diff`) and create PR only if I ask you to do so.
+
+## Active Technologies
+- TypeScript 5.x (strict, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Vite (webview), esbuild (extension host), Zustand, `@radix-ui/react-context-menu`, `@radix-ui/react-alert-dialog`, VS Code Extension API (012-checkout-commit-detached-head)
+- N/A — git repository on the filesystem (012-checkout-commit-detached-head)
+
+## Recent Changes
+- 012-checkout-commit-detached-head: Added TypeScript 5.x (strict, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Vite (webview), esbuild (extension host), Zustand, `@radix-ui/react-context-menu`, `@radix-ui/react-alert-dialog`, VS Code Extension API

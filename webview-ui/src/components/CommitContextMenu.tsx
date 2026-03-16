@@ -44,6 +44,7 @@ function buildResetDescription(
 }
 
 export function CommitContextMenu({ commit, children }: CommitContextMenuProps) {
+  const [checkoutCommitConfirmOpen, setCheckoutCommitConfirmOpen] = useState(false);
   const [createBranchOpen, setCreateBranchOpen] = useState(false);
   const [createTagOpen, setCreateTagOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -183,6 +184,15 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
         <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
         <ContextMenu.Portal>
           <ContextMenu.Content className="min-w-[180px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+            <ContextMenu.Item
+              className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
+              disabled={isOperationInProgress}
+              onSelect={() => setCheckoutCommitConfirmOpen(true)}
+            >
+              Checkout this commit
+            </ContextMenu.Item>
+            <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+
             <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateBranchOpen(true)}>
               Create Branch Here...
             </ContextMenu.Item>
@@ -327,6 +337,17 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
           </ContextMenu.Content>
         </ContextMenu.Portal>
       </ContextMenu.Root>
+
+      <ConfirmDialog
+        open={checkoutCommitConfirmOpen}
+        onConfirm={() => {
+          setCheckoutCommitConfirmOpen(false);
+          rpcClient.checkoutCommit(commit.hash);
+        }}
+        onCancel={() => setCheckoutCommitConfirmOpen(false)}
+        title="Checkout Commit"
+        description={`Checkout commit ${commit.abbreviatedHash} will result in detached HEAD. Continue?`}
+      />
 
       <InputDialog
         open={createBranchOpen}

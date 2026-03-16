@@ -6,6 +6,7 @@ export type RequestMessage =
   | { type: 'getBranches'; payload: Record<string, never> }
   | { type: 'getCommitDetails'; payload: { hash: string } }
   | { type: 'checkoutBranch'; payload: { name: string; remote?: string; pull?: boolean } }
+  | { type: 'checkoutCommit'; payload: { hash: string } }
   | { type: 'fetch'; payload: { remote?: string; prune?: boolean; filters?: Partial<GraphFilters> } }
   | { type: 'copyToClipboard'; payload: { text: string } }
   | { type: 'openDiff'; payload: { hash: string; filePath: string; parentHash?: string } }
@@ -63,7 +64,8 @@ export type RequestMessage =
   | { type: 'updateSubmodule'; payload: { submodulePath: string } }
   | { type: 'initSubmodule'; payload: { submodulePath: string } }
   // Stash-and-checkout flow
-  | { type: 'stashAndCheckout'; payload: { name: string; remote?: string; pull?: boolean } };
+  | { type: 'stashAndCheckout'; payload: { name: string; remote?: string; pull?: boolean } }
+  | { type: 'stashAndCheckoutCommit'; payload: { hash: string } };
 
 export type ResponseMessage =
   | { type: 'commits'; payload: { commits: Commit[]; branches?: Branch[]; hasMore?: boolean; totalLoadedWithoutFilter?: number } }
@@ -85,6 +87,7 @@ export type ResponseMessage =
   | { type: 'prefetchError'; payload: { error: GitError | { message: string } } }
   | { type: 'repoList'; payload: { repos: RepoInfo[]; activeRepoPath: string } }
   | { type: 'checkoutNeedsStash'; payload: { name: string; pull?: boolean } }
+  | { type: 'checkoutCommitNeedsStash'; payload: { hash: string } }
   | { type: 'deleteBranchNeedsForce'; payload: { name: string } }
   | { type: 'checkoutPullFailed'; payload: { branch: string; error: { message: string } } }
   | { type: 'settingsData'; payload: { settings: UserSettings } }
@@ -96,7 +99,7 @@ export type Message = RequestMessage | ResponseMessage;
 /** Compile-time exhaustive maps — adding a union member without updating these causes a TS error. */
 const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   getCommits: true, getBranches: true, getCommitDetails: true,
-  checkoutBranch: true, fetch: true, copyToClipboard: true,
+  checkoutBranch: true, checkoutCommit: true, fetch: true, copyToClipboard: true,
   openDiff: true, openFile: true, refresh: true,
   createBranch: true, renameBranch: true, deleteBranch: true,
   deleteRemoteBranch: true, mergeBranch: true,
@@ -113,7 +116,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   loadMoreCommits: true, openSettings: true, switchRepo: true,
   getSettings: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
   updateSubmodule: true, initSubmodule: true,
-  stashAndCheckout: true,
+  stashAndCheckout: true, stashAndCheckoutCommit: true,
 };
 
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
@@ -122,7 +125,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   remotes: true, stashes: true, cherryPickState: true, revertState: true,
   rebaseState: true, rebaseCommits: true, signatureInfo: true, commitPushedResult: true, commitParents: true,
   commitsAppended: true, prefetchError: true, repoList: true,
-  checkoutNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
+  checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
 };
 

@@ -56,6 +56,21 @@ export class GitBranchService {
     return result;
   }
 
+  async checkoutCommit(hash: string): Promise<Result<string, GitError>> {
+    this.log.info(`Checkout commit: ${hash}`);
+
+    const result = await this.executor.execute({
+      args: ['checkout', hash],
+      cwd: this.workspacePath,
+    });
+
+    if (!result.success) {
+      return result;
+    }
+
+    return ok(`Checked out commit ${hash}`);
+  }
+
   async fetch(remote?: string, prune?: boolean): Promise<Result<string>> {
     this.log.info(`Fetch remote: ${remote ?? 'all'}${prune ? ' (prune)' : ''}`);
     if (remote) {
