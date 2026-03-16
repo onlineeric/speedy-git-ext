@@ -6,6 +6,8 @@ export default tseslint.config(
   {
     ignores: [
       "dist/",
+      "build/",
+      "coverage/",
       "node_modules/",
       "test-repo/",
       "webview-ui/dist/",

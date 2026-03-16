@@ -4,6 +4,7 @@ import { rpcClient } from './rpc/rpcClient';
 import { ControlBar } from './components/ControlBar';
 import { GraphContainer } from './components/GraphContainer';
 import { CommitDetailsPanel } from './components/CommitDetailsPanel';
+import { ConfirmDialog } from './components/ConfirmDialog';
 import { ToastContainer } from './components/ToastContainer';
 
 export function App() {
@@ -25,6 +26,12 @@ export function App() {
   }, []);
 
   const selectedCommit = useGraphStore((state) => state.selectedCommit);
+  const pendingCommitCheckout = useGraphStore((state) => state.pendingCommitCheckout);
+  const pendingCheckoutCommit = pendingCommitCheckout
+    ? mergedCommits.find((commit) => commit.hash === pendingCommitCheckout.hash)
+    : undefined;
+  const pendingCheckoutAbbreviatedHash = pendingCheckoutCommit?.abbreviatedHash
+    ?? pendingCommitCheckout?.hash.slice(0, 7);
 
   const handleCommitSelect = (hash: string | undefined) => {
     setSelectedCommit(hash);
@@ -135,6 +142,21 @@ export function App() {
         </div>
         {showPanel && <CommitDetailsPanel />}
       </div>
+      <ConfirmDialog
+        open={pendingCommitCheckout !== null}
+        onConfirm={() => {
+          const checkout = useGraphStore.getState().pendingCommitCheckout;
+          useGraphStore.getState().setPendingCommitCheckout(null);
+          if (checkout) {
+            rpcClient.stashAndCheckoutCommit(checkout.hash);
+          }
+        }}
+        onCancel={() => useGraphStore.getState().setPendingCommitCheckout(null)}
+        title="Stash Changes"
+        description={`You have uncommitted changes. Stash them and checkout commit ${pendingCheckoutAbbreviatedHash ?? 'selected commit'}?`}
+        confirmLabel="Stash & Checkout"
+        variant="warning"
+      />
       <ToastContainer />
     </div>
   );

@@ -142,6 +142,9 @@ class RpcClient {
       case 'checkoutNeedsStash':
         store.setPendingCheckout({ name: message.payload.name, pull: message.payload.pull });
         break;
+      case 'checkoutCommitNeedsStash':
+        store.setPendingCommitCheckout({ hash: message.payload.hash });
+        break;
       case 'deleteBranchNeedsForce':
         store.setPendingForceDeleteBranch(message.payload.name);
         break;
@@ -169,6 +172,10 @@ class RpcClient {
 
   checkoutBranch(name: string, remote?: string) {
     this.send({ type: 'checkoutBranch', payload: { name, remote } });
+  }
+
+  checkoutCommit(hash: string) {
+    this.send({ type: 'checkoutCommit', payload: { hash } });
   }
 
   fetch(remote?: string, prune?: boolean, filters?: Partial<{ branch?: string; author?: string; maxCount: number }>) {
@@ -226,6 +233,10 @@ class RpcClient {
 
   stashAndCheckout(name: string, pull?: boolean) {
     this.send({ type: 'stashAndCheckout', payload: { name, pull } });
+  }
+
+  stashAndCheckoutCommit(hash: string) {
+    this.send({ type: 'stashAndCheckoutCommit', payload: { hash } });
   }
 
   // Remote ops
