@@ -4,8 +4,13 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
-- None yet.
+## [1.0.2] - 2026-03-16
+
+### Fixed
+- Branch and commit checkout no longer forces stashing when uncommitted changes don't conflict with the target, matching native `git checkout` behavior.
+- Conflicting uncommitted changes now trigger a "Stash & Checkout" / "Cancel" dialog only when git actually rejects the checkout, instead of pre-emptively prompting on any dirty working tree.
+- Checkout conflict detection applies consistently to both branch checkout and commit checkout (detached HEAD) operations.
+- Non-conflict checkout errors (e.g., invalid ref) now show a distinct error message without offering the stash option.
 
 ## [1.0.1] - 2026-03-16
 
