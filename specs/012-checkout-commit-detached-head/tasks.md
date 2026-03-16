@@ -19,7 +19,7 @@
 
 **Purpose**: Confirm project baseline before making any changes.
 
-- [ ] T001 Verify baseline build passes: run `pnpm build && pnpm typecheck` from repo root and confirm zero errors before modifying any files
+- [X] T001 Verify baseline build passes: run `pnpm build && pnpm typecheck` from repo root and confirm zero errors before modifying any files
 
 ---
 
@@ -29,7 +29,7 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T002 Extend `shared/messages.ts`: add `checkoutCommit` and `stashAndCheckoutCommit` to the `RequestMessage` union and `REQUEST_TYPES` map; add `checkoutCommitNeedsStash` to the `ResponseMessage` union and `RESPONSE_TYPES` map, with payload `{ hash: string }` on all three (see `contracts/messages.md` for full shapes)
+- [X] T002 Extend `shared/messages.ts`: add `checkoutCommit` and `stashAndCheckoutCommit` to the `RequestMessage` union and `REQUEST_TYPES` map; add `checkoutCommitNeedsStash` to the `ResponseMessage` union and `RESPONSE_TYPES` map, with payload `{ hash: string }` on all three (see `contracts/messages.md` for full shapes)
 
 **Checkpoint**: Shared types compile — backend handlers and frontend RPC can now be implemented in parallel.
 
@@ -43,11 +43,11 @@
 
 ### Implementation for User Story 1
 
-- [ ] T003 [P] [US1] Add `checkoutCommit(hash: string): Promise<Result<string, GitError>>` method to `src/services/GitBranchService.ts` that runs `git checkout <hash>` via `GitExecutor` (enforces 30 s timeout per Principle I; mirrors existing `checkoutBranch`; no hash validation needed per research.md Finding 3)
-- [ ] T004 [P] [US1] Add `pendingCommitCheckout: { hash: string } | null` state and `setPendingCommitCheckout(v: { hash: string } | null) => void` action to `webview-ui/src/stores/graphStore.ts` (mirrors `pendingCheckout` for branch checkouts; required so stash dialog survives context menu unmount)
-- [ ] T005 [US1] Add `checkoutCommit` request handler to `src/WebviewProvider.ts`: call `isDirtyWorkingTree()` — if clean, call `GitBranchService.checkoutCommit(hash)`; on `Ok` result post `success` and call `sendInitialData()`; on `Err` result post an error response to the frontend and display a VS Code error notification with the git error message; if dirty, post `checkoutCommitNeedsStash { hash }` (mirrors `checkoutBranch` handler pattern)
-- [ ] T006 [US1] Add `checkoutCommit(hash: string)` function to `webview-ui/src/rpc/rpcClient.ts` that posts `{ type: 'checkoutCommit', payload: { hash } }` (depends on T002 types and T004 store)
-- [ ] T007 [US1] Add "Checkout this commit" menu item and detached HEAD `ConfirmDialog` to `webview-ui/src/components/CommitContextMenu.tsx`: place item at top of menu (before "Create Branch Here...") with a separator after; disable when `isOperationInProgress`; dialog message: `"Checkout commit <commit.abbreviatedHash> will result in detached HEAD. Continue?"`; on Confirm call `rpcClient.checkoutCommit(commit.hash)` (depends on T004 store state, T006 rpc call)
+- [X] T003 [P] [US1] Add `checkoutCommit(hash: string): Promise<Result<string, GitError>>` method to `src/services/GitBranchService.ts` that runs `git checkout <hash>` via `GitExecutor` (enforces 30 s timeout per Principle I; mirrors existing `checkoutBranch`; no hash validation needed per research.md Finding 3)
+- [X] T004 [P] [US1] Add `pendingCommitCheckout: { hash: string } | null` state and `setPendingCommitCheckout(v: { hash: string } | null) => void` action to `webview-ui/src/stores/graphStore.ts` (mirrors `pendingCheckout` for branch checkouts; required so stash dialog survives context menu unmount)
+- [X] T005 [US1] Add `checkoutCommit` request handler to `src/WebviewProvider.ts`: call `isDirtyWorkingTree()` — if clean, call `GitBranchService.checkoutCommit(hash)`; on `Ok` result post `success` and call `sendInitialData()`; on `Err` result post an error response to the frontend and display a VS Code error notification with the git error message; if dirty, post `checkoutCommitNeedsStash { hash }` (mirrors `checkoutBranch` handler pattern)
+- [X] T006 [US1] Add `checkoutCommit(hash: string)` function to `webview-ui/src/rpc/rpcClient.ts` that posts `{ type: 'checkoutCommit', payload: { hash } }` (depends on T002 types and T004 store)
+- [X] T007 [US1] Add "Checkout this commit" menu item and detached HEAD `ConfirmDialog` to `webview-ui/src/components/CommitContextMenu.tsx`: place item at top of menu (before "Create Branch Here...") with a separator after; disable when `isOperationInProgress`; dialog message: `"Checkout commit <commit.abbreviatedHash> will result in detached HEAD. Continue?"`; on Confirm call `rpcClient.checkoutCommit(commit.hash)` (depends on T004 store state, T006 rpc call)
 
 **Checkpoint**: User Story 1 is fully functional — confirm via quickstart.md Stories 1, 3, 5, and 6.
 
@@ -61,9 +61,9 @@
 
 ### Implementation for User Story 2
 
-- [ ] T008 [P] [US2] Add `stashAndCheckoutCommit` request handler to `src/WebviewProvider.ts`: call `GitStashService.stash()`, then `GitBranchService.checkoutCommit(hash)`, post `success`, call `sendInitialData()` (mirrors `stashAndCheckout` handler; depends on T002 types and T003 service method)
-- [ ] T009 [P] [US2] Add `stashAndCheckoutCommit(hash: string)` function to `webview-ui/src/rpc/rpcClient.ts` and add `checkoutCommitNeedsStash` response handler that dispatches `store.setPendingCommitCheckout({ hash })` (depends on T002 types and T004 store action)
-- [ ] T010 [US2] Add stash-and-checkout `ConfirmDialog` to `webview-ui/src/components/CommitContextMenu.tsx`: render when `pendingCommitCheckout` is non-null; message: `"You have uncommitted changes. Stash them and checkout the commit?"`; Confirm button label: `"Stash & Checkout"`; Cancel button label: `"Cancel"`; on Confirm call `rpcClient.stashAndCheckoutCommit(pendingCommitCheckout.hash)` and clear `pendingCommitCheckout`; on `stashAndCheckoutCommit` error, clear `pendingCommitCheckout` and display an error notification (do not leave state set); on Cancel clear `pendingCommitCheckout` only (depends on T004 store state, T008 handler, T009 rpc call)
+- [X] T008 [P] [US2] Add `stashAndCheckoutCommit` request handler to `src/WebviewProvider.ts`: call `GitStashService.stash()`, then `GitBranchService.checkoutCommit(hash)`, post `success`, call `sendInitialData()` (mirrors `stashAndCheckout` handler; depends on T002 types and T003 service method)
+- [X] T009 [P] [US2] Add `stashAndCheckoutCommit(hash: string)` function to `webview-ui/src/rpc/rpcClient.ts` and add `checkoutCommitNeedsStash` response handler that dispatches `store.setPendingCommitCheckout({ hash })` (depends on T002 types and T004 store action)
+- [X] T010 [US2] Add stash-and-checkout `ConfirmDialog` to `webview-ui/src/components/CommitContextMenu.tsx`: render when `pendingCommitCheckout` is non-null; message: `"You have uncommitted changes. Stash them and checkout the commit?"`; Confirm button label: `"Stash & Checkout"`; Cancel button label: `"Cancel"`; on Confirm call `rpcClient.stashAndCheckoutCommit(pendingCommitCheckout.hash)` and clear `pendingCommitCheckout`; on `stashAndCheckoutCommit` error, clear `pendingCommitCheckout` and display an error notification (do not leave state set); on Cancel clear `pendingCommitCheckout` only (depends on T004 store state, T008 handler, T009 rpc call)
 
 **Checkpoint**: User Story 2 is fully functional — confirm via quickstart.md Stories 2 and 4.
 
@@ -77,7 +77,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T011 [US3] Review `webview-ui/src/components/CommitContextMenu.tsx` and `webview-ui/src/components/BranchContextMenu.tsx`: (1) confirm no HEAD-specific exclusion logic is present for the "Checkout this commit" item — the item must appear for ALL commit rows including the current HEAD commit (FR-002, spec assumption); (2) confirm `BranchContextMenu.tsx` contains no "Checkout this commit" item — the item is exclusively available in `CommitContextMenu` (FR-009); no code change is expected, this is a review-and-confirm task (test manually via quickstart.md Story 1 using the HEAD commit row and Story 6 for BranchContextMenu exclusion)
+- [X] T011 [US3] Review `webview-ui/src/components/CommitContextMenu.tsx` and `webview-ui/src/components/BranchContextMenu.tsx`: (1) confirm no HEAD-specific exclusion logic is present for the "Checkout this commit" item — the item must appear for ALL commit rows including the current HEAD commit (FR-002, spec assumption); (2) confirm `BranchContextMenu.tsx` contains no "Checkout this commit" item — the item is exclusively available in `CommitContextMenu` (FR-009); no code change is expected, this is a review-and-confirm task (test manually via quickstart.md Story 1 using the HEAD commit row and Story 6 for BranchContextMenu exclusion)
 
 **Checkpoint**: All three user stories are independently functional.
 
@@ -85,9 +85,9 @@
 
 ## Phase N: Polish & Cross-Cutting Concerns
 
-- [ ] T012 [P] Run `pnpm typecheck` from repo root and confirm zero TypeScript strict-mode violations (`noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`)
-- [ ] T013 [P] Run `pnpm lint` from repo root and confirm zero ESLint errors
-- [ ] T014 Run `pnpm build` from repo root and confirm both extension and webview bundles produce zero errors
+- [X] T012 [P] Run `pnpm typecheck` from repo root and confirm zero TypeScript strict-mode violations (`noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`)
+- [X] T013 [P] Run `pnpm lint` from repo root and confirm zero ESLint errors
+- [X] T014 Run `pnpm build` from repo root and confirm both extension and webview bundles produce zero errors
 - [ ] T015 Validate all six quickstart.md manual test flows (Stories 1–6): basic clean checkout, dirty-tree stash flow, cancel at detached HEAD dialog, cancel at stash dialog, disabled state during operation, exclusion from BranchContextMenu
 
 ---

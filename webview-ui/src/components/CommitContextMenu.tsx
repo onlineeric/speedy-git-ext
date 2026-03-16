@@ -44,6 +44,7 @@ function buildResetDescription(
 }
 
 export function CommitContextMenu({ commit, children }: CommitContextMenuProps) {
+  const [checkoutCommitConfirmOpen, setCheckoutCommitConfirmOpen] = useState(false);
   const [createBranchOpen, setCreateBranchOpen] = useState(false);
   const [createTagOpen, setCreateTagOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -66,6 +67,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
   const rebaseInProgress = useGraphStore((s) => s.rebaseInProgress);
   const revertInProgress = useGraphStore((s) => s.revertInProgress);
   const cherryPickInProgress = useGraphStore((s) => s.cherryPickInProgress);
+  const pendingCommitCheckout = useGraphStore((s) => s.pendingCommitCheckout);
   const pendingRebaseEntries = useGraphStore((s) => s.pendingRebaseEntries);
   const loading = useGraphStore((s) => s.loading);
 
@@ -106,6 +108,8 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
   const canRebase = !isHeadCommit && !rebaseInProgress && !loading && !!currentLocalBranch;
   const canRevert = !isRootCommit && !isStashPseudoCommit(commit);
   const canDrop = !isRootCommit && !isMergeCommit && !isStashPseudoCommit(commit) && isCommitOnCurrentBranch;
+  const stashCommitConfirmOpen =
+    pendingCommitCheckout !== null && pendingCommitCheckout.hash === commit.hash;
 
   const handleRebaseOntoCommitConfirm = (ignoreDate: boolean) => {
     setRebaseOntoConfirmOpen(false);
@@ -183,6 +187,15 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
         <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
         <ContextMenu.Portal>
           <ContextMenu.Content className="min-w-[180px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+            <ContextMenu.Item
+              className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
+              disabled={isOperationInProgress}
+              onSelect={() => setCheckoutCommitConfirmOpen(true)}
+            >
+              Checkout this commit
+            </ContextMenu.Item>
+            <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+
             <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateBranchOpen(true)}>
               Create Branch Here...
             </ContextMenu.Item>
@@ -327,6 +340,32 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
           </ContextMenu.Content>
         </ContextMenu.Portal>
       </ContextMenu.Root>
+
+      <ConfirmDialog
+        open={checkoutCommitConfirmOpen}
+        onConfirm={() => {
+          setCheckoutCommitConfirmOpen(false);
+          rpcClient.checkoutCommit(commit.hash);
+        }}
+        onCancel={() => setCheckoutCommitConfirmOpen(false)}
+        title="Checkout Commit"
+        description={`Checkout commit ${commit.abbreviatedHash} will result in detached HEAD. Continue?`}
+      />
+
+      <ConfirmDialog
+        open={stashCommitConfirmOpen}
+        onConfirm={() => {
+          const pendingCheckout = pendingCommitCheckout;
+          useGraphStore.getState().setPendingCommitCheckout(null);
+          if (pendingCheckout) {
+            rpcClient.stashAndCheckoutCommit(pendingCheckout.hash);
+          }
+        }}
+        onCancel={() => useGraphStore.getState().setPendingCommitCheckout(null)}
+        title="Stash Changes"
+        description="You have uncommitted changes. Stash them and checkout the commit?"
+        confirmLabel="Stash & Checkout"
+      />
 
       <InputDialog
         open={createBranchOpen}

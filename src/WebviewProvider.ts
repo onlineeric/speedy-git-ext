@@ -350,6 +350,26 @@ export class WebviewProvider {
         await this.sendInitialData();
         break;
       }
+      case 'checkoutCommit': {
+        const dirtyCheckCO = await this.gitBranchService.isDirtyWorkingTree();
+        if (!dirtyCheckCO.success) {
+          this.postMessage({ type: 'error', payload: { error: dirtyCheckCO.error } });
+          break;
+        }
+        if (dirtyCheckCO.value) {
+          this.postMessage({ type: 'checkoutCommitNeedsStash', payload: { hash: message.payload.hash } });
+          break;
+        }
+        const checkoutResult = await this.gitBranchService.checkoutCommit(message.payload.hash);
+        if (!checkoutResult.success) {
+          this.postMessage({ type: 'error', payload: { error: checkoutResult.error } });
+          void vscode.window.showErrorMessage(checkoutResult.error.message);
+          break;
+        }
+        this.postMessage({ type: 'success', payload: { message: checkoutResult.value } });
+        await this.sendInitialData();
+        break;
+      }
       case 'stashAndCheckout': {
         const stashResult = await this.gitStashService.stash();
         if (!stashResult.success) {
@@ -368,6 +388,21 @@ export class WebviewProvider {
             await this.sendInitialData();
             break;
           }
+        }
+        this.postMessage({ type: 'success', payload: { message: checkoutAfterStash.value } });
+        await this.sendInitialData();
+        break;
+      }
+      case 'stashAndCheckoutCommit': {
+        const stashResult = await this.gitStashService.stash();
+        if (!stashResult.success) {
+          this.postMessage({ type: 'error', payload: { error: stashResult.error } });
+          break;
+        }
+        const checkoutAfterStash = await this.gitBranchService.checkoutCommit(message.payload.hash);
+        if (!checkoutAfterStash.success) {
+          this.postMessage({ type: 'error', payload: { error: checkoutAfterStash.error } });
+          break;
         }
         this.postMessage({ type: 'success', payload: { message: checkoutAfterStash.value } });
         await this.sendInitialData();
