@@ -29,7 +29,7 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T001 Add `isCheckoutConflict(error: GitError): boolean` helper function in src/services/GitBranchService.ts that checks if `error.message` contains `"would be overwritten by checkout"` and returns a boolean. No new error code needed — the helper is the sole detection mechanism.
+- [x] T001 Add `isCheckoutConflict(error: GitError): boolean` helper function in src/services/GitBranchService.ts that checks if `error.message` contains `"would be overwritten by checkout"` and returns a boolean. No new error code needed — the helper is the sole detection mechanism.
 
 **Checkpoint**: Foundation ready — conflict detection helper is in place. User story implementation can now begin.
 
@@ -43,7 +43,7 @@
 
 ### Implementation for User Story 1
 
-- [ ] T002 [US1] Rewrite the `checkoutBranch` handler in src/WebviewProvider.ts to remove the `isDirtyWorkingTree()` pre-check and instead attempt `checkout()` directly. On success, proceed with the existing success path (optional pull, refresh UI). This task only handles the success path — conflict handling is US2.
+- [x] T002 [US1] Rewrite the `checkoutBranch` handler in src/WebviewProvider.ts to remove the `isDirtyWorkingTree()` pre-check and instead attempt `checkout()` directly. On success, proceed with the existing success path (optional pull, refresh UI). This task only handles the success path — conflict handling is US2.
 
 **Checkpoint**: Checkout branch with non-conflicting changes now works silently. The conflict path is a no-op (falls through to generic error) until US2 is implemented.
 
@@ -57,7 +57,7 @@
 
 ### Implementation for User Story 2
 
-- [ ] T003 [US2] Add conflict-detection branching to the `checkoutBranch` handler in src/WebviewProvider.ts: when checkout fails and `isCheckoutConflict(error)` is true, send `checkoutNeedsStash` response (with `pull` flag preserved). For non-conflict errors, send the existing error response. This completes the attempt-first, detect-conflict-on-failure pattern for branch checkout.
+- [x] T003 [US2] Add conflict-detection branching to the `checkoutBranch` handler in src/WebviewProvider.ts: when checkout fails and `isCheckoutConflict(error)` is true, send `checkoutNeedsStash` response (with `pull` flag preserved). For non-conflict errors, send the existing error response. This completes the attempt-first, detect-conflict-on-failure pattern for branch checkout.
 
 **Checkpoint**: Branch checkout now fully matches git's native behavior — silent success for non-conflicting changes, stash dialog for conflicts, error message for other failures.
 
@@ -71,7 +71,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T004 [US3] Rewrite the `checkoutCommit` handler in src/WebviewProvider.ts to remove the `isDirtyWorkingTree()` pre-check and instead attempt checkout directly. On success, proceed with the existing success path. On failure with `isCheckoutConflict(error)`, send `checkoutCommitNeedsStash` response. On other failures, send the existing error response.
+- [x] T004 [US3] Rewrite the `checkoutCommit` handler in src/WebviewProvider.ts to remove the `isDirtyWorkingTree()` pre-check and instead attempt checkout directly. On success, proceed with the existing success path. On failure with `isCheckoutConflict(error)`, send `checkoutCommitNeedsStash` response. On other failures, send the existing error response.
 
 **Checkpoint**: Commit checkout now matches git's native behavior, consistent with branch checkout.
 
@@ -81,10 +81,10 @@
 
 **Purpose**: Validation and cleanup
 
-- [ ] T005 Run `pnpm typecheck` and fix any type errors
-- [ ] T006 Run `pnpm lint` and fix any lint errors
-- [ ] T007 Run `pnpm build` and verify clean build
-- [ ] T008 Run quickstart.md manual smoke test scenarios (all 6 scenarios: 3 for branch checkout, 3 for commit checkout, plus stash dialog and cancel flows, plus edge cases: staged conflicts trigger dialog, both staged+unstaged changes handled correctly, stash failure shows error message)
+- [x] T005 Run `pnpm typecheck` and fix any type errors
+- [x] T006 Run `pnpm lint` and fix any lint errors
+- [x] T007 Run `pnpm build` and verify clean build
+- [x] T008 Run quickstart.md manual smoke test scenarios (all 6 scenarios: 3 for branch checkout, 3 for commit checkout, plus stash dialog and cancel flows, plus edge cases: staged conflicts trigger dialog, both staged+unstaged changes handled correctly, stash failure shows error message)
 
 ---
 

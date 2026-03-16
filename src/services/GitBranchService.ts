@@ -8,6 +8,10 @@ function isBranchNotFullyMerged(stderr: string | undefined): boolean {
   return stderr?.includes('is not fully merged') ?? false;
 }
 
+export function isCheckoutConflict(error: GitError): boolean {
+  return error.message.includes('would be overwritten by checkout');
+}
+
 export class GitBranchService {
   private executor: GitExecutor;
 
