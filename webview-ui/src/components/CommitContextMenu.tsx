@@ -67,7 +67,6 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
   const rebaseInProgress = useGraphStore((s) => s.rebaseInProgress);
   const revertInProgress = useGraphStore((s) => s.revertInProgress);
   const cherryPickInProgress = useGraphStore((s) => s.cherryPickInProgress);
-  const pendingCommitCheckout = useGraphStore((s) => s.pendingCommitCheckout);
   const pendingRebaseEntries = useGraphStore((s) => s.pendingRebaseEntries);
   const loading = useGraphStore((s) => s.loading);
 
@@ -108,8 +107,6 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
   const canRebase = !isHeadCommit && !rebaseInProgress && !loading && !!currentLocalBranch;
   const canRevert = !isRootCommit && !isStashPseudoCommit(commit);
   const canDrop = !isRootCommit && !isMergeCommit && !isStashPseudoCommit(commit) && isCommitOnCurrentBranch;
-  const stashCommitConfirmOpen =
-    pendingCommitCheckout !== null && pendingCommitCheckout.hash === commit.hash;
 
   const handleRebaseOntoCommitConfirm = (ignoreDate: boolean) => {
     setRebaseOntoConfirmOpen(false);
@@ -350,21 +347,6 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
         onCancel={() => setCheckoutCommitConfirmOpen(false)}
         title="Checkout Commit"
         description={`Checkout commit ${commit.abbreviatedHash} will result in detached HEAD. Continue?`}
-      />
-
-      <ConfirmDialog
-        open={stashCommitConfirmOpen}
-        onConfirm={() => {
-          const pendingCheckout = pendingCommitCheckout;
-          useGraphStore.getState().setPendingCommitCheckout(null);
-          if (pendingCheckout) {
-            rpcClient.stashAndCheckoutCommit(pendingCheckout.hash);
-          }
-        }}
-        onCancel={() => useGraphStore.getState().setPendingCommitCheckout(null)}
-        title="Stash Changes"
-        description="You have uncommitted changes. Stash them and checkout the commit?"
-        confirmLabel="Stash & Checkout"
       />
 
       <InputDialog

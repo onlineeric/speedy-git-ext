@@ -235,6 +235,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       fetchGeneration: get().fetchGeneration + 1,
       lastBatchStartIndex: 0,
       totalLoadedWithoutFilter: null,
+      pendingCommitCheckout: null,
       signatureCache: {},
       signatureLoading: {},
     });
@@ -391,11 +392,13 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     set({
       repos,
       activeRepoPath,
-      ...(repoChanged ? { filters: { maxCount: filters.maxCount }, totalLoadedWithoutFilter: null } : {}),
+      ...(repoChanged
+        ? { filters: { maxCount: filters.maxCount }, totalLoadedWithoutFilter: null, pendingCommitCheckout: null }
+        : {}),
     });
   },
   setActiveRepo: (repoPath) => {
-    set({ isLoadingRepo: true });
+    set({ isLoadingRepo: true, pendingCommitCheckout: null });
     import('../rpc/rpcClient').then(({ rpcClient }) => {
       rpcClient.send({ type: 'switchRepo', payload: { repoPath } });
     }).catch(() => {
