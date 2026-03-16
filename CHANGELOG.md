@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 - None yet.
 
+## [1.0.1] - 2026-03-16
+
+### Added
+- "Checkout this commit" option in the commit row right-click context menu to check out any commit directly, entering detached HEAD state.
+- Confirmation dialog before commit checkout identifies the commit by its short hash and explicitly warns about detached HEAD state, with Confirm and Cancel actions.
+- When uncommitted changes exist, a stash prompt appears after confirming the detached HEAD dialog — preventing accidental data loss before the checkout completes.
+- Graph HEAD indicator updates automatically after a successful commit checkout to reflect the new detached HEAD position.
+- "Checkout this commit" is disabled while any git operation is in progress (loading, rebase, cherry-pick, or revert), consistent with Revert Commit and Drop Commit behavior.
+
 ## [1.0.0] - 2026-03-14
 
 ### Added
