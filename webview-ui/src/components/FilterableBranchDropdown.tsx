@@ -215,6 +215,7 @@ export function FilterableBranchDropdown({
       if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
         setListNavigationMode(false);
         setHighlightedIndex(-1);
+        setFilterText((prev) => prev + e.key);
         inputRef.current?.focus();
         return;
       }
