@@ -17,6 +17,7 @@ const dangerItemClass =
 
 export function StashContextMenu({ commit, stashIndex, children }: StashContextMenuProps) {
   const [dropConfirmOpen, setDropConfirmOpen] = useState(false);
+  const isValidIndex = stashIndex >= 0;
 
   const handleApply = () => {
     rpcClient.applyStash(stashIndex);
@@ -27,7 +28,7 @@ export function StashContextMenu({ commit, stashIndex, children }: StashContextM
   };
 
   const handleDrop = () => {
-    setDropConfirmOpen(true);
+    if (isValidIndex) setDropConfirmOpen(true);
   };
 
   const handleCopyHash = () => {
@@ -40,14 +41,14 @@ export function StashContextMenu({ commit, stashIndex, children }: StashContextM
         <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
         <ContextMenu.Portal>
           <ContextMenu.Content className="min-w-[160px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
-            <ContextMenu.Item className={menuItemClass} onSelect={handleApply}>
+            <ContextMenu.Item className={menuItemClass} onSelect={handleApply} disabled={!isValidIndex}>
               Apply Stash
             </ContextMenu.Item>
-            <ContextMenu.Item className={menuItemClass} onSelect={handlePop}>
+            <ContextMenu.Item className={menuItemClass} onSelect={handlePop} disabled={!isValidIndex}>
               Pop Stash
             </ContextMenu.Item>
             <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
-            <ContextMenu.Item className={dangerItemClass} onSelect={handleDrop}>
+            <ContextMenu.Item className={dangerItemClass} onSelect={handleDrop} disabled={!isValidIndex}>
               Drop Stash
             </ContextMenu.Item>
             <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
