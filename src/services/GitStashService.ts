@@ -16,7 +16,7 @@ export class GitStashService {
   async getStashes(): Promise<Result<StashEntry[]>> {
     this.log.info('Get stashes');
     const result = await this.executor.execute({
-      args: ['stash', 'list', '--format=%H%x00%P%x00%gd%x00%gs%x00%aI'],
+      args: ['stash', 'list', '--format=%H%x00%P%x00%gd%x00%gs%x00%aI%x00%an%x00%ae'],
       cwd: this.workspacePath,
     });
     if (!result.success) return result;
@@ -27,8 +27,8 @@ export class GitStashService {
     const stashes: StashEntry[] = [];
     for (const line of stdout.split('\n')) {
       const parts = line.split('\x00');
-      if (parts.length < 5) continue;
-      const [hash, parentHash, reflog, message, dateStr] = parts;
+      if (parts.length < 7) continue;
+      const [hash, parentHash, reflog, message, dateStr, author, authorEmail] = parts;
       // Extract index from reflog like "stash@{0}"
       const indexMatch = reflog.match(/\{(\d+)\}/);
       if (!indexMatch) continue;
@@ -39,6 +39,8 @@ export class GitStashService {
         parentHash: parentHash.split(' ')[0], // First parent only
         message,
         date: new Date(dateStr).getTime(),
+        author,
+        authorEmail,
       });
     }
 

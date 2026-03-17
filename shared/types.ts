@@ -162,6 +162,8 @@ export interface StashEntry {
   parentHash: string;
   message: string;
   date: number;
+  author: string;
+  authorEmail: string;
 }
 
 export type ResetMode = 'soft' | 'mixed' | 'hard';
