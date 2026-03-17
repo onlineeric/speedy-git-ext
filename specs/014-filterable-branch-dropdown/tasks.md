@@ -17,8 +17,8 @@
 
 **Purpose**: Create component skeleton and integrate into ControlBar
 
-- [ ] T001 Create FilterableBranchDropdown.tsx with component skeleton, props interface (`branches: Branch[]`, `selectedBranch: string | undefined`, `onBranchSelect: (branch: string | undefined) => void`), and local type definitions for flat list items (`AllBranchesItem`, `GroupHeaderItem`, `BranchItem`) in webview-ui/src/components/FilterableBranchDropdown.tsx
-- [ ] T002 Replace native `<select>` element in ControlBar with `<FilterableBranchDropdown>` component, passing `branches`, `filters.branch`, and a callback that calls `setFilters({ branch })` + `rpcClient.getCommits({ ...filters, branch })` in webview-ui/src/components/ControlBar.tsx
+- [X] T001 Create FilterableBranchDropdown.tsx with component skeleton, props interface (`branches: Branch[]`, `selectedBranch: string | undefined`, `onBranchSelect: (branch: string | undefined) => void`), and local type definitions for flat list items (`AllBranchesItem`, `GroupHeaderItem`, `BranchItem`) in webview-ui/src/components/FilterableBranchDropdown.tsx
+- [X] T002 Replace native `<select>` element in ControlBar with `<FilterableBranchDropdown>` component, passing `branches`, `filters.branch`, and a callback that calls `setFilters({ branch })` + `rpcClient.getCommits({ ...filters, branch })` in webview-ui/src/components/ControlBar.tsx
 
 **Checkpoint**: Component renders in ControlBar position (may be empty/placeholder). Build passes (`pnpm typecheck && pnpm build`).
 
@@ -32,8 +32,8 @@
 
 ### Implementation for User Story 4
 
-- [ ] T003 [US4] Implement Radix Popover structure with controlled `open` state, trigger button styled with VS Code theme variables showing currently selected branch name (or "All Branches"), and Popover.Content container with `side="bottom"`, `align="start"`, `sideOffset={4}` in webview-ui/src/components/FilterableBranchDropdown.tsx
-- [ ] T004 [US4] Implement open/close behavior: Escape closes and clears filter text (FR-010), click-outside closes via Radix Popover's built-in `onInteractOutside` (FR-011), reset `filterText`/`highlightedIndex`/`listNavigationMode` to defaults on close. Note: auto-focus (FR-005) is implemented in T005 where the input ref is created in webview-ui/src/components/FilterableBranchDropdown.tsx
+- [X] T003 [US4] Implement Radix Popover structure with controlled `open` state, trigger button styled with VS Code theme variables showing currently selected branch name (or "All Branches"), and Popover.Content container with `side="bottom"`, `align="start"`, `sideOffset={4}` in webview-ui/src/components/FilterableBranchDropdown.tsx
+- [X] T004 [US4] Implement open/close behavior: Escape closes and clears filter text (FR-010), click-outside closes via Radix Popover's built-in `onInteractOutside` (FR-011), reset `filterText`/`highlightedIndex`/`listNavigationMode` to defaults on close. Note: auto-focus (FR-005) is implemented in T005 where the input ref is created in webview-ui/src/components/FilterableBranchDropdown.tsx
 
 **Checkpoint**: Dropdown opens with trigger click, shows empty content area. Escape and click-outside close it. Trigger shows selected branch name.
 
@@ -47,9 +47,9 @@
 
 ### Implementation for User Story 1
 
-- [ ] T005 [US1] Implement text input field with `filterText` state, auto-focus via `useRef` + `useEffect` on open, and VS Code input styling (`bg-[var(--vscode-input-background)]`, etc.) in webview-ui/src/components/FilterableBranchDropdown.tsx
-- [ ] T006 [US1] Implement `buildFilteredList` function that produces the flat item array: always-present "All Branches" item, then "Local" group header + filtered local branches, then "Remote" group header + filtered remote branches. Use case-insensitive substring matching on display name. Hide group headers when no branches match in that group. Derive with `useMemo` keyed on `branches` and `filterText` in webview-ui/src/components/FilterableBranchDropdown.tsx
-- [ ] T007 [US1] Render the filtered list as a scrollable container (`max-h-[300px] overflow-y-auto`) with: "All Branches" as a selectable item, group headers as non-selectable styled labels, branch items showing display name with current branch marked `*`, all using VS Code menu theme variables (`--vscode-menu-background`, `--vscode-menu-selectionBackground`, etc.) and text truncation (`truncate`) for long names in webview-ui/src/components/FilterableBranchDropdown.tsx
+- [X] T005 [US1] Implement text input field with `filterText` state, auto-focus via `useRef` + `useEffect` on open, and VS Code input styling (`bg-[var(--vscode-input-background)]`, etc.) in webview-ui/src/components/FilterableBranchDropdown.tsx
+- [X] T006 [US1] Implement `buildFilteredList` function that produces the flat item array: always-present "All Branches" item, then "Local" group header + filtered local branches, then "Remote" group header + filtered remote branches. Use case-insensitive substring matching on display name. Hide group headers when no branches match in that group. Derive with `useMemo` keyed on `branches` and `filterText` in webview-ui/src/components/FilterableBranchDropdown.tsx
+- [X] T007 [US1] Render the filtered list as a scrollable container (`max-h-[300px] overflow-y-auto`) with: "All Branches" as a selectable item, group headers as non-selectable styled labels, branch items showing display name with current branch marked `*`, all using VS Code menu theme variables (`--vscode-menu-background`, `--vscode-menu-selectionBackground`, etc.) and text truncation (`truncate`) for long names in webview-ui/src/components/FilterableBranchDropdown.tsx
 
 **Checkpoint**: Dropdown opens, shows full branch list grouped by Local/Remote. Typing filters the list in real-time. "All Branches" always visible. Build passes.
 
@@ -63,7 +63,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T008 [US3] Implement click handler on branch items and "All Branches" item: call `onBranchSelect` with the branch value (or `undefined` for "All Branches"), close the popover, and reset local state in webview-ui/src/components/FilterableBranchDropdown.tsx
+- [X] T008 [US3] Implement click handler on branch items and "All Branches" item: call `onBranchSelect` with the branch value (or `undefined` for "All Branches"), close the popover, and reset local state in webview-ui/src/components/FilterableBranchDropdown.tsx
 
 **Checkpoint**: Full mouse-driven workflow works: open → optionally filter → click branch → selected. Click outside dismisses.
 
@@ -77,11 +77,11 @@
 
 ### Implementation for User Story 2
 
-- [ ] T009 [US2] Implement Tab key handler on the text input: when Tab is pressed, prevent default, set `listNavigationMode=true`, set `highlightedIndex` to the index of the first selectable item (skip group headers), do nothing if filtered list has no selectable items (FR-006, edge case) in webview-ui/src/components/FilterableBranchDropdown.tsx
-- [ ] T010 [US2] Implement Up/Down arrow key navigation: when `listNavigationMode=true`, ArrowDown moves `highlightedIndex` to next selectable item (skip group headers), ArrowUp moves to previous selectable item, stop at list boundaries (no wrapping per FR-007, spec assumption). Call `scrollIntoView({ block: 'nearest' })` on the highlighted item's DOM element via ref callback in webview-ui/src/components/FilterableBranchDropdown.tsx
-- [ ] T011 [US2] Implement Enter key selection: when `listNavigationMode=true` and `highlightedIndex >= 0`, select the highlighted item by calling `onBranchSelect` with its value, close popover, reset state (FR-008) in webview-ui/src/components/FilterableBranchDropdown.tsx
-- [ ] T012 [US2] Implement type-to-redirect: when `listNavigationMode=true` and a printable character key is pressed, set `listNavigationMode=false`, refocus the text input, and let the character append to `filterText` naturally. Reset `highlightedIndex` to -1 (FR-008a) in webview-ui/src/components/FilterableBranchDropdown.tsx
-- [ ] T013 [US2] Add visual highlight styling to the currently highlighted item using `highlightedIndex`: apply `bg-[var(--vscode-list-activeSelectionBackground)]` and `text-[var(--vscode-list-activeSelectionForeground)]` to the highlighted item in webview-ui/src/components/FilterableBranchDropdown.tsx
+- [X] T009 [US2] Implement Tab key handler on the text input: when Tab is pressed, prevent default, set `listNavigationMode=true`, set `highlightedIndex` to the index of the first selectable item (skip group headers), do nothing if filtered list has no selectable items (FR-006, edge case) in webview-ui/src/components/FilterableBranchDropdown.tsx
+- [X] T010 [US2] Implement Up/Down arrow key navigation: when `listNavigationMode=true`, ArrowDown moves `highlightedIndex` to next selectable item (skip group headers), ArrowUp moves to previous selectable item, stop at list boundaries (no wrapping per FR-007, spec assumption). Call `scrollIntoView({ block: 'nearest' })` on the highlighted item's DOM element via ref callback in webview-ui/src/components/FilterableBranchDropdown.tsx
+- [X] T011 [US2] Implement Enter key selection: when `listNavigationMode=true` and `highlightedIndex >= 0`, select the highlighted item by calling `onBranchSelect` with its value, close popover, reset state (FR-008) in webview-ui/src/components/FilterableBranchDropdown.tsx
+- [X] T012 [US2] Implement type-to-redirect: when `listNavigationMode=true` and a printable character key is pressed, set `listNavigationMode=false`, refocus the text input, and let the character append to `filterText` naturally. Reset `highlightedIndex` to -1 (FR-008a) in webview-ui/src/components/FilterableBranchDropdown.tsx
+- [X] T013 [US2] Add visual highlight styling to the currently highlighted item using `highlightedIndex`: apply `bg-[var(--vscode-list-activeSelectionBackground)]` and `text-[var(--vscode-list-activeSelectionForeground)]` to the highlighted item in webview-ui/src/components/FilterableBranchDropdown.tsx
 
 **Checkpoint**: Full keyboard workflow works: type → Tab → arrows → Enter. Type-to-redirect returns to input. All acceptance scenarios from US2 pass.
 
@@ -91,10 +91,10 @@
 
 **Purpose**: Accessibility, edge cases, and validation
 
-- [ ] T014 Add ARIA attributes: `role="combobox"` and `aria-expanded` on the text input, `role="listbox"` on the list container, `role="option"` on selectable items, `aria-activedescendant` pointing to highlighted item's `id`, `aria-selected` on the currently selected branch in webview-ui/src/components/FilterableBranchDropdown.tsx
-- [ ] T015 Handle edge cases: no branches (show only "All Branches"), Tab with empty filtered list (no-op). Verify current branch `*` indicator (FR-014, implemented in T007) renders correctly across filter states in webview-ui/src/components/FilterableBranchDropdown.tsx
-- [ ] T015a Handle reactive branch updates while dropdown is open: when `branches` prop changes (e.g., after refresh/fetch), re-run filter with current `filterText`, clamp `highlightedIndex` if filtered list shrinks, preserve dropdown open state and filter text in webview-ui/src/components/FilterableBranchDropdown.tsx
-- [ ] T016 Run validation gates: `pnpm typecheck` (zero errors), `pnpm lint` (zero errors), `pnpm build` (clean build)
+- [X] T014 Add ARIA attributes: `role="combobox"` and `aria-expanded` on the text input, `role="listbox"` on the list container, `role="option"` on selectable items, `aria-activedescendant` pointing to highlighted item's `id`, `aria-selected` on the currently selected branch in webview-ui/src/components/FilterableBranchDropdown.tsx
+- [X] T015 Handle edge cases: no branches (show only "All Branches"), Tab with empty filtered list (no-op). Verify current branch `*` indicator (FR-014, implemented in T007) renders correctly across filter states in webview-ui/src/components/FilterableBranchDropdown.tsx
+- [X] T015a Handle reactive branch updates while dropdown is open: when `branches` prop changes (e.g., after refresh/fetch), re-run filter with current `filterText`, clamp `highlightedIndex` if filtered list shrinks, preserve dropdown open state and filter text in webview-ui/src/components/FilterableBranchDropdown.tsx
+- [X] T016 Run validation gates: `pnpm typecheck` (zero errors), `pnpm lint` (zero errors), `pnpm build` (clean build)
 - [ ] T017 Manual smoke test per quickstart.md checklist: verify all 12 test scenarios in both light and dark VS Code themes
 
 ---
