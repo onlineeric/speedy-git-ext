@@ -4,6 +4,15 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.4] - 2026-03-17
+
+### Fixed
+- Stash internal commits (index, untracked) no longer pollute the git graph — `refs/stash` is now excluded from the main log query since stashes are already fetched and displayed separately via the dedicated stash service.
+- Latest stash entry no longer appears as a duplicate merge node in the graph.
+- Stash refs appearing in commit decorations are now correctly identified as stash type instead of being misclassified as local branches.
+- Right-clicking a stash label on a commit row now shows the stash context menu (Apply, Pop, Drop) instead of an empty menu.
+- Stash commit rows now display the author name, avatar, and badge — previously blank because author data was not fetched from git.
+
 ## [1.0.3] - 2026-03-17
 
 ### Added

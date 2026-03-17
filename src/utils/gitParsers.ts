@@ -67,6 +67,12 @@ function parseRefPart(part: string): RefInfo | null {
     return { name: tagName, type: 'tag' };
   }
 
+  // Stash ref (e.g. "refs/stash") — should not normally appear since stash
+  // refs are excluded from git log, but handle defensively.
+  if (part === 'refs/stash' || part.startsWith('stash@{')) {
+    return { name: part, type: 'stash' };
+  }
+
   // Check for remote branches - refs from git log %D format include "origin/branch"
   // We check for common remote prefixes to distinguish from local branches with slashes
   const commonRemotes = ['origin', 'upstream', 'fork'];

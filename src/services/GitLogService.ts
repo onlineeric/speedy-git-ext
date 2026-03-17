@@ -31,7 +31,11 @@ export class GitLogService {
     if (filters?.branch) {
       args.push(filters.branch);
     } else {
-      args.push('--all');
+      // Exclude stash refs — stashes are fetched separately via GitStashService
+      // and merged into the graph by the frontend. Without this exclusion,
+      // stash internal commits (index, untracked) pollute the graph and the
+      // latest stash appears as a duplicate merge node.
+      args.push('--exclude=refs/stash', '--all');
     }
 
     if (filters?.skip && filters.skip > 0) {

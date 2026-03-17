@@ -110,11 +110,17 @@ export const CommitRow = memo(function CommitRow({
           {isHead && (
             <HeadIcon className="text-[var(--vscode-badge-foreground)] flex-shrink-0" />
           )}
-          {visibleRefs.map((displayRef) => (
-            <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)}>
-              <RefLabel displayRef={displayRef} />
-            </BranchContextMenu>
-          ))}
+          {visibleRefs.map((displayRef) =>
+            displayRef.type === 'stash' ? (
+              <StashContextMenu key={displayRefKey(displayRef)} commit={commit} stashIndex={stashIndex}>
+                <RefLabel displayRef={displayRef} />
+              </StashContextMenu>
+            ) : (
+              <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)}>
+                <RefLabel displayRef={displayRef} />
+              </BranchContextMenu>
+            )
+          )}
           <OverflowRefsBadge hiddenRefs={overflowRefs} />
         </div>
       )}
