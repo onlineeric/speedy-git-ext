@@ -4,6 +4,20 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.3] - 2026-03-17
+
+### Added
+- Branch filter dropdown now includes a text input at the top for real-time, case-insensitive filtering — quickly find a branch in repositories with dozens or hundreds of branches.
+- Filtered branch list preserves Local and Remote groupings; groups with no matches are hidden automatically.
+- "All Branches" option always visible in the dropdown to reset the filter at any time.
+- Keyboard-first branch selection: type to filter → Tab to move focus into the list → Up/Down arrows to navigate → Enter to select (combobox pattern, consistent with VS Code Command Palette).
+- While the list is focused, typing any character automatically returns focus to the text input and appends the character, so filtering resumes without needing Shift+Tab.
+- Clicking a branch in the list selects it and closes the dropdown; clicking outside closes it without changing the selection.
+- Escape closes the dropdown and clears the filter text without changing the selected branch.
+- Dropdown trigger displays the currently selected branch name (or "All Branches") in the closed state.
+- Long branch names are truncated with ellipsis when they exceed the dropdown width.
+- Dropdown styling uses VS Code theme variables for seamless integration with light and dark themes.
+
 ## [1.0.2] - 2026-03-16
 
 ### Fixed
