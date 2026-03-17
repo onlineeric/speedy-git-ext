@@ -96,6 +96,7 @@ Built with **Vite** + React plugin → `dist/webview/`
 - TypeScript 5.x (strict, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Vite (webview), esbuild (extension host), Zustand, `@radix-ui/react-context-menu`, `@radix-ui/react-alert-dialog`, VS Code Extension API (012-checkout-commit-detached-head)
 - N/A — git repository on the filesystem (012-checkout-commit-detached-head)
 - TypeScript 5.x (strict mode) + VS Code Extension API, esbuild (backend), Vite + React 18 (webview), Zustand, Radix UI (013-fix-checkout-stash)
+- TypeScript 5.x (strict, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand, `@radix-ui/react-popover` (already installed), Tailwind CSS (014-filterable-branch-dropdown)
+- N/A — all state is in-memory (Zustand store + local component state) (014-filterable-branch-dropdown)
 
 ## Recent Changes
-- 012-checkout-commit-detached-head: Added TypeScript 5.x (strict, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Vite (webview), esbuild (extension host), Zustand, `@radix-ui/react-context-menu`, `@radix-ui/react-alert-dialog`, VS Code Extension API
