@@ -20,7 +20,7 @@
 **Purpose**: Add shared types needed by multiple user stories
 
 - [ ] T001 [P] Add `AvatarUrlMap` type (`Record<string, string>`) and `gitHubAvatarUrls` to shared types in `shared/types.ts`
-- [ ] T002 [P] Add `avatarUrls` response message type (`{ type: 'avatarUrls'; payload: { urls: Record<string, string> } }`) to `shared/messages.ts`, including a type guard if the existing pattern uses one for narrowing ResponseMessage types
+- [ ] T002 [P] Add `avatarUrls` response message type (`{ type: 'avatarUrls'; payload: { urls: Record<string, string> } }`) to `shared/messages.ts`, including a type guard for narrowing the ResponseMessage type (required by Constitution Principle III)
 
 ---
 
@@ -67,9 +67,9 @@
 
 ### Implementation for User Story 3
 
-- [ ] T012 [US3] Create `src/services/GitHubAvatarService.ts` — class with constructor taking repo owner/name, methods: `fetchAvatarUrls(commits: Commit[]): Promise<Result<Record<string, string>, GitError>>` (using the project's Result pattern for error handling), private rate limit state tracking (`remaining: number`, `resetTime: number`), and in-memory cache (`Map<string, { url: string; fetchedAt: number }>`) with 24h TTL
+- [ ] T012 [US3] Create `src/services/GitHubAvatarService.ts` — class with constructor taking repo owner/name, methods: `fetchAvatarUrls(commits: Commit[]): Promise<Result<Record<string, string>, GitError>>` (using the project's Result pattern for error handling), private rate limit state tracking (`remaining: number`, `resetTime: number`), and in-memory cache (`Map<string, { url: string; fetchedAt: number }>`) with 24h TTL. The method MUST deduplicate commits by author email and select one representative commit hash per unique email for the API call, skipping emails already in cache.
 - [ ] T013 [US3] Implement GitHub remote detection in `src/services/GitHubAvatarService.ts` — add static method `parseGitHubRemote(remoteUrl: string): { owner: string; repo: string } | null` that parses `github.com` from SSH/HTTPS remote URLs
-- [ ] T014 [US3] Implement avatar URL fetching in `src/services/GitHubAvatarService.ts` — use Node.js `https` module to call `/repos/{owner}/{repo}/commits/{hash}`, extract `author.avatar_url`, check `x-ratelimit-remaining` and `x-ratelimit-reset` headers, store `resetTime` from `x-ratelimit-reset`, skip API calls when rate limited (check `Date.now() >= resetTime * 1000` before each request to auto-resume when the limit resets)
+- [ ] T014 [US3] Implement avatar URL fetching in `src/services/GitHubAvatarService.ts` — use Node 18 global `fetch` (purpose-built HTTP API per Constitution Principle IV) to call `/repos/{owner}/{repo}/commits/{hash}`, extract `author.avatar_url`, check `x-ratelimit-remaining` and `x-ratelimit-reset` headers, store `resetTime` from `x-ratelimit-reset`, skip API calls when rate limited (check `Date.now() >= resetTime * 1000` before each request to auto-resume when the limit resets). Requests MUST be sequential (one at a time) with early termination when `x-ratelimit-remaining < 5`. Network errors (timeout, DNS failure, offline) MUST be caught and trigger Gravatar fallback for the affected author.
 - [ ] T015 [US3] Integrate `GitHubAvatarService` into `WebviewProvider` in `src/WebviewProvider.ts` — instantiate service when remote is GitHub (using `parseGitHubRemote`), after `sendInitialData()` fetches commits, call `fetchAvatarUrls()` for unique emails not yet cached, post `avatarUrls` message to webview. Also update CSP `img-src` directive in `getHtmlForWebview()` to add `https://avatars.githubusercontent.com` (GitHub avatar image domain)
 - [ ] T016 [US3] Add `gitHubAvatarUrls` state to Zustand store in `webview-ui/src/stores/graphStore.ts` — add `gitHubAvatarUrls: Record<string, string>` state and `setGitHubAvatarUrls(urls: Record<string, string>)` action that merges new URLs into existing map
 - [ ] T017 [US3] Handle `avatarUrls` message in `webview-ui/src/rpc/rpcClient.ts` — add case for `'avatarUrls'` response type that calls `store.setGitHubAvatarUrls(message.payload.urls)`
@@ -104,7 +104,7 @@
 
 - **User Story 1 (P1)**: Independent - modifies only `src/WebviewProvider.ts`
 - **User Story 2 (P2)**: Independent - modifies only `webview-ui/src/components/FilterableBranchDropdown.tsx`
-- **User Story 3 (P3)**: Depends on T001+T002 (shared types) AND T003-T008 (US1) completing first, since T015 also modifies `src/WebviewProvider.ts`. Modifies backend service (new), `WebviewProvider.ts`, store, rpcClient, `AuthorAvatar.tsx`
+- **User Story 3 (P3)**: Depends on T001+T002 (shared types) AND T003-T008 (US1) completing first due to file conflict (both US1 and US3 modify `src/WebviewProvider.ts`), not functional dependency. Modifies backend service (new), `WebviewProvider.ts`, store, rpcClient, `AuthorAvatar.tsx`
 
 ### Within Each User Story
 

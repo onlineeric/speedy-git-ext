@@ -92,7 +92,7 @@ As a user, I want to see commit authors' GitHub profile avatars in the git histo
 **Branch Filter - Visual Improvements**
 
 - **FR-004**: The branch filter dropdown MUST display a dropdown arrow icon on the right side of the input field, matching the style of the nested repo dropdown.
-- **FR-005**: The branch filter dropdown MUST be wide enough to display branch names of reasonable length without excessive truncation.
+- **FR-005**: The branch filter dropdown MUST be wide enough to display branch names up to 60 characters without truncation.
 
 **GitHub Avatar**
 
@@ -128,6 +128,7 @@ As a user, I want to see commit authors' GitHub profile avatars in the git histo
 - The GitHub public API endpoint for fetching commit/user details is accessible without authentication and returns avatar URLs in the response.
 - The system detects whether the repository remote is GitHub-hosted (e.g., by inspecting the remote URL) to determine whether to attempt GitHub avatar fetching.
 - The existing Gravatar integration remains unchanged and serves as the universal fallback.
+- The initial idea spec mentioned "get avatar from the repo itself" as a possible avatar source. This is out of scope for this feature; only GitHub API and Gravatar are implemented as avatar sources.
 - The unauthenticated GitHub API rate limit of 60 requests per hour is sufficient for typical usage patterns (avatar fetching is cached, so repeated views of the same authors do not consume additional requests).
 - The nested repo dropdown uses a native `<select>` element with a browser-provided arrow. The branch filter dropdown (Radix Popover) requires an explicit inline SVG chevron-down icon to achieve a similar visual appearance.
 - A cache expiration of 24 hours for GitHub avatars is a reasonable default to balance freshness with API usage.

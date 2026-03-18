@@ -16,6 +16,8 @@
 
 **Rationale**: This endpoint maps a commit directly to a GitHub user avatar. The repo owner/name can be parsed from the remote URL. Since commits are already loaded, we have hashes available.
 
+**HTTP Client**: Node 18 global `fetch` (purpose-built HTTP API per Constitution Principle IV). Preferred over raw `https` module which requires manual buffer concatenation and response handling.
+
 **Alternatives considered**:
 - `/users/{username}`: Requires knowing the GitHub username, which is not directly available from commit email.
 - `/search/users?q={email}`: More direct email-to-user mapping, but search API has stricter rate limits.

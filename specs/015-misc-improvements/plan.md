@@ -28,7 +28,7 @@ Three improvements: (1) Centralize graph refresh to preserve branch filter acros
 | I. Performance First | PASS | Avatar fetching is async/non-blocking; Gravatar shown immediately while GitHub avatar loads in background; cached for O(1) subsequent lookups |
 | II. Clean Code & Simplicity | PASS | Centralizing refresh reduces code duplication; avatar service follows existing service patterns |
 | III. Type Safety & Explicit Error Handling | PASS | New message types added to shared/messages.ts; Result pattern used for GitHub API calls |
-| IV. Library-First | PASS | Using existing @radix-ui/react-popover; VS Code built-in `https` for API calls; no new dependencies needed |
+| IV. Library-First | PASS | Using existing @radix-ui/react-popover; Node 18 global `fetch` for API calls (purpose-built HTTP API); no new dependencies needed |
 | V. Dual-Process Architecture | PASS | GitHub API calls in backend (extension host); avatar URL mapping sent to frontend via message passing; no git subprocess in webview |
 
 ## Project Structure
@@ -91,9 +91,9 @@ webview-ui/src/
 - Commit type has `authorEmail` field used for Gravatar hash
 
 **Solution**:
-1. Backend `GitHubAvatarService` fetches avatar URLs from GitHub API (`/repos/{owner}/{repo}/commits/{hash}` to get `author.avatar_url`), returning `Result<T, GitError>` per the project's error handling convention
+1. Backend `GitHubAvatarService` fetches avatar URLs from GitHub API (`/repos/{owner}/{repo}/commits/{hash}` to get `author.avatar_url`) using Node 18 global `fetch`, returning `Result<T, GitError>` per the project's error handling convention
 2. Detect GitHub remote by parsing remote URL for `github.com`
-3. After loading commits, extract unique author emails, batch-fetch avatar URLs from GitHub API
+3. After loading commits, extract unique author emails, fetch avatar URLs sequentially from GitHub API (one request per unique email, using a representative commit hash)
 4. Cache `email -> avatarUrl` URL mapping in memory with 24h TTL (caching URLs not image binaries - browser loads images directly from GitHub CDN, matching the existing Gravatar pattern)
 5. Send mapping to frontend via new `avatarUrls` message type
 6. `AuthorAvatar` component checks GitHub URL first, falls back to Gravatar
