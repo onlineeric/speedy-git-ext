@@ -93,10 +93,9 @@ Built with **Vite** + React plugin → `dist/webview/`
 - **Git**: NEVER commit, branch, or merge; only readonly operations (`git log`, `git status`, `git diff`) and create PR only if I ask you to do so.
 
 ## Active Technologies
-- TypeScript 5.x (strict, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Vite (webview), esbuild (extension host), Zustand, `@radix-ui/react-context-menu`, `@radix-ui/react-alert-dialog`, VS Code Extension API (012-checkout-commit-detached-head)
-- N/A — git repository on the filesystem (012-checkout-commit-detached-head)
-- TypeScript 5.x (strict mode) + VS Code Extension API, esbuild (backend), Vite + React 18 (webview), Zustand, Radix UI (013-fix-checkout-stash)
-- TypeScript 5.x (strict, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand, `@radix-ui/react-popover` (already installed), Tailwind CSS (014-filterable-branch-dropdown)
-- N/A — all state is in-memory (Zustand store + local component state) (014-filterable-branch-dropdown)
+- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + VS Code Extension API with esbuild backend, Vite + React 18 webview, Zustand state management, and Radix UI/Tailwind in the UI stack (012-015 milestones).
+- Local git repository as the source of data, with state kept in-memory (Zustand + local component state) and existing caching patterns (e.g., `gravatar.ts`) reused.
+- TypeScript 5.x (strict) + React 18, Zustand, @radix-ui/react-popover (already installed), VS Code Extension API, esbuild, Vite (015-misc-improvements)
+- In-memory caching (existing pattern in gravatar.ts) (015-misc-improvements)
 
 ## Recent Changes

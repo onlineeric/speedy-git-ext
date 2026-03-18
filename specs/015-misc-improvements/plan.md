@@ -1,104 +1,104 @@
-# Implementation Plan: [FEATURE]
+# Implementation Plan: Miscellaneous Improvements - Branch Filter Dropdown & GitHub Avatar
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
+**Branch**: `015-misc-improvements` | **Date**: 2026-03-18 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/015-misc-improvements/spec.md`
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Three improvements: (1) Centralize graph refresh to preserve branch filter across all actions, (2) improve branch filter dropdown visuals (arrow icon + wider), (3) add GitHub avatar support with Gravatar fallback. This is a small incremental improvement using the existing tech stack.
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
-
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Language/Version**: TypeScript 5.x (strict)
+**Primary Dependencies**: React 18, Zustand, @radix-ui/react-popover (already installed), VS Code Extension API, esbuild, Vite
+**Storage**: In-memory caching (existing pattern in gravatar.ts)
+**Testing**: Manual smoke test via VS Code "Run Extension" launch config
+**Target Platform**: VS Code Extension (desktop)
+**Project Type**: VS Code Extension (backend + webview)
+**Performance Goals**: No perceptible lag when switching between filtered/unfiltered views; avatar fetching must not block graph rendering
+**Constraints**: GitHub API unauthenticated rate limit of 60 req/hour; avatar fetching must be async and non-blocking
+**Scale/Scope**: Typical repos with dozens of unique authors; 500+ commits
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| I. Performance First | PASS | Avatar fetching is async/non-blocking; Gravatar shown immediately while GitHub avatar loads in background; cached for O(1) subsequent lookups |
+| II. Clean Code & Simplicity | PASS | Centralizing refresh reduces code duplication; avatar service follows existing service patterns |
+| III. Type Safety & Explicit Error Handling | PASS | New message types added to shared/messages.ts; Result pattern used for GitHub API calls |
+| IV. Library-First | PASS | Using existing @radix-ui/react-popover; VS Code built-in `https` for API calls; no new dependencies needed |
+| V. Dual-Process Architecture | PASS | GitHub API calls in backend (extension host); avatar URL mapping sent to frontend via message passing; no git subprocess in webview |
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```text
-specs/[###-feature]/
-├── plan.md              # This file (/speckit.plan command output)
-├── research.md          # Phase 0 output (/speckit.plan command)
-├── data-model.md        # Phase 1 output (/speckit.plan command)
-├── quickstart.md        # Phase 1 output (/speckit.plan command)
-├── contracts/           # Phase 1 output (/speckit.plan command)
-└── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
+specs/015-misc-improvements/
+├── plan.md              # This file
+├── spec.md              # Feature specification
+├── research.md          # Research findings
+└── checklists/
+    └── requirements.md  # Spec quality checklist
 ```
 
 ### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
 
 ```text
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
 src/
-├── models/
+├── WebviewProvider.ts           # MODIFY: Store currentFilters, apply to all sendInitialData() calls
 ├── services/
-├── cli/
-└── lib/
+│   └── GitHubAvatarService.ts   # NEW: Fetch avatar URLs from GitHub public API with rate limiting
 
-tests/
-├── contract/
-├── integration/
-└── unit/
+shared/
+├── types.ts                     # MODIFY: Add AvatarUrlMap type
+└── messages.ts                  # MODIFY: Add avatarUrls response message type
 
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+webview-ui/src/
+├── components/
+│   ├── FilterableBranchDropdown.tsx  # MODIFY: Add dropdown arrow icon, increase width
+│   └── AuthorAvatar.tsx             # MODIFY: Use GitHub avatar URL when available
+├── stores/
+│   └── graphStore.ts                # MODIFY: Add gitHubAvatarUrls state
+└── rpc/
+    └── rpcClient.ts                 # MODIFY: Handle avatarUrls response message
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+## Research Findings
+
+### Centralized Refresh - Root Cause
+
+`WebviewProvider.sendInitialData(filters?)` is called ~30+ times across action handlers. Only 3 callers pass filters (`refresh`, `fetch`, `getCommits`). All other actions (pull, push, checkout, rebase, cherry pick, stash ops, revert, delete branch, rename branch, create branch, tag ops) call `sendInitialData()` with NO filters, causing the branch filter to be lost.
+
+**Solution**: Store `currentFilters` as instance state in `WebviewProvider`. When `getCommits`/`refresh`/`fetch` are called with filters, update `currentFilters`. In `sendInitialData()`, default to `currentFilters` when no explicit filters are passed. If the filtered branch no longer exists in the refreshed branch list, clear the filter.
+
+### Branch Filter Dropdown - Current State
+
+- `FilterableBranchDropdown.tsx` uses Radix Popover
+- Trigger button: `min-w-[120px] max-w-[200px]` (too narrow for long branch names)
+- Popover content: `w-[280px]` (reasonable but could be wider)
+- No dropdown arrow icon on trigger button
+- `RepoSelector.tsx` uses native `<select>` (has built-in arrow) - NOT a direct style reference
+
+**Solution**: Add a chevron-down SVG icon inside the trigger button. Increase `max-w` on trigger and `w` on popover content.
+
+### GitHub Avatar - Approach
+
+- Existing `AuthorAvatar.tsx` loads Gravatar via Image object with in-memory cache
+- `gravatar.ts` has MD5 hashing, URL building, initials/color generation
+- Commit type has `authorEmail` field used for Gravatar hash
+
+**Solution**:
+1. Backend `GitHubAvatarService` fetches avatar URLs from GitHub API (`/repos/{owner}/{repo}/commits/{hash}` to get `author.avatar_url`), returning `Result<T, GitError>` per the project's error handling convention
+2. Detect GitHub remote by parsing remote URL for `github.com`
+3. After loading commits, extract unique author emails, batch-fetch avatar URLs from GitHub API
+4. Cache `email -> avatarUrl` URL mapping in memory with 24h TTL (caching URLs not image binaries - browser loads images directly from GitHub CDN, matching the existing Gravatar pattern)
+5. Send mapping to frontend via new `avatarUrls` message type
+6. `AuthorAvatar` component checks GitHub URL first, falls back to Gravatar
+7. Rate limit tracking: monitor `x-ratelimit-remaining` header, pause when 0
 
 ## Complexity Tracking
 
-> **Fill ONLY if Constitution Check has violations that must be justified**
-
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+No constitution violations. All changes follow existing patterns.

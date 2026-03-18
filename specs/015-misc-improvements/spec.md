@@ -77,6 +77,7 @@ As a user, I want to see commit authors' GitHub profile avatars in the git histo
 - What happens when the rate limit resets? The system should automatically resume GitHub API requests without requiring user action.
 - What happens if the cached avatar becomes stale (e.g., user changes their GitHub profile picture)? Cached avatars should have a reasonable expiration period.
 - What happens when the repository remote is not hosted on GitHub (e.g., GitLab, Bitbucket, self-hosted)? GitHub avatar fetching is skipped entirely; Gravatar is used directly.
+- What happens when a commit author uses a different email locally than their GitHub account email? The GitHub API may not resolve the avatar for that commit. The system should fall back to Gravatar for unresolved authors.
 
 ## Requirements *(mandatory)*
 
@@ -96,11 +97,11 @@ As a user, I want to see commit authors' GitHub profile avatars in the git histo
 **GitHub Avatar**
 
 - **FR-006**: The system MUST attempt to fetch a commit author's avatar from the GitHub public API before falling back to Gravatar, only when the repository remote is hosted on GitHub. For non-GitHub repositories, the system MUST use Gravatar directly.
-- **FR-007**: The system MUST cache fetched GitHub avatars locally per author account to minimize API calls.
+- **FR-007**: The system MUST cache fetched GitHub avatar URLs in memory per author email to minimize API calls. The browser loads avatar images directly from GitHub's CDN using the cached URL. Note: this differs from the original idea spec which suggested downloading image binaries; caching URLs is simpler, avoids disk I/O, and aligns with the existing Gravatar pattern.
 - **FR-008**: The system MUST monitor the GitHub API rate limit by checking the `x-ratelimit-remaining` response header, and pause all GitHub API avatar requests when the limit reaches zero.
 - **FR-009**: When the GitHub API rate limit is exceeded, the system MUST fall back to Gravatar until the rate limit resets (as indicated by the `x-ratelimit-reset` header).
 - **FR-010**: When the GitHub API returns an error or cannot resolve an avatar for an author, the system MUST fall back to Gravatar for that author.
-- **FR-011**: Cached avatars MUST have a reasonable expiration period to account for profile picture changes.
+- **FR-011**: Cached avatars MUST have a 24-hour expiration period to account for profile picture changes.
 - **FR-012**: While a GitHub avatar is being fetched for the first time, the system MUST display the Gravatar immediately. The GitHub avatar MUST only appear on the next graph render after it has been cached (no in-place image swap).
 
 ### Key Entities
@@ -128,6 +129,6 @@ As a user, I want to see commit authors' GitHub profile avatars in the git histo
 - The system detects whether the repository remote is GitHub-hosted (e.g., by inspecting the remote URL) to determine whether to attempt GitHub avatar fetching.
 - The existing Gravatar integration remains unchanged and serves as the universal fallback.
 - The unauthenticated GitHub API rate limit of 60 requests per hour is sufficient for typical usage patterns (avatar fetching is cached, so repeated views of the same authors do not consume additional requests).
-- The dropdown arrow icon already exists in the codebase (used by the nested repo dropdown) and can be reused for visual consistency.
+- The nested repo dropdown uses a native `<select>` element with a browser-provided arrow. The branch filter dropdown (Radix Popover) requires an explicit inline SVG chevron-down icon to achieve a similar visual appearance.
 - A cache expiration of 24 hours for GitHub avatars is a reasonable default to balance freshness with API usage.
 - The centralized refresh method will be used by all current and future actions that trigger git history graph updates.
