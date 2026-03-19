@@ -231,7 +231,9 @@ export class ExtensionController {
       this.gitWatcherService = new GitWatcherService(this.log);
       this.context.subscriptions.push(this.gitWatcherService);
       this.gitWatcherService.onDidDetectChange(() => {
-        this.webviewProvider?.triggerAutoRefresh();
+        this.webviewProvider?.triggerAutoRefresh().catch((err: unknown) => {
+          this.log.error(`Auto-refresh failed: ${err}`);
+        });
       });
       await this.gitWatcherService.initialize(workspacePath);
     }

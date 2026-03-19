@@ -136,16 +136,7 @@ export class WebviewProvider {
       this.pendingRefresh = true;
       return;
     }
-    this.isRefreshing = true;
-    try {
-      await this.sendInitialData();
-    } finally {
-      this.isRefreshing = false;
-      if (this.pendingRefresh) {
-        this.pendingRefresh = false;
-        void this.triggerAutoRefresh();
-      }
-    }
+    await this.sendInitialData();
   }
 
   /** Push an updated repo list to the webview */
@@ -224,84 +215,93 @@ export class WebviewProvider {
   }
 
   private async sendInitialData(filters?: Partial<GraphFilters>, includeStashes = false) {
-    let effectiveFilters = filters ?? this.currentFilters;
-    const settings = this.getSettingsHandler?.();
-    if (settings) {
-      this.sendSettingsData(settings);
-    }
+    this.isRefreshing = true;
+    try {
+      let effectiveFilters = filters ?? this.currentFilters;
+      const settings = this.getSettingsHandler?.();
+      if (settings) {
+        this.sendSettingsData(settings);
+      }
 
-    // Check if the filtered branch still exists before fetching commits
-    if (effectiveFilters.branch) {
-      const branchResult = await this.gitLogService.getBranches();
-      if (branchResult.success) {
-        const branchExists = branchResult.value.some(
-          (b) => b.name === effectiveFilters.branch || `${b.remote}/${b.name}` === effectiveFilters.branch
-        );
-        if (!branchExists) {
-          const { branch: _, ...rest } = this.currentFilters;
-          this.currentFilters = rest;
-          effectiveFilters = this.currentFilters;
+      // Check if the filtered branch still exists before fetching commits
+      if (effectiveFilters.branch) {
+        const branchResult = await this.gitLogService.getBranches();
+        if (branchResult.success) {
+          const branchExists = branchResult.value.some(
+            (b) => b.name === effectiveFilters.branch || `${b.remote}/${b.name}` === effectiveFilters.branch
+          );
+          if (!branchExists) {
+            const { branch: _, ...rest } = this.currentFilters;
+            this.currentFilters = rest;
+            effectiveFilters = this.currentFilters;
+          }
         }
       }
-    }
 
-    // Fetch commits directly so we can reuse them for avatar fetching
-    if (effectiveFilters) {
-      this.currentFilters = { ...this.currentFilters, ...effectiveFilters };
-    }
-    this.postMessage({ type: 'loading', payload: { loading: true } });
-    const batchSize = this.getBatchSize();
-    const commitsResult = await this.gitLogService.getCommits({ ...effectiveFilters, maxCount: batchSize });
-    let fetchedCommits: Commit[] = [];
-    if (commitsResult.success) {
-      fetchedCommits = commitsResult.value.commits;
-      this.postMessage({
-        type: 'commits',
-        payload: {
-          commits: fetchedCommits,
-          totalLoadedWithoutFilter: commitsResult.value.totalLoadedWithoutFilter,
-        },
-      });
-    } else {
-      this.postMessage({ type: 'error', payload: { error: commitsResult.error } });
-    }
-    this.postMessage({ type: 'loading', payload: { loading: false } });
-
-    await this.handleMessage({ type: 'getBranches', payload: {} });
-    await this.handleMessage({ type: 'getRemotes', payload: {} });
-    await this.handleMessage({ type: 'getSubmodules', payload: {} });
-    if (includeStashes) {
-      await this.handleMessage({ type: 'getStashes', payload: {} });
-    }
-    const cherryPickStateResult = this.gitCherryPickService.getCherryPickState();
-    if (cherryPickStateResult.success) {
-      this.postMessage({ type: 'cherryPickState', payload: { state: cherryPickStateResult.value } });
-    }
-
-    const rebaseStateResult = this.gitRebaseService.getRebaseState();
-    if (rebaseStateResult.success) {
-      if (rebaseStateResult.value.state === 'in-progress') {
-        const conflictResult = await this.gitRebaseService.getConflictInfo();
+      // Fetch commits directly so we can reuse them for avatar fetching
+      if (effectiveFilters) {
+        this.currentFilters = { ...this.currentFilters, ...effectiveFilters };
+      }
+      this.postMessage({ type: 'loading', payload: { loading: true } });
+      const batchSize = this.getBatchSize();
+      const commitsResult = await this.gitLogService.getCommits({ ...effectiveFilters, maxCount: batchSize });
+      let fetchedCommits: Commit[] = [];
+      if (commitsResult.success) {
+        fetchedCommits = commitsResult.value.commits;
         this.postMessage({
-          type: 'rebaseState',
+          type: 'commits',
           payload: {
-            state: 'in-progress',
-            conflictInfo: conflictResult.success ? conflictResult.value : rebaseStateResult.value.conflictInfo,
+            commits: fetchedCommits,
+            totalLoadedWithoutFilter: commitsResult.value.totalLoadedWithoutFilter,
           },
         });
       } else {
-        this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+        this.postMessage({ type: 'error', payload: { error: commitsResult.error } });
       }
-    }
+      this.postMessage({ type: 'loading', payload: { loading: false } });
 
-    const revertStateResult = await this.gitRevertService.getRevertState();
-    if (revertStateResult.success) {
-      this.postMessage({ type: 'revertState', payload: { state: revertStateResult.value } });
-    }
+      await this.handleMessage({ type: 'getBranches', payload: {} });
+      await this.handleMessage({ type: 'getRemotes', payload: {} });
+      await this.handleMessage({ type: 'getSubmodules', payload: {} });
+      if (includeStashes) {
+        await this.handleMessage({ type: 'getStashes', payload: {} });
+      }
+      const cherryPickStateResult = this.gitCherryPickService.getCherryPickState();
+      if (cherryPickStateResult.success) {
+        this.postMessage({ type: 'cherryPickState', payload: { state: cherryPickStateResult.value } });
+      }
 
-    // Fetch GitHub avatars in background (non-blocking), skip if avatars disabled
-    if (settings?.avatarsEnabled !== false && fetchedCommits.length > 0) {
-      void this.fetchAndSendGitHubAvatars(fetchedCommits);
+      const rebaseStateResult = this.gitRebaseService.getRebaseState();
+      if (rebaseStateResult.success) {
+        if (rebaseStateResult.value.state === 'in-progress') {
+          const conflictResult = await this.gitRebaseService.getConflictInfo();
+          this.postMessage({
+            type: 'rebaseState',
+            payload: {
+              state: 'in-progress',
+              conflictInfo: conflictResult.success ? conflictResult.value : rebaseStateResult.value.conflictInfo,
+            },
+          });
+        } else {
+          this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+        }
+      }
+
+      const revertStateResult = await this.gitRevertService.getRevertState();
+      if (revertStateResult.success) {
+        this.postMessage({ type: 'revertState', payload: { state: revertStateResult.value } });
+      }
+
+      // Fetch GitHub avatars in background (non-blocking), skip if avatars disabled
+      if (settings?.avatarsEnabled !== false && fetchedCommits.length > 0) {
+        void this.fetchAndSendGitHubAvatars(fetchedCommits);
+      }
+    } finally {
+      this.isRefreshing = false;
+      if (this.pendingRefresh) {
+        this.pendingRefresh = false;
+        void this.triggerAutoRefresh();
+      }
     }
   }
 
