@@ -1,6 +1,6 @@
 # Feature Specification: Auto-Refresh on Git State Changes
 
-**Feature Branch**: `017-auto-refresh`
+**Feature Branch**: `016-auto-refresh`
 **Created**: 2026-03-19
 **Status**: Draft
 **Input**: User description: "Extension requires manual refresh/fetch to show latest git history. When user performs git operations via VSCode Source Control panel (commit, push, pull, sync, checkout, create branch), the extension does not auto-refresh. Other extensions like Git Graph detect these changes automatically via VSCode's built-in git extension events."
