@@ -4,6 +4,19 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.5] - 2026-03-19
+
+### Added
+- GitHub profile avatars for commit authors, with automatic Gravatar fallback when a GitHub avatar is unavailable or the repository is not hosted on GitHub.
+- GitHub avatar caching per author email with 24-hour expiration to minimize API calls and keep avatars fresh.
+- Automatic GitHub API rate limit handling — pauses avatar requests when the limit is reached and resumes after reset, falling back to Gravatar seamlessly.
+- Dropdown arrow icon on the branch filter input, matching the nested repo dropdown style for better discoverability.
+- Wider branch filter dropdown to display longer branch names (up to 60 characters) without truncation.
+
+### Fixed
+- Branch filter now persists across all graph-refreshing actions (pull, push, fetch, rebase, checkout, cherry-pick, search, refresh button) via a centralized refresh method.
+- Branch filter automatically clears when the filtered branch is deleted, showing the full graph instead of stale results.
+
 ## [1.0.4] - 2026-03-17
 
 ### Fixed

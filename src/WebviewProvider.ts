@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import type { RequestMessage, ResponseMessage } from '../shared/messages.js';
-import type { GraphFilters, RepoInfo, SubmoduleNavEntry, UserSettings } from '../shared/types.js';
+import type { Commit, GraphFilters, RepoInfo, SubmoduleNavEntry, UserSettings } from '../shared/types.js';
 import type { GitLogService } from './services/GitLogService.js';
 import type { GitDiffService } from './services/GitDiffService.js';
 import type { GitBranchService } from './services/GitBranchService.js';
@@ -17,12 +17,18 @@ import type { GitSignatureService } from './services/GitSignatureService.js';
 import type { GitSubmoduleService } from './services/GitSubmoduleService.js';
 import type { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
 import { GitError } from '../shared/errors.js';
+import { GitHubAvatarService } from './services/GitHubAvatarService.js';
 
 export class WebviewProvider {
   private panel: vscode.WebviewPanel | undefined;
   /** Incremented on each repo switch to discard stale commit responses */
   private fetchGeneration = 0;
   private currentRepoPath: string;
+  /** Stores the most recently applied filters so all refresh calls preserve them */
+  private currentFilters: Partial<GraphFilters> = {};
+  /** GitHub avatar service — initialized lazily when the remote is detected as GitHub */
+  private gitHubAvatarService: GitHubAvatarService | null = null;
+  private gitHubAvatarInitialized = false;
   private getSettingsHandler: (() => UserSettings) | undefined;
   private submoduleHandlers:
     | {
@@ -102,6 +108,8 @@ export class WebviewProvider {
     this.gitSignatureService = gitSignatureService;
     this.gitSubmoduleService = gitSubmoduleService;
     this.currentRepoPath = currentRepoPath;
+    this.gitHubAvatarService = null;
+    this.gitHubAvatarInitialized = false;
   }
 
   /** Returns true if the webview panel is currently open */
@@ -180,12 +188,49 @@ export class WebviewProvider {
   }
 
   private async sendInitialData(filters?: Partial<GraphFilters>, includeStashes = false) {
+    let effectiveFilters = filters ?? this.currentFilters;
     const settings = this.getSettingsHandler?.();
     if (settings) {
       this.sendSettingsData(settings);
     }
 
-    await this.handleMessage({ type: 'getCommits', payload: { filters } });
+    // Check if the filtered branch still exists before fetching commits
+    if (effectiveFilters.branch) {
+      const branchResult = await this.gitLogService.getBranches();
+      if (branchResult.success) {
+        const branchExists = branchResult.value.some(
+          (b) => b.name === effectiveFilters.branch || `${b.remote}/${b.name}` === effectiveFilters.branch
+        );
+        if (!branchExists) {
+          const { branch: _, ...rest } = this.currentFilters;
+          this.currentFilters = rest;
+          effectiveFilters = this.currentFilters;
+        }
+      }
+    }
+
+    // Fetch commits directly so we can reuse them for avatar fetching
+    if (effectiveFilters) {
+      this.currentFilters = { ...this.currentFilters, ...effectiveFilters };
+    }
+    this.postMessage({ type: 'loading', payload: { loading: true } });
+    const batchSize = this.getBatchSize();
+    const commitsResult = await this.gitLogService.getCommits({ ...effectiveFilters, maxCount: batchSize });
+    let fetchedCommits: Commit[] = [];
+    if (commitsResult.success) {
+      fetchedCommits = commitsResult.value.commits;
+      this.postMessage({
+        type: 'commits',
+        payload: {
+          commits: fetchedCommits,
+          totalLoadedWithoutFilter: commitsResult.value.totalLoadedWithoutFilter,
+        },
+      });
+    } else {
+      this.postMessage({ type: 'error', payload: { error: commitsResult.error } });
+    }
+    this.postMessage({ type: 'loading', payload: { loading: false } });
+
     await this.handleMessage({ type: 'getBranches', payload: {} });
     await this.handleMessage({ type: 'getRemotes', payload: {} });
     await this.handleMessage({ type: 'getSubmodules', payload: {} });
@@ -217,6 +262,35 @@ export class WebviewProvider {
     if (revertStateResult.success) {
       this.postMessage({ type: 'revertState', payload: { state: revertStateResult.value } });
     }
+
+    // Fetch GitHub avatars in background (non-blocking), skip if avatars disabled
+    if (settings?.avatarsEnabled !== false && fetchedCommits.length > 0) {
+      void this.fetchAndSendGitHubAvatars(fetchedCommits);
+    }
+  }
+
+  /** Initialize GitHubAvatarService lazily from remote URL, then fetch avatar URLs for the given commits */
+  private async fetchAndSendGitHubAvatars(commits: Commit[]) {
+    if (!this.gitHubAvatarInitialized) {
+      this.gitHubAvatarInitialized = true;
+      const remotesResult = await this.gitRemoteService.getRemotes();
+      if (remotesResult.success) {
+        const origin = remotesResult.value.find((r) => r.name === 'origin');
+        if (origin) {
+          const parsed = GitHubAvatarService.parseGitHubRemote(origin.fetchUrl);
+          if (parsed) {
+            this.gitHubAvatarService = new GitHubAvatarService(parsed.owner, parsed.repo);
+          }
+        }
+      }
+    }
+
+    if (!this.gitHubAvatarService) return;
+
+    const avatarResult = await this.gitHubAvatarService.fetchAvatarUrls(commits);
+    if (avatarResult.success && Object.keys(avatarResult.value).length > 0) {
+      this.postMessage({ type: 'avatarUrls', payload: { urls: avatarResult.value } });
+    }
   }
 
   private async sendSubmodulesData() {
@@ -238,6 +312,9 @@ export class WebviewProvider {
     this.log.debug(`Received message: ${message.type}`);
     switch (message.type) {
       case 'getCommits': {
+        if (message.payload.filters) {
+          this.currentFilters = { ...this.currentFilters, ...message.payload.filters };
+        }
         this.postMessage({ type: 'loading', payload: { loading: true } });
         const batchSize = this.getBatchSize();
         const result = await this.gitLogService.getCommits({ ...message.payload.filters, maxCount: batchSize });
@@ -400,6 +477,9 @@ export class WebviewProvider {
         break;
       }
       case 'fetch': {
+        if (message.payload.filters) {
+          this.currentFilters = { ...this.currentFilters, ...message.payload.filters };
+        }
         const result = await this.gitBranchService.fetch(
           message.payload.remote,
           message.payload.prune
@@ -426,6 +506,9 @@ export class WebviewProvider {
         break;
       }
       case 'refresh': {
+        if (message.payload.filters) {
+          this.currentFilters = { ...this.currentFilters, ...message.payload.filters };
+        }
         await this.sendInitialData(message.payload.filters, true);
         break;
       }
@@ -1105,7 +1188,7 @@ export class WebviewProvider {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src https://www.gravatar.com https://secure.gravatar.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src https://www.gravatar.com https://secure.gravatar.com https://avatars.githubusercontent.com;">
   <link rel="stylesheet" href="${styleUri}">
   <title>Speedy Git Graph</title>
 </head>

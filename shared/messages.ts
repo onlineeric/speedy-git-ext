@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap } from './types.js';
 import type { GitError } from './errors.js';
 
 export type RequestMessage =
@@ -92,7 +92,8 @@ export type ResponseMessage =
   | { type: 'checkoutPullFailed'; payload: { branch: string; error: { message: string } } }
   | { type: 'settingsData'; payload: { settings: UserSettings } }
   | { type: 'submodulesData'; payload: { submodules: Submodule[]; stack: SubmoduleNavEntry[] } }
-  | { type: 'submoduleOperationResult'; payload: { success: boolean; error?: string } };
+  | { type: 'submoduleOperationResult'; payload: { success: boolean; error?: string } }
+  | { type: 'avatarUrls'; payload: { urls: AvatarUrlMap } };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -127,6 +128,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commitsAppended: true, prefetchError: true, repoList: true,
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
+  avatarUrls: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {
@@ -135,4 +137,8 @@ export function isRequestMessage(msg: Message): msg is RequestMessage {
 
 export function isResponseMessage(msg: Message): msg is ResponseMessage {
   return msg.type in RESPONSE_TYPES;
+}
+
+export function isAvatarUrlsMessage(msg: ResponseMessage): msg is Extract<ResponseMessage, { type: 'avatarUrls' }> {
+  return msg.type === 'avatarUrls';
 }

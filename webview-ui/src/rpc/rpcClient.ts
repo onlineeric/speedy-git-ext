@@ -151,6 +151,9 @@ class RpcClient {
       case 'checkoutPullFailed':
         store.setError(`Checked out '${message.payload.branch}'. Pull failed: ${message.payload.error.message}`);
         break;
+      case 'avatarUrls':
+        store.setGitHubAvatarUrls(message.payload.urls);
+        break;
     }
   }
 
