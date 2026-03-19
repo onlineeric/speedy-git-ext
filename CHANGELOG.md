@@ -4,6 +4,13 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.6] - 2026-03-19
+
+### Fixed
+- VSIX packaging now excludes non-runtime and development-only folders (`test-repo`, `.claude`, `.codex`, `.specify`, `docs`, `scripts`, `specs`, and `webview-ui` source/config files) to reduce package size and avoid publishing internal artifacts.
+- Extension packaging and publishing scripts now run with `--no-dependencies`, preventing dependency-scanning side effects from re-introducing ignored files.
+- Production packaging no longer includes stale `dist/extension.js.map`; the production extension build now removes leftover source map files before bundling.
+
 ## [1.0.5] - 2026-03-19
 
 ### Added
