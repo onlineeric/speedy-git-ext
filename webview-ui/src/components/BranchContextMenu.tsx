@@ -46,7 +46,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
   const [rebaseConfirmOpen, setRebaseConfirmOpen] = useState(false);
   const loading = useGraphStore((s) => s.loading);
   const branches = useGraphStore((s) => s.branches);
-  const mergedCommits = useGraphStore((s) => s.mergedCommits);
+
   const rebaseInProgress = useGraphStore((s) => s.rebaseInProgress);
   const pendingCheckout = useGraphStore((s) => s.pendingCheckout);
   const pendingForceDeleteBranch = useGraphStore((s) => s.pendingForceDeleteBranch);
@@ -85,7 +85,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
     rpcClient.copyToClipboard(displayName);
   };
 
-  // Standard rebase: show only for non-current branches/remotes/tags that aren't already ancestors of HEAD
+  // Standard rebase: show for non-current branches that aren't on the HEAD commit
   const targetBranch = branches.find((b) => b.name === refInfo.name && b.remote === refInfo.remote);
   const targetHash = targetBranch?.hash;
   const canRebaseOnto =
@@ -94,7 +94,8 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
     !loading &&
     isBranch &&
     !!targetHash &&
-    !mergedCommits.some((c) => c.hash === targetHash);
+    !!headBranch &&
+    targetHash !== headBranch.hash;
 
   const handleRebaseConfirm = (ignoreDate: boolean) => {
     setRebaseConfirmOpen(false);
