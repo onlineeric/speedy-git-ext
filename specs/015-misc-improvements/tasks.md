@@ -19,8 +19,8 @@
 
 **Purpose**: Add shared types needed by multiple user stories
 
-- [ ] T001 [P] Add `AvatarUrlMap` type (`Record<string, string>`) and `gitHubAvatarUrls` to shared types in `shared/types.ts`
-- [ ] T002 [P] Add `avatarUrls` response message type (`{ type: 'avatarUrls'; payload: { urls: Record<string, string> } }`) to `shared/messages.ts`, including a type guard for narrowing the ResponseMessage type (required by Constitution Principle III)
+- [x] T001 [P] Add `AvatarUrlMap` type (`Record<string, string>`) and `gitHubAvatarUrls` to shared types in `shared/types.ts`
+- [x] T002 [P] Add `avatarUrls` response message type (`{ type: 'avatarUrls'; payload: { urls: Record<string, string> } }`) to `shared/messages.ts`, including a type guard for narrowing the ResponseMessage type (required by Constitution Principle III)
 
 ---
 
@@ -32,12 +32,12 @@
 
 ### Implementation for User Story 1
 
-- [ ] T003 [US1] Add `currentFilters: Partial<GraphFilters>` instance field to `WebviewProvider` class in `src/WebviewProvider.ts` — initialize as empty object
-- [ ] T004 [US1] Update `sendInitialData()` in `src/WebviewProvider.ts` to default to `this.currentFilters` when no explicit filters are passed: change signature to use `filters ?? this.currentFilters`
-- [ ] T005 [US1] Update `getCommits` handler in `src/WebviewProvider.ts` to store `message.payload.filters` into `this.currentFilters` before calling git service
-- [ ] T006 [US1] Update `refresh` handler in `src/WebviewProvider.ts` to store `message.payload.filters` into `this.currentFilters` before calling `sendInitialData`
-- [ ] T007 [US1] Update `fetch` handler in `src/WebviewProvider.ts` to store `message.payload.filters` into `this.currentFilters` before calling `sendInitialData`
-- [ ] T008 [US1] Add branch existence check in `sendInitialData()` in `src/WebviewProvider.ts` — after fetching branches, if `currentFilters.branch` is set but not found in branch list, clear the branch filter from `currentFilters`
+- [x] T003 [US1] Add `currentFilters: Partial<GraphFilters>` instance field to `WebviewProvider` class in `src/WebviewProvider.ts` — initialize as empty object
+- [x] T004 [US1] Update `sendInitialData()` in `src/WebviewProvider.ts` to default to `this.currentFilters` when no explicit filters are passed: change signature to use `filters ?? this.currentFilters`
+- [x] T005 [US1] Update `getCommits` handler in `src/WebviewProvider.ts` to store `message.payload.filters` into `this.currentFilters` before calling git service
+- [x] T006 [US1] Update `refresh` handler in `src/WebviewProvider.ts` to store `message.payload.filters` into `this.currentFilters` before calling `sendInitialData`
+- [x] T007 [US1] Update `fetch` handler in `src/WebviewProvider.ts` to store `message.payload.filters` into `this.currentFilters` before calling `sendInitialData`
+- [x] T008 [US1] Add branch existence check in `sendInitialData()` in `src/WebviewProvider.ts` — after fetching branches, if `currentFilters.branch` is set but not found in branch list, clear the branch filter from `currentFilters`
 
 **Checkpoint**: Branch filter should now persist across all actions (pull, push, checkout, rebase, cherry pick, stash ops, revert, fetch, refresh). Verify by setting a branch filter and performing each action.
 
@@ -51,9 +51,9 @@
 
 ### Implementation for User Story 2
 
-- [ ] T009 [US2] Add a chevron-down SVG icon to the trigger button in `webview-ui/src/components/FilterableBranchDropdown.tsx` — add inline SVG after the label text, style with `ml-auto flex-shrink-0` to pin to right side
-- [ ] T010 [US2] Update trigger button classes in `webview-ui/src/components/FilterableBranchDropdown.tsx` — change `max-w-[200px]` to `max-w-[300px]`, add `flex items-center gap-1` for icon alignment
-- [ ] T011 [US2] Update Popover.Content width in `webview-ui/src/components/FilterableBranchDropdown.tsx` — change `w-[280px]` to `w-[360px]` to accommodate longer branch names
+- [x] T009 [US2] Add a chevron-down SVG icon to the trigger button in `webview-ui/src/components/FilterableBranchDropdown.tsx` — add inline SVG after the label text, style with `ml-auto flex-shrink-0` to pin to right side
+- [x] T010 [US2] Update trigger button classes in `webview-ui/src/components/FilterableBranchDropdown.tsx` — change `max-w-[200px]` to `max-w-[300px]`, add `flex items-center gap-1` for icon alignment
+- [x] T011 [US2] Update Popover.Content width in `webview-ui/src/components/FilterableBranchDropdown.tsx` — change `w-[280px]` to `w-[360px]` to accommodate longer branch names
 
 **Checkpoint**: Branch filter dropdown should show arrow icon, and branches up to ~60 characters should be visible without truncation.
 
@@ -67,13 +67,13 @@
 
 ### Implementation for User Story 3
 
-- [ ] T012 [US3] Create `src/services/GitHubAvatarService.ts` — class with constructor taking repo owner/name, methods: `fetchAvatarUrls(commits: Commit[]): Promise<Result<Record<string, string>, GitError>>` (using the project's Result pattern for error handling), private rate limit state tracking (`remaining: number`, `resetTime: number`), and in-memory cache (`Map<string, { url: string; fetchedAt: number }>`) with 24h TTL. The method MUST deduplicate commits by author email and select one representative commit hash per unique email for the API call, skipping emails already in cache.
-- [ ] T013 [US3] Implement GitHub remote detection in `src/services/GitHubAvatarService.ts` — add static method `parseGitHubRemote(remoteUrl: string): { owner: string; repo: string } | null` that parses `github.com` from SSH/HTTPS remote URLs
-- [ ] T014 [US3] Implement avatar URL fetching in `src/services/GitHubAvatarService.ts` — use Node 18 global `fetch` (purpose-built HTTP API per Constitution Principle IV) to call `/repos/{owner}/{repo}/commits/{hash}`, extract `author.avatar_url`, check `x-ratelimit-remaining` and `x-ratelimit-reset` headers, store `resetTime` from `x-ratelimit-reset`, skip API calls when rate limited (check `Date.now() >= resetTime * 1000` before each request to auto-resume when the limit resets). Requests MUST be sequential (one at a time) with early termination when `x-ratelimit-remaining < 5`. Network errors (timeout, DNS failure, offline) MUST be caught and trigger Gravatar fallback for the affected author.
-- [ ] T015 [US3] Integrate `GitHubAvatarService` into `WebviewProvider` in `src/WebviewProvider.ts` — instantiate service when remote is GitHub (using `parseGitHubRemote`), after `sendInitialData()` fetches commits, call `fetchAvatarUrls()` for unique emails not yet cached, post `avatarUrls` message to webview. Also update CSP `img-src` directive in `getHtmlForWebview()` to add `https://avatars.githubusercontent.com` (GitHub avatar image domain)
-- [ ] T016 [US3] Add `gitHubAvatarUrls` state to Zustand store in `webview-ui/src/stores/graphStore.ts` — add `gitHubAvatarUrls: Record<string, string>` state and `setGitHubAvatarUrls(urls: Record<string, string>)` action that merges new URLs into existing map
-- [ ] T017 [US3] Handle `avatarUrls` message in `webview-ui/src/rpc/rpcClient.ts` — add case for `'avatarUrls'` response type that calls `store.setGitHubAvatarUrls(message.payload.urls)`
-- [ ] T018 [US3] Update `AuthorAvatar` component in `webview-ui/src/components/AuthorAvatar.tsx` — read `gitHubAvatarUrls` from Zustand store, if a GitHub URL exists for the email use it as primary image source instead of Gravatar URL, keep Gravatar as fallback
+- [x] T012 [US3] Create `src/services/GitHubAvatarService.ts` — class with constructor taking repo owner/name, methods: `fetchAvatarUrls(commits: Commit[]): Promise<Result<Record<string, string>, GitError>>` (using the project's Result pattern for error handling), private rate limit state tracking (`remaining: number`, `resetTime: number`), and in-memory cache (`Map<string, { url: string; fetchedAt: number }>`) with 24h TTL. The method MUST deduplicate commits by author email and select one representative commit hash per unique email for the API call, skipping emails already in cache.
+- [x] T013 [US3] Implement GitHub remote detection in `src/services/GitHubAvatarService.ts` — add static method `parseGitHubRemote(remoteUrl: string): { owner: string; repo: string } | null` that parses `github.com` from SSH/HTTPS remote URLs
+- [x] T014 [US3] Implement avatar URL fetching in `src/services/GitHubAvatarService.ts` — use Node 18 global `fetch` (purpose-built HTTP API per Constitution Principle IV) to call `/repos/{owner}/{repo}/commits/{hash}`, extract `author.avatar_url`, check `x-ratelimit-remaining` and `x-ratelimit-reset` headers, store `resetTime` from `x-ratelimit-reset`, skip API calls when rate limited (check `Date.now() >= resetTime * 1000` before each request to auto-resume when the limit resets). Requests MUST be sequential (one at a time) with early termination when `x-ratelimit-remaining < 5`. Network errors (timeout, DNS failure, offline) MUST be caught and trigger Gravatar fallback for the affected author.
+- [x] T015 [US3] Integrate `GitHubAvatarService` into `WebviewProvider` in `src/WebviewProvider.ts` — instantiate service when remote is GitHub (using `parseGitHubRemote`), after `sendInitialData()` fetches commits, call `fetchAvatarUrls()` for unique emails not yet cached, post `avatarUrls` message to webview. Also update CSP `img-src` directive in `getHtmlForWebview()` to add `https://avatars.githubusercontent.com` (GitHub avatar image domain)
+- [x] T016 [US3] Add `gitHubAvatarUrls` state to Zustand store in `webview-ui/src/stores/graphStore.ts` — add `gitHubAvatarUrls: Record<string, string>` state and `setGitHubAvatarUrls(urls: Record<string, string>)` action that merges new URLs into existing map
+- [x] T017 [US3] Handle `avatarUrls` message in `webview-ui/src/rpc/rpcClient.ts` — add case for `'avatarUrls'` response type that calls `store.setGitHubAvatarUrls(message.payload.urls)`
+- [x] T018 [US3] Update `AuthorAvatar` component in `webview-ui/src/components/AuthorAvatar.tsx` — read `gitHubAvatarUrls` from Zustand store, if a GitHub URL exists for the email use it as primary image source instead of Gravatar URL, keep Gravatar as fallback
 
 **Checkpoint**: GitHub avatars should appear for authors in GitHub-hosted repos. Gravatar should be used for non-GitHub repos and when GitHub API fails or is rate-limited.
 
@@ -83,9 +83,9 @@
 
 **Purpose**: Final validation and type safety
 
-- [ ] T019 Run `pnpm typecheck` and fix any TypeScript errors
-- [ ] T020 Run `pnpm lint` and fix any ESLint errors
-- [ ] T021 Run `pnpm build` and verify clean build of both extension and webview
+- [x] T019 Run `pnpm typecheck` and fix any TypeScript errors
+- [x] T020 Run `pnpm lint` and fix any ESLint errors
+- [x] T021 Run `pnpm build` and verify clean build of both extension and webview
 - [ ] T022 Manual smoke test: verify all three user stories work correctly via VS Code "Run Extension" launch config
 
 ---
