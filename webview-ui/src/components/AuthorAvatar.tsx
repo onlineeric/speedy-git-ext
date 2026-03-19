@@ -14,10 +14,13 @@ export function AuthorAvatar({ author, email }: AuthorAvatarProps) {
     email,
     state: cachedState ?? 'loading',
   }));
+  // Track the specific URL that failed so it auto-resets when a new URL arrives
+  const [failedGitHubUrl, setFailedGitHubUrl] = useState<string | undefined>(undefined);
+  const gitHubAvatarFailed = failedGitHubUrl !== undefined && failedGitHubUrl === gitHubAvatarUrl;
 
   useEffect(() => {
-    // Skip Gravatar loading if we have a GitHub avatar
-    if (gitHubAvatarUrl) return;
+    // Skip Gravatar loading if we have a working GitHub avatar
+    if (gitHubAvatarUrl && !gitHubAvatarFailed) return;
     if (cachedState === 'loaded' || cachedState === 'failed') {
       return;
     }
@@ -33,13 +36,14 @@ export function AuthorAvatar({ author, email }: AuthorAvatarProps) {
       setGravatarCacheState(email, 'failed');
       setLoadState({ email, state: 'failed' });
     };
-  }, [cachedState, email, gitHubAvatarUrl]);
+  }, [cachedState, email, gitHubAvatarUrl, gitHubAvatarFailed]);
 
   const initials = getInitials(author);
   const backgroundColor = getAvatarBackgroundColor(email);
   const title = email ? `${author} <${email}>` : author;
   const effectiveState = loadState.email === email ? loadState.state : cachedState ?? 'loading';
-  const avatarSrc = gitHubAvatarUrl ?? (effectiveState === 'loaded' ? buildGravatarUrl(email) : null);
+  const effectiveGitHubUrl = gitHubAvatarFailed ? undefined : gitHubAvatarUrl;
+  const avatarSrc = effectiveGitHubUrl ?? (effectiveState === 'loaded' ? buildGravatarUrl(email) : null);
 
   return (
     <div
@@ -55,7 +59,9 @@ export function AuthorAvatar({ author, email }: AuthorAvatarProps) {
           alt=""
           className="absolute inset-0 h-full w-full object-cover"
           onError={() => {
-            if (!gitHubAvatarUrl) {
+            if (gitHubAvatarUrl && !gitHubAvatarFailed) {
+              setFailedGitHubUrl(gitHubAvatarUrl);
+            } else {
               setGravatarCacheState(email, 'failed');
               setLoadState({ email, state: 'failed' });
             }

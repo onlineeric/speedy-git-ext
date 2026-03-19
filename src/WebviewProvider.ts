@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import type { RequestMessage, ResponseMessage } from '../shared/messages.js';
-import type { GraphFilters, RepoInfo, SubmoduleNavEntry, UserSettings } from '../shared/types.js';
+import type { Commit, GraphFilters, RepoInfo, SubmoduleNavEntry, UserSettings } from '../shared/types.js';
 import type { GitLogService } from './services/GitLogService.js';
 import type { GitDiffService } from './services/GitDiffService.js';
 import type { GitBranchService } from './services/GitBranchService.js';
@@ -209,7 +209,28 @@ export class WebviewProvider {
       }
     }
 
-    await this.handleMessage({ type: 'getCommits', payload: { filters: effectiveFilters } });
+    // Fetch commits directly so we can reuse them for avatar fetching
+    if (effectiveFilters) {
+      this.currentFilters = { ...this.currentFilters, ...effectiveFilters };
+    }
+    this.postMessage({ type: 'loading', payload: { loading: true } });
+    const batchSize = this.getBatchSize();
+    const commitsResult = await this.gitLogService.getCommits({ ...effectiveFilters, maxCount: batchSize });
+    let fetchedCommits: Commit[] = [];
+    if (commitsResult.success) {
+      fetchedCommits = commitsResult.value.commits;
+      this.postMessage({
+        type: 'commits',
+        payload: {
+          commits: fetchedCommits,
+          totalLoadedWithoutFilter: commitsResult.value.totalLoadedWithoutFilter,
+        },
+      });
+    } else {
+      this.postMessage({ type: 'error', payload: { error: commitsResult.error } });
+    }
+    this.postMessage({ type: 'loading', payload: { loading: false } });
+
     await this.handleMessage({ type: 'getBranches', payload: {} });
     await this.handleMessage({ type: 'getRemotes', payload: {} });
     await this.handleMessage({ type: 'getSubmodules', payload: {} });
@@ -242,12 +263,14 @@ export class WebviewProvider {
       this.postMessage({ type: 'revertState', payload: { state: revertStateResult.value } });
     }
 
-    // Fetch GitHub avatars in background (non-blocking)
-    void this.fetchAndSendGitHubAvatars(effectiveFilters);
+    // Fetch GitHub avatars in background (non-blocking), skip if avatars disabled
+    if (settings?.avatarsEnabled !== false && fetchedCommits.length > 0) {
+      void this.fetchAndSendGitHubAvatars(fetchedCommits);
+    }
   }
 
-  /** Initialize GitHubAvatarService lazily from remote URL, then fetch avatar URLs for current commits */
-  private async fetchAndSendGitHubAvatars(filters: Partial<GraphFilters>) {
+  /** Initialize GitHubAvatarService lazily from remote URL, then fetch avatar URLs for the given commits */
+  private async fetchAndSendGitHubAvatars(commits: Commit[]) {
     if (!this.gitHubAvatarInitialized) {
       this.gitHubAvatarInitialized = true;
       const remotesResult = await this.gitRemoteService.getRemotes();
@@ -264,11 +287,7 @@ export class WebviewProvider {
 
     if (!this.gitHubAvatarService) return;
 
-    const batchSize = this.getBatchSize();
-    const commitsResult = await this.gitLogService.getCommits({ ...filters, maxCount: batchSize });
-    if (!commitsResult.success) return;
-
-    const avatarResult = await this.gitHubAvatarService.fetchAvatarUrls(commitsResult.value.commits);
+    const avatarResult = await this.gitHubAvatarService.fetchAvatarUrls(commits);
     if (avatarResult.success && Object.keys(avatarResult.value).length > 0) {
       this.postMessage({ type: 'avatarUrls', payload: { urls: avatarResult.value } });
     }
