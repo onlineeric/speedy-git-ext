@@ -56,7 +56,7 @@ As a developer, I want the rebase option on a branch badge to behave identically
 - **FR-002**: The rebase option on the branch badge MUST be available for both local and remote branches.
 - **FR-003**: The rebase option MUST be hidden when the target branch is the current branch.
 - **FR-004**: The rebase option MUST be hidden when the target branch points to the same commit as HEAD.
-- **FR-005**: The rebase option MUST be hidden when a rebase, cherry-pick, or revert operation is already in progress.
+- **FR-005**: The rebase option MUST be hidden when a rebase is already in progress (matching commit-row behavior per FR-007). Note: cherry-pick/revert in-progress checks are not currently enforced on the commit-row rebase either; adding them to both menus is deferred to a future change.
 - **FR-006**: The rebase option MUST be hidden when the user is in detached HEAD state (no current local branch).
 - **FR-007**: The visibility conditions for the rebase option on the branch badge MUST be consistent with the visibility conditions for "Rebase current branch on this commit" on the commit row, except adapted for branch-level context (checking branch identity instead of commit hash equality).
 - **FR-008**: Selecting the rebase option MUST open the existing rebase confirmation dialog with the "Ignore Date" option.
