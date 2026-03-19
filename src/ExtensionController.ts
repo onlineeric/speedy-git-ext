@@ -15,6 +15,7 @@ import { GitSignatureService } from './services/GitSignatureService.js';
 import { GitSubmoduleService } from './services/GitSubmoduleService.js';
 import { GitShowContentProvider } from './GitShowContentProvider.js';
 import { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
+import { GitWatcherService } from './services/GitWatcherService.js';
 import { DEFAULT_GRAPH_COLORS, DEFAULT_USER_SETTINGS, type SubmoduleNavEntry, type UserDateFormat, type UserSettings } from '../shared/types.js';
 
 export class ExtensionController {
@@ -32,6 +33,7 @@ export class ExtensionController {
   private gitSignatureService: GitSignatureService | undefined;
   private gitSubmoduleService: GitSubmoduleService | undefined;
   private contentProviderRegistration: vscode.Disposable | undefined;
+  private gitWatcherService: GitWatcherService | undefined;
   private gitRepoDiscoveryService: GitRepoDiscoveryService | undefined;
   private statusBarItem: vscode.StatusBarItem | undefined;
   private currentRepoPath: string | undefined;
@@ -114,6 +116,8 @@ export class ExtensionController {
     this.gitRebaseService = new GitRebaseService(workspacePath, this.log);
     this.gitSignatureService = new GitSignatureService(workspacePath, this.log);
     this.gitSubmoduleService = new GitSubmoduleService(workspacePath, this.log);
+
+    this.gitWatcherService?.setRepoPath(workspacePath);
 
     if (this.webviewProvider) {
       this.webviewProvider.updateServices(
@@ -223,6 +227,17 @@ export class ExtensionController {
       });
     }
 
+    if (!this.gitWatcherService) {
+      this.gitWatcherService = new GitWatcherService(this.log);
+      this.context.subscriptions.push(this.gitWatcherService);
+      this.gitWatcherService.onDidDetectChange(() => {
+        this.webviewProvider?.triggerAutoRefresh().catch((err: unknown) => {
+          this.log.error(`Auto-refresh failed: ${err}`);
+        });
+      });
+      await this.gitWatcherService.initialize(workspacePath);
+    }
+
     await this.webviewProvider.show();
   }
 
@@ -251,6 +266,8 @@ export class ExtensionController {
     this.webviewProvider = undefined;
     this.contentProviderRegistration?.dispose();
     this.contentProviderRegistration = undefined;
+    this.gitWatcherService?.dispose();
+    this.gitWatcherService = undefined;
     this.gitLogService = undefined;
     this.gitDiffService = undefined;
     this.gitBranchService = undefined;

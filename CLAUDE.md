@@ -97,6 +97,8 @@ Built with **Vite** + React plugin → `dist/webview/`
 - Local git repository as the source of data, with state kept in-memory (Zustand + local component state) and existing caching patterns (e.g., `gravatar.ts`) reused.
 - TypeScript 5.x (strict) + React 18, Zustand, @radix-ui/react-popover (already installed), VS Code Extension API, esbuild, Vite (015-misc-improvements)
 - In-memory caching (existing pattern in gravatar.ts) (015-misc-improvements)
+- TypeScript 5.x (strict) + VS Code Extension API (1.80+), `vscode.git` built-in extension API v1, esbuild (backend), Vite + React 18 (webview) (016-auto-refresh)
+- N/A (in-memory state only) (016-auto-refresh)
 - TypeScript 5.x (strict) + React 18, @radix-ui/react-context-menu, Zustand, VS Code Extension API (017-rebase-branch-on-branch)
 - N/A (in-memory Zustand store) (017-rebase-branch-on-branch)
 
