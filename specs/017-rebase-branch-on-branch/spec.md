@@ -1,6 +1,6 @@
 # Feature Specification: Rebase Branch on Branch Badge Context Menu
 
-**Feature Branch**: `018-rebase-branch-on-branch`
+**Feature Branch**: `017-rebase-branch-on-branch`
 **Created**: 2026-03-19
 **Status**: Draft
 **Input**: User description: "When I am on a branch, right click on another branch's badge, I have no rebase option. If I right click on that another branch row, off the badge area, I can see 'Rebase current branch on this commit'. Add 'Rebase current branch on this branch' menu to right click on branch badge."
