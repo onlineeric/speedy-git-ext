@@ -106,7 +106,7 @@ As a developer, I still want the ability to manually trigger a refresh when I kn
 - **FR-003**: System MUST debounce rapid successive state change events to prevent excessive refreshes, coalescing multiple changes within a short window into a single refresh
 - **FR-004**: System MUST preserve user's current scroll position and selected commit during auto-refresh when the selected commit still exists after refresh
 - **FR-005**: System MUST defer auto-refresh when the webview panel is not visible and trigger a single refresh when the panel becomes visible again
-- **FR-006**: System MUST continue to support manual refresh via the existing refresh button, which bypasses debounce delay
+- **FR-006**: System MUST continue to support manual refresh via the existing refresh button, which bypasses the debounce delay (triggers immediately). Note: manual refresh is still subject to the drop policy (FR-012) if a refresh is already in progress
 - **FR-007**: System MUST properly dispose of all event listeners and filesystem watchers when the extension is deactivated or the webview is closed
 - **FR-008**: System MUST NOT auto-fetch from remote repositories; auto-refresh only re-reads local git state. Fetching remains a manual user action
 - **FR-009**: System MUST always have auto-refresh enabled with no user-facing setting to disable it
