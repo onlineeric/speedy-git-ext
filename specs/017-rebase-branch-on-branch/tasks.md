@@ -23,8 +23,8 @@
 
 ### Implementation for User Story 1
 
-- [ ] T001 [US1] Update `canRebaseOnto` condition in `webview-ui/src/components/BranchContextMenu.tsx`: remove `!mergedCommits.some((c) => c.hash === targetHash)` check, add `!!headBranch` guard (FR-006: detached HEAD), add `targetHash !== headBranch.hash` guard (FR-004: same commit as HEAD)
-- [ ] T002 [US1] Remove unused `mergedCommits` store selector (`useGraphStore((s) => s.mergedCommits)`) and update the comment on line 88 in `webview-ui/src/components/BranchContextMenu.tsx`
+- [x] T001 [US1] Update `canRebaseOnto` condition in `webview-ui/src/components/BranchContextMenu.tsx`: remove `!mergedCommits.some((c) => c.hash === targetHash)` check, add `!!headBranch` guard (FR-006: detached HEAD), add `targetHash !== headBranch.hash` guard (FR-004: same commit as HEAD)
+- [x] T002 [US1] Remove unused `mergedCommits` store selector (`useGraphStore((s) => s.mergedCommits)`) and update the comment on line 88 in `webview-ui/src/components/BranchContextMenu.tsx`
 
 **Checkpoint**: Rebase option now appears on branch badges for all branches meeting visibility conditions (including ancestor branches like `main`). Hidden correctly for current branch, HEAD commit, detached HEAD, and during in-progress rebase.
 
@@ -38,7 +38,7 @@
 
 ### Implementation for User Story 2
 
-- [ ] T003 [US2] Manual smoke test: verify consistency between branch badge and commit row rebase visibility across all acceptance scenarios (ancestor branch, non-ancestor branch, same commit as HEAD, current branch, detached HEAD, rebase in progress, remote-only branch, tags) in `webview-ui/src/components/BranchContextMenu.tsx`
+- [ ] T003 [US2] Manual smoke test: verify consistency between branch badge and commit row rebase visibility across all acceptance scenarios (ancestor branch, non-ancestor branch, same commit as HEAD, current branch, detached HEAD, rebase in progress, remote-only branch, tags) in `webview-ui/src/components/BranchContextMenu.tsx` *(requires manual VS Code testing)*
 
 **Checkpoint**: Branch badge and commit row rebase options appear/hide in identical scenarios.
 
@@ -48,9 +48,9 @@
 
 **Purpose**: Build validation
 
-- [ ] T004 Run `pnpm typecheck` to verify zero TypeScript errors
-- [ ] T005 Run `pnpm lint` to verify zero ESLint errors
-- [ ] T006 Run `pnpm build` to verify clean build of both extension and webview
+- [x] T004 Run `pnpm typecheck` to verify zero TypeScript errors
+- [x] T005 Run `pnpm lint` to verify zero ESLint errors
+- [x] T006 Run `pnpm build` to verify clean build of both extension and webview
 
 ---
 
