@@ -29,6 +29,10 @@ export class WebviewProvider {
   /** GitHub avatar service — initialized lazily when the remote is detected as GitHub */
   private gitHubAvatarService: GitHubAvatarService | null = null;
   private gitHubAvatarInitialized = false;
+  private isRefreshing = false;
+  private pendingRefresh = false;
+  private isPanelVisible = false;
+  private deferredRefresh = false;
   private getSettingsHandler: (() => UserSettings) | undefined;
   private submoduleHandlers:
     | {
@@ -122,6 +126,28 @@ export class WebviewProvider {
     await this.sendInitialData(undefined, true);
   }
 
+  /** Trigger a non-disruptive auto-refresh. Drops if already refreshing, defers if panel hidden. */
+  async triggerAutoRefresh(): Promise<void> {
+    if (!this.isPanelVisible) {
+      this.deferredRefresh = true;
+      return;
+    }
+    if (this.isRefreshing) {
+      this.pendingRefresh = true;
+      return;
+    }
+    this.isRefreshing = true;
+    try {
+      await this.sendInitialData();
+    } finally {
+      this.isRefreshing = false;
+      if (this.pendingRefresh) {
+        this.pendingRefresh = false;
+        void this.triggerAutoRefresh();
+      }
+    }
+  }
+
   /** Push an updated repo list to the webview */
   sendRepoList(repos: RepoInfo[], activeRepoPath: string) {
     this.postMessage({ type: 'repoList', payload: { repos, activeRepoPath } });
@@ -172,8 +198,18 @@ export class WebviewProvider {
       this.context.subscriptions
     );
 
+    this.isPanelVisible = true;
+    this.panel.onDidChangeViewState((e) => {
+      this.isPanelVisible = e.webviewPanel.visible;
+      if (this.isPanelVisible && this.deferredRefresh) {
+        this.deferredRefresh = false;
+        void this.triggerAutoRefresh();
+      }
+    });
+
     this.panel.onDidDispose(() => {
       this.panel = undefined;
+      this.isPanelVisible = false;
     });
 
     // Send repo list first so the dropdown is populated before commits arrive

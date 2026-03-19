@@ -19,9 +19,9 @@
 
 **Purpose**: Create the watcher service, refresh guards, and visibility tracking that ALL user stories depend on. Includes US3 (debounce, drop, defer) since these are integral to the refresh infrastructure.
 
-- [ ] T001 [P] Create `GitWatcherService` in `src/services/GitWatcherService.ts` — skeleton class with: `vscode.EventEmitter<void>` for `onDidDetectChange`, 500ms debounce via `setTimeout`/`clearTimeout`, `dispose()` that cleans up timer and disposables, and a `setRepoPath(path)` method to update watched location
-- [ ] T002 [P] Add auto-refresh support to `src/WebviewProvider.ts` — add `isRefreshing` and `pendingRefresh` boolean flags, add `isPanelVisible` and `deferredRefresh` boolean flags, implement `triggerAutoRefresh()` method that: (a) returns early if panel not visible (sets `deferredRefresh=true`), (b) returns early if `isRefreshing` (sets `pendingRefresh=true`), (c) wraps `sendInitialData()` in `isRefreshing` guard, (d) after completion checks `pendingRefresh` and re-triggers if set
-- [ ] T003 Add visibility tracking to `src/WebviewProvider.ts` — subscribe to `panel.onDidChangeViewState` in the `show()` method to track `isPanelVisible`, and trigger deferred refresh when panel becomes visible again if `deferredRefresh` is true
+- [x] T001 [P] Create `GitWatcherService` in `src/services/GitWatcherService.ts` — skeleton class with: `vscode.EventEmitter<void>` for `onDidDetectChange`, 500ms debounce via `setTimeout`/`clearTimeout`, `dispose()` that cleans up timer and disposables, and a `setRepoPath(path)` method to update watched location
+- [x] T002 [P] Add auto-refresh support to `src/WebviewProvider.ts` — add `isRefreshing` and `pendingRefresh` boolean flags, add `isPanelVisible` and `deferredRefresh` boolean flags, implement `triggerAutoRefresh()` method that: (a) returns early if panel not visible (sets `deferredRefresh=true`), (b) returns early if `isRefreshing` (sets `pendingRefresh=true`), (c) wraps `sendInitialData()` in `isRefreshing` guard, (d) after completion checks `pendingRefresh` and re-triggers if set
+- [x] T003 Add visibility tracking to `src/WebviewProvider.ts` — subscribe to `panel.onDidChangeViewState` in the `show()` method to track `isPanelVisible`, and trigger deferred refresh when panel becomes visible again if `deferredRefresh` is true
 
 **Checkpoint**: Core refresh infrastructure ready — `GitWatcherService` can emit events, `WebviewProvider` can handle them with proper guards
 
@@ -35,8 +35,8 @@
 
 ### Implementation for User Story 1
 
-- [ ] T004 [US1] Add VSCode git extension API subscription in `src/services/GitWatcherService.ts` — acquire `vscode.git` API v1 via `vscode.extensions.getExtension('vscode.git')`, subscribe to `repository.state.onDidChange` for each repository, and handle `onDidOpenRepository`/`onDidCloseRepository` for dynamic repo tracking. All events feed into the debounced change handler.
-- [ ] T005 [US1] Wire `GitWatcherService` into `src/ExtensionController.ts` — create `GitWatcherService` instance when `showGraph()` is first called, subscribe `gitWatcherService.onDidDetectChange` → `webviewProvider.triggerAutoRefresh()`, dispose watcher in `dispose()`, and call `setRepoPath()` when repo changes via `reinitServices()`
+- [x] T004 [US1] Add VSCode git extension API subscription in `src/services/GitWatcherService.ts` — acquire `vscode.git` API v1 via `vscode.extensions.getExtension('vscode.git')`, subscribe to `repository.state.onDidChange` for each repository, and handle `onDidOpenRepository`/`onDidCloseRepository` for dynamic repo tracking. All events feed into the debounced change handler.
+- [x] T005 [US1] Wire `GitWatcherService` into `src/ExtensionController.ts` — create `GitWatcherService` instance when `showGraph()` is first called, subscribe `gitWatcherService.onDidDetectChange` → `webviewProvider.triggerAutoRefresh()`, dispose watcher in `dispose()`, and call `setRepoPath()` when repo changes via `reinitServices()`
 
 **Checkpoint**: Auto-refresh works for all VSCode Source Control operations. Graph updates within ~2s of commit/push/pull/checkout via SCM panel.
 
@@ -50,8 +50,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T006 [US2] Add filesystem watchers in `src/services/GitWatcherService.ts` — use `vscode.workspace.createFileSystemWatcher` with a `RelativePattern` to watch `.git/HEAD`, `.git/refs/**`, `.git/index`, `.git/MERGE_HEAD`, `.git/REBASE_HEAD`. All watcher events (`onDidChange`, `onDidCreate`, `onDidDelete`) feed into the same debounced change handler. Implement `disposeFileWatchers()` and recreate watchers when repo path changes via `setRepoPath()`.
-- [ ] T007 [US2] Handle graceful degradation in `src/services/GitWatcherService.ts` — if VSCode git extension is unavailable (FR-011), skip git API subscription silently and rely on filesystem watchers only. Log at debug level, no user-facing warning.
+- [x] T006 [US2] Add filesystem watchers in `src/services/GitWatcherService.ts` — use `vscode.workspace.createFileSystemWatcher` with a `RelativePattern` to watch `.git/HEAD`, `.git/refs/**`, `.git/index`, `.git/MERGE_HEAD`, `.git/REBASE_HEAD`. All watcher events (`onDidChange`, `onDidCreate`, `onDidDelete`) feed into the same debounced change handler. Implement `disposeFileWatchers()` and recreate watchers when repo path changes via `setRepoPath()`.
+- [x] T007 [US2] Handle graceful degradation in `src/services/GitWatcherService.ts` — if VSCode git extension is unavailable (FR-011), skip git API subscription silently and rely on filesystem watchers only. Log at debug level, no user-facing warning.
 
 **Checkpoint**: Auto-refresh works for terminal git operations. Combined with US1, the graph stays current regardless of how git is used.
 
@@ -65,7 +65,7 @@
 
 ### Implementation for User Story 4
 
-- [ ] T008 [US4] Ensure manual refresh compatibility and verify auto-refresh UX in `src/WebviewProvider.ts` — (a) verify that the existing `handleMessage` case for `'refresh'` correctly interacts with the `isRefreshing` drop guard (manual refresh should also be subject to the drop policy per FR-012), no code changes expected if `triggerAutoRefresh()` and the manual `refresh` handler both check `isRefreshing` consistently; (b) verify scroll position and selected commit are preserved after auto-refresh (FR-004, handled by existing `setCommits` in graphStore); (c) verify loading indicator appears and refresh/fetch buttons are disabled during auto-refresh (FR-010, handled by existing `loading` state); (d) verify commit details panel stays open during auto-refresh and closes only if the selected commit no longer exists (FR-013, handled by existing `setCommits` selection logic)
+- [x] T008 [US4] Ensure manual refresh compatibility and verify auto-refresh UX in `src/WebviewProvider.ts` — (a) verify that the existing `handleMessage` case for `'refresh'` correctly interacts with the `isRefreshing` drop guard (manual refresh should also be subject to the drop policy per FR-012), no code changes expected if `triggerAutoRefresh()` and the manual `refresh` handler both check `isRefreshing` consistently; (b) verify scroll position and selected commit are preserved after auto-refresh (FR-004, handled by existing `setCommits` in graphStore); (c) verify loading indicator appears and refresh/fetch buttons are disabled during auto-refresh (FR-010, handled by existing `loading` state); (d) verify commit details panel stays open during auto-refresh and closes only if the selected commit no longer exists (FR-013, handled by existing `setCommits` selection logic)
 
 **Checkpoint**: Manual refresh and auto-refresh coexist. Drop policy applies uniformly to both trigger sources.
 
@@ -75,8 +75,8 @@
 
 **Purpose**: Disposal, build validation, and edge case handling
 
-- [ ] T009 Verify proper disposal in `src/ExtensionController.ts` and `src/services/GitWatcherService.ts` — ensure all event listeners, filesystem watchers, git API subscriptions, and debounce timers are cleaned up when extension deactivates, webview closes, or repo switches. Confirm `context.subscriptions` integration.
-- [ ] T010 Run `pnpm typecheck && pnpm lint && pnpm build` to validate zero errors across all changed files
+- [x] T009 Verify proper disposal in `src/ExtensionController.ts` and `src/services/GitWatcherService.ts` — ensure all event listeners, filesystem watchers, git API subscriptions, and debounce timers are cleaned up when extension deactivates, webview closes, or repo switches. Confirm `context.subscriptions` integration.
+- [x] T010 Run `pnpm typecheck && pnpm lint && pnpm build` to validate zero errors across all changed files
 
 ---
 
