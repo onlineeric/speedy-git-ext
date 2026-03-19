@@ -224,6 +224,8 @@ export interface InteractiveRebaseConfig {
   squashMessages: SquashGroupMessage[];
 }
 
+export type AvatarUrlMap = Record<string, string>;
+
 export type RebaseState = 'idle' | 'in-progress';
 
 export interface RebaseConflictInfo {

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import type { RequestMessage, ResponseMessage } from '../shared/messages.js';
-import type { GraphFilters, RepoInfo, SubmoduleNavEntry, UserSettings } from '../shared/types.js';
+import type { Commit, GraphFilters, RepoInfo, SubmoduleNavEntry, UserSettings } from '../shared/types.js';
 import type { GitLogService } from './services/GitLogService.js';
 import type { GitDiffService } from './services/GitDiffService.js';
 import type { GitBranchService } from './services/GitBranchService.js';
@@ -17,12 +17,22 @@ import type { GitSignatureService } from './services/GitSignatureService.js';
 import type { GitSubmoduleService } from './services/GitSubmoduleService.js';
 import type { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
 import { GitError } from '../shared/errors.js';
+import { GitHubAvatarService } from './services/GitHubAvatarService.js';
 
 export class WebviewProvider {
   private panel: vscode.WebviewPanel | undefined;
   /** Incremented on each repo switch to discard stale commit responses */
   private fetchGeneration = 0;
   private currentRepoPath: string;
+  /** Stores the most recently applied filters so all refresh calls preserve them */
+  private currentFilters: Partial<GraphFilters> = {};
+  /** GitHub avatar service — initialized lazily when the remote is detected as GitHub */
+  private gitHubAvatarService: GitHubAvatarService | null = null;
+  private gitHubAvatarInitialized = false;
+  private isRefreshing = false;
+  private pendingRefresh = false;
+  private isPanelVisible = false;
+  private deferredRefresh = false;
   private getSettingsHandler: (() => UserSettings) | undefined;
   private submoduleHandlers:
     | {
@@ -102,6 +112,8 @@ export class WebviewProvider {
     this.gitSignatureService = gitSignatureService;
     this.gitSubmoduleService = gitSubmoduleService;
     this.currentRepoPath = currentRepoPath;
+    this.gitHubAvatarService = null;
+    this.gitHubAvatarInitialized = false;
   }
 
   /** Returns true if the webview panel is currently open */
@@ -112,6 +124,19 @@ export class WebviewProvider {
   /** Reload all data for the current active repo (use after a repo switch when panel is already open) */
   async reload() {
     await this.sendInitialData(undefined, true);
+  }
+
+  /** Trigger a non-disruptive auto-refresh. Drops if already refreshing, defers if panel hidden. */
+  async triggerAutoRefresh(): Promise<void> {
+    if (!this.isPanelVisible) {
+      this.deferredRefresh = true;
+      return;
+    }
+    if (this.isRefreshing) {
+      this.pendingRefresh = true;
+      return;
+    }
+    await this.sendInitialData();
   }
 
   /** Push an updated repo list to the webview */
@@ -164,8 +189,18 @@ export class WebviewProvider {
       this.context.subscriptions
     );
 
+    this.isPanelVisible = true;
+    this.panel.onDidChangeViewState((e) => {
+      this.isPanelVisible = e.webviewPanel.visible;
+      if (this.isPanelVisible && this.deferredRefresh) {
+        this.deferredRefresh = false;
+        void this.triggerAutoRefresh();
+      }
+    });
+
     this.panel.onDidDispose(() => {
       this.panel = undefined;
+      this.isPanelVisible = false;
     });
 
     // Send repo list first so the dropdown is populated before commits arrive
@@ -180,42 +215,117 @@ export class WebviewProvider {
   }
 
   private async sendInitialData(filters?: Partial<GraphFilters>, includeStashes = false) {
-    const settings = this.getSettingsHandler?.();
-    if (settings) {
-      this.sendSettingsData(settings);
-    }
+    this.isRefreshing = true;
+    try {
+      let effectiveFilters = filters ?? this.currentFilters;
+      const settings = this.getSettingsHandler?.();
+      if (settings) {
+        this.sendSettingsData(settings);
+      }
 
-    await this.handleMessage({ type: 'getCommits', payload: { filters } });
-    await this.handleMessage({ type: 'getBranches', payload: {} });
-    await this.handleMessage({ type: 'getRemotes', payload: {} });
-    await this.handleMessage({ type: 'getSubmodules', payload: {} });
-    if (includeStashes) {
-      await this.handleMessage({ type: 'getStashes', payload: {} });
-    }
-    const cherryPickStateResult = this.gitCherryPickService.getCherryPickState();
-    if (cherryPickStateResult.success) {
-      this.postMessage({ type: 'cherryPickState', payload: { state: cherryPickStateResult.value } });
-    }
+      // Check if the filtered branch still exists before fetching commits
+      if (effectiveFilters.branch) {
+        const branchResult = await this.gitLogService.getBranches();
+        if (branchResult.success) {
+          const branchExists = branchResult.value.some(
+            (b) => b.name === effectiveFilters.branch || `${b.remote}/${b.name}` === effectiveFilters.branch
+          );
+          if (!branchExists) {
+            const { branch: _, ...rest } = this.currentFilters;
+            this.currentFilters = rest;
+            effectiveFilters = this.currentFilters;
+          }
+        }
+      }
 
-    const rebaseStateResult = this.gitRebaseService.getRebaseState();
-    if (rebaseStateResult.success) {
-      if (rebaseStateResult.value.state === 'in-progress') {
-        const conflictResult = await this.gitRebaseService.getConflictInfo();
+      // Fetch commits directly so we can reuse them for avatar fetching
+      if (effectiveFilters) {
+        this.currentFilters = { ...this.currentFilters, ...effectiveFilters };
+      }
+      this.postMessage({ type: 'loading', payload: { loading: true } });
+      const batchSize = this.getBatchSize();
+      const commitsResult = await this.gitLogService.getCommits({ ...effectiveFilters, maxCount: batchSize });
+      let fetchedCommits: Commit[] = [];
+      if (commitsResult.success) {
+        fetchedCommits = commitsResult.value.commits;
         this.postMessage({
-          type: 'rebaseState',
+          type: 'commits',
           payload: {
-            state: 'in-progress',
-            conflictInfo: conflictResult.success ? conflictResult.value : rebaseStateResult.value.conflictInfo,
+            commits: fetchedCommits,
+            totalLoadedWithoutFilter: commitsResult.value.totalLoadedWithoutFilter,
           },
         });
       } else {
-        this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+        this.postMessage({ type: 'error', payload: { error: commitsResult.error } });
+      }
+      this.postMessage({ type: 'loading', payload: { loading: false } });
+
+      await this.handleMessage({ type: 'getBranches', payload: {} });
+      await this.handleMessage({ type: 'getRemotes', payload: {} });
+      await this.handleMessage({ type: 'getSubmodules', payload: {} });
+      if (includeStashes) {
+        await this.handleMessage({ type: 'getStashes', payload: {} });
+      }
+      const cherryPickStateResult = this.gitCherryPickService.getCherryPickState();
+      if (cherryPickStateResult.success) {
+        this.postMessage({ type: 'cherryPickState', payload: { state: cherryPickStateResult.value } });
+      }
+
+      const rebaseStateResult = this.gitRebaseService.getRebaseState();
+      if (rebaseStateResult.success) {
+        if (rebaseStateResult.value.state === 'in-progress') {
+          const conflictResult = await this.gitRebaseService.getConflictInfo();
+          this.postMessage({
+            type: 'rebaseState',
+            payload: {
+              state: 'in-progress',
+              conflictInfo: conflictResult.success ? conflictResult.value : rebaseStateResult.value.conflictInfo,
+            },
+          });
+        } else {
+          this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+        }
+      }
+
+      const revertStateResult = await this.gitRevertService.getRevertState();
+      if (revertStateResult.success) {
+        this.postMessage({ type: 'revertState', payload: { state: revertStateResult.value } });
+      }
+
+      // Fetch GitHub avatars in background (non-blocking), skip if avatars disabled
+      if (settings?.avatarsEnabled !== false && fetchedCommits.length > 0) {
+        void this.fetchAndSendGitHubAvatars(fetchedCommits);
+      }
+    } finally {
+      this.isRefreshing = false;
+      if (this.pendingRefresh) {
+        this.pendingRefresh = false;
+        void this.triggerAutoRefresh();
+      }
+    }
+  }
+
+  /** Initialize GitHubAvatarService lazily from remote URL, then fetch avatar URLs for the given commits */
+  private async fetchAndSendGitHubAvatars(commits: Commit[]) {
+    if (!this.gitHubAvatarInitialized) {
+      this.gitHubAvatarInitialized = true;
+      const remotesResult = await this.gitRemoteService.getRemotes();
+      if (remotesResult.success) {
+        const origin = remotesResult.value.find((r) => r.name === 'origin');
+        if (origin) {
+          const parsed = GitHubAvatarService.parseGitHubRemote(origin.fetchUrl);
+          if (parsed) {
+            this.gitHubAvatarService = new GitHubAvatarService(parsed.owner, parsed.repo);
+          }
+        }
       }
     }
 
-    const revertStateResult = await this.gitRevertService.getRevertState();
-    if (revertStateResult.success) {
-      this.postMessage({ type: 'revertState', payload: { state: revertStateResult.value } });
+    if (!this.gitHubAvatarService) return;
+
+    const avatarResult = await this.gitHubAvatarService.fetchAvatarUrls(commits);
+    if (avatarResult.success && Object.keys(avatarResult.value).length > 0) {
+      this.postMessage({ type: 'avatarUrls', payload: { urls: avatarResult.value } });
     }
   }
 
@@ -238,6 +348,9 @@ export class WebviewProvider {
     this.log.debug(`Received message: ${message.type}`);
     switch (message.type) {
       case 'getCommits': {
+        if (message.payload.filters) {
+          this.currentFilters = { ...this.currentFilters, ...message.payload.filters };
+        }
         this.postMessage({ type: 'loading', payload: { loading: true } });
         const batchSize = this.getBatchSize();
         const result = await this.gitLogService.getCommits({ ...message.payload.filters, maxCount: batchSize });
@@ -400,6 +513,9 @@ export class WebviewProvider {
         break;
       }
       case 'fetch': {
+        if (message.payload.filters) {
+          this.currentFilters = { ...this.currentFilters, ...message.payload.filters };
+        }
         const result = await this.gitBranchService.fetch(
           message.payload.remote,
           message.payload.prune
@@ -426,6 +542,9 @@ export class WebviewProvider {
         break;
       }
       case 'refresh': {
+        if (message.payload.filters) {
+          this.currentFilters = { ...this.currentFilters, ...message.payload.filters };
+        }
         await this.sendInitialData(message.payload.filters, true);
         break;
       }
@@ -1105,7 +1224,7 @@ export class WebviewProvider {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src https://www.gravatar.com https://secure.gravatar.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src https://www.gravatar.com https://secure.gravatar.com https://avatars.githubusercontent.com;">
   <link rel="stylesheet" href="${styleUri}">
   <title>Speedy Git Graph</title>
 </head>

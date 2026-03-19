@@ -61,8 +61,10 @@ interface GraphStore {
   userSettings: UserSettings;
   pendingUserSettings: UserSettings | undefined;
   searchState: SearchState;
+  gitHubAvatarUrls: Record<string, string>;
   submodules: Submodule[];
   submoduleStack: SubmoduleNavEntry[];
+  setGitHubAvatarUrls: (urls: Record<string, string>) => void;
   setCommits: (commits: Commit[]) => void;
   appendCommits: (newCommits: Commit[], totalLoadedWithoutFilter?: number) => void;
   setBranches: (branches: Branch[]) => void;
@@ -213,8 +215,12 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   userSettings: { ...DEFAULT_USER_SETTINGS },
   pendingUserSettings: undefined,
   searchState: defaultSearchState,
+  gitHubAvatarUrls: {},
   submodules: [],
   submoduleStack: [],
+  setGitHubAvatarUrls: (urls) => set((state) => ({
+    gitHubAvatarUrls: { ...state.gitHubAvatarUrls, ...urls },
+  })),
   setCommits: (commits) => {
     const { mergedCommits, topology } = computeMergedTopology(commits, get().stashes);
     const selectedCommit = get().selectedCommit;
