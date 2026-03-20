@@ -37,7 +37,7 @@ export function buildFileTree(files: FileChange[]): FileTreeNode[] {
     currentLevel.get(fileName)!.files.push(file);
   }
 
-  return buildNodes(root, 0);
+  return buildNodes(root, 0, '');
 }
 
 interface IntermediateNode {
@@ -45,7 +45,7 @@ interface IntermediateNode {
   files: FileChange[];
 }
 
-function buildNodes(level: Map<string, IntermediateNode>, depth: number): FileTreeNode[] {
+function buildNodes(level: Map<string, IntermediateNode>, depth: number, parentPath: string): FileTreeNode[] {
   const folders: FileTreeNode[] = [];
   const fileNodes: FileTreeNode[] = [];
 
@@ -63,7 +63,7 @@ function buildNodes(level: Map<string, IntermediateNode>, depth: number): FileTr
         });
       }
     } else if (node.children.size > 0) {
-      const compacted = compactFolder(name, node, depth);
+      const compacted = compactFolder(name, node, depth, parentPath);
       folders.push(compacted);
     }
   }
@@ -79,7 +79,8 @@ function buildNodes(level: Map<string, IntermediateNode>, depth: number): FileTr
  * e.g., src/ -> components/ -> ui/ with only a child folder buttons/
  * becomes a single node "src/components/ui/buttons/"
  */
-function compactFolder(name: string, node: IntermediateNode, depth: number): FileTreeNode {
+function compactFolder(name: string, node: IntermediateNode, depth: number, parentPath: string): FileTreeNode {
+  const compactedSegments: string[] = [name];
   let compactedName = name;
   let current = node;
 
@@ -93,11 +94,16 @@ function compactFolder(name: string, node: IntermediateNode, depth: number): Fil
     if (childNode.files.length > 0 && childNode.children.size === 0) {
       break; // Child is a file, stop compacting
     }
+    compactedSegments.push(childName);
     compactedName += '/' + childName;
     current = childNode;
   }
 
-  const children = buildNodes(current.children, depth + 1);
+  const compactedPath = parentPath
+    ? `${parentPath}/${compactedSegments.join('/')}`
+    : compactedSegments.join('/');
+
+  const children = buildNodes(current.children, depth + 1, compactedPath);
 
   // Add any files directly in this folder
   for (const file of current.files) {
@@ -118,7 +124,7 @@ function compactFolder(name: string, node: IntermediateNode, depth: number): Fil
   });
 
   return {
-    id: compactedName,
+    id: compactedPath,
     name: compactedName,
     isFolder: true,
     depth,

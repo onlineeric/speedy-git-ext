@@ -1139,12 +1139,8 @@ export class WebviewProvider {
   }
 
   private async openDiffEditor(hash: string, filePath: string, parentHash?: string) {
-    const workspacePath = this.getWorkspacePath();
-    if (!workspacePath) return;
-
     // Validate path stays within repo
-    const resolvedPath = path.resolve(workspacePath, filePath);
-    if (!resolvedPath.startsWith(workspacePath)) return;
+    if (!this.resolveWorkspaceFilePath(filePath)) return;
 
     const parent = parentHash ?? `${hash}~1`;
     const leftUri = vscode.Uri.parse(`git-show://${parent}/${filePath}?${parent}`);
@@ -1161,11 +1157,7 @@ export class WebviewProvider {
   }
 
   private async openFileAtRevision(hash: string, filePath: string) {
-    const workspacePath = this.getWorkspacePath();
-    if (!workspacePath) return;
-
-    const resolvedPath = path.resolve(workspacePath, filePath);
-    if (!resolvedPath.startsWith(workspacePath)) return;
+    if (!this.resolveWorkspaceFilePath(filePath)) return;
 
     const uri = vscode.Uri.parse(`git-show://${hash}/${filePath}?${hash}`);
 
@@ -1179,11 +1171,8 @@ export class WebviewProvider {
   }
 
   private async openCurrentFile(filePath: string) {
-    const workspacePath = this.getWorkspacePath();
-    if (!workspacePath) return;
-
-    const resolvedPath = path.resolve(workspacePath, filePath);
-    if (!resolvedPath.startsWith(workspacePath)) return;
+    const resolvedPath = this.resolveWorkspaceFilePath(filePath);
+    if (!resolvedPath) return;
 
     const uri = vscode.Uri.file(resolvedPath);
 
@@ -1201,6 +1190,22 @@ export class WebviewProvider {
     }
     const folders = vscode.workspace.workspaceFolders;
     return folders?.[0]?.uri.fsPath;
+  }
+
+  private resolveWorkspaceFilePath(filePath: string): string | undefined {
+    const workspacePath = this.getWorkspacePath();
+    if (!workspacePath) {
+      return undefined;
+    }
+
+    const resolvedPath = path.resolve(workspacePath, filePath);
+    const relativePath = path.relative(workspacePath, resolvedPath);
+    const isOutsideWorkspace = !relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath);
+    if (isOutsideWorkspace) {
+      return undefined;
+    }
+
+    return resolvedPath;
   }
 
   private async getOperationInProgressError(): Promise<GitError | null> {
