@@ -69,11 +69,27 @@ As a user, when there are more refs than can be displayed (overflow "+N" badge) 
 
 ---
 
+### User Story 5 - Badges Update When Line Colors Are Reconfigured (Priority: P2)
+
+As a user, when I change my graph line color configuration, I want all badge colors to immediately update to match the new line colors, so badge and graph colors are never out of sync.
+
+**Why this priority**: The graph color palette is user-configurable. If badge colors are derived from line colors at initial render but don't track config changes, badges would show stale colors after a palette change, breaking the core visual association.
+
+**Independent Test**: Can be tested by changing the graph color palette in settings, then verifying that all badge colors on the graph update to match the new line colors without requiring a reload.
+
+**Acceptance Scenarios**:
+
+1. **Given** a user changes their graph color palette from the default to a custom set of colors, **When** the graph re-renders with the new palette, **Then** all badges on every commit row update to use the new lane colors from the updated palette.
+2. **Given** a user removes all custom colors (resetting to defaults), **When** the graph re-renders, **Then** all badges revert to using the default palette colors matching their respective lanes.
+
+---
+
 ### Edge Cases
 
 - What happens when a user has customized the graph color palette to fewer than 10 colors? Badge colors should still correctly cycle through the custom palette (same as the graph does).
 - What happens when a user has customized the graph palette to a single color? All badges across all lanes use that one color; ref type differentiation still works via icons/borders.
 - How does the feature behave with the default fallback color (#4ec9b0) when no custom palette is set and `graphColors` is empty? Badges should use the same fallback color as the graph.
+- What happens when the color palette is changed while the graph is visible? Badge colors must update in the same render cycle as the graph lines — no stale badge colors should be visible.
 
 ## Requirements *(mandatory)*
 
@@ -84,7 +100,7 @@ As a user, when there are more refs than can be displayed (overflow "+N" badge) 
 - **FR-003**: Ref type MUST remain visually distinguishable through existing mechanisms (icons and/or border styles) when multiple badge types share the same lane color background.
 - **FR-004**: The overflow refs badge ("+N") MUST use the commit's lane color for visual consistency.
 - **FR-005**: The HEAD indicator MUST use the commit's lane color for visual consistency.
-- **FR-006**: Badge colors MUST respect user-customized graph color palettes, using the same color resolution logic as the graph itself.
+- **FR-006**: Badge colors MUST dynamically follow the current graph color palette at all times. When a user changes their line color configuration, badge colors MUST update to reflect the new palette immediately (on the same render cycle as the graph lines), using the same color resolution logic as the graph itself.
 - **FR-007**: The merged-branch visual indicator (currently a distinct border) MUST remain visible and distinguishable when badge backgrounds change to lane colors.
 
 ### Key Entities
@@ -101,6 +117,7 @@ As a user, when there are more refs than can be displayed (overflow "+N" badge) 
 - **SC-002**: Badge text is readable (sufficient contrast) on all 10 default palette colors and any reasonable user-customized palette.
 - **SC-003**: Users can still distinguish ref types (branch vs. tag vs. stash) at a glance through non-color visual cues.
 - **SC-004**: No visual regression when users have customized graph color palettes — badges use the same custom colors as the graph.
+- **SC-005**: When a user changes the graph color palette configuration, badge colors update immediately in sync with the graph lines — no stale colors are ever visible.
 
 ## Assumptions
 

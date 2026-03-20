@@ -34,3 +34,4 @@
 - All items pass. Spec is ready for `/speckit.clarify` or `/speckit.plan`.
 - Key Entities section references data structures by concept name (CommitNode, DisplayRef, Graph Color Palette) — these describe domain concepts, not implementation specifics.
 - Assumptions section documents 3 reasonable defaults made without requiring user clarification.
+- Updated 2026-03-20: Added User Story 5 (dynamic config tracking) and SC-005 per user clarification that badge colors must follow line color config changes. All items still pass.
