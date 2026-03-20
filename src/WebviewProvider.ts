@@ -541,6 +541,10 @@ export class WebviewProvider {
         await this.openFileAtRevision(message.payload.hash, message.payload.filePath);
         break;
       }
+      case 'openCurrentFile': {
+        await this.openCurrentFile(message.payload.filePath);
+        break;
+      }
       case 'refresh': {
         if (message.payload.filters) {
           this.currentFilters = { ...this.currentFilters, ...message.payload.filters };
@@ -1171,6 +1175,23 @@ export class WebviewProvider {
     } catch {
       // File might not exist at this revision
       vscode.window.showWarningMessage(`Could not open ${filePath} at revision ${hash.slice(0, 7)}`);
+    }
+  }
+
+  private async openCurrentFile(filePath: string) {
+    const workspacePath = this.getWorkspacePath();
+    if (!workspacePath) return;
+
+    const resolvedPath = path.resolve(workspacePath, filePath);
+    if (!resolvedPath.startsWith(workspacePath)) return;
+
+    const uri = vscode.Uri.file(resolvedPath);
+
+    try {
+      const doc = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(doc, { preview: true });
+    } catch {
+      vscode.window.showWarningMessage(`Could not open ${filePath} — file may not exist`);
     }
   }
 

@@ -6,6 +6,7 @@ import type {
   CommitDetails,
   CommitSignatureInfo,
   DetailsPanelPosition,
+  FileViewMode,
   GraphFilters,
   RemoteInfo,
   RebaseConflictInfo,
@@ -64,6 +65,8 @@ interface GraphStore {
   gitHubAvatarUrls: Record<string, string>;
   submodules: Submodule[];
   submoduleStack: SubmoduleNavEntry[];
+  fileViewMode: FileViewMode;
+  setFileViewMode: (mode: FileViewMode) => void;
   setGitHubAvatarUrls: (urls: Record<string, string>) => void;
   setCommits: (commits: Commit[]) => void;
   appendCommits: (newCommits: Commit[], totalLoadedWithoutFilter?: number) => void;
@@ -218,6 +221,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   gitHubAvatarUrls: {},
   submodules: [],
   submoduleStack: [],
+  fileViewMode: 'list',
+  setFileViewMode: (mode) => set({ fileViewMode: mode }),
   setGitHubAvatarUrls: (urls) => set((state) => ({
     gitHubAvatarUrls: { ...state.gitHubAvatarUrls, ...urls },
   })),
