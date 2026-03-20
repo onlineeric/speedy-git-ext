@@ -541,6 +541,10 @@ export class WebviewProvider {
         await this.openFileAtRevision(message.payload.hash, message.payload.filePath);
         break;
       }
+      case 'openCurrentFile': {
+        await this.openCurrentFile(message.payload.filePath);
+        break;
+      }
       case 'refresh': {
         if (message.payload.filters) {
           this.currentFilters = { ...this.currentFilters, ...message.payload.filters };
@@ -1135,12 +1139,8 @@ export class WebviewProvider {
   }
 
   private async openDiffEditor(hash: string, filePath: string, parentHash?: string) {
-    const workspacePath = this.getWorkspacePath();
-    if (!workspacePath) return;
-
     // Validate path stays within repo
-    const resolvedPath = path.resolve(workspacePath, filePath);
-    if (!resolvedPath.startsWith(workspacePath)) return;
+    if (!this.resolveWorkspaceFilePath(filePath)) return;
 
     const parent = parentHash ?? `${hash}~1`;
     const leftUri = vscode.Uri.parse(`git-show://${parent}/${filePath}?${parent}`);
@@ -1157,11 +1157,7 @@ export class WebviewProvider {
   }
 
   private async openFileAtRevision(hash: string, filePath: string) {
-    const workspacePath = this.getWorkspacePath();
-    if (!workspacePath) return;
-
-    const resolvedPath = path.resolve(workspacePath, filePath);
-    if (!resolvedPath.startsWith(workspacePath)) return;
+    if (!this.resolveWorkspaceFilePath(filePath)) return;
 
     const uri = vscode.Uri.parse(`git-show://${hash}/${filePath}?${hash}`);
 
@@ -1174,12 +1170,42 @@ export class WebviewProvider {
     }
   }
 
+  private async openCurrentFile(filePath: string) {
+    const resolvedPath = this.resolveWorkspaceFilePath(filePath);
+    if (!resolvedPath) return;
+
+    const uri = vscode.Uri.file(resolvedPath);
+
+    try {
+      const doc = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(doc, { preview: true });
+    } catch {
+      vscode.window.showWarningMessage(`Could not open ${filePath} — file may not exist`);
+    }
+  }
+
   private getWorkspacePath(): string | undefined {
     if (this.currentRepoPath) {
       return this.currentRepoPath;
     }
     const folders = vscode.workspace.workspaceFolders;
     return folders?.[0]?.uri.fsPath;
+  }
+
+  private resolveWorkspaceFilePath(filePath: string): string | undefined {
+    const workspacePath = this.getWorkspacePath();
+    if (!workspacePath) {
+      return undefined;
+    }
+
+    const resolvedPath = path.resolve(workspacePath, filePath);
+    const relativePath = path.relative(workspacePath, resolvedPath);
+    const isOutsideWorkspace = !relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath);
+    if (isOutsideWorkspace) {
+      return undefined;
+    }
+
+    return resolvedPath;
   }
 
   private async getOperationInProgressError(): Promise<GitError | null> {

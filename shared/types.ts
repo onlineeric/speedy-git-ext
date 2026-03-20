@@ -150,6 +150,8 @@ export interface CommitDetails {
 
 export type DetailsPanelPosition = 'bottom' | 'right';
 
+export type FileViewMode = 'list' | 'tree';
+
 export interface RemoteInfo {
   name: string;
   fetchUrl: string;
