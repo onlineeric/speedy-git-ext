@@ -6,16 +6,18 @@ import { displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
 
 interface OverflowRefsBadgeProps {
   hiddenRefs: DisplayRef[];
+  laneColorStyle?: React.CSSProperties;
 }
 
-export function OverflowRefsBadge({ hiddenRefs }: OverflowRefsBadgeProps) {
+export function OverflowRefsBadge({ hiddenRefs, laneColorStyle }: OverflowRefsBadgeProps) {
   if (hiddenRefs.length === 0) return null;
 
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
         <span
-          className="px-1.5 py-0.5 text-xs rounded border border-amber-500 text-amber-400 hover:border-amber-400 hover:text-amber-300 cursor-pointer font-medium"
+          className={`px-1.5 py-0.5 text-xs rounded border cursor-pointer font-medium${!laneColorStyle ? ' border-amber-500 text-amber-400 hover:border-amber-400 hover:text-amber-300' : ''}`}
+          style={laneColorStyle}
           onClick={(e) => e.stopPropagation()}
         >
           +{hiddenRefs.length}
@@ -41,7 +43,7 @@ export function OverflowRefsBadge({ hiddenRefs }: OverflowRefsBadgeProps) {
         >
           {hiddenRefs.map((displayRef) => (
             <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)}>
-              <RefLabel displayRef={displayRef} />
+              <RefLabel displayRef={displayRef} laneColorStyle={laneColorStyle} />
             </BranchContextMenu>
           ))}
           <Popover.Arrow className="fill-[var(--vscode-menu-border)]" />

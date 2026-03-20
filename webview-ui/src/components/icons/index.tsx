@@ -1,5 +1,6 @@
 interface IconProps {
   className?: string;
+  style?: React.CSSProperties;
 }
 
 /** Git branch fork shape — 12×12, inherits text color via currentColor */
@@ -54,7 +55,7 @@ export function TagIcon({ className }: IconProps) {
 }
 
 /** Filled target/bullseye for HEAD indicator — 12×12, inherits text color via currentColor */
-export function HeadIcon({ className }: IconProps) {
+export function HeadIcon({ className, style }: IconProps) {
   return (
     <svg
       width={12}
@@ -62,6 +63,7 @@ export function HeadIcon({ className }: IconProps) {
       viewBox="0 0 12 12"
       fill="none"
       className={className}
+      style={style}
       aria-hidden
     >
       {/* Outer ring */}
