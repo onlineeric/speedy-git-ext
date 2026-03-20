@@ -12,6 +12,7 @@ import { mergeRefs, displayRefToRefInfo, displayRefKey } from '../utils/mergeRef
 import { formatAbsoluteDateTime, formatRelativeDate } from '../utils/formatDate';
 import { AuthorAvatar } from './AuthorAvatar';
 import { useGraphStore } from '../stores/graphStore';
+import { getColor, getLaneColorStyle, DEFAULT_GRAPH_PALETTE } from '../utils/colorUtils';
 
 interface CommitRowProps {
   commit: Commit;
@@ -44,9 +45,14 @@ export const CommitRow = memo(function CommitRow({
   onClick,
   style,
 }: CommitRowProps) {
-  const { avatarsEnabled, dateFormat, showRemoteBranches, showTags } = useGraphStore((state) => state.userSettings);
+  const { avatarsEnabled, dateFormat, showRemoteBranches, showTags, graphColors } = useGraphStore((state) => state.userSettings);
   const isStash = commit.refs.some((r) => r.type === 'stash');
   const stashIndex = isStash ? parseStashIndex(commit.refs) : -1;
+
+  const node = topology.nodes.get(commit.hash);
+  const palette = graphColors.length > 0 ? graphColors : DEFAULT_GRAPH_PALETTE;
+  const laneColor = node ? getColor(node.colorIndex, palette) : undefined;
+  const laneColorStyle = laneColor ? getLaneColorStyle(laneColor) : undefined;
 
   const { isHead, displayRefs } = useMemo(() => {
     const mergedRefs = mergeRefs(commit.refs);
@@ -108,20 +114,23 @@ export const CommitRow = memo(function CommitRow({
       {(isHead || displayRefs.length > 0) && (
         <div className="flex items-center gap-1 flex-shrink-0">
           {isHead && (
-            <HeadIcon className="text-[var(--vscode-badge-foreground)] flex-shrink-0" />
+            <HeadIcon
+              className={`flex-shrink-0${!laneColor ? ' text-[var(--vscode-badge-foreground)]' : ''}`}
+              style={laneColor ? { color: laneColor } : undefined}
+            />
           )}
           {visibleRefs.map((displayRef) =>
             displayRef.type === 'stash' ? (
               <StashContextMenu key={displayRefKey(displayRef)} commit={commit} stashIndex={stashIndex}>
-                <RefLabel displayRef={displayRef} />
+                <RefLabel displayRef={displayRef} laneColorStyle={laneColorStyle} />
               </StashContextMenu>
             ) : (
               <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)}>
-                <RefLabel displayRef={displayRef} />
+                <RefLabel displayRef={displayRef} laneColorStyle={laneColorStyle} />
               </BranchContextMenu>
             )
           )}
-          <OverflowRefsBadge hiddenRefs={overflowRefs} />
+          <OverflowRefsBadge hiddenRefs={overflowRefs} laneColorStyle={laneColorStyle} />
         </div>
       )}
 

@@ -5,12 +5,13 @@ import { BranchIcon, TagIcon } from './icons';
 
 interface RefLabelProps extends React.HTMLAttributes<HTMLSpanElement> {
   displayRef: DisplayRef;
+  laneColorStyle?: React.CSSProperties;
 }
 
 /** Renders a single ref badge with an icon and label text. */
 export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
-  function RefLabel({ displayRef, className, ...rest }, ref) {
-    const style = getRefStyle(displayRef.type);
+  function RefLabel({ displayRef, laneColorStyle, className, ...rest }, ref) {
+    const layoutStyle = getRefStyle(displayRef.type);
     const label = getRefLabel(displayRef);
     const title = getRefTitle(displayRef);
     const icon = getRefIcon(displayRef);
@@ -18,8 +19,9 @@ export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
     return (
       <span
         ref={ref}
-        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded ${style}${className ? ` ${className}` : ''}`}
+        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded ${layoutStyle}${className ? ` ${className}` : ''}`}
         title={title}
+        style={laneColorStyle}
         {...rest}
       >
         {icon}
