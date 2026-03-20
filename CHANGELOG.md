@@ -4,6 +4,14 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] - 2026-03-20
+
+### Added
+- Badge colors (branch, tag, stash) now match the commit's graph lane color, so users can visually associate each badge with its graph line at a glance.
+- Badge text color automatically adjusts between light and dark to stay readable on any lane color background.
+- Overflow "+N" badge and HEAD indicator also use the commit's lane color for visual consistency across the entire row.
+- Badge colors update immediately when the graph color palette is changed in settings, staying in sync with graph lines without requiring a reload.
+
 ## [1.0.6] - 2026-03-19
 
 ### Fixed

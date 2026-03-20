@@ -3,6 +3,7 @@ export const DEFAULT_GRAPH_PALETTE = ['#4ec9b0'];
 
 /** Resolve a color index to a hex color from the palette (cycles via modulo). */
 export function getColor(colorIndex: number, palette: string[]): string {
+  if (palette.length === 0) return DEFAULT_GRAPH_PALETTE[0];
   return palette[colorIndex % palette.length];
 }
 
@@ -50,15 +51,25 @@ export function getContrastTextColor(hexColor: string): string {
   return luminance > 0.4 ? '#1a1a1a' : '#f5f5f5';
 }
 
+/** Normalize a hex color to 6-char format (#RRGGBB). */
+function normalizeHex(hex: string): string {
+  const cleaned = hex.startsWith('#') ? hex.slice(1) : hex;
+  if (cleaned.length === 3) {
+    return '#' + cleaned[0] + cleaned[0] + cleaned[1] + cleaned[1] + cleaned[2] + cleaned[2];
+  }
+  return hex;
+}
+
 /** Return inline style for a badge using the given lane hex color. */
 export function getLaneColorStyle(hexColor: string): {
   backgroundColor: string;
   color: string;
   borderColor: string;
 } {
+  const normalized = normalizeHex(hexColor);
   return {
-    backgroundColor: hexColor + '99', // 60% opacity
-    color: getContrastTextColor(hexColor),
-    borderColor: hexColor,
+    backgroundColor: normalized + '99', // 60% opacity
+    color: getContrastTextColor(normalized),
+    borderColor: normalized,
   };
 }

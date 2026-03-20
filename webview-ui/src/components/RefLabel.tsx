@@ -16,10 +16,12 @@ export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
     const title = getRefTitle(displayRef);
     const icon = getRefIcon(displayRef);
 
+    const fallbackColor = !laneColorStyle ? ' border border-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]' : '';
+
     return (
       <span
         ref={ref}
-        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded ${layoutStyle}${className ? ` ${className}` : ''}`}
+        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded ${layoutStyle}${fallbackColor}${className ? ` ${className}` : ''}`}
         title={title}
         style={laneColorStyle}
         {...rest}
