@@ -4,6 +4,14 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.1] - 2026-03-21
+
+### Fixed
+- Auto-refresh no longer fires when nothing has changed — a lightweight commit fingerprint check skips redundant updates, eliminating constant screen flashing during idle.
+- Right-click context menus (commit, branch, stash) are no longer closed by auto-refresh. Auto-refresh now updates the graph in-place without unmounting the graph container or showing a loading screen.
+- Increased watcher debounce (500ms → 1000ms) and added a 2-second minimum interval between refresh cycles to prevent refresh spam during rapid git operations (rebase, multi-file staging).
+- Multi-commit selection and last-clicked state are now preserved across auto-refresh when the selected commits still exist in the updated graph.
+
 ## [1.1.0] - 2026-03-20
 
 ### Added
