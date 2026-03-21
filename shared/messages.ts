@@ -65,7 +65,9 @@ export type RequestMessage =
   | { type: 'initSubmodule'; payload: { submodulePath: string } }
   // Stash-and-checkout flow
   | { type: 'stashAndCheckout'; payload: { name: string; remote?: string; pull?: boolean } }
-  | { type: 'stashAndCheckoutCommit'; payload: { hash: string } };
+  | { type: 'stashAndCheckoutCommit'; payload: { hash: string } }
+  // File actions
+  | { type: 'openCurrentFile'; payload: { filePath: string } };
 
 export type ResponseMessage =
   | { type: 'commits'; payload: { commits: Commit[]; branches?: Branch[]; hasMore?: boolean; totalLoadedWithoutFilter?: number } }
@@ -118,6 +120,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   getSettings: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
   updateSubmodule: true, initSubmodule: true,
   stashAndCheckout: true, stashAndCheckoutCommit: true,
+  openCurrentFile: true,
 };
 
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {

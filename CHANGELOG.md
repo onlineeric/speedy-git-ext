@@ -4,6 +4,24 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] - 2026-03-20
+
+### Added
+- Badge colors (branch, tag, stash) now match the commit's graph lane color, so users can visually associate each badge with its graph line at a glance.
+- Badge text color automatically adjusts between light and dark to stay readable on any lane color background.
+- Overflow "+N" badge and HEAD indicator also use the commit's lane color for visual consistency across the entire row.
+- Badge colors update immediately when the graph color palette is changed in settings, staying in sync with graph lines without requiring a reload.
+- Per-file addition and deletion counts (green/red) on each file row in the commit details panel, showing at a glance which files had the most churn.
+- One-click file actions on hover: copy relative path (with inline checkmark feedback), open file at the selected commit revision (read-only), and open current working tree version.
+- List/tree view toggle for the file changes panel — tree view groups files by directory hierarchy with collapsible folders, all expanded by default.
+- Automatic folder compaction in tree view: single-child intermediate folders are merged into one node (e.g., `src/components/ui/buttons/`) to reduce nesting depth.
+- Renamed files displayed with arrow notation (e.g., `newName.ts ← oldName.ts`) with the old path in muted style.
+- Binary file changes show a "binary" indicator instead of line change counts.
+- All file panel enhancements (per-file counts, action icons, tree view) apply consistently to both committed and uncommitted changes.
+
+### Changed
+- File changes header now shows only the total file count (e.g., "4 files changed") without aggregate addition/deletion totals.
+
 ## [1.0.6] - 2026-03-19
 
 ### Fixed

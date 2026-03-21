@@ -2,6 +2,7 @@ import { memo } from 'react';
 import type { Commit } from '@shared/types';
 import { type GraphTopology, getPassingLanes } from '../utils/graphTopology';
 import { useGraphStore } from '../stores/graphStore';
+import { getColor, DEFAULT_GRAPH_PALETTE } from '../utils/colorUtils';
 
 interface GraphCellProps {
   commit: Commit;
@@ -16,10 +17,6 @@ interface GraphCellProps {
 const LANE_WIDTH = 16;
 const NODE_RADIUS = 4;
 const HEAD_NODE_RADIUS = 6;
-
-function getColor(colorIndex: number, colors: string[]): string {
-  return colors[colorIndex % colors.length];
-}
 
 function getLaneX(lane: number): number {
   return LANE_WIDTH / 2 + lane * LANE_WIDTH;
@@ -36,7 +33,7 @@ export const GraphCell = memo(function GraphCell({
 }: GraphCellProps) {
   const graphColors = useGraphStore((state) => state.userSettings.graphColors);
   const node = topology.nodes.get(commit.hash);
-  const palette = graphColors.length > 0 ? graphColors : ['#4ec9b0'];
+  const palette = graphColors.length > 0 ? graphColors : DEFAULT_GRAPH_PALETTE;
 
   if (!node) {
     return (

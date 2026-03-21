@@ -101,5 +101,8 @@ Built with **Vite** + React plugin → `dist/webview/`
 - N/A (in-memory state only) (016-auto-refresh)
 - TypeScript 5.x (strict) + React 18, @radix-ui/react-context-menu, Zustand, VS Code Extension API (017-rebase-branch-on-branch)
 - N/A (in-memory Zustand store) (017-rebase-branch-on-branch)
+- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand, @tanstack/react-virtual, @radix-ui/react-context-menu, Tailwind CSS (019-badge-lane-color)
+- TypeScript 5.x (strict mode with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand, `@tanstack/react-virtual`, `@headless-tree/core` + `@headless-tree/react` (new), Tailwind CSS, Radix UI (018-commit-files-enhancements)
+- N/A (in-memory Zustand store, session-scoped) (018-commit-files-enhancements)
 
 ## Recent Changes

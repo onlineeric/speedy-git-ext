@@ -3,6 +3,9 @@ import type { CommitDetails, FileChange, DetailsPanelPosition, CommitSignatureIn
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { formatRelativeDate } from '../utils/formatDate';
+import { ListViewIcon, TreeViewIcon } from './icons';
+import { FileChangesTreeView } from './FileChangesTreeView';
+import { FileStatusBadge, FileChangeIndicators, FileActionIcons } from './FileChangeShared';
 
 const MIN_SIZE = 120;
 const DEFAULT_BOTTOM_HEIGHT = 280;
@@ -280,6 +283,9 @@ function getSignatureStatusConfig(signature: CommitSignatureInfo): { label: stri
 }
 
 function FileChangesList({ details }: { details: CommitDetails }) {
+  const fileViewMode = useGraphStore((state) => state.fileViewMode);
+  const setFileViewMode = useGraphStore((state) => state.setFileViewMode);
+
   const handleFileClick = (file: FileChange) => {
     if (file.status === 'deleted') {
       const parentHash = details.parents[0];
@@ -297,84 +303,85 @@ function FileChangesList({ details }: { details: CommitDetails }) {
         <span className="text-xs text-[var(--vscode-descriptionForeground)]">
           {details.files.length} file{details.files.length !== 1 ? 's' : ''} changed
         </span>
-        {details.stats.additions > 0 && (
-          <span className="text-xs text-green-400">+{details.stats.additions}</span>
-        )}
-        {details.stats.deletions > 0 && (
-          <span className="text-xs text-red-400">-{details.stats.deletions}</span>
-        )}
+        <span className="flex items-center gap-0.5">
+          <button
+            className={`rounded p-0.5 ${fileViewMode === 'list' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
+            onClick={() => setFileViewMode('list')}
+            title="List view"
+          >
+            <ListViewIcon size={16} />
+          </button>
+          <button
+            className={`rounded p-0.5 ${fileViewMode === 'tree' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
+            onClick={() => setFileViewMode('tree')}
+            title="Tree view"
+          >
+            <TreeViewIcon size={16} />
+          </button>
+        </span>
       </div>
-      <div className="space-y-0.5">
-        {details.files.map((file) => (
-          <FileChangeRow
-            key={file.path}
-            file={file}
-            onClick={() => handleFileClick(file)}
-          />
-        ))}
-      </div>
+      {fileViewMode === 'list' ? (
+        <div className="space-y-0.5">
+          {details.files.map((file) => (
+            <FileChangeRow
+              key={file.path}
+              file={file}
+              onFileNameClick={() => handleFileClick(file)}
+              commitHash={details.hash}
+              parentHash={details.parents[0]}
+            />
+          ))}
+        </div>
+      ) : (
+        <FileChangesTreeView
+          files={details.files}
+          commitHash={details.hash}
+          parentHash={details.parents[0]}
+          onFileNameClick={handleFileClick}
+        />
+      )}
     </div>
   );
 }
 
 function FileChangeRow({
   file,
-  onClick,
+  onFileNameClick,
+  commitHash,
+  parentHash,
 }: {
   file: FileChange;
-  onClick: () => void;
+  onFileNameClick: () => void;
+  commitHash: string;
+  parentHash?: string;
 }) {
+  const fileTitle = file.oldPath
+    ? `${file.path} ← ${file.oldPath}`
+    : file.path;
+
   return (
     <div
-      className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-[var(--vscode-list-hoverBackground)]"
-      onClick={onClick}
-      title={file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}
+      className="group flex items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-[var(--vscode-list-hoverBackground)]"
+      title={fileTitle}
     >
       <FileStatusBadge status={file.status} />
-      <span className="flex-1 truncate font-mono">
-        {file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}
+      <span
+        className="cursor-pointer truncate font-mono hover:text-[var(--vscode-textLink-foreground)] hover:underline"
+        onClick={onFileNameClick}
+      >
+        {file.path}
+        {file.oldPath && (
+          <span className="text-[var(--vscode-descriptionForeground)]">
+            {' ← '}{file.oldPath}
+          </span>
+        )}
       </span>
-      {file.additions !== undefined && file.additions > 0 && (
-        <span className="text-green-400">+{file.additions}</span>
-      )}
-      {file.deletions !== undefined && file.deletions > 0 && (
-        <span className="text-red-400">-{file.deletions}</span>
-      )}
+      <FileChangeIndicators file={file} />
+      <FileActionIcons
+        file={file}
+        commitHash={commitHash}
+        parentHash={parentHash}
+      />
     </div>
   );
-}
-
-function FileStatusBadge({ status }: { status: FileChange['status'] }) {
-  const config = getStatusConfig(status);
-  return (
-    <span
-      className={`flex h-4 w-4 items-center justify-center rounded text-[10px] font-bold ${config.className}`}
-      title={config.label}
-    >
-      {config.letter}
-    </span>
-  );
-}
-
-function getStatusConfig(status: FileChange['status']): {
-  letter: string;
-  label: string;
-  className: string;
-} {
-  switch (status) {
-    case 'added':
-      return { letter: 'A', label: 'Added', className: 'text-green-400 bg-green-900/40' };
-    case 'modified':
-      return { letter: 'M', label: 'Modified', className: 'text-blue-400 bg-blue-900/40' };
-    case 'deleted':
-      return { letter: 'D', label: 'Deleted', className: 'text-red-400 bg-red-900/40' };
-    case 'renamed':
-      return { letter: 'R', label: 'Renamed', className: 'text-yellow-400 bg-yellow-900/40' };
-    case 'copied':
-      return { letter: 'C', label: 'Copied', className: 'text-purple-400 bg-purple-900/40' };
-    case 'untracked':
-      return { letter: 'U', label: 'Untracked', className: 'text-gray-400 bg-gray-900/40' };
-    default:
-      return { letter: '?', label: 'Unknown', className: 'text-gray-400 bg-gray-900/40' };
-  }
 }

@@ -197,6 +197,10 @@ class RpcClient {
     this.send({ type: 'openFile', payload: { hash, filePath } });
   }
 
+  openCurrentFile(filePath: string) {
+    this.send({ type: 'openCurrentFile', payload: { filePath } });
+  }
+
   refresh(filters?: Partial<{ branch?: string; author?: string; maxCount: number }>) {
     this.send({ type: 'refresh', payload: { filters } });
   }

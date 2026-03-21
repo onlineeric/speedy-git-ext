@@ -50,16 +50,21 @@ export class GitDiffService {
 
     // Get stats (additions/deletions) — use -z for correct rename path parsing
     // For merge commits, diff against first parent explicitly
+    // --no-commit-id prevents the commit hash from being prepended to the output
     const numstatArgs = isMerge
-      ? ['diff-tree', '--numstat', '-r', '-z', `${hash}^1`, hash]
-      : ['diff-tree', '--numstat', '-r', '--root', '-z', hash];
+      ? ['diff-tree', '--no-commit-id', '--numstat', '-r', '-z', `${hash}^1`, hash]
+      : ['diff-tree', '--no-commit-id', '--numstat', '-r', '--root', '-z', hash];
     const statsResult = await this.executor.execute({
       args: numstatArgs,
       cwd: this.workspacePath,
     });
 
+    if (!statsResult.success) {
+      this.log.warn(`Numstat command failed for ${hash.slice(0, 7)}: ${statsResult.error.message}`);
+    }
+
     const stats = statsResult.success
-      ? parseNumstat(statsResult.value.stdout, filesResult.value)
+      ? parseNumstat(statsResult.value.stdout, filesResult.value, this.log)
       : { additions: 0, deletions: 0 };
 
     return ok({
@@ -255,7 +260,11 @@ function mapStatusCode(code: string): FileChangeStatus {
  * and "adds\tdels\0oldpath\0newpath\0" for renames/copies.
  * The first entry is the commit hash line (no tabs), which we skip.
  */
-function parseNumstat(output: string, files: FileChange[]): { additions: number; deletions: number } {
+function parseNumstat(
+  output: string,
+  files: FileChange[],
+  log: import('vscode').LogOutputChannel
+): { additions: number; deletions: number } {
   let totalAdditions = 0;
   let totalDeletions = 0;
 
@@ -268,6 +277,11 @@ function parseNumstat(output: string, files: FileChange[]): { additions: number;
     }
   }
 
+  log.debug(`parseNumstat: output length=${output.length}, files count=${files.length}, fileMap keys=[${[...fileMap.keys()].join(', ')}]`);
+
+  // With --numstat -z, the output format is:
+  //   Non-rename: "additions\tdeletions\tpath\0"  (path is 3rd tab field)
+  //   Rename:     "additions\tdeletions\t\0oldpath\0newpath\0" (empty 3rd tab field, paths as separate NUL fields)
   const parts = output.split(NULL_CHAR);
   let i = 0;
   while (i < parts.length) {
@@ -279,28 +293,36 @@ function parseNumstat(output: string, files: FileChange[]): { additions: number;
 
     const addStr = tabParts[0];
     const delStr = tabParts[1];
-    // Binary files show '-' for additions/deletions
+    const isBinary = addStr === '-' && delStr === '-';
     const additions = addStr === '-' ? 0 : parseInt(addStr, 10);
     const deletions = delStr === '-' ? 0 : parseInt(delStr, 10);
 
-    // The file path follows as the next null-separated field(s)
-    const filePath = parts[i + 1] ?? '';
-
-    // For renames/copies, check if there's a second path
-    const file = fileMap.get(filePath);
-    if (file && (file.status === 'renamed' || file.status === 'copied')) {
-      // Skip the extra path field for renames/copies
+    // Determine file path based on format:
+    // - Renames/copies: 3rd tab field is empty, old/new paths are next NUL-separated fields
+    // - Regular files: 3rd tab field contains the path
+    const thirdField = tabParts[2] ?? '';
+    let filePath: string;
+    if (thirdField === '' && parts[i + 1]) {
+      // Rename/copy format: skip stat + oldpath + newpath
+      filePath = parts[i + 1];
       i += 3;
     } else {
-      i += 2;
+      // Regular file: path is in the 3rd tab field
+      filePath = thirdField;
+      i += 1;
     }
 
     totalAdditions += additions;
     totalDeletions += deletions;
 
+    const file = fileMap.get(filePath);
     if (file) {
-      file.additions = additions;
-      file.deletions = deletions;
+      if (!isBinary) {
+        file.additions = additions;
+        file.deletions = deletions;
+      }
+    } else {
+      log.warn(`parseNumstat: no match for path "${filePath}" in fileMap`);
     }
   }
 
