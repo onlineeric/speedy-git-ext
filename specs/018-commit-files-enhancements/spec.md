@@ -98,7 +98,7 @@ When a commit touches many files across multiple directories, a flat list of rel
 - **FR-018**: Renamed files MUST display the new path followed by an arrow and the old path in muted style (e.g., `newName.ts ← oldName.ts`). In tree view, the arrow notation applies to the file name only.
 - **FR-019**: In tree view, intermediate folders that contain only a single subfolder (and no files) MUST be compacted into a single node showing the combined path (e.g., `src/components/ui/buttons/`).
 - **FR-020**: Folder nodes in tree view MUST display only the folder name/path without any aggregate change counts or file counts.
-- **FR-021**: Each file row MUST follow the layout order: status badge (A/M/D/R/C), file path/name, change counts (+N -N), then action icons (on hover). This order applies to both list and tree views.
+- **FR-021**: Each file row MUST follow the layout order: status badge (A/M/D/R/C), file path/name link, action icons (on hover), then change counts (+N -N). This order applies to both list and tree views.
 
 ### Key Entities
 
@@ -127,7 +127,7 @@ When a commit touches many files across multiple directories, a flat list of rel
 - Q: How should renamed files be displayed? → A: Show with arrow notation (e.g., `newName.ts ← oldName.ts`) with old path in muted style.
 - Q: Should tree view folder compaction be required or optional? → A: Required — single-child intermediate folders are always compacted into one node (e.g., `src/components/ui/buttons/`).
 - Q: Should folder nodes in tree view display aggregate change counts? → A: No — folders show only the folder name/path, no stats.
-- Q: Where should the status badge (A/M/D) appear in the file row layout? → A: Keep at the start. Layout order: `[badge] [file path] [+N -N] [...icons on hover]`.
+- Q: Where should the status badge (A/M/D) appear in the file row layout? → A: Keep at the start. Layout order: `[badge] [file path] [...icons on hover] [+N -N]`.
 
 ## Assumptions
 

@@ -96,6 +96,13 @@
 - [x] T024 [P] Run `pnpm lint` and fix any ESLint errors across all modified and new files
 - [x] T025 Run `pnpm build` and verify clean production build of both extension and webview (depends on T023, T024)
 - [ ] T026 Run full smoke test from quickstart.md checklist via VS Code "Run Extension" launch config: verify all 12 test scenarios pass (depends on T025)
+- [x] T027 Fix `parseNumstat` in `src/services/GitDiffService.ts`: add `--no-commit-id` to numstat git command, fix file path extraction to use `tabParts[2]` for non-rename files (was incorrectly using `parts[i+1]`), handle binary files by leaving additions/deletions undefined
+- [x] T028 Fix file row layout order in `CommitDetailsPanel.tsx` and `FileChangesTreeView.tsx`: action icons appear after file name link (not pushed to end of row with ml-auto)
+- [x] T029 Fix tree/list view toggle icons: increase size from 12×12 to 16×16, position right after "xx files changed" text instead of right-aligned
+- [x] T030 Fix `openFileAtRevision` in `WebviewProvider.ts`: use `vscode.Uri.from()` instead of `vscode.Uri.parse()` for reliable URI encoding, remove unnecessary `resolveWorkspaceFilePath` check, update `GitShowContentProvider` to use dynamic service getter
+- [x] T031 Add diagnostic logging to `parseNumstat` in `GitDiffService.ts`: log output length, file count, fileMap keys, and warn on unmatched paths
+- [x] T032 Remove "binary" label from `FileChangeIndicators` in `FileChangeShared.tsx`: remove `isBinaryFile()` function and binary label rendering
+- [x] T033 Fix open file at commit URI structure in `WebviewProvider.ts` and `GitShowContentProvider.ts`: use `query` for real file path, `path` for `{hashPrefix}: {filename}` tab title display (like Git Graph). Updated both `openFileAtRevision` and `openDiffEditor` URI construction
 
 ---
 

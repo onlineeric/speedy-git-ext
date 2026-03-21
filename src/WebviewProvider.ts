@@ -1139,12 +1139,10 @@ export class WebviewProvider {
   }
 
   private async openDiffEditor(hash: string, filePath: string, parentHash?: string) {
-    // Validate path stays within repo
-    if (!this.resolveWorkspaceFilePath(filePath)) return;
-
     const parent = parentHash ?? `${hash}~1`;
-    const leftUri = vscode.Uri.parse(`git-show://${parent}/${filePath}?${parent}`);
-    const rightUri = vscode.Uri.parse(`git-show://${hash}/${filePath}?${hash}`);
+    const fileName = filePath.split('/').pop() ?? filePath;
+    const leftUri = vscode.Uri.from({ scheme: 'git-show', authority: parent, path: `/${parent.slice(0, 8)}: ${fileName}`, query: filePath });
+    const rightUri = vscode.Uri.from({ scheme: 'git-show', authority: hash, path: `/${hash.slice(0, 8)}: ${fileName}`, query: filePath });
 
     const title = `${filePath} (${hash.slice(0, 7)})`;
 
@@ -1157,15 +1155,24 @@ export class WebviewProvider {
   }
 
   private async openFileAtRevision(hash: string, filePath: string) {
-    if (!this.resolveWorkspaceFilePath(filePath)) return;
-
-    const uri = vscode.Uri.parse(`git-show://${hash}/${filePath}?${hash}`);
+    // URI structure:
+    //   authority = full hash (for content lookup)
+    //   path = /{hashPrefix}: {filename} (for VS Code tab title display, like Git Graph)
+    //   query = original file path (for actual git show lookup)
+    const shortHash = hash.slice(0, 8);
+    const fileName = filePath.split('/').pop() ?? filePath;
+    const uri = vscode.Uri.from({
+      scheme: 'git-show',
+      authority: hash,
+      path: `/${shortHash}: ${fileName}`,
+      query: filePath,
+    });
 
     try {
       const doc = await vscode.workspace.openTextDocument(uri);
       await vscode.window.showTextDocument(doc, { preview: true });
-    } catch {
-      // File might not exist at this revision
+    } catch (err) {
+      this.log.warn(`openFileAtRevision failed for ${filePath}@${hash.slice(0, 7)}: ${err}`);
       vscode.window.showWarningMessage(`Could not open ${filePath} at revision ${hash.slice(0, 7)}`);
     }
   }

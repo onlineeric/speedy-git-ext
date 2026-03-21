@@ -10,11 +10,6 @@ export function shouldShowChangeCounts(file: FileChange): boolean {
   return true;
 }
 
-export function isBinaryFile(file: FileChange): boolean {
-  return file.additions === undefined && file.deletions === undefined
-    && file.status !== 'added' && file.status !== 'deleted';
-}
-
 export function getStatusConfig(status: FileChange['status']): {
   letter: string;
   label: string;
@@ -52,13 +47,9 @@ export function FileStatusBadge({ status }: { status: FileChange['status'] }) {
 
 export function FileChangeIndicators({ file }: { file: FileChange }) {
   const showCounts = shouldShowChangeCounts(file);
-  const binary = isBinaryFile(file);
 
   return (
     <>
-      {binary && (
-        <span className="text-[var(--vscode-descriptionForeground)]">binary</span>
-      )}
       {showCounts && file.additions !== undefined && file.additions > 0 && (
         <span className="text-green-400">+{file.additions}</span>
       )}
