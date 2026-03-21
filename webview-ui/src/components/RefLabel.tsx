@@ -10,7 +10,7 @@ interface RefLabelProps extends React.HTMLAttributes<HTMLSpanElement> {
 
 /** Renders a single ref badge with an icon and label text. */
 export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
-  function RefLabel({ displayRef, laneColorStyle, className, ...rest }, ref) {
+  function RefLabel({ displayRef, laneColorStyle, className, style, ...rest }, ref) {
     const layoutStyle = getRefStyle(displayRef.type);
     const label = getRefLabel(displayRef);
     const title = getRefTitle(displayRef);
@@ -23,8 +23,8 @@ export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
         ref={ref}
         className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded ${layoutStyle}${fallbackColor}${className ? ` ${className}` : ''}`}
         title={title}
-        style={laneColorStyle}
         {...rest}
+        style={laneColorStyle ? { ...style, ...laneColorStyle } : style}
       >
         {icon}
         {label}
