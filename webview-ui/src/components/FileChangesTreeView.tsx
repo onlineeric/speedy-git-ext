@@ -174,14 +174,12 @@ function FileNode({
           </span>
         )}
       </span>
-      <span className="ml-auto flex items-center gap-1.5">
-        <FileChangeIndicators file={file} />
-        <FileActionIcons
-          file={file}
-          commitHash={commitHash}
-          parentHash={parentHash}
-        />
-      </span>
+      <FileChangeIndicators file={file} />
+      <FileActionIcons
+        file={file}
+        commitHash={commitHash}
+        parentHash={parentHash}
+      />
     </div>
   );
 }

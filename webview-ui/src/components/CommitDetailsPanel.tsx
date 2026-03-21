@@ -303,20 +303,20 @@ function FileChangesList({ details }: { details: CommitDetails }) {
         <span className="text-xs text-[var(--vscode-descriptionForeground)]">
           {details.files.length} file{details.files.length !== 1 ? 's' : ''} changed
         </span>
-        <span className="ml-auto flex items-center gap-0.5">
+        <span className="flex items-center gap-0.5">
           <button
-            className={`rounded p-0.5 ${fileViewMode === 'list' ? 'text-[var(--vscode-foreground)]' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
+            className={`rounded p-0.5 ${fileViewMode === 'list' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
             onClick={() => setFileViewMode('list')}
             title="List view"
           >
-            <ListViewIcon />
+            <ListViewIcon size={16} />
           </button>
           <button
-            className={`rounded p-0.5 ${fileViewMode === 'tree' ? 'text-[var(--vscode-foreground)]' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
+            className={`rounded p-0.5 ${fileViewMode === 'tree' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
             onClick={() => setFileViewMode('tree')}
             title="Tree view"
           >
-            <TreeViewIcon />
+            <TreeViewIcon size={16} />
           </button>
         </span>
       </div>
@@ -376,14 +376,12 @@ function FileChangeRow({
           </span>
         )}
       </span>
-      <span className="ml-auto flex items-center gap-1.5">
-        <FileChangeIndicators file={file} />
-        <FileActionIcons
-          file={file}
-          commitHash={commitHash}
-          parentHash={parentHash}
-        />
-      </span>
+      <FileChangeIndicators file={file} />
+      <FileActionIcons
+        file={file}
+        commitHash={commitHash}
+        parentHash={parentHash}
+      />
     </div>
   );
 }

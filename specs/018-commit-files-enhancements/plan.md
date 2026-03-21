@@ -91,3 +91,15 @@ webview-ui/src/
 ## Complexity Tracking
 
 > No constitution violations to justify. All design choices align with existing patterns and principles.
+
+## Post-Implementation Bug Fixes (2026-03-21)
+
+### Bugs Found During Smoke Testing
+
+1. **Per-file change counts not displaying** (`src/services/GitDiffService.ts`): `parseNumstat` incorrectly assumed file paths were in separate NUL-terminated fields (`parts[i+1]`), but with `--numstat -z`, non-rename file paths are the 3rd tab-separated field (`tabParts[2]`). Also missing `--no-commit-id` flag which caused the commit hash to be prepended to the output, corrupting the first file's stats. Binary files were also incorrectly set to `0` instead of left `undefined` for proper binary detection.
+
+2. **Action icons at end of row** (`CommitDetailsPanel.tsx`, `FileChangesTreeView.tsx`): `ml-auto` pushed action icons to the right edge. Moved icons to appear immediately after the file name link. Updated FR-021 layout order to: `[badge] [file path] [icons on hover] [+N -N]`.
+
+3. **View toggle icons too small and misplaced** (`icons/index.tsx`, `CommitDetailsPanel.tsx`): `ListViewIcon` and `TreeViewIcon` increased from 12×12 to 16×16. Removed `ml-auto` so they appear right after the "N files changed" text.
+
+4. **Open file at commit showing current version** (`WebviewProvider.ts`, `GitShowContentProvider.ts`): Replaced `vscode.Uri.parse()` with `vscode.Uri.from()` for reliable URI encoding. Removed unnecessary `resolveWorkspaceFilePath` guard that could silently bail. Updated `GitShowContentProvider` to use a dynamic service getter (lambda) instead of a captured reference, preventing stale service after repo switches.

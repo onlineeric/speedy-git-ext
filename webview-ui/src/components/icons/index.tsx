@@ -95,10 +95,10 @@ export function FileCodeIcon({ className }: IconProps) {
   );
 }
 
-/** Horizontal lines (list view toggle) — 12×12, inherits text color via currentColor */
-export function ListViewIcon({ className }: IconProps) {
+/** Horizontal lines (list view toggle) — inherits text color via currentColor */
+export function ListViewIcon({ className, size = 16 }: IconProps & { size?: number }) {
   return (
-    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
       <line x1={1} y1={3} x2={11} y2={3} stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" />
       <line x1={1} y1={6} x2={11} y2={6} stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" />
       <line x1={1} y1={9} x2={11} y2={9} stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" />
@@ -106,10 +106,10 @@ export function ListViewIcon({ className }: IconProps) {
   );
 }
 
-/** Tree hierarchy (tree view toggle) — 12×12, inherits text color via currentColor */
-export function TreeViewIcon({ className }: IconProps) {
+/** Tree hierarchy (tree view toggle) — inherits text color via currentColor */
+export function TreeViewIcon({ className, size = 16 }: IconProps & { size?: number }) {
   return (
-    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
       <line x1={2} y1={2} x2={2} y2={10} stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" />
       <line x1={2} y1={3.5} x2={5} y2={3.5} stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" />
       <line x1={2} y1={6.5} x2={5} y2={6.5} stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" />

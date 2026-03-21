@@ -173,7 +173,7 @@ export class ExtensionController {
 
     // Register git-show:// content provider for diff view
     if (!this.contentProviderRegistration) {
-      const provider = new GitShowContentProvider(this.gitDiffService!);
+      const provider = new GitShowContentProvider(() => this.gitDiffService!);
       this.contentProviderRegistration = vscode.workspace.registerTextDocumentContentProvider(
         'git-show',
         provider

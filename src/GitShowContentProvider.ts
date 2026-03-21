@@ -6,14 +6,19 @@ import type { GitDiffService } from './services/GitDiffService.js';
  * Handles URIs with the scheme: git-show://COMMIT_HASH/path/to/file?COMMIT_HASH
  */
 export class GitShowContentProvider implements vscode.TextDocumentContentProvider {
-  constructor(private readonly gitDiffService: GitDiffService) {}
+  constructor(private readonly getService: () => GitDiffService) {}
+
+  private get gitDiffService(): GitDiffService {
+    return this.getService();
+  }
 
   async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
     const hash = uri.authority;
-    const filePath = uri.path.slice(1); // Remove leading '/'
+    // File path is stored in the query parameter; path contains human-readable tab title
+    const filePath = uri.query;
 
     if (!hash || !filePath) {
-      throw new Error(`Invalid git-show URI: missing ${!hash ? 'hash' : 'file path'}`);
+      throw new Error(`Invalid git-show URI: missing ${!hash ? 'hash' : 'file path'} (uri: ${uri.toString()})`);
     }
 
     const result = await this.gitDiffService.getCommitFile(hash, filePath);
