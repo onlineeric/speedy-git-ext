@@ -233,14 +233,19 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
       : -1;
 
+    // Preserve multi-selection and last-clicked state for hashes that still exist
+    const newHashSet = new Set(mergedCommits.map((c) => c.hash));
+    const prevSelectedCommits = get().selectedCommits;
+    const prevLastClickedHash = get().lastClickedHash;
+
     set({
       commits,
       mergedCommits,
       topology,
       selectedCommit: selectedCommitIndex >= 0 ? selectedCommit : undefined,
       selectedCommitIndex,
-      selectedCommits: [],
-      lastClickedHash: undefined,
+      selectedCommits: prevSelectedCommits.filter((h) => newHashSet.has(h)),
+      lastClickedHash: prevLastClickedHash && newHashSet.has(prevLastClickedHash) ? prevLastClickedHash : undefined,
       hasMore: true,
       prefetching: false,
       fetchGeneration: get().fetchGeneration + 1,

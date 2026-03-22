@@ -15,6 +15,8 @@ export interface CommitNode {
     fromLane: number;
     toLane: number;
     colorIndex: number;
+    /** True when reReserveParent changed this from same-lane to cross-lane */
+    reReserved?: boolean;
   }[];
   /** Connections coming INTO this commit from ABOVE (from child commits) */
   incomingConnections: {
@@ -285,7 +287,7 @@ function buildIncomingConnections(
       let incomingLane: number;
       if (conn.fromLane === conn.toLane) {
         incomingLane = conn.toLane;
-      } else if (isMergeCommit) {
+      } else if (isMergeCommit && !conn.reReserved) {
         // Merge rows already bend onto toLane on the child row.
         incomingLane = conn.toLane;
       } else {
@@ -353,7 +355,7 @@ function computePassingLanes(
           const continuationLane =
             conn.fromLane === conn.toLane
               ? conn.toLane
-              : isMergeCommit
+              : (isMergeCommit && !conn.reReserved)
               ? conn.toLane
               : conn.fromLane;
 
@@ -405,6 +407,7 @@ function reReserveParent(
       for (const conn of previousNode.parentConnections) {
         if (conn.parentHash === parentHash && conn.toLane === oldLane) {
           conn.toLane = newLane;
+          conn.reReserved = true;
           break;
         }
       }

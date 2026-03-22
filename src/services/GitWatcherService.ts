@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
-const DEBOUNCE_MS = 500;
+const DEBOUNCE_MS = 1000;
+const MIN_INTERVAL_MS = 2000;
 
 /**
  * Watches for git state changes via VSCode git extension API and filesystem watchers.
@@ -11,6 +12,7 @@ export class GitWatcherService implements vscode.Disposable {
   readonly onDidDetectChange = this._onDidDetectChange.event;
 
   private debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  private lastRefreshTime = 0;
   private readonly disposables: vscode.Disposable[] = [];
   private fileWatchers: vscode.FileSystemWatcher[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,15 +110,18 @@ export class GitWatcherService implements vscode.Disposable {
     this.fileWatchers = [];
   }
 
-  /** Debounced handler — all change sources funnel into this */
+  /** Debounced handler with minimum interval — all change sources funnel into this */
   private scheduleRefresh(): void {
     if (this.debounceTimer !== undefined) {
       clearTimeout(this.debounceTimer);
     }
+    const elapsed = Date.now() - this.lastRefreshTime;
+    const delay = Math.max(DEBOUNCE_MS, MIN_INTERVAL_MS - elapsed);
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = undefined;
+      this.lastRefreshTime = Date.now();
       this._onDidDetectChange.fire();
-    }, DEBOUNCE_MS);
+    }, delay);
   }
 
   dispose(): void {

@@ -33,6 +33,8 @@ export class WebviewProvider {
   private pendingRefresh = false;
   private isPanelVisible = false;
   private deferredRefresh = false;
+  /** Fingerprint of the last commit data sent to webview, used to skip no-op auto-refreshes */
+  private lastCommitFingerprint = '';
   private getSettingsHandler: (() => UserSettings) | undefined;
   private submoduleHandlers:
     | {
@@ -114,6 +116,7 @@ export class WebviewProvider {
     this.currentRepoPath = currentRepoPath;
     this.gitHubAvatarService = null;
     this.gitHubAvatarInitialized = false;
+    this.lastCommitFingerprint = '';
   }
 
   /** Returns true if the webview panel is currently open */
@@ -136,7 +139,7 @@ export class WebviewProvider {
       this.pendingRefresh = true;
       return;
     }
-    await this.sendInitialData();
+    await this.sendInitialData(undefined, false, true);
   }
 
   /** Push an updated repo list to the webview */
@@ -214,7 +217,12 @@ export class WebviewProvider {
     await this.sendInitialData(undefined, true);
   }
 
-  private async sendInitialData(filters?: Partial<GraphFilters>, includeStashes = false) {
+  private computeCommitFingerprint(commits: Commit[]): string {
+    if (commits.length === 0) return '';
+    return commits.map((c) => c.hash).join(',');
+  }
+
+  private async sendInitialData(filters?: Partial<GraphFilters>, includeStashes = false, isAutoRefresh = false) {
     this.isRefreshing = true;
     try {
       let effectiveFilters = filters ?? this.currentFilters;
@@ -242,23 +250,36 @@ export class WebviewProvider {
       if (effectiveFilters) {
         this.currentFilters = { ...this.currentFilters, ...effectiveFilters };
       }
-      this.postMessage({ type: 'loading', payload: { loading: true } });
+      // Only show loading indicator for manual refresh / initial load (not auto-refresh)
+      if (!isAutoRefresh) {
+        this.postMessage({ type: 'loading', payload: { loading: true } });
+      }
       const batchSize = this.getBatchSize();
       const commitsResult = await this.gitLogService.getCommits({ ...effectiveFilters, maxCount: batchSize });
       let fetchedCommits: Commit[] = [];
       if (commitsResult.success) {
         fetchedCommits = commitsResult.value.commits;
-        this.postMessage({
-          type: 'commits',
-          payload: {
-            commits: fetchedCommits,
-            totalLoadedWithoutFilter: commitsResult.value.totalLoadedWithoutFilter,
-          },
-        });
+
+        // Skip sending commits if nothing changed during auto-refresh
+        const fingerprint = this.computeCommitFingerprint(fetchedCommits);
+        const commitsUnchanged = isAutoRefresh && fingerprint === this.lastCommitFingerprint;
+        this.lastCommitFingerprint = fingerprint;
+
+        if (!commitsUnchanged) {
+          this.postMessage({
+            type: 'commits',
+            payload: {
+              commits: fetchedCommits,
+              totalLoadedWithoutFilter: commitsResult.value.totalLoadedWithoutFilter,
+            },
+          });
+        }
       } else {
         this.postMessage({ type: 'error', payload: { error: commitsResult.error } });
       }
-      this.postMessage({ type: 'loading', payload: { loading: false } });
+      if (!isAutoRefresh) {
+        this.postMessage({ type: 'loading', payload: { loading: false } });
+      }
 
       await this.handleMessage({ type: 'getBranches', payload: {} });
       await this.handleMessage({ type: 'getRemotes', payload: {} });
