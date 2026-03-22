@@ -218,8 +218,8 @@ export class WebviewProvider {
   }
 
   private computeCommitFingerprint(commits: Commit[]): string {
-    if (commits.length === 0) return '0::';
-    return `${commits.length}:${commits[0].hash}:${commits[commits.length - 1].hash}`;
+    if (commits.length === 0) return '';
+    return commits.map((c) => c.hash).join(',');
   }
 
   private async sendInitialData(filters?: Partial<GraphFilters>, includeStashes = false, isAutoRefresh = false) {
@@ -260,20 +260,20 @@ export class WebviewProvider {
       if (commitsResult.success) {
         fetchedCommits = commitsResult.value.commits;
 
-        // Skip sending data if nothing changed during auto-refresh
+        // Skip sending commits if nothing changed during auto-refresh
         const fingerprint = this.computeCommitFingerprint(fetchedCommits);
-        if (isAutoRefresh && fingerprint === this.lastCommitFingerprint) {
-          return;
-        }
+        const commitsUnchanged = isAutoRefresh && fingerprint === this.lastCommitFingerprint;
         this.lastCommitFingerprint = fingerprint;
 
-        this.postMessage({
-          type: 'commits',
-          payload: {
-            commits: fetchedCommits,
-            totalLoadedWithoutFilter: commitsResult.value.totalLoadedWithoutFilter,
-          },
-        });
+        if (!commitsUnchanged) {
+          this.postMessage({
+            type: 'commits',
+            payload: {
+              commits: fetchedCommits,
+              totalLoadedWithoutFilter: commitsResult.value.totalLoadedWithoutFilter,
+            },
+          });
+        }
       } else {
         this.postMessage({ type: 'error', payload: { error: commitsResult.error } });
       }
