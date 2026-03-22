@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Right-click context menus (commit, branch, stash) are no longer closed by auto-refresh. Auto-refresh now updates the graph in-place without unmounting the graph container or showing a loading screen.
 - Increased watcher debounce (500ms → 1000ms) and added a 2-second minimum interval between refresh cycles to prevent refresh spam during rapid git operations (rebase, multi-file staging).
 - Multi-commit selection and last-clicked state are now preserved across auto-refresh when the selected commits still exist in the updated graph.
+- Graph lines from two different branches no longer overlap on the same lane when both branches share a common parent and one is a merge commit — each branch now renders on its own distinct lane.
 
 ## [1.1.0] - 2026-03-20
 

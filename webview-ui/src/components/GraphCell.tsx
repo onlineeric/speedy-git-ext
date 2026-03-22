@@ -135,7 +135,7 @@ export const GraphCell = memo(function GraphCell({
             />
           );
         } else {
-          if (!hasMerge) {
+          if (!hasMerge || conn.reReserved) {
             // For regular branch commits, keep child row straight and let the parent row
             // render the split curve via incomingConnections (matches Git Graph style).
             return (
