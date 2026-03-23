@@ -104,5 +104,6 @@ Built with **Vite** + React plugin → `dist/webview/`
 - TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand, @tanstack/react-virtual, @radix-ui/react-context-menu, Tailwind CSS (019-badge-lane-color)
 - TypeScript 5.x (strict mode with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand, `@tanstack/react-virtual`, `@headless-tree/core` + `@headless-tree/react` (new), Tailwind CSS, Radix UI (018-commit-files-enhancements)
 - N/A (in-memory Zustand store, session-scoped) (018-commit-files-enhancements)
+- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand, `@radix-ui/react-dialog`, Tailwind CSS, esbuild (backend), Vite (webview) (020-push-branch-dialog)
 
 ## Recent Changes
