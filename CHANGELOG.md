@@ -4,6 +4,12 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.2] - 2026-03-23
+
+### Fixed
+- Stash commits no longer pull their parent onto the stash lane — stashes now render as dead-end leaf nodes with a short stub connecting to the parent's actual lane, matching standard git graph tools.
+- Unrelated branch commits no longer visually stack on top of stash lines or other branch lines when lanes are freed by cross-lane connections — a new busy-lane tracking mechanism prevents lane reuse while a connection line still passes through.
+
 ## [1.1.1] - 2026-03-21
 
 ### Fixed
