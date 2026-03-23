@@ -1,5 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, InteractiveRebaseConfig, MergeOptions, ResetMode, CommitParentInfo } from '@shared/types';
+import type { CherryPickOptions, InteractiveRebaseConfig, MergeOptions, PushForceMode, ResetMode, CommitParentInfo } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 
 declare const acquireVsCodeApi: () => {
@@ -15,6 +15,7 @@ class RpcClient {
   private pendingPushedChecks = new Map<string, { resolve: (pushed: boolean) => void; reject: (error: Error) => void }>();
   private pendingParentLookups = new Map<number, { resolve: (parents: CommitParentInfo[]) => void; reject: (error: Error) => void }>();
   private parentRequestIdByHash = new Map<string, number>();
+  private pendingPush: { resolve: (message: string) => void; reject: (error: Error) => void } | null = null;
 
   private messageHandler = (event: MessageEvent) => {
     const message = event.data as ResponseMessage;
@@ -76,6 +77,10 @@ class RpcClient {
         break;
       case 'error':
         store.setError(message.payload.error.message);
+        if (this.pendingPush) {
+          this.pendingPush.reject(new Error(message.payload.error.message));
+          this.pendingPush = null;
+        }
         this.rejectPendingLookups(message.payload.error.message);
         break;
       case 'prefetchError':
@@ -84,6 +89,10 @@ class RpcClient {
         break;
       case 'success':
         store.setSuccessMessage(message.payload.message);
+        if (this.pendingPush) {
+          this.pendingPush.resolve(message.payload.message);
+          this.pendingPush = null;
+        }
         break;
       case 'remotes':
         store.setRemotes(message.payload.remotes);
@@ -247,8 +256,11 @@ class RpcClient {
   }
 
   // Remote ops
-  push(remote?: string, branch?: string, setUpstream?: boolean, force?: boolean) {
-    this.send({ type: 'push', payload: { remote, branch, setUpstream, force } });
+  pushAsync(remote: string, branch: string, setUpstream?: boolean, forceMode?: PushForceMode): Promise<string> {
+    return new Promise((resolve, reject) => {
+      this.pendingPush = { resolve, reject };
+      this.send({ type: 'push', payload: { remote, branch, setUpstream, forceMode } });
+    });
   }
 
   pull(remote?: string, branch?: string, rebase?: boolean) {

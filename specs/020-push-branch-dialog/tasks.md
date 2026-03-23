@@ -17,8 +17,8 @@
 
 **Purpose**: Add shared type definitions and update message contracts that all layers depend on
 
-- [ ] T001 Add `PushForceMode` type (`'none' | 'force-with-lease' | 'force'`) to `shared/types.ts`
-- [ ] T002 Update push message payload in `shared/messages.ts` — replace `force?: boolean` with `forceMode?: PushForceMode`, make `remote` and `branch` required strings, add import for `PushForceMode`
+- [x] T001 Add `PushForceMode` type (`'none' | 'force-with-lease' | 'force'`) to `shared/types.ts`
+- [x] T002 Update push message payload in `shared/messages.ts` — replace `force?: boolean` with `forceMode?: PushForceMode`, make `remote` and `branch` required strings, add import for `PushForceMode`
 
 ---
 
@@ -28,9 +28,9 @@
 
 **Note**: All tasks in this phase touch different files and can run in parallel after Phase 1
 
-- [ ] T003 [P] Update `GitRemoteService.push()` in `src/services/GitRemoteService.ts` — change `force?: boolean` param to `forceMode?: PushForceMode`, map `'force-with-lease'` to `--force-with-lease` and `'force'` to `--force` flags, keep `'none'`/undefined as no flag
-- [ ] T004 [P] Update push message handler in `src/WebviewProvider.ts` — pass `message.payload.forceMode` instead of `message.payload.force` to `gitRemoteService.push()`
-- [ ] T005 [P] Update `rpcClient.push()` signature in `webview-ui/src/rpc/rpcClient.ts` — change `force?: boolean` to `forceMode?: PushForceMode`, add `pushAsync()` method that returns `Promise<string>` using pending request pattern (resolve on `success` response, reject on `error` response)
+- [x] T003 [P] Update `GitRemoteService.push()` in `src/services/GitRemoteService.ts` — change `force?: boolean` param to `forceMode?: PushForceMode`, map `'force-with-lease'` to `--force-with-lease` and `'force'` to `--force` flags, keep `'none'`/undefined as no flag
+- [x] T004 [P] Update push message handler in `src/WebviewProvider.ts` — pass `message.payload.forceMode` instead of `message.payload.force` to `gitRemoteService.push()`
+- [x] T005 [P] Update `rpcClient.push()` signature in `webview-ui/src/rpc/rpcClient.ts` — change `force?: boolean` to `forceMode?: PushForceMode`, add `pushAsync()` method that returns `Promise<string>` using pending request pattern (resolve on `success` response, reject on `error` response)
 
 **Checkpoint**: Backend and RPC layer ready — all existing push functionality preserved with new force mode support
 
@@ -44,9 +44,9 @@
 
 ### Implementation for User Story 1
 
-- [ ] T006 [US1] Create `PushDialog` component in `webview-ui/src/components/PushDialog.tsx` — dialog shell using `@radix-ui/react-dialog` with Portal/Overlay/Content, title displaying "Push Branch: `<branchName>`", `--set-upstream / -u` checkbox (checked by default), "Push mode:" radio group (Normal/`--force-with-lease`/`--force`, default Normal), remote dropdown (populated from `useGraphStore(s => s.remotes)`, default "origin"), implement `buildPushCommand()` pure helper function that takes `{ remote, branch, setUpstream, forceMode }` and returns full command string (e.g., `git push -u origin my-branch`), render read-only command preview textbox at bottom wired to state so it updates on any option change, Execute and Cancel buttons
-- [ ] T007 [US1] Implement async push execution flow in `webview-ui/src/components/PushDialog.tsx` — on Execute click: set `isPushing` state to true, disable all controls, show loading indicator, call `await rpcClient.pushAsync(remote, branch, setUpstream, forceMode)`, on success/failure close dialog (parent handles via `onCancel` callback)
-- [ ] T008 [US1] Wire PushDialog into `webview-ui/src/components/BranchContextMenu.tsx` — add `pushDialogOpen` state, replace direct `rpcClient.push(undefined, refInfo.name)` call with `setPushDialogOpen(true)`, render `<PushDialog>` with `open`, `branchName`, `onCancel` props
+- [x] T006 [US1] Create `PushDialog` component in `webview-ui/src/components/PushDialog.tsx` — dialog shell using `@radix-ui/react-dialog` with Portal/Overlay/Content, title displaying "Push Branch: `<branchName>`", `--set-upstream / -u` checkbox (checked by default), "Push mode:" radio group (Normal/`--force-with-lease`/`--force`, default Normal), remote dropdown (populated from `useGraphStore(s => s.remotes)`, default "origin"), implement `buildPushCommand()` pure helper function that takes `{ remote, branch, setUpstream, forceMode }` and returns full command string (e.g., `git push -u origin my-branch`), render read-only command preview textbox at bottom wired to state so it updates on any option change, Execute and Cancel buttons
+- [x] T007 [US1] Implement async push execution flow in `webview-ui/src/components/PushDialog.tsx` — on Execute click: set `isPushing` state to true, disable all controls, show loading indicator, call `await rpcClient.pushAsync(remote, branch, setUpstream, forceMode)`, on success/failure close dialog (parent handles via `onCancel` callback)
+- [x] T008 [US1] Wire PushDialog into `webview-ui/src/components/BranchContextMenu.tsx` — add `pushDialogOpen` state, replace direct `rpcClient.push(undefined, refInfo.name)` call with `setPushDialogOpen(true)`, render `<PushDialog>` with `open`, `branchName`, `onCancel` props
 
 **Checkpoint**: User Story 1 fully functional — dialog opens, shows defaults with working command preview, executes push with loading state, closes with toast notification
 
@@ -60,7 +60,7 @@
 
 ### Implementation for User Story 2
 
-- [ ] T009 [US2] Add sharp yellow force push warning in `webview-ui/src/components/PushDialog.tsx` — when `forceMode` is `'force-with-lease'` or `'force'`, display a yellow warning message on the dialog body and apply warning styling to the Execute button, remove warning immediately when mode returns to Normal
+- [x] T009 [US2] Add sharp yellow force push warning in `webview-ui/src/components/PushDialog.tsx` — when `forceMode` is `'force-with-lease'` or `'force'`, display a yellow warning message on the dialog body and apply warning styling to the Execute button, remove warning immediately when mode returns to Normal
 
 **Checkpoint**: User Story 2 complete — force push warning displays/hides appropriately based on push mode selection
 
@@ -74,7 +74,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T010 [US3] Add copy button adjacent to command preview in `webview-ui/src/components/PushDialog.tsx` — use `navigator.clipboard.writeText()` to copy command text, add `copied` state that briefly shows "Copied!" feedback (auto-reset after ~2 seconds via setTimeout), style button inline with the read-only textbox
+- [x] T010 [US3] Add copy button adjacent to command preview in `webview-ui/src/components/PushDialog.tsx` — use `navigator.clipboard.writeText()` to copy command text, add `copied` state that briefly shows "Copied!" feedback (auto-reset after ~2 seconds via setTimeout), style button inline with the read-only textbox
 
 **Checkpoint**: Copy-and-cancel workflow complete — developers can extract the command for manual use
 
@@ -88,7 +88,7 @@
 
 ### Implementation for User Story 4
 
-- [ ] T011 [US4] Audit all push entry points in the codebase (search for `rpcClient.push` and push-related menu items) and ensure each triggers PushDialog instead of direct push calls — document findings and update any additional entry points found
+- [x] T011 [US4] Audit all push entry points in the codebase (search for `rpcClient.push` and push-related menu items) and ensure each triggers PushDialog instead of direct push calls — document findings and update any additional entry points found
 
 **Checkpoint**: All push entry points unified under PushDialog
 
@@ -98,8 +98,8 @@
 
 **Purpose**: Edge case handling and build validation
 
-- [ ] T012 Handle edge cases in `webview-ui/src/components/PushDialog.tsx` — when no remotes configured: disable Execute button and show "No remotes configured" message; when single remote: pre-select it in dropdown; ensure branch names with special characters display correctly in preview
-- [ ] T013 Run `pnpm typecheck && pnpm lint && pnpm build` to validate zero errors across all modified files
+- [x] T012 Handle edge cases in `webview-ui/src/components/PushDialog.tsx` — when no remotes configured: disable Execute button and show "No remotes configured" message; when single remote: pre-select it in dropdown; ensure branch names with special characters display correctly in preview
+- [x] T013 Run `pnpm typecheck && pnpm lint && pnpm build` to validate zero errors across all modified files
 
 ---
 

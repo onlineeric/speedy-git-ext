@@ -1,7 +1,7 @@
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { type Result, ok } from '../../shared/errors.js';
-import type { RemoteInfo } from '../../shared/types.js';
+import type { PushForceMode, RemoteInfo } from '../../shared/types.js';
 import { validateRefName } from '../utils/gitValidation.js';
 
 export class GitRemoteService {
@@ -14,8 +14,8 @@ export class GitRemoteService {
     this.executor = new GitExecutor(log);
   }
 
-  async push(remote?: string, branch?: string, setUpstream?: boolean, force?: boolean): Promise<Result<string>> {
-    this.log.info(`Push${remote ? ` to ${remote}` : ''}${branch ? `/${branch}` : ''}${force ? ' (force-with-lease)' : ''}`);
+  async push(remote?: string, branch?: string, setUpstream?: boolean, forceMode?: PushForceMode): Promise<Result<string>> {
+    this.log.info(`Push${remote ? ` to ${remote}` : ''}${branch ? `/${branch}` : ''}${forceMode && forceMode !== 'none' ? ` (${forceMode})` : ''}`);
     if (remote) {
       const check = validateRefName(remote);
       if (!check.success) return check;
@@ -27,7 +27,8 @@ export class GitRemoteService {
 
     const args = ['push'];
     if (setUpstream) args.push('-u');
-    if (force) args.push('--force-with-lease');
+    if (forceMode === 'force-with-lease') args.push('--force-with-lease');
+    else if (forceMode === 'force') args.push('--force');
     // When a branch is specified, a remote is required (git treats the first
     // positional arg as the remote). Default to 'origin' if not provided.
     const effectiveRemote = remote ?? (branch ? 'origin' : undefined);
