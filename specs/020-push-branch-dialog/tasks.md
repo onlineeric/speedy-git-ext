@@ -9,7 +9,7 @@
 
 ## Format: `[ID] [P?] [Story] Description`
 
-- **[P]**: Can run in parallel (different files, no dependencies)
+- **[P]**: Can run in parallel (different files, no dependencies on incomplete tasks in same file)
 - **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
 - Include exact file paths in descriptions
 
@@ -38,32 +38,31 @@
 
 ## Phase 3: User Story 1 — Push Branch with Default Options (Priority: P1) MVP
 
-**Goal**: Developer right-clicks a local branch badge, selects "Push Branch", a dialog opens with defaults, and clicking "Execute" pushes the branch with loading state and auto-close
+**Goal**: Developer right-clicks a local branch badge, selects "Push Branch", a dialog opens with defaults and a working command preview, and clicking "Execute" pushes the branch with loading state and auto-close
 
 **Independent Test**: Right-click any local branch badge → select "Push Branch" → verify dialog opens with branch name in title, default options pre-selected, and command preview showing `git push -u origin <branch>` → click "Execute" → verify push succeeds, dialog closes, success toast appears
 
 ### Implementation for User Story 1
 
-- [ ] T006 [US1] Create `PushDialog` component in `webview-ui/src/components/PushDialog.tsx` — dialog shell using `@radix-ui/react-dialog` with Portal/Overlay/Content, title displaying "Push Branch: `<branchName>`", `--set-upstream / -u` checkbox (checked by default), "Push mode:" radio group (Normal/`--force-with-lease`/`--force`, default Normal), remote dropdown (populated from `useGraphStore(s => s.remotes)`, default "origin"), read-only command preview textbox at bottom, Execute and Cancel buttons
+- [ ] T006 [US1] Create `PushDialog` component in `webview-ui/src/components/PushDialog.tsx` — dialog shell using `@radix-ui/react-dialog` with Portal/Overlay/Content, title displaying "Push Branch: `<branchName>`", `--set-upstream / -u` checkbox (checked by default), "Push mode:" radio group (Normal/`--force-with-lease`/`--force`, default Normal), remote dropdown (populated from `useGraphStore(s => s.remotes)`, default "origin"), implement `buildPushCommand()` pure helper function that takes `{ remote, branch, setUpstream, forceMode }` and returns full command string (e.g., `git push -u origin my-branch`), render read-only command preview textbox at bottom wired to state so it updates on any option change, Execute and Cancel buttons
 - [ ] T007 [US1] Implement async push execution flow in `webview-ui/src/components/PushDialog.tsx` — on Execute click: set `isPushing` state to true, disable all controls, show loading indicator, call `await rpcClient.pushAsync(remote, branch, setUpstream, forceMode)`, on success/failure close dialog (parent handles via `onCancel` callback)
 - [ ] T008 [US1] Wire PushDialog into `webview-ui/src/components/BranchContextMenu.tsx` — add `pushDialogOpen` state, replace direct `rpcClient.push(undefined, refInfo.name)` call with `setPushDialogOpen(true)`, render `<PushDialog>` with `open`, `branchName`, `onCancel` props
 
-**Checkpoint**: User Story 1 fully functional — dialog opens, shows defaults, executes push with loading state, closes with toast notification
+**Checkpoint**: User Story 1 fully functional — dialog opens, shows defaults with working command preview, executes push with loading state, closes with toast notification
 
 ---
 
-## Phase 4: User Story 2 — Configure Push Options (Priority: P1)
+## Phase 4: User Story 2 — Force Push Warning (Priority: P1)
 
-**Goal**: Developer can toggle options in the dialog and the command preview updates in real time, with force push warning display
+**Goal**: When developer selects a force push mode, a sharp yellow warning is displayed on the dialog with visual cues on the Execute button
 
-**Independent Test**: Open push dialog → uncheck `--set-upstream / -u` → verify `-u` removed from preview → select `--force-with-lease` → verify flag appears in preview AND yellow warning shown → select `--force` → verify flag changes → change remote → verify remote updates in preview → select Normal → verify warning removed
+**Independent Test**: Open push dialog → select `--force-with-lease` → verify yellow warning message appears and Execute button has warning styling → select `--force` → verify warning persists → select Normal → verify warning removed
 
 ### Implementation for User Story 2
 
-- [ ] T009 [US2] Implement `buildPushCommand()` pure helper function in `webview-ui/src/components/PushDialog.tsx` — takes `{ remote, branch, setUpstream, forceMode }` and returns full command string (e.g., `git push -u origin my-branch`), wire it to state so command preview updates on any option change
-- [ ] T010 [US2] Add sharp yellow force push warning in `webview-ui/src/components/PushDialog.tsx` — when `forceMode` is `'force-with-lease'` or `'force'`, display a yellow warning message on the dialog body and apply warning styling to the Execute button, remove warning when mode returns to Normal
+- [ ] T009 [US2] Add sharp yellow force push warning in `webview-ui/src/components/PushDialog.tsx` — when `forceMode` is `'force-with-lease'` or `'force'`, display a yellow warning message on the dialog body and apply warning styling to the Execute button, remove warning immediately when mode returns to Normal
 
-**Checkpoint**: User Story 2 complete — all option combinations correctly reflected in command preview, force warning displays/hides appropriately
+**Checkpoint**: User Story 2 complete — force push warning displays/hides appropriately based on push mode selection
 
 ---
 
@@ -75,7 +74,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T011 [US3] Add copy button adjacent to command preview in `webview-ui/src/components/PushDialog.tsx` — use `navigator.clipboard.writeText()` to copy command text, add `copied` state that briefly shows "Copied!" feedback (auto-reset after ~2 seconds via setTimeout), style button inline with the read-only textbox
+- [ ] T010 [US3] Add copy button adjacent to command preview in `webview-ui/src/components/PushDialog.tsx` — use `navigator.clipboard.writeText()` to copy command text, add `copied` state that briefly shows "Copied!" feedback (auto-reset after ~2 seconds via setTimeout), style button inline with the read-only textbox
 
 **Checkpoint**: Copy-and-cancel workflow complete — developers can extract the command for manual use
 
@@ -89,7 +88,7 @@
 
 ### Implementation for User Story 4
 
-- [ ] T012 [US4] Audit all push entry points in the codebase (search for `rpcClient.push` and push-related menu items) and ensure each triggers PushDialog instead of direct push calls — document findings and update any additional entry points found
+- [ ] T011 [US4] Audit all push entry points in the codebase (search for `rpcClient.push` and push-related menu items) and ensure each triggers PushDialog instead of direct push calls — document findings and update any additional entry points found
 
 **Checkpoint**: All push entry points unified under PushDialog
 
@@ -99,8 +98,8 @@
 
 **Purpose**: Edge case handling and build validation
 
-- [ ] T013 Handle edge cases in `webview-ui/src/components/PushDialog.tsx` — when no remotes configured: disable Execute button and show "No remotes configured" message; when single remote: pre-select it in dropdown; ensure branch names with special characters display correctly in preview
-- [ ] T014 Run `pnpm typecheck && pnpm lint && pnpm build` to validate zero errors across all modified files
+- [ ] T012 Handle edge cases in `webview-ui/src/components/PushDialog.tsx` — when no remotes configured: disable Execute button and show "No remotes configured" message; when single remote: pre-select it in dropdown; ensure branch names with special characters display correctly in preview
+- [ ] T013 Run `pnpm typecheck && pnpm lint && pnpm build` to validate zero errors across all modified files
 
 ---
 
@@ -118,17 +117,17 @@
 
 ### User Story Dependencies
 
-- **User Story 1 (P1)**: Depends on Foundational phase — creates the PushDialog component and BranchContextMenu integration
-- **User Story 2 (P1)**: Depends on US1 — adds interactive option behavior and force warning to existing PushDialog
+- **User Story 1 (P1)**: Depends on Foundational phase — creates the PushDialog component with all controls, command preview builder, and BranchContextMenu integration
+- **User Story 2 (P1)**: Depends on US1 — adds force push warning to existing PushDialog
 - **User Story 3 (P2)**: Depends on US1 — adds copy button to existing command preview
 - **User Story 4 (P2)**: Depends on US1 — audits and ensures all entry points use PushDialog
 
-**Note**: US3 and US4 are independent of US2 and could run in parallel with US2 after US1 completes.
+**Note**: US2, US3, and US4 are independent of each other and can proceed sequentially after US1. However, US2 (T009), US3 (T010), and US4 (T011) should NOT run in parallel with each other if they modify the same file (`PushDialog.tsx`) — run them sequentially within the same file.
 
 ### Parallel Opportunities
 
 - **Phase 2**: T003, T004, T005 can all run in parallel (different files)
-- **After US1**: US2, US3, and US4 can start in parallel (US3/US4 don't depend on US2)
+- **After US1**: US4 (T011, different files) can run in parallel with US2 or US3. US2 (T009) and US3 (T010) both modify `PushDialog.tsx` and must run sequentially.
 
 ---
 
@@ -144,10 +143,12 @@ Task: T005 "Update rpcClient.push() and add pushAsync() in webview-ui/src/rpc/rp
 ## Parallel Example: After User Story 1
 
 ```bash
-# These can start in parallel once US1 (Phase 3) is complete:
-Task: T009 "US2 — buildPushCommand() and live preview in PushDialog.tsx"
-Task: T011 "US3 — Copy button with clipboard in PushDialog.tsx"
-Task: T012 "US4 — Audit push entry points"
+# US4 touches different files and can run in parallel with US2 or US3:
+Task: T011 "US4 — Audit push entry points (different files)"
+
+# US2 and US3 both modify PushDialog.tsx — run sequentially:
+Task: T009 "US2 — Force push warning in PushDialog.tsx"
+Task: T010 "US3 — Copy button with clipboard in PushDialog.tsx"
 ```
 
 ---
@@ -159,14 +160,14 @@ Task: T012 "US4 — Audit push entry points"
 1. Complete Phase 1: Setup (T001–T002)
 2. Complete Phase 2: Foundational (T003–T005)
 3. Complete Phase 3: User Story 1 (T006–T008)
-4. **STOP and VALIDATE**: Dialog opens, defaults work, Execute pushes, loading state, auto-close
-5. This is a functional MVP — developers can push via dialog
+4. **STOP and VALIDATE**: Dialog opens, defaults work, command preview shows correct command, Execute pushes, loading state, auto-close
+5. This is a functional MVP — developers can push via dialog with full command visibility
 
 ### Incremental Delivery
 
 1. Setup + Foundational → Backend ready
-2. Add User Story 1 → Dialog opens and executes push (MVP!)
-3. Add User Story 2 → Options are interactive with live preview and force warning
+2. Add User Story 1 → Dialog opens with working command preview and executes push (MVP!)
+3. Add User Story 2 → Force push warning for safety visibility
 4. Add User Story 3 → Copy button for manual command use
 5. Add User Story 4 → All entry points consistent
 6. Polish → Edge cases handled, build validated
@@ -175,9 +176,10 @@ Task: T012 "US4 — Audit push entry points"
 
 ## Notes
 
-- [P] tasks = different files, no dependencies
+- [P] tasks = different files, no dependencies on incomplete tasks in same file
 - [Story] label maps task to specific user story for traceability
-- US1 creates PushDialog.tsx; US2–US4 modify it incrementally
-- US3 and US4 can run in parallel with US2 after US1 completes
+- US1 creates PushDialog.tsx with all controls and command preview builder; US2–US4 modify it incrementally
+- US2 and US3 both modify PushDialog.tsx — run sequentially, not in parallel
+- US4 (audit) touches different files and can run in parallel with US2 or US3
 - Commit after each phase or logical group
 - Stop at any checkpoint to validate story independently
