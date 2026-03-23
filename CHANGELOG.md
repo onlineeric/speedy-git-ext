@@ -4,6 +4,16 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] - 2026-03-24
+
+### Added
+- Push Branch dialog with configurable options: `--set-upstream / -u` checkbox (on by default), push mode selection (Normal, `--force-with-lease`, `--force`), and remote dropdown for multi-remote repositories.
+- Live command preview at the bottom of the push dialog showing the fully constructed `git push` command, updating in real time as options change.
+- Copy button next to the command preview to copy the exact git command to the clipboard for manual terminal use.
+- Yellow warning message and visual cues on the dialog when a force push mode (`--force` or `--force-with-lease`) is selected.
+- Loading indicator with disabled controls while a push operation is in progress; dialog closes automatically on completion with a success or error notification.
+- Consistent push workflow across all entry points in the extension — every "Push Branch" action opens the same dialog with the same options.
+
 ## [1.1.2] - 2026-03-23
 
 ### Fixed

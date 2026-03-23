@@ -649,13 +649,13 @@ export class WebviewProvider {
           message.payload.remote,
           message.payload.branch,
           message.payload.setUpstream,
-          message.payload.force
+          message.payload.forceMode
         );
         if (result.success) {
-          this.postMessage({ type: 'success', payload: { message: result.value } });
+          this.postMessage({ type: 'pushResult', payload: { success: true, message: result.value } });
           await this.sendInitialData();
         } else {
-          this.postMessage({ type: 'error', payload: { error: result.error } });
+          this.postMessage({ type: 'pushResult', payload: { success: false, message: result.error.message } });
         }
         break;
       }
