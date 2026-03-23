@@ -95,6 +95,7 @@ export type ResponseMessage =
   | { type: 'settingsData'; payload: { settings: UserSettings } }
   | { type: 'submodulesData'; payload: { submodules: Submodule[]; stack: SubmoduleNavEntry[] } }
   | { type: 'submoduleOperationResult'; payload: { success: boolean; error?: string } }
+  | { type: 'pushResult'; payload: { success: boolean; message: string } }
   | { type: 'avatarUrls'; payload: { urls: AvatarUrlMap } };
 
 export type Message = RequestMessage | ResponseMessage;
@@ -131,7 +132,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commitsAppended: true, prefetchError: true, repoList: true,
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
-  avatarUrls: true,
+  pushResult: true, avatarUrls: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {

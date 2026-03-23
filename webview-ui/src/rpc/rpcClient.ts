@@ -77,10 +77,6 @@ class RpcClient {
         break;
       case 'error':
         store.setError(message.payload.error.message);
-        if (this.pendingPush) {
-          this.pendingPush.reject(new Error(message.payload.error.message));
-          this.pendingPush = null;
-        }
         this.rejectPendingLookups(message.payload.error.message);
         break;
       case 'prefetchError':
@@ -89,8 +85,16 @@ class RpcClient {
         break;
       case 'success':
         store.setSuccessMessage(message.payload.message);
+        break;
+      case 'pushResult':
         if (this.pendingPush) {
-          this.pendingPush.resolve(message.payload.message);
+          if (message.payload.success) {
+            store.setSuccessMessage(message.payload.message);
+            this.pendingPush.resolve(message.payload.message);
+          } else {
+            store.setError(message.payload.message);
+            this.pendingPush.reject(new Error(message.payload.message));
+          }
           this.pendingPush = null;
         }
         break;

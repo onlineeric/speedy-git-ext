@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { PushForceMode } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
@@ -31,14 +31,29 @@ export function buildPushCommand(options: {
   return parts.join(' ');
 }
 
+function getDefaultRemote(remotes: { name: string }[]): string {
+  return remotes.find(r => r.name === 'origin')?.name ?? remotes[0]?.name ?? '';
+}
+
 export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
   const remotes = useGraphStore((s) => s.remotes);
 
   const [setUpstream, setSetUpstream] = useState(true);
   const [forceMode, setForceMode] = useState<PushForceMode>('none');
-  const [selectedRemote, setSelectedRemote] = useState('origin');
+  const [selectedRemote, setSelectedRemote] = useState(() => getDefaultRemote(remotes));
   const [isPushing, setIsPushing] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Reset dialog state each time it opens, syncing selectedRemote with current remotes
+  useEffect(() => {
+    if (open) {
+      setSetUpstream(true);
+      setForceMode('none');
+      setSelectedRemote(getDefaultRemote(remotes));
+      setIsPushing(false);
+      setCopied(false);
+    }
+  }, [open, remotes]);
 
   const command = buildPushCommand({ remote: selectedRemote, branch: branchName, setUpstream, forceMode });
   const isForce = forceMode !== 'none';
@@ -68,17 +83,8 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
 
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen && !isPushing) {
-      resetState();
       onCancel();
     }
-  };
-
-  const resetState = () => {
-    setSetUpstream(true);
-    setForceMode('none');
-    setSelectedRemote('origin');
-    setIsPushing(false);
-    setCopied(false);
   };
 
   return (
