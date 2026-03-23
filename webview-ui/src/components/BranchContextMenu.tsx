@@ -7,6 +7,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { InputDialog } from './InputDialog';
 import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 import { MergeDialog } from './MergeDialog';
+import { PushDialog } from './PushDialog';
 import { CheckoutWithPullDialog } from './CheckoutWithPullDialog';
 
 
@@ -42,6 +43,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [pushDialogOpen, setPushDialogOpen] = useState(false);
   const [checkoutWithPullOpen, setCheckoutWithPullOpen] = useState(false);
   const [rebaseConfirmOpen, setRebaseConfirmOpen] = useState(false);
   const loading = useGraphStore((s) => s.loading);
@@ -109,7 +111,6 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
 
   return (
     <>
-      {/* Wrapper span stops contextmenu event from bubbling to parent CommitContextMenu */}
       {/* Wrapper stops contextmenu event from bubbling to parent CommitContextMenu */}
       <span onContextMenu={(e) => e.stopPropagation()}>
       <ContextMenu.Root>
@@ -141,7 +142,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                 <ContextMenu.Item className={menuItemClass} onSelect={() => setRenameOpen(true)}>
                   Rename Branch...
                 </ContextMenu.Item>
-                <ContextMenu.Item className={menuItemClass} onSelect={() => rpcClient.push(undefined, refInfo.name)}>
+                <ContextMenu.Item className={menuItemClass} onSelect={() => setPushDialogOpen(true)}>
                   Push Branch
                 </ContextMenu.Item>
                 {isCurrentBranch && (
@@ -249,6 +250,13 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         label="New branch name"
         defaultValue={refInfo.name}
         validate={(v) => v.startsWith('-') ? 'Branch name cannot start with -' : undefined}
+      />
+
+      {/* Push dialog */}
+      <PushDialog
+        open={pushDialogOpen}
+        branchName={refInfo.name}
+        onCancel={() => setPushDialogOpen(false)}
       />
 
       {/* Merge dialog */}

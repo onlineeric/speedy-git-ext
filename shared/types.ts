@@ -170,6 +170,8 @@ export interface StashEntry {
 
 export type ResetMode = 'soft' | 'mixed' | 'hard';
 
+export type PushForceMode = 'none' | 'force-with-lease' | 'force';
+
 export interface MergeOptions {
   noCommit: boolean;
   noFastForward: boolean;

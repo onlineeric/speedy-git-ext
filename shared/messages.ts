@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap } from './types.js';
 import type { GitError } from './errors.js';
 
 export type RequestMessage =
@@ -19,7 +19,7 @@ export type RequestMessage =
   | { type: 'deleteRemoteBranch'; payload: { remote: string; name: string } }
   | { type: 'mergeBranch'; payload: { branch: string; noFastForward?: boolean; squash?: boolean; noCommit?: boolean } }
   // Remote ops
-  | { type: 'push'; payload: { remote?: string; branch?: string; setUpstream?: boolean; force?: boolean } }
+  | { type: 'push'; payload: { remote: string; branch: string; setUpstream?: boolean; forceMode?: PushForceMode } }
   | { type: 'pull'; payload: { remote?: string; branch?: string; rebase?: boolean } }
   | { type: 'getRemotes'; payload: Record<string, never> }
   | { type: 'addRemote'; payload: { name: string; url: string } }
@@ -95,6 +95,7 @@ export type ResponseMessage =
   | { type: 'settingsData'; payload: { settings: UserSettings } }
   | { type: 'submodulesData'; payload: { submodules: Submodule[]; stack: SubmoduleNavEntry[] } }
   | { type: 'submoduleOperationResult'; payload: { success: boolean; error?: string } }
+  | { type: 'pushResult'; payload: { success: boolean; message: string } }
   | { type: 'avatarUrls'; payload: { urls: AvatarUrlMap } };
 
 export type Message = RequestMessage | ResponseMessage;
@@ -131,7 +132,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commitsAppended: true, prefetchError: true, repoList: true,
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
-  avatarUrls: true,
+  pushResult: true, avatarUrls: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {
