@@ -147,11 +147,14 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
               </div>
             </fieldset>
 
-            {isForce && (
-              <div className="px-3 py-2 rounded border border-yellow-500 bg-yellow-500/10 text-sm text-yellow-300">
-                Warning: Force pushing will overwrite remote history. This can cause data loss for other collaborators.
-              </div>
-            )}
+            {/* Always rendered to reserve fixed height — prevents dialog from resizing when toggling push mode */}
+            <div className={`px-3 py-2 rounded border text-sm ${
+              isForce
+                ? 'border-yellow-500 bg-yellow-500/10 text-yellow-300'
+                : 'border-transparent text-transparent select-none'
+            }`}>
+              Warning: Force pushing will overwrite remote history. This can cause data loss for other collaborators.
+            </div>
 
             {/* Command preview */}
             <div className="space-y-1">
