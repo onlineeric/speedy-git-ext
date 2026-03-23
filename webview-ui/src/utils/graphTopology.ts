@@ -72,6 +72,13 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
   // Track which commit hash reserved each parent (for re-reservation when lower lane claims it)
   const reservedByHash = new Map<string, string>();
 
+  // Track lanes with active connection lines passing through (freed in activeLanes but visually occupied)
+  const busyLanes = new Map<number, number>();
+
+  // Collect stash commit indices during the main loop so the post-loop
+  // resolution can iterate only stashes instead of scanning all commits.
+  const stashIndices: number[] = [];
+
   for (let i = 0; i < commits.length; i++) {
     const commit = commits[i];
     const hash = commit.hash;
@@ -91,7 +98,7 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
 
     if (assignedLane === -1) {
       // Not found anywhere, assign to first available lane
-      assignedLane = findAvailableLane(activeLanes);
+      assignedLane = findAvailableLane(activeLanes, busyLanes, i);
       if (assignedLane === activeLanes.length) {
         activeLanes.push(null);
       }
@@ -110,14 +117,27 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
     const parentConnections: CommitNode['parentConnections'] = [];
     const parents = commit.parents;
 
-    if (parents.length === 0) {
+    // Stash commits are dead-end leaf nodes — skip parent processing so they
+    // don't pull their parent onto the stash lane. Connections are resolved post-loop.
+    const isStash = commit.refs.some(r => r.type === 'stash');
+
+    if (isStash) {
+      // No parent processing — stash connections resolved after the main loop.
+      // Mark the stash lane as busy until the parent row so the connection line
+      // prevents other commits from landing on this lane.
+      stashIndices.push(i);
+      if (parents.length > 0) {
+        const parentRow = commitIndexByHash.get(parents[0]);
+        if (parentRow !== undefined) markBusyLane(busyLanes, assignedLane, parentRow);
+      }
+    } else if (parents.length === 0) {
       // Root commit - lane stays free
     } else if (parents.length === 1) {
       // Single parent
       const parentHash = parents[0];
-      const parentInCommits = commitIndexByHash.has(parentHash);
+      const parentRow = commitIndexByHash.get(parentHash);
 
-      if (parentInCommits) {
+      if (parentRow !== undefined) {
         const existingLane = reservedLane.get(parentHash);
 
         if (existingLane !== undefined && existingLane !== assignedLane) {
@@ -130,6 +150,8 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
               toLane: assignedLane,
               colorIndex,
             });
+            // reReserveParent freed existingLane but the rewritten connection still passes through it
+            markBusyLane(busyLanes, existingLane, parentRow);
           } else {
             // Parent already reserved on lower lane - draw connection to that lane
             const childColor = colorIndex;
@@ -139,6 +161,8 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
               toLane: existingLane,
               colorIndex: childColor,
             });
+            // Connection line passes through assignedLane (continuation = fromLane for non-merge)
+            markBusyLane(busyLanes, assignedLane, parentRow);
           }
         } else {
           // Reserve parent on same lane
@@ -157,9 +181,9 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
       // Merge commit - multiple parents
       for (let p = 0; p < parents.length; p++) {
         const parentHash = parents[p];
-        const parentInCommits = commitIndexByHash.has(parentHash);
+        const parentRow = commitIndexByHash.get(parentHash);
 
-        if (!parentInCommits) continue;
+        if (parentRow === undefined) continue;
 
         const existingLane = reservedLane.get(parentHash);
 
@@ -175,6 +199,8 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
                 toLane: assignedLane,
                 colorIndex,
               });
+              // reReserveParent freed existingLane but the rewritten connection still passes through it
+              markBusyLane(busyLanes, existingLane, parentRow);
             } else {
               // Already reserved on lower lane, connect to that lane
               const childColor = colorIndex;
@@ -184,6 +210,8 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
                 toLane: existingLane,
                 colorIndex: childColor,
               });
+              // Connection line passes through assignedLane until the merge's continuation reaches toLane
+              markBusyLane(busyLanes, assignedLane, parentRow);
             }
           } else {
             // Use same lane
@@ -210,7 +238,7 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
             });
           } else {
             // Find adjacent lane for branch (prefer lane next to current)
-            const branchLane = findAdjacentLane(activeLanes, assignedLane);
+            const branchLane = findAdjacentLane(activeLanes, assignedLane, busyLanes, i);
             if (branchLane === activeLanes.length) {
               activeLanes.push(null);
             }
@@ -243,6 +271,26 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
       incomingConnections: [],
       hasConnectionFromAbove: false,
     });
+
+  }
+
+  // Resolve stash connections now that all lane assignments are finalized.
+  // Stash commits were skipped during parent processing to prevent them from
+  // pulling their parent onto the stash lane. Now we simply draw a connection
+  // from the stash's lane to wherever its parent ended up.
+  for (const idx of stashIndices) {
+    const commit = commits[idx];
+    if (commit.parents.length === 0) continue;
+    const stashNode = nodes.get(commit.hash);
+    const parentNode = nodes.get(commit.parents[0]);
+    if (stashNode && parentNode) {
+      stashNode.parentConnections.push({
+        parentHash: commit.parents[0],
+        fromLane: stashNode.lane,
+        toLane: parentNode.lane,
+        colorIndex: stashNode.colorIndex,
+      });
+    }
   }
 
   // Build incoming connections from finalized parent connections so rendering
@@ -431,11 +479,29 @@ function addIncomingConnection(
 }
 
 /**
- * Find first available (null) lane
+ * Check if a lane has an active connection line passing through it at the given row.
  */
-function findAvailableLane(lanes: (string | null)[]): number {
+function isLaneBusy(busyLanes: Map<number, number>, lane: number, currentRow: number): boolean {
+  const endRow = busyLanes.get(lane);
+  return endRow !== undefined && currentRow < endRow;
+}
+
+/**
+ * Mark a lane as visually busy (connection line passing through) until endRowIndex.
+ */
+function markBusyLane(busyLanes: Map<number, number>, lane: number, endRowIndex: number): void {
+  const existing = busyLanes.get(lane);
+  if (existing === undefined || endRowIndex > existing) {
+    busyLanes.set(lane, endRowIndex);
+  }
+}
+
+/**
+ * Find first available lane that is both null and not busy with a passing connection.
+ */
+function findAvailableLane(lanes: (string | null)[], busyLanes: Map<number, number>, currentRow: number): number {
   for (let i = 0; i < lanes.length; i++) {
-    if (lanes[i] === null) {
+    if (lanes[i] === null && !isLaneBusy(busyLanes, i, currentRow)) {
       return i;
     }
   }
@@ -443,22 +509,23 @@ function findAvailableLane(lanes: (string | null)[]): number {
 }
 
 /**
- * Find an available lane adjacent to the given lane (prefer lane+1, then lane-1, then any)
+ * Find an available lane adjacent to the given lane (prefer lane+1, then lane-1, then any).
+ * Lanes with active passing connections are not considered available.
  */
-function findAdjacentLane(lanes: (string | null)[], nearLane: number): number {
+function findAdjacentLane(lanes: (string | null)[], nearLane: number, busyLanes: Map<number, number>, currentRow: number): number {
   // Prefer the lane immediately to the right
   const rightLane = nearLane + 1;
-  if (rightLane >= lanes.length || lanes[rightLane] === null) {
+  if (rightLane >= lanes.length || (lanes[rightLane] === null && !isLaneBusy(busyLanes, rightLane, currentRow))) {
     return rightLane;
   }
 
   // Try lane to the left (if valid and available)
-  if (nearLane > 0 && lanes[nearLane - 1] === null) {
+  if (nearLane > 0 && lanes[nearLane - 1] === null && !isLaneBusy(busyLanes, nearLane - 1, currentRow)) {
     return nearLane - 1;
   }
 
   // Find any available lane
-  return findAvailableLane(lanes);
+  return findAvailableLane(lanes, busyLanes, currentRow);
 }
 
 /**
