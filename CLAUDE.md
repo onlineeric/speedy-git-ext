@@ -93,17 +93,8 @@ Built with **Vite** + React plugin → `dist/webview/`
 - **Git**: NEVER commit, branch, or merge; only readonly operations (`git log`, `git status`, `git diff`) and create PR only if I ask you to do so.
 
 ## Active Technologies
-- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + VS Code Extension API with esbuild backend, Vite + React 18 webview, Zustand state management, and Radix UI/Tailwind in the UI stack (012-015 milestones).
-- Local git repository as the source of data, with state kept in-memory (Zustand + local component state) and existing caching patterns (e.g., `gravatar.ts`) reused.
-- TypeScript 5.x (strict) + React 18, Zustand, @radix-ui/react-popover (already installed), VS Code Extension API, esbuild, Vite (015-misc-improvements)
-- In-memory caching (existing pattern in gravatar.ts) (015-misc-improvements)
-- TypeScript 5.x (strict) + VS Code Extension API (1.80+), `vscode.git` built-in extension API v1, esbuild (backend), Vite + React 18 (webview) (016-auto-refresh)
-- N/A (in-memory state only) (016-auto-refresh)
-- TypeScript 5.x (strict) + React 18, @radix-ui/react-context-menu, Zustand, VS Code Extension API (017-rebase-branch-on-branch)
-- N/A (in-memory Zustand store) (017-rebase-branch-on-branch)
-- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand, @tanstack/react-virtual, @radix-ui/react-context-menu, Tailwind CSS (019-badge-lane-color)
-- TypeScript 5.x (strict mode with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand, `@tanstack/react-virtual`, `@headless-tree/core` + `@headless-tree/react` (new), Tailwind CSS, Radix UI (018-commit-files-enhancements)
-- N/A (in-memory Zustand store, session-scoped) (018-commit-files-enhancements)
-- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand, `@radix-ui/react-dialog`, Tailwind CSS, esbuild (backend), Vite (webview) (020-push-branch-dialog)
+- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + VS Code Extension API (Node-backed with esbuild, VS Code git API as needed) + Vite + React 18 webview, with Zustand and Tailwind-based UI layers that include Radix UI and add-on libraries such as `@radix-ui/react-context-menu`, `@radix-ui/react-dialog`, `@radix-ui/react-popover`, `@tanstack/react-virtual`, and headless-tree when features require them.
+- Local git repo remains the runtime data source; app state and caches are kept in-memory (`Zustand`/component state) and reused caching patterns (e.g., `gravatar.ts`) are shared across features.
+- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand, Tailwind CSS, Vite (webview build), esbuild (extension build) (021-ui-panel-toolbar-polish)
 
 ## Recent Changes
