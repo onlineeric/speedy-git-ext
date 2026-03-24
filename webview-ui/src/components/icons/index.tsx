@@ -121,6 +121,47 @@ export function TreeViewIcon({ className, size = 16 }: IconProps & { size?: numb
   );
 }
 
+/** Cloud shape for remote management — 12×12, inherits text color via currentColor */
+export function CloudIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path
+        d="M 3 9 C 1.5 9 0.5 8 0.5 6.5 C 0.5 5.2 1.3 4.2 2.5 4 C 2.8 2.5 4.2 1.5 6 1.5 C 7.8 1.5 9.2 2.5 9.5 4 C 10.7 4.2 11.5 5.2 11.5 6.5 C 11.5 8 10.5 9 9 9 Z"
+        stroke="currentColor"
+        strokeWidth={1.2}
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** X close icon — 12×12, inherits text color via currentColor */
+export function CloseIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path d="M 3 3 L 9 9 M 9 3 L 3 9" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Right-pointing arrow for move panel — 12×12, inherits text color via currentColor */
+export function MoveRightIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path d="M 2 6 H 10 M 7 3 L 10 6 L 7 9" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Down-pointing arrow for move panel — 12×12, inherits text color via currentColor */
+export function MoveBottomIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path d="M 6 2 V 10 M 3 7 L 6 10 L 9 7" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** Filled target/bullseye for HEAD indicator — 12×12, inherits text color via currentColor */
 export function HeadIcon({ className, style }: IconProps) {
   return (
