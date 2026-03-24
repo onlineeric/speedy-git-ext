@@ -4,6 +4,19 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.1] - 2026-03-24
+
+### Changed
+- Commit details panel in right-side position now supports drag-to-resize width, matching the existing bottom panel height resize behavior, with a maximum width cap that preserves at least 200px for the graph area.
+- Toolbar action buttons reordered to Refresh, Fetch, Search for a more logical workflow (refresh local state first, then fetch remote, then search).
+- "Manage Remotes..." text button replaced with a compact cloud icon button, moved next to the settings gear to reduce toolbar clutter.
+- Panel header "move" button now displays an icon with a descriptive label ("Move to right" or "Move to bottom") instead of a bare arrow symbol.
+- Panel header close and move buttons are larger for easier click targeting.
+
+### Fixed
+- Close button in the commit details panel header now renders a proper X icon instead of garbled text caused by a Unicode rendering issue.
+- Switching repositories via the dropdown now immediately closes the commit details panel and clears the selected commit highlight, preventing stale commit information from a different repository from being displayed.
+
 ## [1.2.0] - 2026-03-24
 
 ### Added
