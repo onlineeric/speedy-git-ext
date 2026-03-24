@@ -15,7 +15,7 @@
 
 **Purpose**: Add SVG icon components needed by US2 (CloudIcon) and US4 (CloseIcon, MoveRightIcon, MoveBottomIcon)
 
-- [ ] T001 Add CloudIcon, CloseIcon, MoveRightIcon, and MoveBottomIcon SVG components to webview-ui/src/components/icons/index.tsx following existing IconProps pattern (12x12 viewBox, currentColor, aria-hidden)
+- [x] T001 Add CloudIcon, CloseIcon, MoveRightIcon, and MoveBottomIcon SVG components to webview-ui/src/components/icons/index.tsx following existing IconProps pattern (12x12 viewBox, currentColor, aria-hidden)
 
 **Checkpoint**: All 4 new icons exported and available for import
 
@@ -31,7 +31,7 @@
 
 **Independent Test**: Move panel to right side → drag left resize handle → verify width changes smoothly and caps at max
 
-- [ ] T002 [P] [US1] Fix right-side panel resize in webview-ui/src/components/CommitDetailsPanel.tsx: add `relative` to panel container className, read parent container width in handleResizeStart to compute maxWidth (containerWidth - 200), apply Math.min(maxWidth, Math.max(MIN_SIZE, newSize))
+- [x] T002 [P] [US1] Fix right-side panel resize in webview-ui/src/components/CommitDetailsPanel.tsx: add `relative` to panel container className, read parent container width in handleResizeStart to compute maxWidth (containerWidth - 200), apply Math.min(maxWidth, Math.max(MIN_SIZE, newSize))
 
 ### User Story 2 - Toolbar Button Reorganization
 
@@ -39,7 +39,7 @@
 
 **Independent Test**: Verify toolbar button order visually, click cloud icon → Remote Management dialog opens
 
-- [ ] T003 [P] [US2] Reorganize toolbar in webview-ui/src/components/ControlBar.tsx: reorder buttons to Refresh, Fetch, Search after branch dropdown; remove "Manage Remotes..." text button; add CloudIcon button (import from icons) between ml-auto loaded commits count and settings gear button with title="Manage Remotes" and aria-label
+- [x] T003 [P] [US2] Reorganize toolbar in webview-ui/src/components/ControlBar.tsx: reorder buttons to Refresh, Fetch, Search after branch dropdown; remove "Manage Remotes..." text button; add CloudIcon button (import from icons) between ml-auto loaded commits count and settings gear button with title="Manage Remotes" and aria-label
 
 ### User Story 3 - Hide Commit Details Panel on Repo Switch
 
@@ -47,7 +47,7 @@
 
 **Independent Test**: Open commit details → switch repo from dropdown → verify panel closes and no commit is highlighted
 
-- [ ] T004 [P] [US3] Clear commit state on repo switch in webview-ui/src/stores/graphStore.ts: in setActiveRepo, add to the set() call: selectedCommit: undefined, selectedCommitIndex: -1, selectedCommits: [], lastClickedHash: undefined, commitDetails: undefined, detailsPanelOpen: false
+- [x] T004 [P] [US3] Clear commit state on repo switch in webview-ui/src/stores/graphStore.ts: in setActiveRepo, add to the set() call: selectedCommit: undefined, selectedCommitIndex: -1, selectedCommits: [], lastClickedHash: undefined, commitDetails: undefined, detailsPanelOpen: false
 
 **Checkpoint**: All P1 stories independently functional — resize works, toolbar reordered, repo switch clears panel
 
@@ -61,7 +61,7 @@
 
 **Dependencies**: T001 (icons), T002 (same file — CommitDetailsPanel.tsx)
 
-- [ ] T005 [US4] Update PanelHeader in webview-ui/src/components/CommitDetailsPanel.tsx: replace Unicode move arrows with MoveRightIcon/MoveBottomIcon SVG + add text label "Move to right" or "Move to bottom"; replace Unicode close ✕ with CloseIcon SVG; increase both buttons from px-1.5 py-0.5 to px-2 py-1 with flex items-center gap-1 for icon+label layout
+- [x] T005 [US4] Update PanelHeader in webview-ui/src/components/CommitDetailsPanel.tsx: replace Unicode move arrows with MoveRightIcon/MoveBottomIcon SVG + add text label "Move to right" or "Move to bottom"; replace Unicode close ✕ with CloseIcon SVG; increase both buttons from px-1.5 py-0.5 to px-2 py-1 with flex items-center gap-1 for icon+label layout
 
 **Checkpoint**: All 4 user stories complete — panel header buttons render correctly with SVG icons and labels
 
@@ -71,7 +71,7 @@
 
 **Purpose**: Verify all changes compile and work together
 
-- [ ] T006 Run pnpm typecheck, pnpm lint, and pnpm build to validate zero errors across all modified files
+- [x] T006 Run pnpm typecheck, pnpm lint, and pnpm build to validate zero errors across all modified files
 - [ ] T007 Run quickstart.md smoke test checklist via VS Code "Run Extension" launch config
 
 ---
