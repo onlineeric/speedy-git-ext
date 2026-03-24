@@ -414,7 +414,16 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     });
   },
   setActiveRepo: (repoPath) => {
-    set({ isLoadingRepo: true, pendingCommitCheckout: null });
+    set({
+      isLoadingRepo: true,
+      pendingCommitCheckout: null,
+      selectedCommit: undefined,
+      selectedCommitIndex: -1,
+      selectedCommits: [],
+      lastClickedHash: undefined,
+      commitDetails: undefined,
+      detailsPanelOpen: false,
+    });
     import('../rpc/rpcClient').then(({ rpcClient }) => {
       rpcClient.send({ type: 'switchRepo', payload: { repoPath } });
     }).catch(() => {

@@ -4,6 +4,7 @@ import { rpcClient } from '../rpc/rpcClient';
 import { RemoteManagementDialog } from './RemoteManagementDialog';
 import { RepoSelector } from './RepoSelector';
 import { FilterableBranchDropdown } from './FilterableBranchDropdown';
+import { CloudIcon } from './icons';
 
 export function ControlBar() {
   const { branches, filters, setFilters, mergedCommits, loading, totalLoadedWithoutFilter, searchState, openSearch, closeSearch } = useGraphStore();
@@ -36,28 +37,20 @@ export function ControlBar() {
       />
 
       <button
+        onClick={handleRefresh}
+        className="px-3 py-1 text-sm bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] rounded hover:bg-[var(--vscode-button-hoverBackground)] focus:outline-none"
+        title="Refresh"
+      >
+        Refresh
+      </button>
+
+      <button
         onClick={handleFetch}
         disabled={loading}
         className={buttonSecondaryClass}
         title="Fetch all remotes"
       >
         Fetch
-      </button>
-
-      <button
-        onClick={() => setRemoteDialogOpen(true)}
-        className={buttonSecondaryClass}
-        title="Manage remotes"
-      >
-        Manage Remotes...
-      </button>
-
-      <button
-        onClick={handleRefresh}
-        className="px-3 py-1 text-sm bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] rounded hover:bg-[var(--vscode-button-hoverBackground)] focus:outline-none"
-        title="Refresh"
-      >
-        Refresh
       </button>
 
       <button
@@ -71,6 +64,15 @@ export function ControlBar() {
       <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)]">
         {totalLoadedWithoutFilter !== null ? totalLoadedWithoutFilter : mergedCommits.length} loaded commits
       </span>
+
+      <button
+        onClick={() => setRemoteDialogOpen(true)}
+        aria-label="Manage Remotes"
+        className={buttonSecondaryClass}
+        title="Manage Remotes"
+      >
+        <CloudIcon />
+      </button>
 
       <button
         onClick={() => rpcClient.openSettings()}

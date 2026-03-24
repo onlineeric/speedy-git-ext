@@ -3,13 +3,15 @@ import type { CommitDetails, FileChange, DetailsPanelPosition, CommitSignatureIn
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { formatRelativeDate } from '../utils/formatDate';
-import { ListViewIcon, TreeViewIcon } from './icons';
+import { ListViewIcon, TreeViewIcon, CloseIcon, MoveRightIcon, MoveBottomIcon } from './icons';
 import { FileChangesTreeView } from './FileChangesTreeView';
 import { FileStatusBadge, FileChangeIndicators, FileActionIcons } from './FileChangeShared';
 
 const MIN_SIZE = 120;
 const DEFAULT_BOTTOM_HEIGHT = 280;
 const DEFAULT_RIGHT_WIDTH = 400;
+
+const MIN_GRAPH_WIDTH = 200;
 
 export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
   const {
@@ -23,6 +25,7 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
   const [bottomHeight, setBottomHeight] = useState(DEFAULT_BOTTOM_HEIGHT);
   const [rightWidth, setRightWidth] = useState(DEFAULT_RIGHT_WIDTH);
   const resizing = useRef(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const handleResizeStart = useCallback(
     (event: React.MouseEvent) => {
@@ -31,15 +34,17 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
 
       const startPos = detailsPanelPosition === 'bottom' ? event.clientY : event.clientX;
       const startSize = detailsPanelPosition === 'bottom' ? bottomHeight : rightWidth;
+      const containerWidth = panelRef.current?.parentElement?.clientWidth ?? Infinity;
+      const maxWidth = containerWidth - MIN_GRAPH_WIDTH;
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         if (!resizing.current) return;
         const delta = startPos - (detailsPanelPosition === 'bottom' ? moveEvent.clientY : moveEvent.clientX);
-        const newSize = Math.max(MIN_SIZE, startSize + delta);
+        const clamped = Math.max(MIN_SIZE, startSize + delta);
         if (detailsPanelPosition === 'bottom') {
-          setBottomHeight(newSize);
+          setBottomHeight(clamped);
         } else {
-          setRightWidth(newSize);
+          setRightWidth(Math.min(maxWidth, clamped));
         }
       };
 
@@ -66,7 +71,8 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
 
   return (
     <div
-      className={`flex flex-col border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] ${
+      ref={panelRef}
+      className={`relative flex flex-col border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] ${
         isBottom ? 'border-t' : 'border-l'
       }`}
       style={panelStyle}
@@ -124,17 +130,18 @@ function PanelHeader({
       </span>
       <button
         onClick={onTogglePosition}
-        className="rounded px-1.5 py-0.5 text-xs text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)]"
+        className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)]"
         title={`Move panel to ${position === 'bottom' ? 'right' : 'bottom'}`}
       >
-        {position === 'bottom' ? '\u2b95' : '\u2b07'}
+        <span>{'Move'}</span>
+        {position === 'bottom' ? <MoveRightIcon /> : <MoveBottomIcon />}
       </button>
       <button
         onClick={onClose}
-        className="rounded px-1.5 py-0.5 text-xs text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)]"
+        className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)]"
         title="Close panel"
       >
-        \u2715
+        <CloseIcon />
       </button>
     </div>
   );
