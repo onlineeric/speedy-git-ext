@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
+import { buildCheckoutCommand } from '../utils/gitCommandBuilder';
+import { CommandPreview } from './CommandPreview';
 
 interface CheckoutWithPullDialogProps {
   open: boolean;
@@ -54,6 +56,10 @@ export function CheckoutWithPullDialog({ open, branchName, onConfirm, onCancel }
               />
               <span className="text-sm text-[var(--vscode-foreground)]">No pull</span>
             </label>
+          </div>
+
+          <div className="mt-4">
+            <CommandPreview command={buildCheckoutCommand({ branch: branchName, pull })} />
           </div>
 
           <div className="flex justify-end gap-2 mt-4">

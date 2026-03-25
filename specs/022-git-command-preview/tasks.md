@@ -17,7 +17,7 @@
 
 **Purpose**: Create the shared utility and reusable component that all dialogs depend on. No user story work can begin until this phase is complete.
 
-- [ ] T001 [P] Create all command builder pure functions (buildPushCommand, buildMergeCommand, buildRebaseCommand, buildCherryPickCommand, buildResetCommand, buildRevertCommand, buildDropCommitCommand, buildCheckoutCommand, buildTagCommand) with typed option interfaces in `webview-ui/src/utils/gitCommandBuilder.ts`
+- [X] T001 [P] Create all command builder pure functions (buildPushCommand, buildMergeCommand, buildRebaseCommand, buildCherryPickCommand, buildResetCommand, buildRevertCommand, buildDropCommitCommand, buildCheckoutCommand, buildTagCommand) with typed option interfaces in `webview-ui/src/utils/gitCommandBuilder.ts`
   - Import `PushForceMode`, `ResetMode` from `@shared/types`
   - Each function takes a typed options object and returns a git command string
   - `buildPushCommand({ remote, branch, setUpstream, forceMode })` → `git push [-u] [--force-with-lease|--force] <remote> <branch>`
@@ -29,14 +29,14 @@
   - `buildDropCommitCommand({ hash })` → `git rebase -i <hash>~1  # drop <hash>`
   - `buildCheckoutCommand({ branch, pull })` → `git checkout <branch> [&& git pull]`
   - `buildTagCommand({ name, hash, message? })` → `git tag [-a] <name> [-m "<message>"] <hash>`
-- [ ] T002 [P] Create reusable CommandPreview component in `webview-ui/src/components/CommandPreview.tsx`
+- [X] T002 [P] Create reusable CommandPreview component in `webview-ui/src/components/CommandPreview.tsx`
   - Extract from PushDialog.tsx lines 165-183 (readonly input + Copy button with "Copied!" feedback)
   - Props: `{ command: string }`
   - Encapsulate clipboard logic (`navigator.clipboard.writeText`) + `copied` state with 2s timeout
   - Use same CSS: label "Command preview:", flex row, readonly input with `font-mono select-all`, secondary-styled Copy button
   - Input MUST use `overflow-x: auto` (or Tailwind `overflow-x-auto`) so long command strings (e.g., cherry-picking many commits) scroll horizontally without breaking the dialog layout
   - Silent failure on clipboard error (matching existing PushDialog behavior)
-- [ ] T003 Create unit tests for all builder functions in `webview-ui/src/utils/__tests__/gitCommandBuilder.test.ts`
+- [X] T003 Create unit tests for all builder functions in `webview-ui/src/utils/__tests__/gitCommandBuilder.test.ts`
   - Follow existing vitest pattern from `mergeRefs.test.ts`: `import { describe, it, expect } from 'vitest'`
   - One `describe` block per builder function
   - Test all flag combinations per function:
@@ -62,7 +62,7 @@
 
 ### Implementation for User Story 1
 
-- [ ] T004 [US1] Refactor PushDialog to use shared pieces in `webview-ui/src/components/PushDialog.tsx`
+- [X] T004 [US1] Refactor PushDialog to use shared pieces in `webview-ui/src/components/PushDialog.tsx`
   - Remove inline `buildPushCommand` function (lines 19-32) → import from `../utils/gitCommandBuilder`
   - Remove `copied` state and `handleCopy` handler (lines 67-82)
   - Replace inline command preview UI (lines 165-183) with `<CommandPreview command={command} />`
@@ -81,11 +81,11 @@
 
 ### Implementation for User Story 2
 
-- [ ] T005 [P] [US2] Add command preview to MergeDialog in `webview-ui/src/components/MergeDialog.tsx`
+- [X] T005 [P] [US2] Add command preview to MergeDialog in `webview-ui/src/components/MergeDialog.tsx`
   - Import `buildMergeCommand` from `../utils/gitCommandBuilder` and `CommandPreview` from `./CommandPreview`
   - Compute command: `buildMergeCommand({ branch: branchName, noCommit, noFastForward: noCommit ? true : noFastForward })`
   - Insert `<CommandPreview command={command} />` between the checkboxes section and the action buttons (after line 61, before line 63)
-- [ ] T006 [P] [US2] Add command preview to CherryPickDialog in `webview-ui/src/components/CherryPickDialog.tsx`
+- [X] T006 [P] [US2] Add command preview to CherryPickDialog in `webview-ui/src/components/CherryPickDialog.tsx`
   - Import `buildCherryPickCommand` from `../utils/gitCommandBuilder` and `CommandPreview` from `./CommandPreview`
   - Compute command using existing state: `buildCherryPickCommand({ hashes: commits.map(c => c.abbreviatedHash), appendSourceRef, noCommit, ...(isSingleMergeCommit ? { mainlineParent } : {}) })`
   - Insert `<CommandPreview command={command} />` between options section and action buttons
@@ -102,26 +102,26 @@
 
 ### Implementation for User Story 3
 
-- [ ] T007 [P] [US3] Add optional targetRef prop and command preview to RebaseConfirmDialog in `webview-ui/src/components/RebaseConfirmDialog.tsx`
+- [X] T007 [P] [US3] Add optional targetRef prop and command preview to RebaseConfirmDialog in `webview-ui/src/components/RebaseConfirmDialog.tsx`
   - Add `targetRef?: string` to `RebaseConfirmDialogProps` interface
   - Import `buildRebaseCommand` from `../utils/gitCommandBuilder` and `CommandPreview` from `./CommandPreview`
   - When `targetRef` is provided, compute command: `buildRebaseCommand({ targetRef, ignoreDate })`
   - Render `<CommandPreview>` between description/checkbox area and action buttons (only when targetRef is provided)
   - Backward compatible: existing callers without targetRef continue working (no preview shown)
-- [ ] T008 [P] [US3] Add optional commandPreview prop to ConfirmDialog in `webview-ui/src/components/ConfirmDialog.tsx`
+- [X] T008 [P] [US3] Add optional commandPreview prop to ConfirmDialog in `webview-ui/src/components/ConfirmDialog.tsx`
   - Add `commandPreview?: string` to `ConfirmDialogProps` interface
   - Import `CommandPreview` from `./CommandPreview`
   - When `commandPreview` is provided, render `<CommandPreview command={commandPreview} />` between `<AlertDialog.Description>` and the action buttons div
   - No change for existing usages that don't pass the prop
-- [ ] T009 [P] [US3] Add command preview to DropCommitDialog in `webview-ui/src/components/DropCommitDialog.tsx`
+- [X] T009 [P] [US3] Add command preview to DropCommitDialog in `webview-ui/src/components/DropCommitDialog.tsx`
   - Import `buildDropCommitCommand` from `../utils/gitCommandBuilder` and `CommandPreview` from `./CommandPreview`
   - Compute command: `buildDropCommitCommand({ hash: commitHash.slice(0, 7) })` (abbreviated hash)
   - Insert `<CommandPreview command={command} />` between the warning text section and action buttons (after line 37, before line 39)
-- [ ] T010 [US3] Wire CommitContextMenu to pass command data to dialogs in `webview-ui/src/components/CommitContextMenu.tsx`
+- [X] T010 [US3] Wire CommitContextMenu to pass command data to dialogs in `webview-ui/src/components/CommitContextMenu.tsx`
   - Import `buildResetCommand` from `../utils/gitCommandBuilder`
   - Pass `commandPreview={buildResetCommand({ hash: commit.abbreviatedHash, mode: pendingResetMode })}` to the Reset ConfirmDialog (around line 383)
   - Pass `targetRef={commit.hash}` to RebaseConfirmDialog (around line 395)
-- [ ] T011 [US3] Wire BranchContextMenu to pass targetRef to RebaseConfirmDialog in `webview-ui/src/components/BranchContextMenu.tsx`
+- [X] T011 [US3] Wire BranchContextMenu to pass targetRef to RebaseConfirmDialog in `webview-ui/src/components/BranchContextMenu.tsx`
   - Pass `targetRef={displayName}` to RebaseConfirmDialog (around line 302)
 
 **Checkpoint**: Rebase, Reset, and Drop Commit dialogs all show command preview. Context menus correctly pass data. Run `pnpm typecheck` to verify.
@@ -136,11 +136,11 @@
 
 ### Implementation for User Story 4
 
-- [ ] T012 [P] [US4] Add command preview to CheckoutWithPullDialog in `webview-ui/src/components/CheckoutWithPullDialog.tsx`
+- [X] T012 [P] [US4] Add command preview to CheckoutWithPullDialog in `webview-ui/src/components/CheckoutWithPullDialog.tsx`
   - Import `buildCheckoutCommand` from `../utils/gitCommandBuilder` and `CommandPreview` from `./CommandPreview`
   - Compute command: `buildCheckoutCommand({ branch: branchName, pull })`
   - Insert `<CommandPreview command={command} />` between the radio buttons and action buttons (after line 57, before line 59)
-- [ ] T013 [P] [US4] Add command preview to TagCreationDialog in `webview-ui/src/components/TagCreationDialog.tsx`
+- [X] T013 [P] [US4] Add command preview to TagCreationDialog in `webview-ui/src/components/TagCreationDialog.tsx`
   - Import `buildTagCommand` from `../utils/gitCommandBuilder` and `CommandPreview` from `./CommandPreview`
   - Compute command: `buildTagCommand({ name: name.trim() || '<name>', hash: commit.abbreviatedHash, ...(message.trim() ? { message: message.trim() } : {}) })`
   - Show placeholder `<name>` when tag name is empty
@@ -150,12 +150,29 @@
 
 ---
 
+## Phase 5b: Additional Dialogs — Command Preview for Delete Branch, Stash, Tag, and Rename Branch
+
+**Goal**: Add command previews to dialogs that were missing them: Delete Branch, Force Delete Branch, Delete Remote Branch, Delete Tag, Drop Stash, Stash & Checkout, and Rename Branch.
+
+- [X] T016 [P] Add builder functions: buildDeleteBranchCommand, buildDeleteRemoteBranchCommand, buildDeleteTagCommand, buildDropStashCommand, buildStashAndCheckoutCommand, buildRenameBranchCommand in `webview-ui/src/utils/gitCommandBuilder.ts`
+- [X] T017 [P] Add unit tests for all new builder functions in `webview-ui/src/utils/__tests__/gitCommandBuilder.test.ts`
+- [X] T018 Add optional `buildCommandPreview` callback prop to InputDialog in `webview-ui/src/components/InputDialog.tsx` for reactive command preview based on user input
+- [X] T019 Wire command previews into BranchContextMenu dialogs in `webview-ui/src/components/BranchContextMenu.tsx`:
+  - Delete Branch/Tag/Remote ConfirmDialog → `commandPreview` prop
+  - Force Delete Branch ConfirmDialog → `commandPreview` prop
+  - Stash & Checkout ConfirmDialog → `commandPreview` prop
+  - Rename Branch InputDialog → `buildCommandPreview` callback prop
+- [X] T020 Wire command preview into Drop Stash ConfirmDialog in `webview-ui/src/components/StashContextMenu.tsx`
+- [X] T021 Run full validation: `pnpm typecheck && pnpm lint && pnpm test` — all 98 tests pass
+
+---
+
 ## Phase 6: Polish & Validation
 
 **Purpose**: Final validation across all user stories
 
-- [ ] T014 Run full validation: `pnpm typecheck && pnpm lint && pnpm test && pnpm build`
-- [ ] T015 Manual smoke test: open each of the 8 dialogs in the extension, verify command preview appears, updates reactively with option changes, and Copy button copies to clipboard with "Copied!" feedback. Also verify that out-of-scope dialogs (Interactive Rebase, Revert Parent Selection, Remote Management) remain unchanged per FR-009.
+- [X] T014 Run full validation: `pnpm typecheck && pnpm lint && pnpm test && pnpm build`
+- [ ] T015 Manual smoke test (requires manual verification): open each dialog in the extension, verify command preview appears, updates reactively with option changes, and Copy button copies to clipboard with "Copied!" feedback. Also verify that out-of-scope dialogs (Interactive Rebase, Revert Parent Selection, Remote Management) remain unchanged per FR-009.
 
 ---
 

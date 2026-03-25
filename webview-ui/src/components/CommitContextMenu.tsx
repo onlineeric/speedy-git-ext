@@ -3,6 +3,7 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { Commit, CherryPickOptions, ResetMode, RebaseEntry, CommitParentInfo } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
+import { buildResetCommand } from '../utils/gitCommandBuilder';
 import { ConfirmDialog } from './ConfirmDialog';
 import { InputDialog } from './InputDialog';
 import { TagCreationDialog } from './TagCreationDialog';
@@ -383,6 +384,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
         description={buildResetDescription(pendingResetMode, hasRemoteUpstream, currentLocalBranch?.name)}
         confirmLabel={pendingResetMode === 'hard' ? 'Discard Changes' : 'Reset'}
         variant={pendingResetMode === 'hard' ? 'danger' : 'warning'}
+        commandPreview={pendingResetMode ? buildResetCommand({ hash: commit.abbreviatedHash, mode: pendingResetMode }) : undefined}
       />
 
       <CherryPickDialog
@@ -398,6 +400,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
         onCancel={() => setRebaseOntoConfirmOpen(false)}
         title="Rebase Current Branch onto Commit"
         description={`Rebase the current branch onto commit ${commit.abbreviatedHash}? This will rewrite commit history. Pushed commits will require a force-push.`}
+        targetRef={commit.hash}
       />
 
       {interactiveRebaseOpen && (

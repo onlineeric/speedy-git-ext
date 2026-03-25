@@ -2,6 +2,8 @@ import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { Commit } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
+import { buildTagCommand } from '../utils/gitCommandBuilder';
+import { CommandPreview } from './CommandPreview';
 
 interface TagCreationDialogProps {
   open: boolean;
@@ -78,6 +80,13 @@ export function TagCreationDialog({ open, commit, onClose }: TagCreationDialogPr
                 rows={3}
                 className="w-full px-2 py-1.5 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:border-[var(--vscode-focusBorder)] resize-none"
               />
+            </div>
+            <div className="mt-3">
+              <CommandPreview command={buildTagCommand({
+                name: name.trim() || '<name>',
+                hash: commit.abbreviatedHash,
+                ...(message.trim() ? { message: message.trim() } : {}),
+              })} />
             </div>
             <div className="flex justify-end gap-2 mt-4">
               <Dialog.Close

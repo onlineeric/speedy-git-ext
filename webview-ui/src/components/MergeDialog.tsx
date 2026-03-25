@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import type { MergeOptions } from '@shared/types';
+import { buildMergeCommand } from '../utils/gitCommandBuilder';
+import { CommandPreview } from './CommandPreview';
 
 interface MergeDialogProps {
   open: boolean;
@@ -58,6 +60,10 @@ export function MergeDialog({ open, branchName, onConfirm, onCancel }: MergeDial
               />
               <span className="text-sm text-[var(--vscode-foreground)]">Create a new commit even if fast forward is possible</span>
             </label>
+          </div>
+
+          <div className="mt-4">
+            <CommandPreview command={buildMergeCommand({ branch: branchName, noCommit, noFastForward: noCommit ? true : noFastForward })} />
           </div>
 
           <div className="flex justify-end gap-2 mt-4">

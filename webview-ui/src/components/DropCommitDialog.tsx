@@ -1,4 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
+import { buildDropCommitCommand } from '../utils/gitCommandBuilder';
+import { CommandPreview } from './CommandPreview';
 
 interface DropCommitDialogProps {
   open: boolean;
@@ -35,6 +37,9 @@ export function DropCommitDialog({
                 This commit exists on a remote branch. You will need to force-push after dropping it.
               </p>
             )}
+          </div>
+          <div className="mt-4">
+            <CommandPreview command={buildDropCommitCommand({ hash: commitHash.slice(0, 7) })} />
           </div>
           <div className="mt-6 flex justify-end gap-2">
             <Dialog.Close className="rounded bg-[var(--vscode-button-secondaryBackground)] px-3 py-1.5 text-sm text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]">
