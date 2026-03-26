@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { Commit } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
+import { buildDropStashCommand } from '../utils/gitCommandBuilder';
 import { ConfirmDialog } from './ConfirmDialog';
 
 interface StashContextMenuProps {
@@ -70,6 +71,7 @@ export function StashContextMenu({ commit, stashIndex, children }: StashContextM
         description={`Are you sure you want to drop stash@{${stashIndex}}? This cannot be undone.`}
         confirmLabel="Drop"
         variant="danger"
+        commandPreview={buildDropStashCommand({ stashIndex })}
       />
     </>
   );

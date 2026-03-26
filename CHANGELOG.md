@@ -4,6 +4,20 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.0] - 2026-03-26
+
+### Added
+- Live git command preview across all major dialogs (Merge, Cherry-Pick, Rebase, Reset, Drop Commit, Checkout with Pull, Tag Creation, Delete Branch, Delete Remote Branch, Delete Tag, Drop Stash, Stash & Checkout, and Rename Branch), showing the equivalent CLI command that updates reactively as options change.
+- One-click copy button on every command preview to copy the exact git command to the clipboard, with brief "Copied!" visual feedback.
+- Cherry-pick command preview displays abbreviated commit hashes for readability and suppresses `-x` when `--no-commit` is active, accurately reflecting flag interactions.
+- Drop Commit command preview shows `git rebase -i <hash>~1` with a comment clarifying the commit to be dropped.
+- Checkout with Pull command preview displays `git checkout <branch> && git pull` or just `git checkout <branch>` depending on the pull toggle.
+- Tag Creation command preview switches between lightweight and annotated tag command variants based on whether an annotation message is entered.
+- Delete Branch, Force Delete Branch, and Delete Remote Branch confirmation dialogs now show the corresponding `git branch -d`, `git branch -D`, or `git push --delete` command.
+
+### Changed
+- Push dialog command preview refactored from inline implementation to shared, centralized components with no visual or behavioral changes.
+
 ## [1.2.1] - 2026-03-24
 
 ### Changed

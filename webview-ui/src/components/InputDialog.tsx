@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
+import { CommandPreview } from './CommandPreview';
 
 interface InputDialogProps {
   open: boolean;
@@ -10,6 +11,7 @@ interface InputDialogProps {
   defaultValue?: string;
   placeholder?: string;
   validate?: (value: string) => string | undefined;
+  buildCommandPreview?: (value: string) => string;
 }
 
 export function InputDialog({
@@ -21,6 +23,7 @@ export function InputDialog({
   defaultValue = '',
   placeholder,
   validate,
+  buildCommandPreview,
 }: InputDialogProps) {
   const [value, setValue] = useState(defaultValue);
   const [error, setError] = useState<string>();
@@ -72,6 +75,11 @@ export function InputDialog({
             />
             {error && (
               <p className="mt-1 text-xs text-[var(--vscode-errorForeground)]">{error}</p>
+            )}
+            {buildCommandPreview && (
+              <div className="mt-3">
+                <CommandPreview command={buildCommandPreview(value.trim())} />
+              </div>
             )}
             <div className="flex justify-end gap-2 mt-4">
               <Dialog.Close

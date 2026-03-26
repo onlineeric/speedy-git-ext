@@ -1,8 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { RefInfo } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
+import {
+  buildDeleteBranchCommand,
+  buildDeleteRemoteBranchCommand,
+  buildDeleteTagCommand,
+  buildRenameBranchCommand,
+  buildStashAndCheckoutCommand,
+} from '../utils/gitCommandBuilder';
 import { ConfirmDialog } from './ConfirmDialog';
 import { InputDialog } from './InputDialog';
 import { RebaseConfirmDialog } from './RebaseConfirmDialog';
@@ -98,6 +105,22 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
     !!targetHash &&
     !!headBranch &&
     targetHash !== headBranch.hash;
+
+  const deleteCommandPreview = useMemo(() => {
+    if (isTag) return buildDeleteTagCommand({ name: refInfo.name });
+    if (isRemoteBranch && refInfo.remote) return buildDeleteRemoteBranchCommand({ remote: refInfo.remote, name: refInfo.name });
+    return buildDeleteBranchCommand({ name: refInfo.name });
+  }, [isTag, isRemoteBranch, refInfo.name, refInfo.remote]);
+
+  const buildRenamePreview = useCallback(
+    (newName: string) => buildRenameBranchCommand({ oldName: refInfo.name, newName: newName || '<new-name>' }),
+    [refInfo.name],
+  );
+
+  const stashAndCheckoutPreview = useMemo(() => {
+    if (!pendingCheckout) return '';
+    return buildStashAndCheckoutCommand({ branch: pendingCheckout.name, pull: pendingCheckout.pull ?? false });
+  }, [pendingCheckout]);
 
   const handleRebaseConfirm = (ignoreDate: boolean) => {
     setRebaseConfirmOpen(false);
@@ -223,6 +246,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         }
         confirmLabel="Delete"
         variant="danger"
+        commandPreview={deleteCommandPreview}
       />
 
       <ConfirmDialog
@@ -236,6 +260,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         description={`Branch '${refInfo.name}' is not fully merged. Force deleting it may permanently remove unmerged commits from this branch reference. Continue?`}
         confirmLabel="Force Delete"
         variant="danger"
+        commandPreview={buildDeleteBranchCommand({ name: refInfo.name, force: true })}
       />
 
       {/* Rename dialog */}
@@ -250,6 +275,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         label="New branch name"
         defaultValue={refInfo.name}
         validate={(v) => v.startsWith('-') ? 'Branch name cannot start with -' : undefined}
+        buildCommandPreview={buildRenamePreview}
       />
 
       {/* Push dialog */}
@@ -296,6 +322,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         description="You have uncommitted changes. Stash them and checkout the branch?"
         confirmLabel="Stash & Checkout"
         variant="warning"
+        commandPreview={stashAndCheckoutPreview}
       />
 
       {/* Rebase confirmation */}
@@ -305,6 +332,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         onCancel={() => setRebaseConfirmOpen(false)}
         title="Rebase Current Branch"
         description={`Rebase the current branch onto '${displayName}'? This will rewrite commit history. Pushed commits will require a force-push.`}
+        targetRef={displayName}
       />
     </>
   );

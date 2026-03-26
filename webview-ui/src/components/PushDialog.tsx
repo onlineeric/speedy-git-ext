@@ -3,6 +3,8 @@ import * as Dialog from '@radix-ui/react-dialog';
 import type { PushForceMode } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
+import { buildPushCommand } from '../utils/gitCommandBuilder';
+import { CommandPreview } from './CommandPreview';
 
 interface PushDialogProps {
   open: boolean;
@@ -16,21 +18,6 @@ const PUSH_MODE_OPTIONS = [
   { value: 'force', label: '--force' },
 ] as const;
 
-export function buildPushCommand(options: {
-  remote: string;
-  branch: string;
-  setUpstream: boolean;
-  forceMode: PushForceMode;
-}): string {
-  const parts = ['git push'];
-  if (options.setUpstream) parts.push('-u');
-  if (options.forceMode === 'force-with-lease') parts.push('--force-with-lease');
-  else if (options.forceMode === 'force') parts.push('--force');
-  parts.push(options.remote);
-  parts.push(options.branch);
-  return parts.join(' ');
-}
-
 function getDefaultRemote(remotes: { name: string }[]): string {
   return remotes.find(r => r.name === 'origin')?.name ?? remotes[0]?.name ?? '';
 }
@@ -42,7 +29,6 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
   const [forceMode, setForceMode] = useState<PushForceMode>('none');
   const [selectedRemote, setSelectedRemote] = useState(() => getDefaultRemote(remotes));
   const [isPushing, setIsPushing] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   // Reset dialog state each time it opens, syncing selectedRemote with current remotes
   useEffect(() => {
@@ -51,7 +37,6 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
       setForceMode('none');
       setSelectedRemote(getDefaultRemote(remotes));
       setIsPushing(false);
-      setCopied(false);
     }
   }, [open, remotes]);
 
@@ -68,16 +53,6 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
     } finally {
       setIsPushing(false);
       onCancel();
-    }
-  };
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(command);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard API may fail in restricted contexts; silently ignore
     }
   };
 
@@ -163,24 +138,7 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
             </div>
 
             {/* Command preview */}
-            <div className="space-y-1">
-              <label className="text-sm text-[var(--vscode-descriptionForeground)]">Command preview:</label>
-              <div className="flex items-center gap-1">
-                <input
-                  type="text"
-                  readOnly
-                  value={command}
-                  className="flex-1 px-2 py-1 text-sm font-mono rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] select-all"
-                />
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="px-2 py-1 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] whitespace-nowrap"
-                >
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-              </div>
-            </div>
+            <CommandPreview command={command} />
           </div>
 
           {/* Action buttons */}
