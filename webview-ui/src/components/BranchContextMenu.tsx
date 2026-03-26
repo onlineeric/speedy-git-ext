@@ -264,8 +264,10 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         onCancel={() => setDeleteConfirmOpen(false)}
       />
 
-      {/* Force delete dialog (with optional remote delete, pre-populated from initial attempt) */}
+      {/* Force delete dialog (with optional remote delete, pre-populated from initial attempt).
+         key forces remount when deleteRemote state changes so useState picks up the new initialDeleteRemote. */}
       <DeleteBranchDialog
+        key={`force-delete-${!!pendingForceDeleteBranch?.deleteRemote}`}
         open={forceDeleteConfirmOpen}
         branchName={refInfo.name}
         force
