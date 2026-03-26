@@ -1,6 +1,6 @@
 # Speedy Git Extension
 
-Fast, practical Git history and history-editing inside VS Code.
+Fast, practical Git history and history-editing inside VS Code and Cursor.
 
 ![Speedy Git Extension screenshot](./resources/speedy-git-screenshot.png)
 
@@ -32,5 +32,5 @@ Open Speedy Git from VSCode bottom status bar:
 
 ## Requirements
 
-- VS Code 1.80+
+- VS Code 1.80+ or Cursor IDE
 - Git available in PATH

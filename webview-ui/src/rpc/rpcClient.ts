@@ -159,7 +159,7 @@ class RpcClient {
         store.setPendingCommitCheckout({ hash: message.payload.hash });
         break;
       case 'deleteBranchNeedsForce':
-        store.setPendingForceDeleteBranch(message.payload.name);
+        store.setPendingForceDeleteBranch({ name: message.payload.name, deleteRemote: message.payload.deleteRemote });
         break;
       case 'checkoutPullFailed':
         store.setError(`Checked out '${message.payload.branch}'. Pull failed: ${message.payload.error.message}`);
@@ -227,8 +227,8 @@ class RpcClient {
     this.send({ type: 'renameBranch', payload: { oldName, newName } });
   }
 
-  deleteBranch(name: string, force?: boolean) {
-    this.send({ type: 'deleteBranch', payload: { name, force } });
+  deleteBranch(name: string, force?: boolean, deleteRemote?: { remote: string; name: string }) {
+    this.send({ type: 'deleteBranch', payload: { name, force, deleteRemote } });
   }
 
   deleteRemoteBranch(remote: string, name: string) {

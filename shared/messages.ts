@@ -15,7 +15,7 @@ export type RequestMessage =
   // Branch ops
   | { type: 'createBranch'; payload: { name: string; startPoint?: string } }
   | { type: 'renameBranch'; payload: { oldName: string; newName: string } }
-  | { type: 'deleteBranch'; payload: { name: string; force?: boolean } }
+  | { type: 'deleteBranch'; payload: { name: string; force?: boolean; deleteRemote?: { remote: string; name: string } } }
   | { type: 'deleteRemoteBranch'; payload: { remote: string; name: string } }
   | { type: 'mergeBranch'; payload: { branch: string; noFastForward?: boolean; squash?: boolean; noCommit?: boolean } }
   // Remote ops
@@ -90,7 +90,7 @@ export type ResponseMessage =
   | { type: 'repoList'; payload: { repos: RepoInfo[]; activeRepoPath: string } }
   | { type: 'checkoutNeedsStash'; payload: { name: string; pull?: boolean } }
   | { type: 'checkoutCommitNeedsStash'; payload: { hash: string } }
-  | { type: 'deleteBranchNeedsForce'; payload: { name: string } }
+  | { type: 'deleteBranchNeedsForce'; payload: { name: string; deleteRemote?: { remote: string; name: string } } }
   | { type: 'checkoutPullFailed'; payload: { branch: string; error: { message: string } } }
   | { type: 'settingsData'; payload: { settings: UserSettings } }
   | { type: 'submodulesData'; payload: { submodules: Submodule[]; stack: SubmoduleNavEntry[] } }

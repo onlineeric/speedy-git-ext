@@ -4,13 +4,13 @@ import type { RefInfo } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import {
-  buildDeleteBranchCommand,
   buildDeleteRemoteBranchCommand,
   buildDeleteTagCommand,
   buildRenameBranchCommand,
   buildStashAndCheckoutCommand,
 } from '../utils/gitCommandBuilder';
 import { ConfirmDialog } from './ConfirmDialog';
+import { DeleteBranchDialog } from './DeleteBranchDialog';
 import { InputDialog } from './InputDialog';
 import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 import { MergeDialog } from './MergeDialog';
@@ -109,7 +109,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
   const deleteCommandPreview = useMemo(() => {
     if (isTag) return buildDeleteTagCommand({ name: refInfo.name });
     if (isRemoteBranch && refInfo.remote) return buildDeleteRemoteBranchCommand({ remote: refInfo.remote, name: refInfo.name });
-    return buildDeleteBranchCommand({ name: refInfo.name });
+    return '';
   }, [isTag, isRemoteBranch, refInfo.name, refInfo.remote]);
 
   const buildRenamePreview = useCallback(
@@ -128,9 +128,16 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
     rpcClient.rebase(displayName, ignoreDate);
   };
 
+  // Find remote counterpart for local branch (used in delete dialog)
+  const remoteBranch = useMemo(() => {
+    if (!isLocalBranch) return undefined;
+    const remote = branches.find((b) => b.remote && b.name === refInfo.name);
+    return remote ? { remote: remote.remote!, name: remote.name } : undefined;
+  }, [isLocalBranch, branches, refInfo.name]);
+
   // pendingCheckout is for this branch (from checkoutNeedsStash response)
   const stashConfirmOpen = pendingCheckout !== null && pendingCheckout.name === refInfo.name;
-  const forceDeleteConfirmOpen = pendingForceDeleteBranch === refInfo.name;
+  const forceDeleteConfirmOpen = pendingForceDeleteBranch !== null && pendingForceDeleteBranch.name === refInfo.name;
 
   return (
     <>
@@ -222,45 +229,55 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
       </ContextMenu.Root>
       </span>
 
-      {/* Delete confirmation */}
+      {/* Delete confirmation for tags and remote branches */}
       <ConfirmDialog
-        open={deleteConfirmOpen}
+        open={deleteConfirmOpen && !isLocalBranch}
         onConfirm={() => {
           setDeleteConfirmOpen(false);
           if (isTag) {
             rpcClient.deleteTag(refInfo.name);
           } else if (isRemoteBranch && refInfo.remote) {
             rpcClient.deleteRemoteBranch(refInfo.remote, refInfo.name);
-          } else {
-            rpcClient.deleteBranch(refInfo.name);
           }
         }}
         onCancel={() => setDeleteConfirmOpen(false)}
-        title={isTag ? 'Delete Tag' : isRemoteBranch ? 'Delete Remote Branch' : 'Delete Branch'}
+        title={isTag ? 'Delete Tag' : 'Delete Remote Branch'}
         description={
           isTag
             ? `Are you sure you want to delete tag '${refInfo.name}'?`
-            : isRemoteBranch
-            ? `Are you sure you want to delete remote branch '${displayName}'? This will remove it from the remote.`
-            : `Are you sure you want to delete branch '${refInfo.name}'?`
+            : `Are you sure you want to delete remote branch '${displayName}'? This will remove it from the remote.`
         }
         confirmLabel="Delete"
         variant="danger"
         commandPreview={deleteCommandPreview}
       />
 
-      <ConfirmDialog
+      {/* Delete confirmation for local branches (with optional remote delete) */}
+      <DeleteBranchDialog
+        open={deleteConfirmOpen && isLocalBranch}
+        branchName={refInfo.name}
+        remoteBranch={remoteBranch}
+        onConfirm={(deleteRemote) => {
+          setDeleteConfirmOpen(false);
+          rpcClient.deleteBranch(refInfo.name, undefined, deleteRemote);
+        }}
+        onCancel={() => setDeleteConfirmOpen(false)}
+      />
+
+      {/* Force delete dialog (with optional remote delete, pre-populated from initial attempt).
+         key forces remount when deleteRemote state changes so useState picks up the new initialDeleteRemote. */}
+      <DeleteBranchDialog
+        key={`force-delete-${!!pendingForceDeleteBranch?.deleteRemote}`}
         open={forceDeleteConfirmOpen}
-        onConfirm={() => {
+        branchName={refInfo.name}
+        force
+        remoteBranch={remoteBranch}
+        initialDeleteRemote={!!pendingForceDeleteBranch?.deleteRemote}
+        onConfirm={(deleteRemote) => {
           useGraphStore.getState().setPendingForceDeleteBranch(null);
-          rpcClient.deleteBranch(refInfo.name, true);
+          rpcClient.deleteBranch(refInfo.name, true, deleteRemote);
         }}
         onCancel={() => useGraphStore.getState().setPendingForceDeleteBranch(null)}
-        title="Force Delete Branch"
-        description={`Branch '${refInfo.name}' is not fully merged. Force deleting it may permanently remove unmerged commits from this branch reference. Continue?`}
-        confirmLabel="Force Delete"
-        variant="danger"
-        commandPreview={buildDeleteBranchCommand({ name: refInfo.name, force: true })}
       />
 
       {/* Rename dialog */}
