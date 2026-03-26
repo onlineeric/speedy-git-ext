@@ -55,7 +55,7 @@ interface GraphStore {
   totalLoadedWithoutFilter: number | null;
   pendingCheckout: { name: string; pull?: boolean } | null;
   pendingCommitCheckout: { hash: string } | null;
-  pendingForceDeleteBranch: string | null;
+  pendingForceDeleteBranch: { name: string; deleteRemote?: { remote: string; name: string } } | null;
   repos: RepoInfo[];
   activeRepoPath: string;
   isLoadingRepo: boolean;
@@ -103,7 +103,7 @@ interface GraphStore {
   setTotalLoadedWithoutFilter: (n: number | null) => void;
   setPendingCheckout: (checkout: { name: string; pull?: boolean } | null) => void;
   setPendingCommitCheckout: (checkout: { hash: string } | null) => void;
-  setPendingForceDeleteBranch: (branchName: string | null) => void;
+  setPendingForceDeleteBranch: (pending: { name: string; deleteRemote?: { remote: string; name: string } } | null) => void;
   setRepos: (repos: RepoInfo[], activeRepoPath: string) => void;
   setActiveRepo: (repoPath: string) => void;
   setIsLoadingRepo: (v: boolean) => void;
@@ -401,7 +401,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setTotalLoadedWithoutFilter: (totalLoadedWithoutFilter) => set({ totalLoadedWithoutFilter }),
   setPendingCheckout: (pendingCheckout) => set({ pendingCheckout }),
   setPendingCommitCheckout: (pendingCommitCheckout) => set({ pendingCommitCheckout }),
-  setPendingForceDeleteBranch: (pendingForceDeleteBranch) => set({ pendingForceDeleteBranch }),
+  setPendingForceDeleteBranch: (pending) => set({ pendingForceDeleteBranch: pending }),
   setRepos: (repos, activeRepoPath) => {
     const { activeRepoPath: prevPath, filters } = get();
     const repoChanged = prevPath !== '' && prevPath !== activeRepoPath;

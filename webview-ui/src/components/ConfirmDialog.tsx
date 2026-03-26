@@ -1,4 +1,5 @@
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
+import { CommandPreview } from './CommandPreview';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -8,6 +9,7 @@ interface ConfirmDialogProps {
   description: string;
   confirmLabel?: string;
   variant?: 'danger' | 'warning';
+  commandPreview?: string;
 }
 
 export function ConfirmDialog({
@@ -18,6 +20,7 @@ export function ConfirmDialog({
   description,
   confirmLabel = 'Confirm',
   variant = 'warning',
+  commandPreview,
 }: ConfirmDialogProps) {
   const confirmButtonClass =
     variant === 'danger'
@@ -35,6 +38,11 @@ export function ConfirmDialog({
           <AlertDialog.Description className="mt-2 text-sm text-[var(--vscode-descriptionForeground)]">
             {description}
           </AlertDialog.Description>
+          {commandPreview && (
+            <div className="mt-4">
+              <CommandPreview command={commandPreview} />
+            </div>
+          )}
           <div className="flex justify-end gap-2 mt-4">
             <AlertDialog.Cancel
               className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { Commit, CherryPickOptions } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
+import { buildCherryPickCommand } from '../utils/gitCommandBuilder';
+import { CommandPreview } from './CommandPreview';
 
 interface CherryPickDialogProps {
   open: boolean;
@@ -123,6 +125,15 @@ export function CherryPickDialog({ open, commits, onConfirm, onCancel }: CherryP
                 Stage changes only (do not commit)
               </span>
             </label>
+          </div>
+
+          <div className="mt-4">
+            <CommandPreview command={buildCherryPickCommand({
+              hashes: commits.map(c => c.abbreviatedHash),
+              appendSourceRef,
+              noCommit,
+              ...(isSingleMergeCommit ? { mainlineParent } : {}),
+            })} />
           </div>
 
           <div className="flex justify-end gap-2 mt-6">
