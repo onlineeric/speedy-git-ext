@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 
 interface CommandPreviewProps {
   command: string;
@@ -6,12 +6,15 @@ interface CommandPreviewProps {
 
 export function CommandPreview({ command }: CommandPreviewProps) {
   const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
 
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(command);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard API may fail in restricted contexts; silently ignore
     }

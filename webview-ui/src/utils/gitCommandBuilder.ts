@@ -175,7 +175,7 @@ export function buildRenameBranchCommand(options: RenameBranchCommandOptions): s
 export function buildTagCommand(options: TagCommandOptions): string {
   const parts = ['git tag'];
   if (options.message) {
-    parts.push('-a', options.name, '-m', `"${options.message}"`, options.hash);
+    parts.push('-a', options.name, '-m', `"${options.message.replace(/"/g, '\\"')}"`, options.hash);
   } else {
     parts.push(options.name, options.hash);
   }

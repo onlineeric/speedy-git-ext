@@ -173,6 +173,11 @@ describe('buildTagCommand', () => {
     expect(buildTagCommand({ name: 'v1.0.0', hash: 'abc1234', message: 'Release 1.0.0' }))
       .toBe('git tag -a v1.0.0 -m "Release 1.0.0" abc1234');
   });
+
+  it('escapes double quotes in annotation message', () => {
+    expect(buildTagCommand({ name: 'v1.0.0', hash: 'abc1234', message: 'Release "v1"' }))
+      .toBe('git tag -a v1.0.0 -m "Release \\"v1\\"" abc1234');
+  });
 });
 
 describe('buildDeleteBranchCommand', () => {
