@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Checkout with Pull command preview displays `git checkout <branch> && git pull` or just `git checkout <branch>` depending on the pull toggle.
 - Tag Creation command preview switches between lightweight and annotated tag command variants based on whether an annotation message is entered.
 - Delete Branch, Force Delete Branch, and Delete Remote Branch confirmation dialogs now show the corresponding `git branch -d`, `git branch -D`, or `git push --delete` command.
+- "Also delete remote branch" checkbox in the delete branch confirmation dialog when the branch has a remote counterpart, allowing local and remote deletion in a single action (unchecked by default to prevent accidental remote deletion).
+- The remote-delete checkbox also appears in the force-delete dialog for unmerged branches with a remote counterpart.
+- Command preview in the delete dialog updates dynamically when the remote-delete checkbox is toggled, showing the additional `git push --delete` command.
+
+### Fixed
+- Checking out a local branch that has a remote counterpart (even when diverged) now correctly shows the checkout-with-pull dialog, preventing users from unknowingly working on outdated code.
+- Checking out a remote branch that already has a local counterpart now correctly shows the checkout-with-pull dialog instead of silently creating a new tracking branch.
 
 ### Changed
 - Push dialog command preview refactored from inline implementation to shared, centralized components with no visual or behavioral changes.

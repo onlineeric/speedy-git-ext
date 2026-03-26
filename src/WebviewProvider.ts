@@ -606,10 +606,22 @@ export class WebviewProvider {
           message.payload.force
         );
         if (result.success) {
+          // If remote deletion was also requested, attempt it after successful local delete
+          if (message.payload.deleteRemote) {
+            const remoteResult = await this.gitBranchService.deleteRemoteBranch(
+              message.payload.deleteRemote.remote,
+              message.payload.deleteRemote.name
+            );
+            if (!remoteResult.success) {
+              this.postMessage({ type: 'error', payload: { error: { message: `Local branch deleted. Remote deletion failed: ${remoteResult.error.message}` } } });
+              await this.sendInitialData();
+              break;
+            }
+          }
           this.postMessage({ type: 'success', payload: { message: result.value } });
           await this.sendInitialData();
         } else if (result.error.code === 'BRANCH_NOT_FULLY_MERGED' && !message.payload.force) {
-          this.postMessage({ type: 'deleteBranchNeedsForce', payload: { name: message.payload.name } });
+          this.postMessage({ type: 'deleteBranchNeedsForce', payload: { name: message.payload.name, deleteRemote: message.payload.deleteRemote } });
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }

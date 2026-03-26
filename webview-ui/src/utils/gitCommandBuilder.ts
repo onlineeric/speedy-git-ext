@@ -150,6 +150,19 @@ export function buildDeleteBranchCommand(options: DeleteBranchCommandOptions): s
   return `git branch ${options.force ? '-D' : '-d'} ${options.name}`;
 }
 
+export interface DeleteBranchWithRemoteCommandOptions {
+  name: string;
+  force?: boolean;
+  remote: string;
+  remoteBranchName: string;
+}
+
+export function buildDeleteBranchWithRemoteCommand(options: DeleteBranchWithRemoteCommandOptions): string {
+  const localCmd = buildDeleteBranchCommand({ name: options.name, force: options.force });
+  const remoteCmd = buildDeleteRemoteBranchCommand({ remote: options.remote, name: options.remoteBranchName });
+  return `${localCmd} && ${remoteCmd}`;
+}
+
 export function buildDeleteRemoteBranchCommand(options: DeleteRemoteBranchCommandOptions): string {
   return `git push ${options.remote} --delete ${options.name}`;
 }

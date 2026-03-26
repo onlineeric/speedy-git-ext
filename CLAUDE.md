@@ -93,10 +93,7 @@ Built with **Vite** + React plugin → `dist/webview/`
 - **Git**: NEVER commit, branch, or merge; only readonly operations (`git log`, `git status`, `git diff`) and create PR only if I ask you to do so.
 
 ## Active Technologies
-- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + VS Code Extension API (Node-backed with esbuild, VS Code git API as needed) + Vite + React 18 webview, with Zustand and Tailwind-based UI layers that include Radix UI and add-on libraries such as `@radix-ui/react-context-menu`, `@radix-ui/react-dialog`, `@radix-ui/react-popover`, `@tanstack/react-virtual`, and headless-tree when features require them.
-- Local git repo remains the runtime data source; app state and caches are kept in-memory (`Zustand`/component state) and reused caching patterns (e.g., `gravatar.ts`) are shared across features.
-- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand, Tailwind CSS, Vite (webview build), esbuild (extension build) (021-ui-panel-toolbar-polish)
-- TypeScript 5.x (strict: `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Radix UI (`@radix-ui/react-dialog`, `@radix-ui/react-alert-dialog`), Zustand, Tailwind CSS (022-git-command-preview)
-- N/A (no persistent state — all command strings computed in-memory from dialog state) (022-git-command-preview)
+- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) with a VS Code Extension backend (`esbuild`, VS Code API) and Vite React 18 webview frontend, using Zustand and Tailwind CSS UI patterns.
+- Shared libraries across features include Radix UI (`react-context-menu`, `react-dialog`, `react-alert-dialog`, `react-popover`), `@tanstack/react-virtual`, and `headless-tree`; local git is the runtime source, and app state/caches are kept in-memory (`Zustand`/component state, e.g., reused `gravatar.ts`) with no persistent feature-level state.
 
 ## Recent Changes
