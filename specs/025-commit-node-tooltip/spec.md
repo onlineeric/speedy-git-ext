@@ -70,7 +70,7 @@ As a developer, I want the tooltip to display associated Pull Request links or I
 **Acceptance Scenarios**:
 
 1. **Given** a commit message contains a recognized PR reference (e.g., `#42`), **When** the tooltip appears, **Then** the PR reference is displayed as a clickable link that opens the PR in the user's browser.
-2. **Given** a commit message contains a recognized issue tracker ID (e.g., `JIRA-123`), **When** the tooltip appears, **Then** the issue ID is displayed as a clickable link.
+2. **Given** a commit message contains a recognized issue tracker ID (e.g., `JIRA-123`), **When** the tooltip appears, **Then** the issue ID is displayed as a text label. It is not clickable unless a base URL for the issue tracker is configured (deferred to future iteration).
 3. **Given** a commit message contains no recognized external references, **When** the tooltip appears, **Then** no external links section is shown.
 
 ---
@@ -95,7 +95,7 @@ As a developer, I want the tooltip to display associated Pull Request links or I
 - **FR-003**: The tooltip MUST be interactive — users MUST be able to move the cursor into the tooltip area to interact with its content (scroll, click external reference links) without the tooltip disappearing. The tooltip does not include copy-to-clipboard buttons.
 - **FR-004**: The tooltip header MAY display the commit's short hash for identification. The tooltip MUST NOT duplicate commit metadata (author, date, message) already visible in the commit row. Tooltip sections MUST display in fixed order: Short Hash header → References (branches, tags, HEAD, stashes) → Remote Sync Status → Worktree Status → External Links. Sections with no data are omitted but the relative order of visible sections is preserved.
 - **FR-005**: The tooltip MUST display all git references (branches, tags, stashes, HEAD) that directly point to the hovered commit, including both local and remote branches. Branch display MUST follow the existing app branch badge pattern: local-only branches show name only, remote-only branches show `prefix/name` (e.g., `origin/main`), and paired local+remote branches show grouped format (e.g., `dev ⇄ origin`).
-- **FR-006**: The tooltip MUST visually distinguish between different reference types (branches, tags, stashes, HEAD).
+- **FR-006**: The tooltip MUST visually distinguish between different reference types (branches, tags, stashes, HEAD) by reusing the existing badge/label styling from `CommitRow` (color-coded badges for branches, tags, and stashes) and a distinct HEAD indicator.
 - **FR-007**: The tooltip MUST display a remote sync status indicator showing whether the commit is "Local Only" or "Pushed to Remote." The backend MUST determine sync status by checking if the commit hash is reachable from any remote tracking ref (e.g., via `git branch -r --contains <hash>`), covering multi-remote setups. The check uses the existing GitExecutor 30s timeout. While the sync status is loading, the tooltip MUST show a loading indicator in the sync status section. On timeout or error, display "Sync status unavailable."
 - **FR-008**: The tooltip MUST display worktree status (active worktree path) when the commit is checked out in a worktree; the section MUST be omitted when not applicable. Worktree data MUST be bulk-fetched via `git worktree list` once on graph load, cached, and matched per commit on hover.
 - **FR-009**: The tooltip MUST display clickable links for recognized external references (PR numbers, issue tracker IDs) found in the commit message. The base URL for links MUST be auto-detected from the git remote URL. GitHub is supported initially; other hosting platforms may be added later.
@@ -116,7 +116,7 @@ As a developer, I want the tooltip to display associated Pull Request links or I
 
 ### Measurable Outcomes
 
-- **SC-001**: Users can view commit metadata and references within 300ms of hovering over a commit node (200ms hover delay + 100ms render), with no perceptible lag.
+- **SC-001**: Users can view commit references and short hash within 300ms of hovering over a commit node (200ms hover delay + 100ms render), with no perceptible lag.
 - **SC-002**: The tooltip displays complete, accurate reference information for 100% of commits in the graph — no missing or incorrect branch, tag, stash, or HEAD associations.
 - **SC-003**: Users can interact with the tooltip (scroll content, click links/buttons) without the tooltip flickering or dismissing unexpectedly during normal cursor movement.
 - **SC-004**: The tooltip correctly identifies remote sync status for 100% of commits — no false "Local Only" or false "Pushed to Remote" indicators.
