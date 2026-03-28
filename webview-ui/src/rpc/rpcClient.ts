@@ -139,6 +139,15 @@ class RpcClient {
         }
         break;
       }
+      case 'containingBranches':
+        store.setContainingBranches(message.payload.hash, {
+          branches: message.payload.branches,
+          status: message.payload.status,
+        });
+        break;
+      case 'worktreeList':
+        store.setWorktreeList(message.payload.worktrees);
+        break;
       case 'commitParents': {
         const lookupKey = message.payload.parents.map((parent) => parent.hash).join(',');
         const requestId = this.parentRequestIdByHash.get(lookupKey);
@@ -437,6 +446,21 @@ class RpcClient {
 
   initSubmodule(submodulePath: string) {
     this.send({ type: 'initSubmodule', payload: { submodulePath } });
+  }
+
+  // Worktree ops
+  getWorktreeList() {
+    this.send({ type: 'getWorktreeList', payload: {} });
+  }
+
+  // Containing branches
+  getContainingBranches(hash: string) {
+    this.send({ type: 'getContainingBranches', payload: { hash } });
+  }
+
+  // External browser
+  openExternal(url: string) {
+    this.send({ type: 'openExternal', payload: { url } });
   }
 
   // Pagination

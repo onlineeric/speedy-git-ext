@@ -4,6 +4,17 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.4.0] - 2026-03-28
+
+### Added
+- Hover tooltip on commit graph nodes: hover over any commit circle/dot for 200ms to see a detailed popup showing all branches, tags, stashes, and HEAD that contain the commit in their history — matching standard Git UI tools like SourceTree and GitLens.
+- Worktree status in the tooltip displaying the absolute path when a commit is checked out in an active git worktree; omitted when not applicable.
+- Clickable external reference links in the tooltip for GitHub PR numbers and issue tracker IDs found in commit messages, auto-detected from the git remote URL.
+- Interactive tooltip: move the cursor into the tooltip to scroll long reference lists or click external links without the tooltip dismissing.
+- Tooltip auto-repositions to stay fully visible within the webview viewport and adapts to VS Code dark, light, and high contrast themes.
+- References area in the tooltip is split into conditional HEAD, Branches, Tags, and Stashes subsections with separators, making large mixed ref sets easier to scan.
+- Tooltip ref badges preserve per-reference lane colors, so containing refs from different lanes remain visually distinguishable instead of sharing one fallback color.
+
 ## [1.3.0] - 2026-03-26
 
 ### Added
