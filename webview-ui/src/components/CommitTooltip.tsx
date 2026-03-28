@@ -146,9 +146,6 @@ function ReferencesSection({ hash, isHead }: ReferencesSectionProps) {
   const mergedCommits = useGraphStore((s) => s.mergedCommits);
   const topology = useGraphStore((s) => s.topology);
   const graphColors = useGraphStore((s) => s.userSettings.graphColors);
-  const currentBranchName = useGraphStore(
-    (s) => s.branches.find((branch) => branch.current && !branch.remote)?.name
-  );
   const directBranchRefs = useGraphStore((s) => {
     const commit = s.mergedCommits.find((candidate) => candidate.hash === hash);
     if (!commit) return [];
@@ -168,6 +165,11 @@ function ReferencesSection({ hash, isHead }: ReferencesSectionProps) {
     }
   }, [hash, containingResult]);
 
+  const headCommit = useMemo(
+    () => mergedCommits.find((commit) => commit.refs.some((ref) => ref.type === 'head')),
+    [mergedCommits]
+  );
+
   // Convert containing branches to display refs
   const branchDisplayRefs = useMemo(() => {
     if (containingResult?.status === 'loaded' && containingResult.branches.length > 0) {
@@ -182,10 +184,9 @@ function ReferencesSection({ hash, isHead }: ReferencesSectionProps) {
     return [];
   }, [containingResult, directBranchRefs, knownBranches]);
 
-  const headContainsCommit =
-    currentBranchName !== undefined &&
-    containingResult?.status === 'loaded' &&
-    containingResult.branches.includes(currentBranchName);
+  const headContainsCommit = headCommit
+    ? headCommit.hash === hash || isReachableFromHead(hash, headCommit.hash, mergedCommits)
+    : false;
   const showHead = isHead || headContainsCommit;
   const palette = graphColors.length > 0 ? graphColors : DEFAULT_GRAPH_PALETTE;
 
@@ -202,6 +203,13 @@ function ReferencesSection({ hash, isHead }: ReferencesSectionProps) {
 
     return map;
   }, [knownBranches, palette, topology]);
+
+  const headStyle = useMemo(() => {
+    if (!headCommit) return undefined;
+    const node = topology.nodes.get(headCommit.hash);
+    if (!node) return undefined;
+    return getLaneColorStyle(getColor(node.colorIndex, palette));
+  }, [headCommit, palette, topology]);
 
   const { tagDisplayRefs, stashDisplayRefs, styleByRefKey } = useMemo(() => {
     const nextStyleByRefKey = new Map<string, CSSProperties>();
@@ -286,9 +294,7 @@ function ReferencesSection({ hash, isHead }: ReferencesSectionProps) {
           <ReferenceSubsection label="HEAD">
             <span
               className="inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-xs"
-              style={
-                currentBranchName ? branchStyleByQualifiedName.get(currentBranchName) : undefined
-              }
+              style={headStyle}
             >
               <HeadIcon className="flex-shrink-0" />
               HEAD
@@ -363,8 +369,10 @@ function ExternalLinksSection({ subject }: { subject: string }) {
   const remotes = useGraphStore((s) => s.remotes);
 
   const externalRefs = useMemo(() => {
-    const origin = remotes.find((r) => r.name === 'origin');
-    const ownerRepo = origin ? parseGitHubOwnerRepo(origin.fetchUrl) : null;
+    const ownerRepo =
+      remotes
+        .map((remote) => parseGitHubOwnerRepo(remote.fetchUrl))
+        .find((candidate) => candidate !== null) ?? null;
     return parseExternalRefs(subject, ownerRepo);
   }, [subject, remotes]);
 
