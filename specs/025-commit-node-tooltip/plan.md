@@ -5,7 +5,7 @@
 
 ## Summary
 
-Display an interactive hover tooltip on commit node circles in the graph view, showing git references, remote sync status, worktree status, and external links (GitHub PRs/issues). The tooltip uses the existing `@radix-ui/react-popover` for positioning, communicates with the backend via VS Code message passing for async data (sync status), and bulk-fetches worktree data on graph load. All data is cached per session.
+Display a detailed tooltip popup when a user hovers over a commit node circle in the graph view. The tooltip shows: short hash header, all branches (local and remote) that **contain** the commit in their history (fetched asynchronously via `git branch -a --contains <hash>`), plus HEAD, tags, and stashes that contain the commit within the loaded graph, rendered in split subsections with per-reference badge colors. It also shows worktree status and clickable external reference links (GitHub PRs/issues). Uses Radix Popover for positioning, timer-based hover/dismiss logic, and Zustand for tooltip state with per-commit session caching.
 
 ## Technical Context
 
@@ -13,11 +13,11 @@ Display an interactive hover tooltip on commit node circles in the graph view, s
 **Primary Dependencies**: React 18, Zustand, `@radix-ui/react-popover` (already installed), `@tanstack/react-virtual`, esbuild (backend), Vite (frontend)
 **Storage**: In-memory caches (Zustand store + component state)
 **Testing**: Manual smoke test via VS Code "Run Extension" launch config
-**Target Platform**: VS Code Extension (1.80+), webview
-**Project Type**: VS Code extension (dual-process: Node.js backend + React webview)
-**Performance Goals**: Tooltip appears within 100ms after 200ms hover delay (300ms total). No frame drops during hover/scroll.
-**Constraints**: <100ms tooltip render after delay; cached data reused until graph refresh; tooltip must escape virtual scroll clipping via Portal
-**Scale/Scope**: Repos with 500+ commits, many branches, multiple worktrees
+**Target Platform**: VS Code Extension (1.80+)
+**Project Type**: VS Code Extension (desktop-app)
+**Performance Goals**: Tooltip render within 100ms of hover delay elapsing; containing branches load asynchronously with loading indicator
+**Constraints**: Git process timeout 30s (GitExecutor), no new packages needed
+**Scale/Scope**: Repositories with 500+ commits, dozens of branches
 
 ## Constitution Check
 
@@ -25,13 +25,11 @@ Display an interactive hover tooltip on commit node circles in the graph view, s
 
 | Principle | Status | Notes |
 |-----------|--------|-------|
-| I. Performance First | PASS | Hover delay prevents flickering; data cached per session; worktree bulk-fetched on load; no re-renders outside hovered component; Portal avoids scroll container re-layout |
-| II. Clean Code & Simplicity | PASS | Single-purpose tooltip component; reuses existing Popover pattern (OverflowRefsBadge); no over-engineering |
-| III. Type Safety & Explicit Error Handling | PASS | New shared types for WorktreeInfo and tooltip messages; Result<T,E> for new git operations; existing `isCommitPushed` already uses Result pattern |
-| IV. Library-First & Purpose-Built | PASS | Uses existing `@radix-ui/react-popover` for positioning; reuses `GitHubAvatarService.parseGitHubRemote()` for URL detection; no new package installs needed |
-| V. Dual-Process Architecture Integrity | PASS | Backend handles git I/O (worktree list, sync status); frontend handles rendering and hover state; shared types in `shared/` |
-| Agent Restrictions | PASS | No auto-installs; no git mutations |
-| Build & Validation Gates | PASS | typecheck + lint + build + smoke test |
+| I. Performance First | PASS | Containing branches fetched async with loading indicator; cached per session; worktree bulk-fetched on load; HEAD/tags/stashes derived from already-loaded graph data without extra backend calls |
+| II. Clean Code & Simplicity | PASS | Custom `useTooltipHover` hook encapsulates timer logic; `CommitTooltip` keeps refs/worktree/external links isolated; `externalRefParser` and `commitReachability` remain pure utilities |
+| III. Type Safety & Explicit Error Handling | PASS | New types (`WorktreeInfo`, `ExternalRef`, `ContainingBranchesResult`) in `shared/types.ts`; new messages with type guards; `Result<T, GitError>` for git operations |
+| IV. Library-First | PASS | Radix Popover (already installed) for positioning; no regex for structured data parsing (porcelain git output) |
+| V. Dual-Process Architecture | PASS | Backend handles `git branch --contains` and `git worktree list`; frontend handles rendering and state; communication via message passing only |
 
 ## Project Structure
 
@@ -39,44 +37,48 @@ Display an interactive hover tooltip on commit node circles in the graph view, s
 
 ```text
 specs/025-commit-node-tooltip/
-├── spec.md              # Feature specification (complete)
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output
 ├── data-model.md        # Phase 1 output
+├── quickstart.md        # Phase 1 output
 ├── contracts/           # Phase 1 output
-│   └── messages.md      # New message type contracts
-└── tasks.md             # Phase 2 output (created by /speckit.tasks)
+│   └── messages.md      # Message contract definitions
+└── tasks.md             # Phase 2 output (/speckit.tasks command)
 ```
 
 ### Source Code (repository root)
 
 ```text
 shared/
-├── types.ts             # ADD: WorktreeInfo, ExternalRef types
-└── messages.ts          # ADD: getWorktreeList/worktreeList message types (sync status reuses existing isCommitPushed/commitPushedResult)
+├── types.ts             # Add WorktreeInfo, ExternalRef, ContainingBranchesResult
+├── messages.ts          # Add getContainingBranches/containingBranches, getWorktreeList/worktreeList messages
+└── errors.ts            # No changes
 
 src/
-├── services/
-│   └── GitWorktreeService.ts    # NEW: git worktree list parsing
-├── WebviewProvider.ts           # MODIFY: handle new tooltip messages, bulk-fetch worktrees on load
-└── ExtensionController.ts       # MODIFY: instantiate GitWorktreeService
+├── ExtensionController.ts   # Instantiate GitWorktreeService
+├── WebviewProvider.ts        # Handle getContainingBranches, getWorktreeList messages
+└── services/
+    └── GitWorktreeService.ts # NEW: Parse git worktree list --porcelain
 
 webview-ui/src/
 ├── components/
-│   ├── GraphCell.tsx             # MODIFY: add hover handlers on SVG circle
-│   ├── CommitRow.tsx             # MODIFY: pass tooltip state/callbacks
-│   ├── GraphContainer.tsx        # MODIFY: scroll dismiss, tooltip portal host
-│   └── CommitTooltip.tsx         # NEW: tooltip component using Radix Popover
+│   ├── CommitTooltip.tsx     # NEW: Tooltip component with split reference sections and per-ref badge colors
+│   ├── GraphCell.tsx         # Add hover event handlers on SVG circle
+│   ├── CommitRow.tsx         # Pass tooltip-related props
+│   └── GraphContainer.tsx    # Scroll dismiss listener, tooltip portal rendering
+├── hooks/
+│   └── useTooltipHover.ts    # NEW: Timer-based hover/dismiss logic
 ├── stores/
-│   └── graphStore.ts             # MODIFY: add worktreeList, tooltipSyncStatusCache
+│   └── graphStore.ts         # Add tooltip state (hover, worktree cache, containing branches cache)
 ├── rpc/
-│   └── rpcClient.ts              # MODIFY: add getWorktreeList, handle worktreeList response
+│   └── rpcClient.ts          # Add getContainingBranches(), getWorktreeList(), handle responses
 └── utils/
-    └── externalRefParser.ts      # NEW: parse commit message for PR/issue references
+    ├── externalRefParser.ts  # NEW: Extract PR/issue refs from commit messages
+    └── commitReachability.ts # Reused to derive containing HEAD/tags/stashes from loaded commits
 ```
 
-**Structure Decision**: Follows existing project layout. New files are minimal — one backend service, one frontend component, one utility. All other changes are modifications to existing files.
+**Structure Decision**: Follows existing dual-process architecture. Backend services in `src/services/`, shared types in `shared/`, frontend components/hooks/utils in `webview-ui/src/`. No new directories needed.
 
 ## Complexity Tracking
 
-No constitution violations to justify.
+No constitution violations. No complexity justifications needed.

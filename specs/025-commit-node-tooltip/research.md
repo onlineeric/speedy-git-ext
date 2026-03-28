@@ -30,15 +30,16 @@
 - React Context — Would require a new context provider wrapping `GraphContainer`. Works but adds a layer vs. using the existing Zustand store.
 - Local state in `GraphContainer` with prop drilling — Would require passing callbacks through `CommitRow` → `GraphCell`, causing unnecessary re-renders.
 
-## R4: Sync Status — Existing `isCommitPushed` Reuse
+## R4: Containing Branches — New Async RPC Call
 
-**Decision**: Reuse the existing `isCommitPushed` RPC call and `commitPushedResult` response.
+**Decision**: Create a new `getContainingBranches` RPC request/response pair. The backend runs `git branch -a --contains <hash>` via `GitExecutor`, parses the branch names, and returns them to the frontend. Results are cached per commit in the Zustand store.
 
-**Rationale**: `GitHistoryService.isCommitPushed()` already runs `git branch -r --contains <hash>` with the GitExecutor 30s timeout. The `isCommitPushed`/`commitPushedResult` message pair already exists in `shared/messages.ts`. The RPC client already has `rpcClient.isCommitPushed(hash)` returning a `Promise<boolean>`. No backend changes needed for sync status.
+**Rationale**: The spec requires showing all branches (local and remote) whose history contains the hovered commit (FR-005). This matches standard Git UI tools (SourceTree, GitLens, Fork). `git branch -a --contains <hash>` is the authoritative git command for this. The result is a list of branch names that can be parsed into display-ready refs using the existing `mergeRefs` utility. The fetch is triggered on hover (not bulk on load) because running `--contains` for every loaded commit would be prohibitively expensive. Per-commit caching avoids redundant git processes on repeated hovers.
 
 **Alternatives considered**:
-- New dedicated message type — Unnecessary duplication of existing infrastructure.
-- Bulk pre-fetch sync status for all commits — Too expensive (`git branch -r --contains` per commit on load would spawn hundreds of git processes).
+- Reuse `commit.refs` (decoration-only refs) — Insufficient. `commit.refs` only includes refs whose tip is exactly at the commit. A commit deep in `main`'s history would show no branch refs. This was the original spec behavior and was identified as incorrect.
+- Frontend graph traversal — Could determine containing branches by walking the loaded commit graph in the frontend. However, this only works for commits within the loaded window (batch size). Commits beyond the loaded range would produce incomplete results. `git branch -a --contains` is authoritative.
+- Bulk pre-fetch for all commits — Too expensive. `git branch --contains` per commit on graph load would spawn hundreds of git processes. On-demand per hover with caching is the right tradeoff.
 
 ## R5: Worktree Data — New Backend Service
 
@@ -64,7 +65,7 @@
 
 **Decision**: Use Radix Popover with `side="right"` (preferred), `align="center"`, `sideOffset={8}`, and `collisionPadding={8}`. Radix handles automatic flip/shift within viewport.
 
-**Rationale**: The SVG circle is on the left side of the row. Positioning the tooltip to the right of the circle avoids overlapping the graph lanes. Radix Popover's built-in collision detection handles narrow viewports by flipping to `left`, `top`, or `bottom` as needed. The `avoidCollisions` prop (true by default) combined with `collisionBoundary` handles the FR-012 requirement.
+**Rationale**: The SVG circle is on the left side of the row. Positioning the tooltip to the right of the circle avoids overlapping the graph lanes. Radix Popover's built-in collision detection handles narrow viewports by flipping to `left`, `top`, or `bottom` as needed. The `avoidCollisions` prop (true by default) combined with `collisionBoundary` handles the FR-011 requirement.
 
 **Alternatives considered**:
 - Always position below — Would overlap adjacent commit rows in the virtual list.
@@ -74,7 +75,7 @@
 
 **Decision**: Add a scroll event listener on the `GraphContainer` scroll container (`containerRef`) that clears the hovered commit hash, dismissing the tooltip.
 
-**Rationale**: The virtual scroll container already has a ref (`containerRef`). Adding a passive scroll listener is zero-cost and immediately clears tooltip state. This satisfies FR-013.
+**Rationale**: The virtual scroll container already has a ref (`containerRef`). Adding a passive scroll listener is zero-cost and immediately clears tooltip state. This satisfies FR-012.
 
 **Alternatives considered**:
 - `IntersectionObserver` on the hovered row — More complex, same result.

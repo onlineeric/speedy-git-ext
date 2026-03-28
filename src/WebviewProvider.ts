@@ -15,8 +15,10 @@ import type { GitRevertService } from './services/GitRevertService.js';
 import type { GitRebaseService } from './services/GitRebaseService.js';
 import type { GitSignatureService } from './services/GitSignatureService.js';
 import type { GitSubmoduleService } from './services/GitSubmoduleService.js';
+import type { GitWorktreeService } from './services/GitWorktreeService.js';
 import type { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
 import { GitError } from '../shared/errors.js';
+import { GitExecutor } from './services/GitExecutor.js';
 import { GitHubAvatarService } from './services/GitHubAvatarService.js';
 
 export class WebviewProvider {
@@ -58,6 +60,7 @@ export class WebviewProvider {
     private gitRebaseService: GitRebaseService,
     private gitSignatureService: GitSignatureService,
     private gitSubmoduleService: GitSubmoduleService,
+    private gitWorktreeService: GitWorktreeService,
     private readonly log: vscode.LogOutputChannel,
     private readonly gitRepoDiscoveryService?: GitRepoDiscoveryService,
     currentRepoPath?: string
@@ -99,6 +102,7 @@ export class WebviewProvider {
     gitRebaseService: GitRebaseService,
     gitSignatureService: GitSignatureService,
     gitSubmoduleService: GitSubmoduleService,
+    gitWorktreeService: GitWorktreeService,
     currentRepoPath: string
   ) {
     this.gitLogService = gitLogService;
@@ -113,6 +117,7 @@ export class WebviewProvider {
     this.gitRebaseService = gitRebaseService;
     this.gitSignatureService = gitSignatureService;
     this.gitSubmoduleService = gitSubmoduleService;
+    this.gitWorktreeService = gitWorktreeService;
     this.currentRepoPath = currentRepoPath;
     this.gitHubAvatarService = null;
     this.gitHubAvatarInitialized = false;
@@ -284,6 +289,7 @@ export class WebviewProvider {
       await this.handleMessage({ type: 'getBranches', payload: {} });
       await this.handleMessage({ type: 'getRemotes', payload: {} });
       await this.handleMessage({ type: 'getSubmodules', payload: {} });
+      await this.handleMessage({ type: 'getWorktreeList', payload: {} });
       if (includeStashes) {
         await this.handleMessage({ type: 'getStashes', payload: {} });
       }
@@ -564,6 +570,42 @@ export class WebviewProvider {
       }
       case 'openCurrentFile': {
         await this.openCurrentFile(message.payload.filePath);
+        break;
+      }
+      case 'getWorktreeList': {
+        const result = await this.gitWorktreeService.listWorktrees();
+        this.postMessage({
+          type: 'worktreeList',
+          payload: { worktrees: result.success ? result.value : [] },
+        });
+        break;
+      }
+      case 'getContainingBranches': {
+        const executor = new GitExecutor(this.log);
+        const result = await executor.execute({
+          args: ['branch', '-a', '--contains', message.payload.hash, '--format=%(refname:short)'],
+          cwd: this.currentRepoPath,
+        });
+        let branches: string[] = [];
+        let status: 'loaded' | 'error' = 'loaded';
+        if (result.success) {
+          branches = result.value.stdout
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0)
+            .map((name) => name.startsWith('remotes/') ? name.slice('remotes/'.length) : name)
+            .filter((name) => name !== 'HEAD' && !name.endsWith('/HEAD'));
+        } else {
+          status = 'error';
+        }
+        this.postMessage({
+          type: 'containingBranches',
+          payload: { hash: message.payload.hash, branches, status },
+        });
+        break;
+      }
+      case 'openExternal': {
+        await vscode.env.openExternal(vscode.Uri.parse(message.payload.url));
         break;
       }
       case 'refresh': {

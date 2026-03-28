@@ -5,6 +5,7 @@ import type {
   Commit,
   CommitDetails,
   CommitSignatureInfo,
+  ContainingBranchesResult,
   DetailsPanelPosition,
   FileViewMode,
   GraphFilters,
@@ -17,6 +18,7 @@ import type {
   Submodule,
   SubmoduleNavEntry,
   UserSettings,
+  WorktreeInfo,
 } from '@shared/types';
 import { DEFAULT_USER_SETTINGS } from '@shared/types';
 import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
@@ -66,6 +68,16 @@ interface GraphStore {
   submodules: Submodule[];
   submoduleStack: SubmoduleNavEntry[];
   fileViewMode: FileViewMode;
+  // Tooltip state
+  hoveredCommitHash: string | null;
+  tooltipAnchorRect: DOMRect | null;
+  worktreeList: WorktreeInfo[];
+  worktreeByHead: Map<string, WorktreeInfo>;
+  containingBranchesCache: Map<string, ContainingBranchesResult>;
+  setHoveredCommit: (hash: string | null, anchorRect: DOMRect | null) => void;
+  setWorktreeList: (list: WorktreeInfo[]) => void;
+  setContainingBranches: (hash: string, result: ContainingBranchesResult) => void;
+  clearTooltipCaches: () => void;
   setFileViewMode: (mode: FileViewMode) => void;
   setGitHubAvatarUrls: (urls: Record<string, string>) => void;
   setCommits: (commits: Commit[]) => void;
@@ -222,6 +234,29 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   submodules: [],
   submoduleStack: [],
   fileViewMode: 'list',
+  hoveredCommitHash: null,
+  tooltipAnchorRect: null,
+  worktreeList: [],
+  worktreeByHead: new Map(),
+  containingBranchesCache: new Map(),
+  setHoveredCommit: (hash, anchorRect) => set({ hoveredCommitHash: hash, tooltipAnchorRect: anchorRect }),
+  setWorktreeList: (list) => {
+    const byHead = new Map<string, WorktreeInfo>();
+    for (const wt of list) {
+      byHead.set(wt.head, wt);
+    }
+    set({ worktreeList: list, worktreeByHead: byHead });
+  },
+  setContainingBranches: (hash, result) => set((state) => {
+    const next = new Map(state.containingBranchesCache);
+    next.set(hash, result);
+    return { containingBranchesCache: next };
+  }),
+  clearTooltipCaches: () => set({
+    containingBranchesCache: new Map(),
+    hoveredCommitHash: null,
+    tooltipAnchorRect: null,
+  }),
   setFileViewMode: (mode) => set({ fileViewMode: mode }),
   setGitHubAvatarUrls: (urls) => set((state) => ({
     gitHubAvatarUrls: { ...state.gitHubAvatarUrls, ...urls },
@@ -254,6 +289,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       pendingCommitCheckout: null,
       signatureCache: {},
       signatureLoading: {},
+      containingBranchesCache: new Map(),
+      hoveredCommitHash: null,
+      tooltipAnchorRect: null,
     });
   },
   appendCommits: (newCommits, totalLoadedWithoutFilter) => {

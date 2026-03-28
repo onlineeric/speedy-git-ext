@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo } from './types.js';
 import type { GitError } from './errors.js';
 
 export type RequestMessage =
@@ -66,6 +66,12 @@ export type RequestMessage =
   // Stash-and-checkout flow
   | { type: 'stashAndCheckout'; payload: { name: string; remote?: string; pull?: boolean } }
   | { type: 'stashAndCheckoutCommit'; payload: { hash: string } }
+  // Worktree ops
+  | { type: 'getWorktreeList'; payload: Record<string, never> }
+  // Containing branches
+  | { type: 'getContainingBranches'; payload: { hash: string } }
+  // External browser
+  | { type: 'openExternal'; payload: { url: string } }
   // File actions
   | { type: 'openCurrentFile'; payload: { filePath: string } };
 
@@ -96,7 +102,9 @@ export type ResponseMessage =
   | { type: 'submodulesData'; payload: { submodules: Submodule[]; stack: SubmoduleNavEntry[] } }
   | { type: 'submoduleOperationResult'; payload: { success: boolean; error?: string } }
   | { type: 'pushResult'; payload: { success: boolean; message: string } }
-  | { type: 'avatarUrls'; payload: { urls: AvatarUrlMap } };
+  | { type: 'avatarUrls'; payload: { urls: AvatarUrlMap } }
+  | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[] } }
+  | { type: 'containingBranches'; payload: { hash: string; branches: string[]; status: 'loaded' | 'error' } };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -121,6 +129,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   getSettings: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
   updateSubmodule: true, initSubmodule: true,
   stashAndCheckout: true, stashAndCheckoutCommit: true,
+  getWorktreeList: true, getContainingBranches: true, openExternal: true,
   openCurrentFile: true,
 };
 
@@ -132,7 +141,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commitsAppended: true, prefetchError: true, repoList: true,
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
-  pushResult: true, avatarUrls: true,
+  pushResult: true, avatarUrls: true, worktreeList: true, containingBranches: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {

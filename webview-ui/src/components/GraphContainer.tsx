@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Submodule } from '@shared/types';
@@ -9,6 +9,8 @@ import { CherryPickConflictBanner } from './CherryPickConflictBanner';
 import { RebaseConflictBanner } from './RebaseConflictBanner';
 import { SearchWidget } from './SearchWidget';
 import { SubmoduleBreadcrumb } from './SubmoduleBreadcrumb';
+import { CommitTooltip } from './CommitTooltip';
+import { useTooltipHover } from '../hooks/useTooltipHover';
 
 const ROW_HEIGHT = 28;
 const OVERSCAN = 10;
@@ -40,7 +42,21 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
   const selectCommit = useGraphStore((state) => state.selectCommit);
   const selectedCommitIndex = useGraphStore((state) => state.selectedCommitIndex);
   const searchState = useGraphStore((state) => state.searchState);
+  const hoveredCommitHash = useGraphStore((state) => state.hoveredCommitHash);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { onNodeMouseEnter, onNodeMouseLeave, onTooltipMouseEnter, onTooltipMouseLeave, dismissImmediate } = useTooltipHover();
+
+  const hoveredCommit = useMemo(
+    () => hoveredCommitHash ? commits.find((c) => c.hash === hoveredCommitHash) : undefined,
+    [hoveredCommitHash, commits]
+  );
+
+  // Stable callback refs to avoid breaking CommitRow memoization
+  const stableOnNodeMouseEnter = useCallback(
+    (hash: string, rect: DOMRect) => onNodeMouseEnter(hash, rect),
+    [onNodeMouseEnter]
+  );
+  const stableOnNodeMouseLeave = useCallback(() => onNodeMouseLeave(), [onNodeMouseLeave]);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -53,6 +69,15 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
     observer.observe(element);
     return () => observer.disconnect();
   }, [setMaxVisibleRefs]);
+
+  // Dismiss tooltip on scroll
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+    const handleScroll = () => dismissImmediate();
+    element.addEventListener('scroll', handleScroll, { passive: true });
+    return () => element.removeEventListener('scroll', handleScroll);
+  }, [dismissImmediate]);
 
   const virtualizer = useVirtualizer({
     count: commits.length,
@@ -172,6 +197,8 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
                 isSearchMatch={isSearchMatch}
                 isCurrentSearchMatch={isCurrentSearchMatch}
                 onClick={(event) => handleCommitClick(commit.hash, virtualItem.index, event)}
+                onNodeMouseEnter={stableOnNodeMouseEnter}
+                onNodeMouseLeave={stableOnNodeMouseLeave}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -185,6 +212,11 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
           })}
         </div>
       </div>
+      <CommitTooltip
+        commit={hoveredCommit}
+        onMouseEnter={onTooltipMouseEnter}
+        onMouseLeave={onTooltipMouseLeave}
+      />
       {prefetching && (
         <div className="flex items-center justify-center py-2 text-xs text-[var(--vscode-descriptionForeground)]">
           Loading…
