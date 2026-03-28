@@ -13,6 +13,7 @@ import { GitRevertService } from './services/GitRevertService.js';
 import { GitRebaseService } from './services/GitRebaseService.js';
 import { GitSignatureService } from './services/GitSignatureService.js';
 import { GitSubmoduleService } from './services/GitSubmoduleService.js';
+import { GitWorktreeService } from './services/GitWorktreeService.js';
 import { GitShowContentProvider } from './GitShowContentProvider.js';
 import { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
 import { GitWatcherService } from './services/GitWatcherService.js';
@@ -32,6 +33,7 @@ export class ExtensionController {
   private gitRebaseService: GitRebaseService | undefined;
   private gitSignatureService: GitSignatureService | undefined;
   private gitSubmoduleService: GitSubmoduleService | undefined;
+  private gitWorktreeService: GitWorktreeService | undefined;
   private contentProviderRegistration: vscode.Disposable | undefined;
   private gitWatcherService: GitWatcherService | undefined;
   private gitRepoDiscoveryService: GitRepoDiscoveryService | undefined;
@@ -116,6 +118,7 @@ export class ExtensionController {
     this.gitRebaseService = new GitRebaseService(workspacePath, this.log);
     this.gitSignatureService = new GitSignatureService(workspacePath, this.log);
     this.gitSubmoduleService = new GitSubmoduleService(workspacePath, this.log);
+    this.gitWorktreeService = new GitWorktreeService(workspacePath, this.log);
 
     this.gitWatcherService?.setRepoPath(workspacePath);
 
@@ -133,6 +136,7 @@ export class ExtensionController {
         this.gitRebaseService,
         this.gitSignatureService,
         this.gitSubmoduleService,
+        this.gitWorktreeService!,
         workspacePath
       );
     }
@@ -196,6 +200,7 @@ export class ExtensionController {
         this.gitRebaseService!,
         this.gitSignatureService!,
         this.gitSubmoduleService!,
+        this.gitWorktreeService!,
         this.log,
         this.gitRepoDiscoveryService,
         workspacePath
@@ -280,6 +285,7 @@ export class ExtensionController {
     this.gitRebaseService = undefined;
     this.gitSignatureService = undefined;
     this.gitSubmoduleService = undefined;
+    this.gitWorktreeService = undefined;
     this.gitRepoDiscoveryService?.dispose();
     this.gitRepoDiscoveryService = undefined;
     this.statusBarItem?.dispose();

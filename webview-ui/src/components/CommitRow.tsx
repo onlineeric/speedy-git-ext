@@ -27,6 +27,8 @@ interface CommitRowProps {
   isSearchMatch?: boolean;
   isCurrentSearchMatch?: boolean;
   onClick: (e: React.MouseEvent) => void;
+  onNodeMouseEnter?: (hash: string, rect: DOMRect) => void;
+  onNodeMouseLeave?: () => void;
   style: React.CSSProperties;
 }
 
@@ -43,6 +45,8 @@ export const CommitRow = memo(function CommitRow({
   isSearchMatch = false,
   isCurrentSearchMatch = false,
   onClick,
+  onNodeMouseEnter,
+  onNodeMouseLeave,
   style,
 }: CommitRowProps) {
   const { avatarsEnabled, dateFormat, showRemoteBranches, showTags, graphColors } = useGraphStore((state) => state.userSettings);
@@ -102,6 +106,8 @@ export const CommitRow = memo(function CommitRow({
         width={graphWidth}
         height={rowHeight}
         isHeadCommit={isHead}
+        onNodeMouseEnter={onNodeMouseEnter}
+        onNodeMouseLeave={onNodeMouseLeave}
       />
 
       <span

@@ -12,6 +12,8 @@ interface GraphCellProps {
   width: number;
   height: number;
   isHeadCommit?: boolean;
+  onNodeMouseEnter?: (hash: string, rect: DOMRect) => void;
+  onNodeMouseLeave?: () => void;
 }
 
 const LANE_WIDTH = 16;
@@ -30,6 +32,8 @@ export const GraphCell = memo(function GraphCell({
   width,
   height,
   isHeadCommit = false,
+  onNodeMouseEnter,
+  onNodeMouseLeave,
 }: GraphCellProps) {
   const graphColors = useGraphStore((state) => state.userSettings.graphColors);
   const node = topology.nodes.get(commit.hash);
@@ -173,6 +177,12 @@ export const GraphCell = memo(function GraphCell({
         fill={hasMerge ? 'transparent' : color}
         stroke={color}
         strokeWidth={2}
+        className={onNodeMouseEnter ? 'cursor-pointer' : undefined}
+        onMouseEnter={onNodeMouseEnter ? (e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          onNodeMouseEnter(commit.hash, rect);
+        } : undefined}
+        onMouseLeave={onNodeMouseLeave}
       />
     </svg>
   );

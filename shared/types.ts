@@ -230,6 +230,25 @@ export interface InteractiveRebaseConfig {
 
 export type AvatarUrlMap = Record<string, string>;
 
+export interface WorktreeInfo {
+  path: string;
+  head: string;
+  branch: string;
+  isMain: boolean;
+  isDetached: boolean;
+}
+
+export interface ExternalRef {
+  label: string;
+  url: string | null;
+  type: 'pr-or-issue' | 'jira';
+}
+
+export interface ContainingBranchesResult {
+  branches: string[];
+  status: 'loaded' | 'loading' | 'error';
+}
+
 export type RebaseState = 'idle' | 'in-progress';
 
 export interface RebaseConflictInfo {
