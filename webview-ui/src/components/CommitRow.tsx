@@ -8,6 +8,7 @@ import { StashContextMenu } from './StashContextMenu';
 import { OverflowRefsBadge } from './OverflowRefsBadge';
 import { RefLabel } from './RefLabel';
 import { HeadIcon } from './icons';
+import { renderInlineCode } from '../utils/inlineCodeRenderer';
 import { mergeRefs, displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
 import { formatAbsoluteDateTime, formatRelativeDate } from '../utils/formatDate';
 import { AuthorAvatar } from './AuthorAvatar';
@@ -144,7 +145,7 @@ export const CommitRow = memo(function CommitRow({
         className={`flex-1 truncate text-sm ${isStash ? 'italic text-[var(--vscode-descriptionForeground)]' : ''}`}
         title={commit.subject}
       >
-        {commit.subject}
+        {renderInlineCode(commit.subject)}
       </span>
 
       <div className="flex w-36 flex-shrink-0 items-center gap-2 overflow-hidden">

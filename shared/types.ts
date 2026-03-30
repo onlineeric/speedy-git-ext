@@ -249,6 +249,22 @@ export interface ContainingBranchesResult {
   status: 'loaded' | 'loading' | 'error';
 }
 
+export interface PersistedUIState {
+  version: number;
+  detailsPanelPosition: DetailsPanelPosition;
+  fileViewMode: FileViewMode;
+  bottomPanelHeight: number;
+  rightPanelWidth: number;
+}
+
+export const DEFAULT_PERSISTED_UI_STATE: PersistedUIState = {
+  version: 1,
+  detailsPanelPosition: 'bottom',
+  fileViewMode: 'list',
+  bottomPanelHeight: 280,
+  rightPanelWidth: 400,
+};
+
 export type RebaseState = 'idle' | 'in-progress';
 
 export interface RebaseConflictInfo {
