@@ -22,14 +22,7 @@
     "git graph",
     "git history",
     "git log",
-    "rebase",
-    "git ui",
-    "git history",
-    "git tools",
-    "git operations",
-    "git workflow",
-    "git history viewer",
-    "git history editor"
+    "git ui"
   ],
   "activationEvents": ["onStartupFinished"],
   "main": "./dist/extension.js",
