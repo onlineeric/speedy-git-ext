@@ -73,7 +73,7 @@ As a developer using the merge dialog, I want the option labels to display git f
 - **FR-002**: System MUST apply inline code rendering in the commit list (CommitRow), commit details panel subject, and commit details panel body.
 - **FR-003**: System MUST leave commit messages without backticks completely unchanged in rendering.
 - **FR-004**: System MUST handle unpaired backticks gracefully by rendering them as literal characters.
-- **FR-005**: System MUST handle empty backtick pairs by rendering them as-is without creating empty styled elements.
+- **FR-005**: System MUST handle empty backtick pairs (``) by rendering them as two literal backtick characters without creating empty styled elements.
 - **FR-006**: System MUST add a --squash checkbox option to the merge dialog, positioned as the first option (above --no-commit and --no-ff). The --squash checkbox operates independently with no coupling behavior on other checkboxes.
 - **FR-007**: The --squash option label MUST read: "--squash: combines all changes from the target branch into a single change on the current branch without creating a merge commit."
 - **FR-008**: The --squash checkbox MUST update the command preview to include `--squash` when checked, reusing the existing command builder support.

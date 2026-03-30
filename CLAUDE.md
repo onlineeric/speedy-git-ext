@@ -99,5 +99,7 @@ Built with **Vite** + React plugin → `dist/webview/`
 - In-memory caches (Zustand store + component state) (025-commit-node-tooltip)
 - TypeScript 5.x (strict) + VS Code Extension API, React 18, Zustand, esbuild, Vite (026-persist-ui-state)
 - VS Code `context.globalState` (key-value, JSON-serializable, global across workspaces) (026-persist-ui-state)
+- TypeScript 5.x (strict) + React 18, Zustand, Radix UI (AlertDialog), Tailwind CSS, esbuild (backend), Vite (frontend) (027-ui-enhancements-merge-inline)
+- N/A (no persistence changes) (027-ui-enhancements-merge-inline)
 
 ## Recent Changes
