@@ -3,6 +3,7 @@ import type { CommitDetails, FileChange, DetailsPanelPosition, FileViewMode, Com
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { formatRelativeDate } from '../utils/formatDate';
+import { renderInlineCode } from '../utils/inlineCodeRenderer';
 import { ListViewIcon, TreeViewIcon, CloseIcon, MoveRightIcon, MoveBottomIcon } from './icons';
 import { FileChangesTreeView } from './FileChangesTreeView';
 import { FileStatusBadge, FileChangeIndicators, FileActionIcons } from './FileChangeShared';
@@ -138,7 +139,7 @@ function PanelHeader({
         {details.abbreviatedHash}
       </span>
       <span className="flex-1 truncate text-sm" title={details.subject}>
-        {details.subject}
+        {renderInlineCode(details.subject)}
       </span>
       <button
         onClick={onTogglePosition}
@@ -194,7 +195,7 @@ function CommitMetadata({ details }: { details: CommitDetails }) {
       {details.body && (
         <div className="pt-1">
           <span className="whitespace-pre-wrap text-[var(--vscode-descriptionForeground)]">
-            {details.body}
+            {renderInlineCode(details.body)}
           </span>
         </div>
       )}

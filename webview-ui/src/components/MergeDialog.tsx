@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import type { MergeOptions } from '@shared/types';
 import { buildMergeCommand } from '../utils/gitCommandBuilder';
+import { InlineCode } from '../utils/inlineCodeRenderer';
 import { CommandPreview } from './CommandPreview';
 
 interface MergeDialogProps {
@@ -12,16 +13,19 @@ interface MergeDialogProps {
 }
 
 export function MergeDialog({ open, branchName, onConfirm, onCancel }: MergeDialogProps) {
+  const [squash, setSquash] = useState(false);
   const [noCommit, setNoCommit] = useState(false);
   const [noFastForward, setNoFastForward] = useState(false);
 
   const handleConfirm = () => {
-    onConfirm({ noCommit, noFastForward: noCommit ? true : noFastForward });
+    onConfirm({ squash, noCommit, noFastForward: noCommit ? true : noFastForward });
+    setSquash(false);
     setNoCommit(false);
     setNoFastForward(false);
   };
 
   const handleCancel = () => {
+    setSquash(false);
     setNoCommit(false);
     setNoFastForward(false);
     onCancel();
@@ -43,11 +47,21 @@ export function MergeDialog({ open, branchName, onConfirm, onCancel }: MergeDial
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
+                checked={squash}
+                onChange={(e) => setSquash(e.target.checked)}
+                className="w-4 h-4 accent-[var(--vscode-button-background)]"
+              />
+              <span className="text-sm text-[var(--vscode-foreground)]"><InlineCode>--squash</InlineCode>: combines all changes from the target branch into a single change on the current branch without creating a merge commit</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
                 checked={noCommit}
                 onChange={(e) => setNoCommit(e.target.checked)}
                 className="w-4 h-4 accent-[var(--vscode-button-background)]"
               />
-              <span className="text-sm text-[var(--vscode-foreground)]">No commits, stage changes only</span>
+              <span className="text-sm text-[var(--vscode-foreground)]"><InlineCode>--no-commit</InlineCode>: No commits, stage changes only</span>
             </label>
 
             <label className={`flex items-center gap-2 cursor-pointer select-none ${noCommit ? 'opacity-50' : ''}`}>
@@ -58,12 +72,12 @@ export function MergeDialog({ open, branchName, onConfirm, onCancel }: MergeDial
                 onChange={(e) => setNoFastForward(e.target.checked)}
                 className="w-4 h-4 accent-[var(--vscode-button-background)]"
               />
-              <span className="text-sm text-[var(--vscode-foreground)]">Create a new commit even if fast forward is possible</span>
+              <span className="text-sm text-[var(--vscode-foreground)]"><InlineCode>--no-ff</InlineCode>: Create a new commit even if fast forward is possible</span>
             </label>
           </div>
 
           <div className="mt-4">
-            <CommandPreview command={buildMergeCommand({ branch: branchName, noCommit, noFastForward: noCommit ? true : noFastForward })} />
+            <CommandPreview command={buildMergeCommand({ branch: branchName, squash, noCommit, noFastForward: noCommit ? true : noFastForward })} />
           </div>
 
           <div className="flex justify-end gap-2 mt-4">

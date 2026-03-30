@@ -4,7 +4,7 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.4.1] - 2026-03-30
+## [1.5.0] - 2026-03-30
 
 ### Added
 - Commit details panel now remembers its position (bottom or right), file change view mode (list or tree), and panel size across panel close/reopen and VS Code reload.
@@ -12,6 +12,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Panel height (bottom position) and width (right position) are stored independently, so switching positions preserves the last-used size for each orientation.
 - All toolbar icons (position toggle, view mode toggle) correctly reflect the restored state after reopening.
 - Graceful fallback to defaults when stored preferences are missing or corrupted, with automatic recovery on next user interaction.
+- Backtick-delimited text in commit messages (e.g., `functionName`) now renders with inline code styling (grey background, no visible backticks) across the commit list, details panel subject, and details panel body.
+- Multiple inline code segments in a single commit message each render independently with their own styling.
+- Unpaired backticks and empty backtick pairs render as literal characters with no special styling.
+- Squash merge option (`--squash`) added to the merge dialog as the first checkbox, allowing all branch changes to be combined into a single staged change without creating a merge commit.
+- Merge dialog option labels now display git flags (`--squash`, `--no-commit`, `--no-ff`) with inline code styling (grey background) to visually distinguish flags from descriptive text.
 
 ## [1.4.0] - 2026-03-28
 
