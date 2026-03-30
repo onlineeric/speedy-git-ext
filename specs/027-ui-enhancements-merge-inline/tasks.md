@@ -27,7 +27,7 @@
 
 **Purpose**: Create the shared inline code parsing utility that User Stories 1 and 3 both depend on.
 
-- [ ] T001 Create inline code rendering utility in `webview-ui/src/utils/inlineCodeRenderer.tsx`. Export three things: (1) `parseInlineCode()` that splits text on backtick pairs into segments of `{ text, isCode }`, (2) `renderInlineCode(text: string): React.ReactNode` convenience function that returns React nodes (`<span>` for plain text, `<code>` with grey background for code), and (3) `InlineCode` React component for wrapping static known text in inline code style (for reuse in MergeDialog labels). Handle edge cases: unpaired backticks render as literal characters, empty backtick pairs (``) render as two literal backtick characters. Use `bg-[var(--vscode-textCodeBlock-background)]` and `font-mono rounded px-1` for styling in a single place.
+- [x] T001 Create inline code rendering utility in `webview-ui/src/utils/inlineCodeRenderer.tsx`. Export three things: (1) `parseInlineCode()` that splits text on backtick pairs into segments of `{ text, isCode }`, (2) `renderInlineCode(text: string): React.ReactNode` convenience function that returns React nodes (`<span>` for plain text, `<code>` with grey background for code), and (3) `InlineCode` React component for wrapping static known text in inline code style (for reuse in MergeDialog labels). Handle edge cases: unpaired backticks render as literal characters, empty backtick pairs (``) render as two literal backtick characters. Use `bg-[var(--vscode-textCodeBlock-background)]` and `font-mono rounded px-1` for styling in a single place.
 
 **Checkpoint**: Foundation ready — `renderInlineCode()` can be imported by CommitRow, CommitDetailsPanel, and MergeDialog.
 
@@ -41,9 +41,9 @@
 
 ### Implementation for User Story 1
 
-- [ ] T002 [P] [US1] Update commit subject rendering in `webview-ui/src/components/CommitRow.tsx` to use `renderInlineCode()` instead of plain text for `commit.subject`. Ensure `truncate` behavior and `title` attribute still work correctly (title should show raw text with backticks for copy-ability). Verify messages without backticks render unchanged (FR-003).
-- [ ] T003 [P] [US1] Update commit subject rendering in `webview-ui/src/components/CommitDetailsPanel.tsx` header section to use `renderInlineCode()` for `details.subject`. Keep existing `truncate` and `title` behavior.
-- [ ] T004 [US1] Update commit body rendering in `webview-ui/src/components/CommitDetailsPanel.tsx` body section to use `renderInlineCode()` for `details.body`. Preserve `whitespace-pre-wrap` formatting — the body may contain newlines that must be retained.
+- [x] T002 [P] [US1] Update commit subject rendering in `webview-ui/src/components/CommitRow.tsx` to use `renderInlineCode()` instead of plain text for `commit.subject`. Ensure `truncate` behavior and `title` attribute still work correctly (title should show raw text with backticks for copy-ability). Verify messages without backticks render unchanged (FR-003).
+- [x] T003 [P] [US1] Update commit subject rendering in `webview-ui/src/components/CommitDetailsPanel.tsx` header section to use `renderInlineCode()` for `details.subject`. Keep existing `truncate` and `title` behavior.
+- [x] T004 [US1] Update commit body rendering in `webview-ui/src/components/CommitDetailsPanel.tsx` body section to use `renderInlineCode()` for `details.body`. Preserve `whitespace-pre-wrap` formatting — the body may contain newlines that must be retained.
 
 **Checkpoint**: Commit messages with backticks now render with inline code styling across the entire UI. Messages without backticks render unchanged.
 
@@ -57,7 +57,7 @@
 
 ### Implementation for User Story 2
 
-- [ ] T005 [US2] Add `squash` state variable (default `false`) to `webview-ui/src/components/MergeDialog.tsx`. Add a checkbox for --squash positioned as the first option (above --no-commit and --no-ff). Pass `squash` in the `onConfirm()` options object. Pass `squash` to `buildMergeCommand()` for command preview. The --squash checkbox operates independently with no coupling to other checkboxes. Reset `squash` state in `handleOpenChange` alongside existing state resets.
+- [x] T005 [US2] Add `squash` state variable (default `false`) to `webview-ui/src/components/MergeDialog.tsx`. Add a checkbox for --squash positioned as the first option (above --no-commit and --no-ff). Pass `squash` in the `onConfirm()` options object. Pass `squash` to `buildMergeCommand()` for command preview. The --squash checkbox operates independently with no coupling to other checkboxes. Reset `squash` state in `handleOpenChange` alongside existing state resets.
 
 **Checkpoint**: --squash checkbox works end-to-end — the existing `rpcClient.mergeBranch()`, message types, and backend handler already support the `squash` flag.
 
@@ -71,7 +71,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T006 [US3] Update all three checkbox labels in `webview-ui/src/components/MergeDialog.tsx`: import `InlineCode` component from `webview-ui/src/utils/inlineCodeRenderer.tsx` and use it to wrap the "--squash", "--no-commit", and "--no-ff" flag text in each label. Update label text to: "--no-commit: No commits, stage changes only" and "--no-ff: Create a new commit even if fast forward is possible". This reuses the same styling as commit message inline code (DRY).
+- [x] T006 [US3] Update all three checkbox labels in `webview-ui/src/components/MergeDialog.tsx`: import `InlineCode` component from `webview-ui/src/utils/inlineCodeRenderer.tsx` and use it to wrap the "--squash", "--no-commit", and "--no-ff" flag text in each label. Update label text to: "--no-commit: No commits, stage changes only" and "--no-ff: Create a new commit even if fast forward is possible". This reuses the same styling as commit message inline code (DRY).
 
 **Checkpoint**: All three merge options show git flags with inline code styling. Descriptive text remains plain.
 
@@ -81,9 +81,9 @@
 
 **Purpose**: Validation and cleanup across all stories.
 
-- [ ] T007 Run `pnpm typecheck` and fix any TypeScript errors
-- [ ] T008 Run `pnpm lint` and fix any ESLint errors
-- [ ] T009 Run `pnpm build` and verify clean build of both extension and webview
+- [x] T007 Run `pnpm typecheck` and fix any TypeScript errors
+- [x] T008 Run `pnpm lint` and fix any ESLint errors
+- [x] T009 Run `pnpm build` and verify clean build of both extension and webview
 - [ ] T010 Run quickstart.md validation — smoke test all three features via VS Code "Run Extension" launch config
 
 ---
