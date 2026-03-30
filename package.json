@@ -19,9 +19,17 @@
   ],
   "keywords": [
     "git",
-    "graph",
-    "visualization",
-    "scm"
+    "git graph",
+    "git history",
+    "git log",
+    "rebase",
+    "git ui",
+    "git history",
+    "git tools",
+    "git operations",
+    "git workflow",
+    "git history viewer",
+    "git history editor"
   ],
   "activationEvents": ["onStartupFinished"],
   "main": "./dist/extension.js",
