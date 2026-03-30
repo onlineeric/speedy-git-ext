@@ -9,6 +9,7 @@ import type {
   DetailsPanelPosition,
   FileViewMode,
   GraphFilters,
+  PersistedUIState,
   RemoteInfo,
   RebaseConflictInfo,
   RebaseEntry,
@@ -20,7 +21,7 @@ import type {
   UserSettings,
   WorktreeInfo,
 } from '@shared/types';
-import { DEFAULT_USER_SETTINGS } from '@shared/types';
+import { DEFAULT_USER_SETTINGS, DEFAULT_PERSISTED_UI_STATE } from '@shared/types';
 import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
 
 interface GraphStore {
@@ -68,6 +69,8 @@ interface GraphStore {
   submodules: Submodule[];
   submoduleStack: SubmoduleNavEntry[];
   fileViewMode: FileViewMode;
+  bottomPanelHeight: number;
+  rightPanelWidth: number;
   // Tooltip state
   hoveredCommitHash: string | null;
   tooltipAnchorRect: DOMRect | null;
@@ -79,6 +82,9 @@ interface GraphStore {
   setContainingBranches: (hash: string, result: ContainingBranchesResult) => void;
   clearTooltipCaches: () => void;
   setFileViewMode: (mode: FileViewMode) => void;
+  setBottomPanelHeight: (height: number) => void;
+  setRightPanelWidth: (width: number) => void;
+  hydratePersistedUIState: (state: PersistedUIState) => void;
   setGitHubAvatarUrls: (urls: Record<string, string>) => void;
   setCommits: (commits: Commit[]) => void;
   appendCommits: (newCommits: Commit[], totalLoadedWithoutFilter?: number) => void;
@@ -195,7 +201,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   selectedCommitIndex: -1,
   commitDetails: undefined,
   detailsPanelOpen: false,
-  detailsPanelPosition: 'bottom',
+  detailsPanelPosition: DEFAULT_PERSISTED_UI_STATE.detailsPanelPosition,
   loading: true,
   error: undefined,
   successMessage: undefined,
@@ -233,7 +239,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   gitHubAvatarUrls: {},
   submodules: [],
   submoduleStack: [],
-  fileViewMode: 'list',
+  fileViewMode: DEFAULT_PERSISTED_UI_STATE.fileViewMode,
+  bottomPanelHeight: DEFAULT_PERSISTED_UI_STATE.bottomPanelHeight,
+  rightPanelWidth: DEFAULT_PERSISTED_UI_STATE.rightPanelWidth,
   hoveredCommitHash: null,
   tooltipAnchorRect: null,
   worktreeList: [],
@@ -257,7 +265,20 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     hoveredCommitHash: null,
     tooltipAnchorRect: null,
   }),
-  setFileViewMode: (mode) => set({ fileViewMode: mode }),
+  setFileViewMode: (mode) => {
+    set({ fileViewMode: mode });
+    import('../rpc/rpcClient').then(({ rpcClient }) => {
+      rpcClient.persistUIState({ fileViewMode: mode });
+    }).catch(() => {});
+  },
+  setBottomPanelHeight: (bottomPanelHeight) => set({ bottomPanelHeight }),
+  setRightPanelWidth: (rightPanelWidth) => set({ rightPanelWidth }),
+  hydratePersistedUIState: (state) => set({
+    detailsPanelPosition: state.detailsPanelPosition,
+    fileViewMode: state.fileViewMode,
+    bottomPanelHeight: state.bottomPanelHeight,
+    rightPanelWidth: state.rightPanelWidth,
+  }),
   setGitHubAvatarUrls: (urls) => set((state) => ({
     gitHubAvatarUrls: { ...state.gitHubAvatarUrls, ...urls },
   })),
@@ -355,10 +376,13 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     detailsPanelOpen: commitDetails !== undefined,
   }),
   setDetailsPanelOpen: (detailsPanelOpen) => set({ detailsPanelOpen }),
-  toggleDetailsPanelPosition: () =>
-    set((state) => ({
-      detailsPanelPosition: state.detailsPanelPosition === 'bottom' ? 'right' : 'bottom',
-    })),
+  toggleDetailsPanelPosition: () => {
+    const newPosition = get().detailsPanelPosition === 'bottom' ? 'right' : 'bottom';
+    set({ detailsPanelPosition: newPosition });
+    import('../rpc/rpcClient').then(({ rpcClient }) => {
+      rpcClient.persistUIState({ detailsPanelPosition: newPosition });
+    }).catch(() => {});
+  },
   setLoading: (loading) => set((state) => {
     if (!loading && state.pendingUserSettings) {
       return {

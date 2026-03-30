@@ -23,15 +23,15 @@
 
 **Note**: This design preserves Zustand as the live state store (FR-007). Persistence supplements existing state management — it does not replace it.
 
-- [ ] T001 [P] Add `PersistedUIState` interface and `DEFAULT_PERSISTED_UI_STATE` constant to `shared/types.ts` — fields: `version` (number, default 1), `detailsPanelPosition` (DetailsPanelPosition, default 'bottom'), `fileViewMode` (FileViewMode, default 'list'), `bottomPanelHeight` (number, default 280), `rightPanelWidth` (number, default 400)
-- [ ] T002 [P] Add `persistedUIState` response type and `updatePersistedUIState` request type to `shared/messages.ts` — add to RequestMessage/ResponseMessage unions, REQUEST_TYPES/RESPONSE_TYPES enums, and type guards
-- [ ] T003 Add `bottomPanelHeight` and `rightPanelWidth` fields with setters (`setBottomPanelHeight`, `setRightPanelWidth`) and a `hydratePersistedUIState` action to the Zustand store in `webview-ui/src/stores/graphStore.ts` — defaults: bottomPanelHeight=280, rightPanelWidth=400; hydratePersistedUIState accepts a PersistedUIState and sets all four fields (position, viewMode, height, width)
-- [ ] T004 Add `persistedUIState` case to the message handler switch in `webview-ui/src/rpc/rpcClient.ts` — on receiving `persistedUIState` response, call `store.hydratePersistedUIState(payload.uiState)`
-- [ ] T005 Add a `persistUIState` helper method to `webview-ui/src/rpc/rpcClient.ts` that sends an `updatePersistedUIState` request with a partial state payload to the extension host
-- [ ] T006 Add `loadPersistedUIState()` private method to `src/WebviewProvider.ts` — reads from `this.context.globalState.get('speedyGit.uiState')`, validates shape and version (if stored version !== current version, discard and return defaults), type-checks each field, clamps sizes to >= 120px MIN_SIZE, falls back to per-field defaults for any invalid value, returns a valid `PersistedUIState`
-- [ ] T007 Add `savePersistedUIState()` private method to `src/WebviewProvider.ts` — merges partial update into current state and writes to `this.context.globalState.update('speedyGit.uiState', mergedState)`
-- [ ] T008 Send persisted UI state to webview during initialization in `src/WebviewProvider.ts` — call `loadPersistedUIState()` and post `persistedUIState` message in `sendInitialData()`, before other initial data messages
-- [ ] T009 Handle `updatePersistedUIState` request in the message handler switch in `src/WebviewProvider.ts` — call `savePersistedUIState()` with the received partial state
+- [x] T001 [P] Add `PersistedUIState` interface and `DEFAULT_PERSISTED_UI_STATE` constant to `shared/types.ts` — fields: `version` (number, default 1), `detailsPanelPosition` (DetailsPanelPosition, default 'bottom'), `fileViewMode` (FileViewMode, default 'list'), `bottomPanelHeight` (number, default 280), `rightPanelWidth` (number, default 400)
+- [x] T002 [P] Add `persistedUIState` response type and `updatePersistedUIState` request type to `shared/messages.ts` — add to RequestMessage/ResponseMessage unions, REQUEST_TYPES/RESPONSE_TYPES enums, and type guards
+- [x] T003 Add `bottomPanelHeight` and `rightPanelWidth` fields with setters (`setBottomPanelHeight`, `setRightPanelWidth`) and a `hydratePersistedUIState` action to the Zustand store in `webview-ui/src/stores/graphStore.ts` — defaults: bottomPanelHeight=280, rightPanelWidth=400; hydratePersistedUIState accepts a PersistedUIState and sets all four fields (position, viewMode, height, width)
+- [x] T004 Add `persistedUIState` case to the message handler switch in `webview-ui/src/rpc/rpcClient.ts` — on receiving `persistedUIState` response, call `store.hydratePersistedUIState(payload.uiState)`
+- [x] T005 Add a `persistUIState` helper method to `webview-ui/src/rpc/rpcClient.ts` that sends an `updatePersistedUIState` request with a partial state payload to the extension host
+- [x] T006 Add `loadPersistedUIState()` private method to `src/WebviewProvider.ts` — reads from `this.context.globalState.get('speedyGit.uiState')`, validates shape and version (if stored version !== current version, discard and return defaults), type-checks each field, clamps sizes to >= 120px MIN_SIZE, falls back to per-field defaults for any invalid value, returns a valid `PersistedUIState`
+- [x] T007 Add `savePersistedUIState()` private method to `src/WebviewProvider.ts` — merges partial update into current state and writes to `this.context.globalState.update('speedyGit.uiState', mergedState)`
+- [x] T008 Send persisted UI state to webview during initialization in `src/WebviewProvider.ts` — call `loadPersistedUIState()` and post `persistedUIState` message in `sendInitialData()`, before other initial data messages
+- [x] T009 Handle `updatePersistedUIState` request in the message handler switch in `src/WebviewProvider.ts` — call `savePersistedUIState()` with the received partial state
 
 **Checkpoint**: Shared types defined, message contracts in place, extension host can read/write/send persisted state, webview can receive and hydrate. Foundation ready.
 
@@ -43,8 +43,8 @@
 
 **Independent Test**: Toggle panel to right → close panel → reopen panel → verify panel is on the right and toggle icon shows "Move to Bottom."
 
-- [ ] T010 [US1] Update `toggleDetailsPanelPosition` action in `webview-ui/src/stores/graphStore.ts` to call `rpcClient.persistUIState({ detailsPanelPosition: newPosition })` after toggling
-- [ ] T011 [US1] Confirm the position toggle icon in `webview-ui/src/components/CommitDetailsPanel.tsx` derives its state from the store's `detailsPanelPosition`; if any hardcoded default overrides the hydrated value, fix it so the icon reflects the restored state
+- [x] T010 [US1] Update `toggleDetailsPanelPosition` action in `webview-ui/src/stores/graphStore.ts` to call `rpcClient.persistUIState({ detailsPanelPosition: newPosition })` after toggling
+- [x] T011 [US1] Confirm the position toggle icon in `webview-ui/src/components/CommitDetailsPanel.tsx` derives its state from the store's `detailsPanelPosition`; if any hardcoded default overrides the hydrated value, fix it so the icon reflects the restored state
 
 **Checkpoint**: Panel position persists across close/reopen. US1 fully functional.
 
@@ -56,8 +56,8 @@
 
 **Independent Test**: Set position=right, viewMode=tree, resize panel → reload VS Code → open panel → verify all three preferences restored.
 
-- [ ] T012 [US2] Ensure `persistedUIState` message is sent before other initial data in `src/WebviewProvider.ts` `sendInitialData()` so hydration happens before first render — adjust message ordering if needed
-- [ ] T013 [US2] Ensure `hydratePersistedUIState` in `webview-ui/src/stores/graphStore.ts` sets all four fields atomically and that the store initializes with defaults before hydration (no flash of undefined values) — fix if any field is left as undefined during hydration
+- [x] T012 [US2] Ensure `persistedUIState` message is sent before other initial data in `src/WebviewProvider.ts` `sendInitialData()` so hydration happens before first render — adjust message ordering if needed
+- [x] T013 [US2] Ensure `hydratePersistedUIState` in `webview-ui/src/stores/graphStore.ts` sets all four fields atomically and that the store initializes with defaults before hydration (no flash of undefined values) — fix if any field is left as undefined during hydration
 
 **Checkpoint**: Full reload scenario works. US2 is an integration validation of the persistence pipeline. If US1, US3, US4 persist correctly and T008/T012 ensure early hydration, this should pass.
 
@@ -69,8 +69,8 @@
 
 **Independent Test**: Switch to tree view → close panel → reopen → verify tree view is active and toggle icon reflects tree mode.
 
-- [ ] T014 [US3] Update `setFileViewMode` action in `webview-ui/src/stores/graphStore.ts` to call `rpcClient.persistUIState({ fileViewMode: newMode })` after setting the mode
-- [ ] T015 [US3] Confirm the file view mode toggle icon in `webview-ui/src/components/CommitDetailsPanel.tsx` derives its state from the store's `fileViewMode`; if any hardcoded default overrides the hydrated value, fix it so the icon reflects the restored mode
+- [x] T014 [US3] Update `setFileViewMode` action in `webview-ui/src/stores/graphStore.ts` to call `rpcClient.persistUIState({ fileViewMode: newMode })` after setting the mode
+- [x] T015 [US3] Confirm the file view mode toggle icon in `webview-ui/src/components/CommitDetailsPanel.tsx` derives its state from the store's `fileViewMode`; if any hardcoded default overrides the hydrated value, fix it so the icon reflects the restored mode
 
 **Checkpoint**: File view mode persists across close/reopen and reload. US3 fully functional.
 
@@ -82,10 +82,10 @@
 
 **Independent Test**: Resize bottom panel height → close → reopen → verify height matches. Switch to right → resize width → close → reopen → verify width matches.
 
-- [ ] T016 [US4] Refactor `CommitDetailsPanel.tsx` to read `bottomPanelHeight` and `rightPanelWidth` from the Zustand store instead of local `useState` — remove the local `bottomHeight`/`rightWidth` state variables, use `useGraphStore` selectors instead
-- [ ] T017 [US4] Update the resize mouse-move handler in `webview-ui/src/components/CommitDetailsPanel.tsx` to call `store.setBottomPanelHeight()` or `store.setRightPanelWidth()` (replacing local setState calls)
-- [ ] T018 [US4] Add persistence call on resize end (mouse-up) in `webview-ui/src/components/CommitDetailsPanel.tsx` — call `rpcClient.persistUIState({ bottomPanelHeight })` or `rpcClient.persistUIState({ rightPanelWidth })` at the end of the drag, not during the drag
-- [ ] T019 [US4] Ensure that switching panel position in `webview-ui/src/components/CommitDetailsPanel.tsx` uses the correct stored dimension — bottom position reads `bottomPanelHeight`, right position reads `rightPanelWidth` (independent values, not shared); fix if either dimension cross-references the wrong field
+- [x] T016 [US4] Refactor `CommitDetailsPanel.tsx` to read `bottomPanelHeight` and `rightPanelWidth` from the Zustand store instead of local `useState` — remove the local `bottomHeight`/`rightWidth` state variables, use `useGraphStore` selectors instead
+- [x] T017 [US4] Update the resize mouse-move handler in `webview-ui/src/components/CommitDetailsPanel.tsx` to call `store.setBottomPanelHeight()` or `store.setRightPanelWidth()` (replacing local setState calls)
+- [x] T018 [US4] Add persistence call on resize end (mouse-up) in `webview-ui/src/components/CommitDetailsPanel.tsx` — call `rpcClient.persistUIState({ bottomPanelHeight })` or `rpcClient.persistUIState({ rightPanelWidth })` at the end of the drag, not during the drag
+- [x] T019 [US4] Ensure that switching panel position in `webview-ui/src/components/CommitDetailsPanel.tsx` uses the correct stored dimension — bottom position reads `bottomPanelHeight`, right position reads `rightPanelWidth` (independent values, not shared); fix if either dimension cross-references the wrong field
 
 **Checkpoint**: Panel sizes persist across close/reopen and reload. US4 fully functional.
 
@@ -95,11 +95,11 @@
 
 **Purpose**: Validation, edge cases, and build verification across all stories.
 
-- [ ] T020 [P] Confirm edge case: first-time user with no saved state — `loadPersistedUIState()` returns defaults, panel renders normally, first user action creates persisted state; fix if defaults are not written on first change
-- [ ] T021 Run `pnpm typecheck` to verify zero TypeScript errors
-- [ ] T022 Run `pnpm lint` to verify zero ESLint errors
-- [ ] T023 Run `pnpm build` to verify clean build of extension and webview
-- [ ] T024 Manual smoke test via VS Code "Run Extension" launch config — test all four user stories end-to-end
+- [x] T020 [P] Confirm edge case: first-time user with no saved state — `loadPersistedUIState()` returns defaults, panel renders normally, first user action creates persisted state; fix if defaults are not written on first change
+- [x] T021 Run `pnpm typecheck` to verify zero TypeScript errors
+- [x] T022 Run `pnpm lint` to verify zero ESLint errors
+- [x] T023 Run `pnpm build` to verify clean build of extension and webview
+- [ ] T024 Manual (requires human testing) smoke test via VS Code "Run Extension" launch config — test all four user stories end-to-end
 
 ---
 

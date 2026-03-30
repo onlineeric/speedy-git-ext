@@ -1,4 +1,4 @@
-import { memo, useState, useCallback, useRef, useEffect } from 'react';
+import { memo, useCallback, useRef, useEffect } from 'react';
 import type { CommitDetails, FileChange, DetailsPanelPosition, CommitSignatureInfo } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
@@ -8,9 +8,6 @@ import { FileChangesTreeView } from './FileChangesTreeView';
 import { FileStatusBadge, FileChangeIndicators, FileActionIcons } from './FileChangeShared';
 
 const MIN_SIZE = 120;
-const DEFAULT_BOTTOM_HEIGHT = 280;
-const DEFAULT_RIGHT_WIDTH = 400;
-
 const MIN_GRAPH_WIDTH = 200;
 
 export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
@@ -18,12 +15,14 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
     commitDetails,
     detailsPanelOpen,
     detailsPanelPosition,
+    bottomPanelHeight,
+    rightPanelWidth,
     setDetailsPanelOpen,
     toggleDetailsPanelPosition,
+    setBottomPanelHeight,
+    setRightPanelWidth,
   } = useGraphStore();
 
-  const [bottomHeight, setBottomHeight] = useState(DEFAULT_BOTTOM_HEIGHT);
-  const [rightWidth, setRightWidth] = useState(DEFAULT_RIGHT_WIDTH);
   const resizing = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -33,7 +32,7 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
       resizing.current = true;
 
       const startPos = detailsPanelPosition === 'bottom' ? event.clientY : event.clientX;
-      const startSize = detailsPanelPosition === 'bottom' ? bottomHeight : rightWidth;
+      const startSize = detailsPanelPosition === 'bottom' ? bottomPanelHeight : rightPanelWidth;
       const containerWidth = panelRef.current?.parentElement?.clientWidth ?? Infinity;
       const maxWidth = containerWidth - MIN_GRAPH_WIDTH;
 
@@ -42,9 +41,9 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
         const delta = startPos - (detailsPanelPosition === 'bottom' ? moveEvent.clientY : moveEvent.clientX);
         const clamped = Math.max(MIN_SIZE, startSize + delta);
         if (detailsPanelPosition === 'bottom') {
-          setBottomHeight(clamped);
+          setBottomPanelHeight(clamped);
         } else {
-          setRightWidth(Math.min(maxWidth, clamped));
+          setRightPanelWidth(Math.min(maxWidth, clamped));
         }
       };
 
@@ -52,12 +51,19 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
         resizing.current = false;
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
+        // Persist the final size after drag ends
+        const store = useGraphStore.getState();
+        if (detailsPanelPosition === 'bottom') {
+          rpcClient.persistUIState({ bottomPanelHeight: store.bottomPanelHeight });
+        } else {
+          rpcClient.persistUIState({ rightPanelWidth: store.rightPanelWidth });
+        }
       };
 
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     },
-    [detailsPanelPosition, bottomHeight, rightWidth]
+    [detailsPanelPosition, bottomPanelHeight, rightPanelWidth, setBottomPanelHeight, setRightPanelWidth]
   );
 
   if (!detailsPanelOpen || !commitDetails) {
@@ -66,8 +72,8 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
 
   const isBottom = detailsPanelPosition === 'bottom';
   const panelStyle = isBottom
-    ? { height: bottomHeight, minHeight: MIN_SIZE }
-    : { width: rightWidth, minWidth: MIN_SIZE };
+    ? { height: bottomPanelHeight, minHeight: MIN_SIZE }
+    : { width: rightPanelWidth, minWidth: MIN_SIZE };
 
   return (
     <div

@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import type { RequestMessage, ResponseMessage } from '../shared/messages.js';
-import type { Commit, GraphFilters, RepoInfo, SubmoduleNavEntry, UserSettings } from '../shared/types.js';
+import type { Commit, GraphFilters, PersistedUIState, RepoInfo, SubmoduleNavEntry, UserSettings } from '../shared/types.js';
+import { DEFAULT_PERSISTED_UI_STATE } from '../shared/types.js';
 import type { GitLogService } from './services/GitLogService.js';
 import type { GitDiffService } from './services/GitDiffService.js';
 import type { GitBranchService } from './services/GitBranchService.js';
@@ -156,6 +157,50 @@ export class WebviewProvider {
     this.postMessage({ type: 'settingsData', payload: { settings } });
   }
 
+  private static readonly UI_STATE_KEY = 'speedyGit.uiState';
+  private static readonly MIN_PANEL_SIZE = 120;
+
+  private loadPersistedUIState(): PersistedUIState {
+    const stored = this.context.globalState.get<unknown>(WebviewProvider.UI_STATE_KEY);
+    const defaults = DEFAULT_PERSISTED_UI_STATE;
+
+    if (!stored || typeof stored !== 'object' || stored === null) {
+      return { ...defaults };
+    }
+
+    const raw = stored as Record<string, unknown>;
+
+    if (raw.version !== defaults.version) {
+      return { ...defaults };
+    }
+
+    return {
+      version: defaults.version,
+      detailsPanelPosition:
+        raw.detailsPanelPosition === 'bottom' || raw.detailsPanelPosition === 'right'
+          ? raw.detailsPanelPosition
+          : defaults.detailsPanelPosition,
+      fileViewMode:
+        raw.fileViewMode === 'list' || raw.fileViewMode === 'tree'
+          ? raw.fileViewMode
+          : defaults.fileViewMode,
+      bottomPanelHeight:
+        typeof raw.bottomPanelHeight === 'number' && raw.bottomPanelHeight >= WebviewProvider.MIN_PANEL_SIZE
+          ? raw.bottomPanelHeight
+          : defaults.bottomPanelHeight,
+      rightPanelWidth:
+        typeof raw.rightPanelWidth === 'number' && raw.rightPanelWidth >= WebviewProvider.MIN_PANEL_SIZE
+          ? raw.rightPanelWidth
+          : defaults.rightPanelWidth,
+    };
+  }
+
+  private savePersistedUIState(partial: Partial<Omit<PersistedUIState, 'version'>>) {
+    const current = this.loadPersistedUIState();
+    const merged: PersistedUIState = { ...current, ...partial };
+    void this.context.globalState.update(WebviewProvider.UI_STATE_KEY, merged);
+  }
+
   async show() {
     if (this.panel) {
       this.panel.reveal();
@@ -230,6 +275,10 @@ export class WebviewProvider {
   private async sendInitialData(filters?: Partial<GraphFilters>, includeStashes = false, isAutoRefresh = false) {
     this.isRefreshing = true;
     try {
+      // Send persisted UI state first so the webview can hydrate before first render
+      const persistedUIState = this.loadPersistedUIState();
+      this.postMessage({ type: 'persistedUIState', payload: { uiState: persistedUIState } });
+
       let effectiveFilters = filters ?? this.currentFilters;
       const settings = this.getSettingsHandler?.();
       if (settings) {
@@ -606,6 +655,10 @@ export class WebviewProvider {
       }
       case 'openExternal': {
         await vscode.env.openExternal(vscode.Uri.parse(message.payload.url));
+        break;
+      }
+      case 'updatePersistedUIState': {
+        this.savePersistedUIState(message.payload.uiState);
         break;
       }
       case 'refresh': {
