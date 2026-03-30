@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef, useEffect } from 'react';
-import type { CommitDetails, FileChange, DetailsPanelPosition, CommitSignatureInfo } from '@shared/types';
+import type { CommitDetails, FileChange, DetailsPanelPosition, FileViewMode, CommitSignatureInfo } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { formatRelativeDate } from '../utils/formatDate';
@@ -25,6 +25,12 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
 
   const resizing = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const handleTogglePosition = useCallback(() => {
+    const newPosition = detailsPanelPosition === 'bottom' ? 'right' : 'bottom';
+    toggleDetailsPanelPosition();
+    rpcClient.persistUIState({ detailsPanelPosition: newPosition });
+  }, [detailsPanelPosition, toggleDetailsPanelPosition]);
 
   const handleResizeStart = useCallback(
     (event: React.MouseEvent) => {
@@ -88,7 +94,7 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
         details={commitDetails}
         position={detailsPanelPosition}
         onClose={() => setDetailsPanelOpen(false)}
-        onTogglePosition={toggleDetailsPanelPosition}
+        onTogglePosition={handleTogglePosition}
       />
       <PanelBody details={commitDetails} />
     </div>
@@ -299,6 +305,11 @@ function FileChangesList({ details }: { details: CommitDetails }) {
   const fileViewMode = useGraphStore((state) => state.fileViewMode);
   const setFileViewMode = useGraphStore((state) => state.setFileViewMode);
 
+  const handleSetFileViewMode = (mode: FileViewMode) => {
+    setFileViewMode(mode);
+    rpcClient.persistUIState({ fileViewMode: mode });
+  };
+
   const handleFileClick = (file: FileChange) => {
     if (file.status === 'deleted') {
       const parentHash = details.parents[0];
@@ -319,14 +330,14 @@ function FileChangesList({ details }: { details: CommitDetails }) {
         <span className="flex items-center gap-0.5">
           <button
             className={`rounded p-0.5 ${fileViewMode === 'list' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
-            onClick={() => setFileViewMode('list')}
+            onClick={() => handleSetFileViewMode('list')}
             title="List view"
           >
             <ListViewIcon size={16} />
           </button>
           <button
             className={`rounded p-0.5 ${fileViewMode === 'tree' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
-            onClick={() => setFileViewMode('tree')}
+            onClick={() => handleSetFileViewMode('tree')}
             title="Tree view"
           >
             <TreeViewIcon size={16} />

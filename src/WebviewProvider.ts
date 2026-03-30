@@ -38,6 +38,8 @@ export class WebviewProvider {
   private deferredRefresh = false;
   /** Fingerprint of the last commit data sent to webview, used to skip no-op auto-refreshes */
   private lastCommitFingerprint = '';
+  /** In-memory cache of persisted UI state to avoid stale reads in rapid sequential saves */
+  private uiStateCache: PersistedUIState | undefined;
   private getSettingsHandler: (() => UserSettings) | undefined;
   private submoduleHandlers:
     | {
@@ -161,20 +163,24 @@ export class WebviewProvider {
   private static readonly MIN_PANEL_SIZE = 120;
 
   private loadPersistedUIState(): PersistedUIState {
+    if (this.uiStateCache) return this.uiStateCache;
+
     const stored = this.context.globalState.get<unknown>(WebviewProvider.UI_STATE_KEY);
     const defaults = DEFAULT_PERSISTED_UI_STATE;
 
     if (!stored || typeof stored !== 'object' || stored === null) {
-      return { ...defaults };
+      this.uiStateCache = { ...defaults };
+      return this.uiStateCache;
     }
 
     const raw = stored as Record<string, unknown>;
 
     if (raw.version !== defaults.version) {
-      return { ...defaults };
+      this.uiStateCache = { ...defaults };
+      return this.uiStateCache;
     }
 
-    return {
+    this.uiStateCache = {
       version: defaults.version,
       detailsPanelPosition:
         raw.detailsPanelPosition === 'bottom' || raw.detailsPanelPosition === 'right'
@@ -185,20 +191,38 @@ export class WebviewProvider {
           ? raw.fileViewMode
           : defaults.fileViewMode,
       bottomPanelHeight:
-        typeof raw.bottomPanelHeight === 'number' && raw.bottomPanelHeight >= WebviewProvider.MIN_PANEL_SIZE
+        typeof raw.bottomPanelHeight === 'number' && isFinite(raw.bottomPanelHeight) && raw.bottomPanelHeight >= WebviewProvider.MIN_PANEL_SIZE
           ? raw.bottomPanelHeight
           : defaults.bottomPanelHeight,
       rightPanelWidth:
-        typeof raw.rightPanelWidth === 'number' && raw.rightPanelWidth >= WebviewProvider.MIN_PANEL_SIZE
+        typeof raw.rightPanelWidth === 'number' && isFinite(raw.rightPanelWidth) && raw.rightPanelWidth >= WebviewProvider.MIN_PANEL_SIZE
           ? raw.rightPanelWidth
           : defaults.rightPanelWidth,
     };
+    return this.uiStateCache;
   }
 
   private savePersistedUIState(partial: Partial<Omit<PersistedUIState, 'version'>>) {
     const current = this.loadPersistedUIState();
-    const merged: PersistedUIState = { ...current, ...partial };
-    void this.context.globalState.update(WebviewProvider.UI_STATE_KEY, merged);
+    const defaults = DEFAULT_PERSISTED_UI_STATE;
+    // Validate incoming fields before merging to prevent storing invalid values
+    const validated: Partial<Omit<PersistedUIState, 'version'>> = {
+      ...(partial.detailsPanelPosition === 'bottom' || partial.detailsPanelPosition === 'right'
+        ? { detailsPanelPosition: partial.detailsPanelPosition }
+        : {}),
+      ...(partial.fileViewMode === 'list' || partial.fileViewMode === 'tree'
+        ? { fileViewMode: partial.fileViewMode }
+        : {}),
+      ...(typeof partial.bottomPanelHeight === 'number' && isFinite(partial.bottomPanelHeight)
+        ? { bottomPanelHeight: Math.max(WebviewProvider.MIN_PANEL_SIZE, partial.bottomPanelHeight) }
+        : partial.bottomPanelHeight !== undefined ? { bottomPanelHeight: defaults.bottomPanelHeight } : {}),
+      ...(typeof partial.rightPanelWidth === 'number' && isFinite(partial.rightPanelWidth)
+        ? { rightPanelWidth: Math.max(WebviewProvider.MIN_PANEL_SIZE, partial.rightPanelWidth) }
+        : partial.rightPanelWidth !== undefined ? { rightPanelWidth: defaults.rightPanelWidth } : {}),
+    };
+    // Update cache synchronously so back-to-back saves see the latest state
+    this.uiStateCache = { ...current, ...validated };
+    void this.context.globalState.update(WebviewProvider.UI_STATE_KEY, this.uiStateCache);
   }
 
   async show() {

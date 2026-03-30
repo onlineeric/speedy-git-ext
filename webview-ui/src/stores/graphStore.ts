@@ -265,12 +265,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     hoveredCommitHash: null,
     tooltipAnchorRect: null,
   }),
-  setFileViewMode: (mode) => {
-    set({ fileViewMode: mode });
-    import('../rpc/rpcClient').then(({ rpcClient }) => {
-      rpcClient.persistUIState({ fileViewMode: mode });
-    }).catch(() => {});
-  },
+  setFileViewMode: (mode) => set({ fileViewMode: mode }),
   setBottomPanelHeight: (bottomPanelHeight) => set({ bottomPanelHeight }),
   setRightPanelWidth: (rightPanelWidth) => set({ rightPanelWidth }),
   hydratePersistedUIState: (state) => set({
@@ -376,13 +371,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     detailsPanelOpen: commitDetails !== undefined,
   }),
   setDetailsPanelOpen: (detailsPanelOpen) => set({ detailsPanelOpen }),
-  toggleDetailsPanelPosition: () => {
-    const newPosition = get().detailsPanelPosition === 'bottom' ? 'right' : 'bottom';
-    set({ detailsPanelPosition: newPosition });
-    import('../rpc/rpcClient').then(({ rpcClient }) => {
-      rpcClient.persistUIState({ detailsPanelPosition: newPosition });
-    }).catch(() => {});
-  },
+  toggleDetailsPanelPosition: () =>
+    set((state) => ({
+      detailsPanelPosition: state.detailsPanelPosition === 'bottom' ? 'right' : 'bottom',
+    })),
   setLoading: (loading) => set((state) => {
     if (!loading && state.pendingUserSettings) {
       return {
