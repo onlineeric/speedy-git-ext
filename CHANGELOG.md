@@ -4,6 +4,12 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.5.1] - 2026-03-30
+
+### Fixed
+- README screenshots (main screenshot, source control icon, status bar button) now render correctly on the VS Code Marketplace and Open VSX listing pages — previously excluded from the package by `.vscodeignore`.
+- Fixed broken LICENSE link in README that pointed to `LICENSE` instead of `LICENSE.md`.
+
 ## [1.5.0] - 2026-03-30
 
 ### Added

@@ -21,8 +21,6 @@ vitest.config.ts
 tsconfig*.json
 esbuild.config.mjs
 pnpm-lock.yaml
-resources/**
-!resources/speedy-git-ext-icon-128.png
 !dist/**
 **/*.map
 dist/extension.js.map
