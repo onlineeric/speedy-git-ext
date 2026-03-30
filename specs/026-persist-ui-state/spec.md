@@ -26,6 +26,8 @@ A user repositions the commit details panel from the default bottom position to 
 
 A user has customized their commit details panel: positioned it on the right, switched file changes to tree view, and resized the panel. They reload VS Code. When they open the commit details panel again, all three preferences (position, view mode, and size) are restored.
 
+**Implementation note**: US2 is an integration validation story. Its implementation is the persistence foundation (shared types, message contracts, extension host read/write, Zustand hydration) combined with the individual field persistence from US1, US3, and US4. US2 is validated end-to-end after all other stories are complete.
+
 **Why this priority**: VS Code reload is a common event (extension updates, settings changes, workspace switching). Losing all UI preferences on reload undermines user trust and productivity.
 
 **Independent Test**: Can be tested by setting all three preferences, reloading VS Code, opening the panel, and verifying all preferences are restored.
