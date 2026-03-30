@@ -119,4 +119,4 @@ All shortcuts are customizable in VS Code's Keyboard Shortcuts editor.
 
 - Issues and feature requests: [GitHub Issues](https://github.com/onlineeric/speedy-git-ext/issues)
 - Source code: [github.com/onlineeric/speedy-git-ext](https://github.com/onlineeric/speedy-git-ext)
-- License: [MIT](LICENSE)
+- License: [MIT](LICENSE.md)
