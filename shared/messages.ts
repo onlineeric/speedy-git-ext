@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, PersistedUIState } from './types.js';
 import type { GitError } from './errors.js';
 
 export type RequestMessage =
@@ -73,7 +73,9 @@ export type RequestMessage =
   // External browser
   | { type: 'openExternal'; payload: { url: string } }
   // File actions
-  | { type: 'openCurrentFile'; payload: { filePath: string } };
+  | { type: 'openCurrentFile'; payload: { filePath: string } }
+  // UI state persistence
+  | { type: 'updatePersistedUIState'; payload: { uiState: Partial<Omit<PersistedUIState, 'version'>> } };
 
 export type ResponseMessage =
   | { type: 'commits'; payload: { commits: Commit[]; branches?: Branch[]; hasMore?: boolean; totalLoadedWithoutFilter?: number } }
@@ -104,7 +106,8 @@ export type ResponseMessage =
   | { type: 'pushResult'; payload: { success: boolean; message: string } }
   | { type: 'avatarUrls'; payload: { urls: AvatarUrlMap } }
   | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[] } }
-  | { type: 'containingBranches'; payload: { hash: string; branches: string[]; status: 'loaded' | 'error' } };
+  | { type: 'containingBranches'; payload: { hash: string; branches: string[]; status: 'loaded' | 'error' } }
+  | { type: 'persistedUIState'; payload: { uiState: PersistedUIState } };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -130,7 +133,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   updateSubmodule: true, initSubmodule: true,
   stashAndCheckout: true, stashAndCheckoutCommit: true,
   getWorktreeList: true, getContainingBranches: true, openExternal: true,
-  openCurrentFile: true,
+  openCurrentFile: true, updatePersistedUIState: true,
 };
 
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
@@ -142,6 +145,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
   pushResult: true, avatarUrls: true, worktreeList: true, containingBranches: true,
+  persistedUIState: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {

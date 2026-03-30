@@ -1,5 +1,5 @@
-import { memo, useState, useCallback, useRef, useEffect } from 'react';
-import type { CommitDetails, FileChange, DetailsPanelPosition, CommitSignatureInfo } from '@shared/types';
+import { memo, useCallback, useRef, useEffect } from 'react';
+import type { CommitDetails, FileChange, DetailsPanelPosition, FileViewMode, CommitSignatureInfo } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { formatRelativeDate } from '../utils/formatDate';
@@ -8,9 +8,6 @@ import { FileChangesTreeView } from './FileChangesTreeView';
 import { FileStatusBadge, FileChangeIndicators, FileActionIcons } from './FileChangeShared';
 
 const MIN_SIZE = 120;
-const DEFAULT_BOTTOM_HEIGHT = 280;
-const DEFAULT_RIGHT_WIDTH = 400;
-
 const MIN_GRAPH_WIDTH = 200;
 
 export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
@@ -18,14 +15,22 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
     commitDetails,
     detailsPanelOpen,
     detailsPanelPosition,
+    bottomPanelHeight,
+    rightPanelWidth,
     setDetailsPanelOpen,
     toggleDetailsPanelPosition,
+    setBottomPanelHeight,
+    setRightPanelWidth,
   } = useGraphStore();
 
-  const [bottomHeight, setBottomHeight] = useState(DEFAULT_BOTTOM_HEIGHT);
-  const [rightWidth, setRightWidth] = useState(DEFAULT_RIGHT_WIDTH);
   const resizing = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const handleTogglePosition = useCallback(() => {
+    const newPosition = detailsPanelPosition === 'bottom' ? 'right' : 'bottom';
+    toggleDetailsPanelPosition();
+    rpcClient.persistUIState({ detailsPanelPosition: newPosition });
+  }, [detailsPanelPosition, toggleDetailsPanelPosition]);
 
   const handleResizeStart = useCallback(
     (event: React.MouseEvent) => {
@@ -33,7 +38,7 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
       resizing.current = true;
 
       const startPos = detailsPanelPosition === 'bottom' ? event.clientY : event.clientX;
-      const startSize = detailsPanelPosition === 'bottom' ? bottomHeight : rightWidth;
+      const startSize = detailsPanelPosition === 'bottom' ? bottomPanelHeight : rightPanelWidth;
       const containerWidth = panelRef.current?.parentElement?.clientWidth ?? Infinity;
       const maxWidth = containerWidth - MIN_GRAPH_WIDTH;
 
@@ -42,9 +47,9 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
         const delta = startPos - (detailsPanelPosition === 'bottom' ? moveEvent.clientY : moveEvent.clientX);
         const clamped = Math.max(MIN_SIZE, startSize + delta);
         if (detailsPanelPosition === 'bottom') {
-          setBottomHeight(clamped);
+          setBottomPanelHeight(clamped);
         } else {
-          setRightWidth(Math.min(maxWidth, clamped));
+          setRightPanelWidth(Math.min(maxWidth, clamped));
         }
       };
 
@@ -52,12 +57,19 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
         resizing.current = false;
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
+        // Persist the final size after drag ends
+        const store = useGraphStore.getState();
+        if (detailsPanelPosition === 'bottom') {
+          rpcClient.persistUIState({ bottomPanelHeight: store.bottomPanelHeight });
+        } else {
+          rpcClient.persistUIState({ rightPanelWidth: store.rightPanelWidth });
+        }
       };
 
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     },
-    [detailsPanelPosition, bottomHeight, rightWidth]
+    [detailsPanelPosition, bottomPanelHeight, rightPanelWidth, setBottomPanelHeight, setRightPanelWidth]
   );
 
   if (!detailsPanelOpen || !commitDetails) {
@@ -66,8 +78,8 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
 
   const isBottom = detailsPanelPosition === 'bottom';
   const panelStyle = isBottom
-    ? { height: bottomHeight, minHeight: MIN_SIZE }
-    : { width: rightWidth, minWidth: MIN_SIZE };
+    ? { height: bottomPanelHeight, minHeight: MIN_SIZE }
+    : { width: rightPanelWidth, minWidth: MIN_SIZE };
 
   return (
     <div
@@ -82,7 +94,7 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
         details={commitDetails}
         position={detailsPanelPosition}
         onClose={() => setDetailsPanelOpen(false)}
-        onTogglePosition={toggleDetailsPanelPosition}
+        onTogglePosition={handleTogglePosition}
       />
       <PanelBody details={commitDetails} />
     </div>
@@ -293,6 +305,11 @@ function FileChangesList({ details }: { details: CommitDetails }) {
   const fileViewMode = useGraphStore((state) => state.fileViewMode);
   const setFileViewMode = useGraphStore((state) => state.setFileViewMode);
 
+  const handleSetFileViewMode = (mode: FileViewMode) => {
+    setFileViewMode(mode);
+    rpcClient.persistUIState({ fileViewMode: mode });
+  };
+
   const handleFileClick = (file: FileChange) => {
     if (file.status === 'deleted') {
       const parentHash = details.parents[0];
@@ -313,14 +330,14 @@ function FileChangesList({ details }: { details: CommitDetails }) {
         <span className="flex items-center gap-0.5">
           <button
             className={`rounded p-0.5 ${fileViewMode === 'list' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
-            onClick={() => setFileViewMode('list')}
+            onClick={() => handleSetFileViewMode('list')}
             title="List view"
           >
             <ListViewIcon size={16} />
           </button>
           <button
             className={`rounded p-0.5 ${fileViewMode === 'tree' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
-            onClick={() => setFileViewMode('tree')}
+            onClick={() => handleSetFileViewMode('tree')}
             title="Tree view"
           >
             <TreeViewIcon size={16} />

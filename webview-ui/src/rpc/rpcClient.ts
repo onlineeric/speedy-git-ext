@@ -1,5 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, InteractiveRebaseConfig, MergeOptions, PushForceMode, ResetMode, CommitParentInfo } from '@shared/types';
+import type { CherryPickOptions, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, CommitParentInfo } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 
 declare const acquireVsCodeApi: () => {
@@ -175,6 +175,9 @@ class RpcClient {
         break;
       case 'avatarUrls':
         store.setGitHubAvatarUrls(message.payload.urls);
+        break;
+      case 'persistedUIState':
+        store.hydratePersistedUIState(message.payload.uiState);
         break;
     }
   }
@@ -417,6 +420,11 @@ class RpcClient {
     }
     this.pendingParentLookups.clear();
     this.parentRequestIdByHash.clear();
+  }
+
+  // UI state persistence
+  persistUIState(uiState: Partial<Omit<PersistedUIState, 'version'>>) {
+    this.send({ type: 'updatePersistedUIState', payload: { uiState } });
   }
 
   // Settings

@@ -4,6 +4,15 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.4.1] - 2026-03-30
+
+### Added
+- Commit details panel now remembers its position (bottom or right), file change view mode (list or tree), and panel size across panel close/reopen and VS Code reload.
+- Panel UI preferences are restored instantly on reopen with no flash of default settings.
+- Panel height (bottom position) and width (right position) are stored independently, so switching positions preserves the last-used size for each orientation.
+- All toolbar icons (position toggle, view mode toggle) correctly reflect the restored state after reopening.
+- Graceful fallback to defaults when stored preferences are missing or corrupted, with automatic recovery on next user interaction.
+
 ## [1.4.0] - 2026-03-28
 
 ### Added
