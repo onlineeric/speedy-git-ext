@@ -29,16 +29,16 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T001 [P] Update `GraphFilters` interface: rename `branch?: string` to `branches?: string[]` in `shared/types.ts`
-- [ ] T002 [P] Update `loadMoreCommits` message filter type: change `branch?: string` to `branches?: string[]` in `shared/messages.ts`
-- [ ] T003 Update `GitLogService.getCommits()` to push multiple branch refs as positional args to `git log` (loop over `filters.branches` array; fall back to `--exclude=refs/stash --all` when empty/undefined) in `src/services/GitLogService.ts`
-- [ ] T004 Update `GitLogService.getCommits()` hasFilter check: change `filters?.branch` to `filters?.branches?.length` in `src/services/GitLogService.ts`
-- [ ] T005 Update `WebviewProvider.sendInitialData()` branch existence validation: iterate `effectiveFilters.branches` array and remove any branches that no longer exist in `src/WebviewProvider.ts`
-- [ ] T006 Update `WebviewProvider` message handlers (`getCommits`, `refresh`, `loadMoreCommits`) to merge `branches` array filter correctly in `src/WebviewProvider.ts`
-- [ ] T007 Update `rpcClient.getCommits()`, `rpcClient.refresh()`, `rpcClient.fetch()` filter type signatures to use `branches?: string[]` in `webview-ui/src/rpc/rpcClient.ts`
-- [ ] T008 Update `rpcClient.firePrefetch()` to extract `branches` (array) instead of `branch` from store filters in `webview-ui/src/rpc/rpcClient.ts`
-- [ ] T009 Update `graphStore.ts` hasFilter check in `appendCommits`: change `filters.branch` to `filters.branches?.length` in `webview-ui/src/stores/graphStore.ts`
-- [ ] T010 Run `pnpm typecheck` to verify all type errors from the `branch → branches` rename are resolved across the codebase
+- [x] T001 [P] Update `GraphFilters` interface: rename `branch?: string` to `branches?: string[]` in `shared/types.ts`
+- [x] T002 [P] Update `loadMoreCommits` message filter type: change `branch?: string` to `branches?: string[]` in `shared/messages.ts`
+- [x] T003 Update `GitLogService.getCommits()` to push multiple branch refs as positional args to `git log` (loop over `filters.branches` array; fall back to `--exclude=refs/stash --all` when empty/undefined) in `src/services/GitLogService.ts`
+- [x] T004 Update `GitLogService.getCommits()` hasFilter check: change `filters?.branch` to `filters?.branches?.length` in `src/services/GitLogService.ts`
+- [x] T005 Update `WebviewProvider.sendInitialData()` branch existence validation: iterate `effectiveFilters.branches` array and remove any branches that no longer exist in `src/WebviewProvider.ts`
+- [x] T006 Update `WebviewProvider` message handlers (`getCommits`, `refresh`, `loadMoreCommits`) to merge `branches` array filter correctly in `src/WebviewProvider.ts`
+- [x] T007 Update `rpcClient.getCommits()`, `rpcClient.refresh()`, `rpcClient.fetch()` filter type signatures to use `branches?: string[]` in `webview-ui/src/rpc/rpcClient.ts`
+- [x] T008 Update `rpcClient.firePrefetch()` to extract `branches` (array) instead of `branch` from store filters in `webview-ui/src/rpc/rpcClient.ts`
+- [x] T009 Update `graphStore.ts` hasFilter check in `appendCommits`: change `filters.branch` to `filters.branches?.length` in `webview-ui/src/stores/graphStore.ts`
+- [x] T010 Run `pnpm typecheck` to verify all type errors from the `branch → branches` rename are resolved across the codebase
 
 **Checkpoint**: Foundation ready — shared types, backend, and RPC layer all support `branches: string[]`. User story implementation can now begin.
 
@@ -52,11 +52,11 @@
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Create `MultiBranchDropdown.tsx` by copying `FilterableBranchDropdown.tsx` as a starting point. Change props to: `selectedBranches: string[]`, `onBranchToggle: (branch: string) => void`, `onClearSelection: () => void`. Keep `FilterableBranchDropdown.tsx` unchanged for future single-select reuse in `webview-ui/src/components/MultiBranchDropdown.tsx`
-- [ ] T012 [US1] Update `selectItem()` in `MultiBranchDropdown`: for branch items, call `onBranchToggle(item.value)` instead of closing; for "All Branches", call `onClearSelection()`. Dropdown must remain open after both actions in `webview-ui/src/components/MultiBranchDropdown.tsx`
-- [ ] T013 [US1] Update `isSelected` logic in branch list rendering: change from single-branch comparison to `selectedBranches.includes(item.value)` in `webview-ui/src/components/MultiBranchDropdown.tsx`
-- [ ] T014 [US1] Update `ControlBar.tsx`: switch from `FilterableBranchDropdown` to `MultiBranchDropdown`. Replace `handleBranchSelect(branch: string | undefined)` with `handleBranchToggle(branch: string)` that adds/removes from branches array, and `handleClearSelection()` that sets `branches` to `undefined`. Both must call `setFilters` and `rpcClient.getCommits` immediately after each toggle (per FR-012) in `webview-ui/src/components/ControlBar.tsx`
-- [ ] T015 [US1] Handle edge case: when last branch is deselected (array becomes empty), treat as "All Branches" (set `branches` to `undefined`) in `webview-ui/src/components/ControlBar.tsx`
+- [x] T011 [US1] Create `MultiBranchDropdown.tsx` by copying `FilterableBranchDropdown.tsx` as a starting point. Change props to: `selectedBranches: string[]`, `onBranchToggle: (branch: string) => void`, `onClearSelection: () => void`. Keep `FilterableBranchDropdown.tsx` unchanged for future single-select reuse in `webview-ui/src/components/MultiBranchDropdown.tsx`
+- [x] T012 [US1] Update `selectItem()` in `MultiBranchDropdown`: for branch items, call `onBranchToggle(item.value)` instead of closing; for "All Branches", call `onClearSelection()`. Dropdown must remain open after both actions in `webview-ui/src/components/MultiBranchDropdown.tsx`
+- [x] T013 [US1] Update `isSelected` logic in branch list rendering: change from single-branch comparison to `selectedBranches.includes(item.value)` in `webview-ui/src/components/MultiBranchDropdown.tsx`
+- [x] T014 [US1] Update `ControlBar.tsx`: switch from `FilterableBranchDropdown` to `MultiBranchDropdown`. Replace `handleBranchSelect(branch: string | undefined)` with `handleBranchToggle(branch: string)` that adds/removes from branches array, and `handleClearSelection()` that sets `branches` to `undefined`. Both must call `setFilters` and `rpcClient.getCommits` immediately after each toggle (per FR-012) in `webview-ui/src/components/ControlBar.tsx`
+- [x] T015 [US1] Handle edge case: when last branch is deselected (array becomes empty), treat as "All Branches" (set `branches` to `undefined`) in `webview-ui/src/components/ControlBar.tsx`
 
 **Checkpoint**: Core multi-select works — users can toggle branches, graph updates per toggle. MVP complete.
 
@@ -70,8 +70,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T016 [US2] Verify text filter preserves selections: ensure `filteredList` in `MultiBranchDropdown` only affects visibility (already the case since filter is on `useMemo` and selections are in parent state). No code change expected — validate and document in `webview-ui/src/components/MultiBranchDropdown.tsx`
-- [ ] T017 [US2] Verify `filterText` state is independent of selection state — clearing text shows all branches with current selections intact. Manual test only; no code change expected in `webview-ui/src/components/MultiBranchDropdown.tsx`
+- [x] T016 [US2] Verify text filter preserves selections: ensure `filteredList` in `MultiBranchDropdown` only affects visibility (already the case since filter is on `useMemo` and selections are in parent state). No code change expected — validate and document in `webview-ui/src/components/MultiBranchDropdown.tsx`
+- [x] T017 [US2] Verify `filterText` state is independent of selection state — clearing text shows all branches with current selections intact. Manual test only; no code change expected in `webview-ui/src/components/MultiBranchDropdown.tsx`
 
 **Checkpoint**: Text filter and multi-select work together without interference.
 
@@ -85,8 +85,8 @@
 
 ### Implementation for User Story 3
 
-- [ ] T018 [P] [US3] Update trigger button label: show "All Branches" when `selectedBranches` is undefined or empty, branch name when length === 1, "{N} branches selected" when length >= 2 in `webview-ui/src/components/MultiBranchDropdown.tsx`
-- [ ] T019 [P] [US3] Add checkbox/check indicator to each branch row: render a checkmark icon or checkbox element for selected branches, empty/unchecked for unselected in `webview-ui/src/components/MultiBranchDropdown.tsx`
+- [x] T018 [P] [US3] Update trigger button label: show "All Branches" when `selectedBranches` is undefined or empty, branch name when length === 1, "{N} branches selected" when length >= 2 in `webview-ui/src/components/MultiBranchDropdown.tsx`
+- [x] T019 [P] [US3] Add checkbox/check indicator to each branch row: render a checkmark icon or checkbox element for selected branches, empty/unchecked for unselected in `webview-ui/src/components/MultiBranchDropdown.tsx`
 
 **Checkpoint**: Visual indicators are clear and readable for all selection states.
 
@@ -100,8 +100,8 @@
 
 ### Implementation for User Story 4
 
-- [ ] T020 [US4] Ensure `handleOpenChange` in `MultiBranchDropdown` does not close on item click — only on external dismissal (Escape, click-outside). Remove `setOpen(false)` from `selectItem`/toggle path (already addressed in T012 but verify Radix Popover `onOpenChange` is not triggered by internal clicks) in `webview-ui/src/components/MultiBranchDropdown.tsx`
-- [ ] T021 [US4] Verify full keyboard navigation in list mode: Enter toggles selection without closing dropdown, arrow keys navigate between selectable items, type-to-redirect returns focus to text input (per FR-011) in `webview-ui/src/components/MultiBranchDropdown.tsx`
+- [x] T020 [US4] Ensure `handleOpenChange` in `MultiBranchDropdown` does not close on item click — only on external dismissal (Escape, click-outside). Remove `setOpen(false)` from `selectItem`/toggle path (already addressed in T012 but verify Radix Popover `onOpenChange` is not triggered by internal clicks) in `webview-ui/src/components/MultiBranchDropdown.tsx`
+- [x] T021 [US4] Verify full keyboard navigation in list mode: Enter toggles selection without closing dropdown, arrow keys navigate between selectable items, type-to-redirect returns focus to text input (per FR-011) in `webview-ui/src/components/MultiBranchDropdown.tsx`
 
 **Checkpoint**: Dropdown behavior supports ergonomic multi-select workflow.
 
@@ -111,11 +111,11 @@
 
 **Purpose**: Final validation and edge case handling across all stories.
 
-- [ ] T022 Handle branch list refresh: when branches prop changes, remove any `selectedBranches` entries that no longer exist in the branch list. Implement in `ControlBar.tsx` or `MultiBranchDropdown.tsx` via a `useEffect` that reconciles selections in `webview-ui/src/components/ControlBar.tsx`
-- [ ] T023 Run `pnpm typecheck` — zero TypeScript errors
-- [ ] T024 Run `pnpm lint` — zero ESLint errors
-- [ ] T025 Run `pnpm build` — clean build of both extension and webview
-- [ ] T026 Run quickstart.md validation: manual smoke test via VS Code "Run Extension" launch config covering all acceptance scenarios
+- [x] T022 Handle branch list refresh: when branches prop changes, remove any `selectedBranches` entries that no longer exist in the branch list. Implement in `ControlBar.tsx` or `MultiBranchDropdown.tsx` via a `useEffect` that reconciles selections in `webview-ui/src/components/ControlBar.tsx`
+- [x] T023 Run `pnpm typecheck` — zero TypeScript errors
+- [x] T024 Run `pnpm lint` — zero ESLint errors
+- [x] T025 Run `pnpm build` — clean build of both extension and webview
+- [x] T026 Run quickstart.md validation: manual smoke test via VS Code "Run Extension" launch config covering all acceptance scenarios
 
 ---
 

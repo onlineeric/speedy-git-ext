@@ -27,9 +27,11 @@ export class GitLogService {
     const maxCount = filters?.maxCount ?? 500;
     const args = ['log'];
 
-    // Add branch filter or --all flag
-    if (filters?.branch) {
-      args.push(filters.branch);
+    // Add branch filter(s) or --all flag
+    if (filters?.branches && filters.branches.length > 0) {
+      for (const branch of filters.branches) {
+        args.push(branch);
+      }
     } else {
       // Exclude stash refs — stashes are fetched separately via GitStashService
       // and merged into the graph by the frontend. Without this exclusion,
@@ -73,7 +75,7 @@ export class GitLogService {
       }
     }
 
-    const hasFilter = !!(filters?.branch || filters?.author);
+    const hasFilter = !!(filters?.branches?.length || filters?.author);
     return ok({
       commits,
       totalLoadedWithoutFilter: hasFilter ? undefined : commits.length,
