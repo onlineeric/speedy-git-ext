@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef, useEffect } from 'react';
+import { memo, useCallback, useRef, useEffect, useState } from 'react';
 import type { CommitDetails, FileChange, DetailsPanelPosition, FileViewMode, CommitSignatureInfo } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
@@ -10,6 +10,10 @@ import { FileStatusBadge, FileChangeIndicators, FileActionIcons } from './FileCh
 
 const MIN_SIZE = 120;
 const MIN_GRAPH_WIDTH = 200;
+const SPLIT_DETAILS_MIN_WIDTH = 280;
+const SPLIT_FILES_MIN_WIDTH = 360;
+const SPLIT_LAYOUT_PADDING = 48;
+type BottomPanelLayoutMode = 'stacked' | 'split';
 
 export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
   const {
@@ -26,6 +30,7 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
 
   const resizing = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const [panelWidth, setPanelWidth] = useState(0);
 
   const handleTogglePosition = useCallback(() => {
     const newPosition = detailsPanelPosition === 'bottom' ? 'right' : 'bottom';
@@ -73,11 +78,27 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
     [detailsPanelPosition, bottomPanelHeight, rightPanelWidth, setBottomPanelHeight, setRightPanelWidth]
   );
 
+  useEffect(() => {
+    const element = panelRef.current;
+    if (!element) return;
+
+    setPanelWidth(element.getBoundingClientRect().width);
+
+    const observer = new ResizeObserver((entries) => {
+      const nextWidth = entries[0]?.contentRect.width ?? 0;
+      setPanelWidth(nextWidth);
+    });
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   if (!detailsPanelOpen || !commitDetails) {
     return null;
   }
 
   const isBottom = detailsPanelPosition === 'bottom';
+  const bottomLayoutMode = getBottomLayoutMode(panelWidth);
   const panelStyle = isBottom
     ? { height: bottomPanelHeight, minHeight: MIN_SIZE }
     : { width: rightPanelWidth, minWidth: MIN_SIZE };
@@ -97,10 +118,20 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
         onClose={() => setDetailsPanelOpen(false)}
         onTogglePosition={handleTogglePosition}
       />
-      <PanelBody details={commitDetails} />
+      <PanelBody
+        details={commitDetails}
+        position={detailsPanelPosition}
+        bottomLayoutMode={bottomLayoutMode}
+      />
     </div>
   );
 });
+
+function getBottomLayoutMode(panelWidth: number): BottomPanelLayoutMode {
+  return panelWidth >= SPLIT_DETAILS_MIN_WIDTH + SPLIT_FILES_MIN_WIDTH + SPLIT_LAYOUT_PADDING
+    ? 'split'
+    : 'stacked';
+}
 
 function ResizeHandle({
   position,
@@ -160,13 +191,86 @@ function PanelHeader({
   );
 }
 
-function PanelBody({ details }: { details: CommitDetails }) {
+function PanelBody({
+  details,
+  position,
+  bottomLayoutMode,
+}: {
+  details: CommitDetails;
+  position: DetailsPanelPosition;
+  bottomLayoutMode: BottomPanelLayoutMode;
+}) {
+  const isSplitBottomLayout = position === 'bottom' && bottomLayoutMode === 'split';
+
+  if (isSplitBottomLayout) {
+    return (
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        <CommitDetailsSection details={details} splitLayout />
+        <FilesChangedSection details={details} splitLayout />
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-auto">
-      <CommitMetadata details={details} />
-      <CommitSignatureSection hash={details.hash} />
-      <FileChangesList details={details} />
+      <CommitDetailsSection details={details} />
+      <FilesChangedSection details={details} />
     </div>
+  );
+}
+
+function CommitDetailsSection({
+  details,
+  splitLayout = false,
+}: {
+  details: CommitDetails;
+  splitLayout?: boolean;
+}) {
+  const containerClassName = splitLayout
+    ? 'flex min-w-0 flex-1 flex-col overflow-hidden border-r border-[var(--vscode-panel-border)]'
+    : 'min-w-0';
+
+  const contentClassName = splitLayout
+    ? 'min-h-0 flex-1 overflow-auto'
+    : '';
+
+  return (
+    <section
+      className={containerClassName}
+      style={splitLayout ? { minWidth: SPLIT_DETAILS_MIN_WIDTH } : undefined}
+    >
+      <div className={contentClassName}>
+        <CommitMetadata details={details} />
+        <CommitSignatureSection hash={details.hash} />
+      </div>
+    </section>
+  );
+}
+
+function FilesChangedSection({
+  details,
+  splitLayout = false,
+}: {
+  details: CommitDetails;
+  splitLayout?: boolean;
+}) {
+  const containerClassName = splitLayout
+    ? 'flex min-w-0 flex-[1.15] flex-col overflow-hidden'
+    : 'min-w-0';
+
+  const contentClassName = splitLayout
+    ? 'min-h-0 flex-1 overflow-auto'
+    : '';
+
+  return (
+    <section
+      className={containerClassName}
+      style={splitLayout ? { minWidth: SPLIT_FILES_MIN_WIDTH } : undefined}
+    >
+      <div className={contentClassName}>
+        <FileChangesList details={details} splitLayout={splitLayout} />
+      </div>
+    </section>
   );
 }
 
@@ -302,7 +406,13 @@ function getSignatureStatusConfig(signature: CommitSignatureInfo): { label: stri
   }
 }
 
-function FileChangesList({ details }: { details: CommitDetails }) {
+function FileChangesList({
+  details,
+  splitLayout = false,
+}: {
+  details: CommitDetails;
+  splitLayout?: boolean;
+}) {
   const fileViewMode = useGraphStore((state) => state.fileViewMode);
   const setFileViewMode = useGraphStore((state) => state.setFileViewMode);
 
@@ -323,7 +433,7 @@ function FileChangesList({ details }: { details: CommitDetails }) {
   };
 
   return (
-    <div className="px-3 py-2">
+    <div className={`px-3 py-2 ${splitLayout ? 'h-full' : ''}`}>
       <div className="mb-1 flex items-center gap-2">
         <span className="text-xs text-[var(--vscode-descriptionForeground)]">
           {details.files.length} file{details.files.length !== 1 ? 's' : ''} changed
