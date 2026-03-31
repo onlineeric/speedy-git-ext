@@ -12,6 +12,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Layout re-evaluates and transitions seamlessly as the panel is resized, with no manual toggle or setting required.
 - Both sections in side-by-side mode scale their widths responsively to the available panel space rather than using fixed sizes.
 - Right-side panel position continues to use the original stacked arrangement in all cases, preserving existing behavior.
+- Branch filter dropdown now supports multi-select — select multiple branches to view only commits reachable from the selected set, with the graph updating immediately after each toggle.
+- Text filter in the branch dropdown works alongside multi-select: type to narrow the list, select from filtered results, and clear the filter without losing selections.
+- Check indicators next to each branch in the dropdown visually distinguish selected from unselected branches.
+- Trigger button label reflects the current selection state: "All Branches" when none selected, the branch name when one is selected, or "3 branches selected" when multiple are selected.
+- Dropdown stays open after each selection or deselection, closing only on Escape or click-outside, for efficient multi-branch workflows.
+- "All Branches" option at the top of the dropdown clears all selections and returns to the unfiltered graph view.
+- Branch selections automatically reconcile when the branch list changes (e.g., after fetch or prune) — deleted branches are silently removed from the selection.
+- Full keyboard navigation preserved in multi-select mode: Tab to enter list, arrow keys to navigate, Enter to toggle selection, type-to-redirect back to filter input.
 
 ## [1.5.1] - 2026-03-30
 

@@ -314,7 +314,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const { commits, stashes, filters, totalLoadedWithoutFilter: existingTotal, selectedCommit } = get();
     const allCommits = [...commits, ...newCommits];
     const { mergedCommits, topology } = computeMergedTopology(allCommits, stashes);
-    const hasFilter = !!(filters.branch || filters.author);
+    const hasFilter = !!(filters.branches?.length || filters.author);
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
       : -1;

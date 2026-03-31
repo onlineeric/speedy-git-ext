@@ -186,7 +186,7 @@ class RpcClient {
     this.vscode?.postMessage(message);
   }
 
-  getCommits(filters?: Partial<{ branch?: string; author?: string; maxCount: number }>) {
+  getCommits(filters?: Partial<{ branches?: string[]; author?: string; maxCount: number }>) {
     this.send({ type: 'getCommits', payload: { filters } });
   }
 
@@ -206,7 +206,7 @@ class RpcClient {
     this.send({ type: 'checkoutCommit', payload: { hash } });
   }
 
-  fetch(remote?: string, prune?: boolean, filters?: Partial<{ branch?: string; author?: string; maxCount: number }>) {
+  fetch(remote?: string, prune?: boolean, filters?: Partial<{ branches?: string[]; author?: string; maxCount: number }>) {
     this.send({ type: 'fetch', payload: { remote, prune, filters } });
   }
 
@@ -226,7 +226,7 @@ class RpcClient {
     this.send({ type: 'openCurrentFile', payload: { filePath } });
   }
 
-  refresh(filters?: Partial<{ branch?: string; author?: string; maxCount: number }>) {
+  refresh(filters?: Partial<{ branches?: string[]; author?: string; maxCount: number }>) {
     this.send({ type: 'refresh', payload: { filters } });
   }
 
@@ -472,7 +472,7 @@ class RpcClient {
   }
 
   // Pagination
-  loadMoreCommits(skip: number, generation: number, filters: { branch?: string; author?: string }) {
+  loadMoreCommits(skip: number, generation: number, filters: { branches?: string[]; author?: string }) {
     this.send({ type: 'loadMoreCommits', payload: { skip, generation, filters } });
   }
 
@@ -480,8 +480,8 @@ class RpcClient {
     const store = useGraphStore.getState();
     if (!store.hasMore || store.prefetching) return;
     store.setPrefetching(true);
-    const { branch, author } = store.filters;
-    this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branch, author });
+    const { branches, author } = store.filters;
+    this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branches, author });
   }
 }
 
