@@ -17,7 +17,7 @@
 
 **Purpose**: Prepare the existing panel component for a focused responsive-layout refactor
 
-- [ ] T001 Extract the current stacked panel structure into explicit section boundaries for refactor in `webview-ui/src/components/CommitDetailsPanel.tsx`
+- [x] T001 Extract the current stacked panel structure into explicit section boundaries for refactor in `webview-ui/src/components/CommitDetailsPanel.tsx`
 
 ---
 
@@ -27,9 +27,9 @@
 
 **⚠️ CRITICAL**: No user story work should begin until this phase is complete
 
-- [ ] T002 Add local layout constants and a derived bottom layout mode helper in `webview-ui/src/components/CommitDetailsPanel.tsx`
-- [ ] T003 Refactor `PanelBody` into reusable commit-details and files-changed section renderers in `webview-ui/src/components/CommitDetailsPanel.tsx`
-- [ ] T004 Add panel-width observation and responsive mode evaluation in `webview-ui/src/components/CommitDetailsPanel.tsx`
+- [x] T002 Add local layout constants and a derived bottom layout mode helper in `webview-ui/src/components/CommitDetailsPanel.tsx`
+- [x] T003 Refactor `PanelBody` into reusable commit-details and files-changed section renderers in `webview-ui/src/components/CommitDetailsPanel.tsx`
+- [x] T004 Add panel-width observation and responsive mode evaluation in `webview-ui/src/components/CommitDetailsPanel.tsx`
 
 **Checkpoint**: The component can now decide between stacked and split bottom layouts without changing rendered behavior yet
 
@@ -43,9 +43,9 @@
 
 ### Implementation for User Story 1
 
-- [ ] T005 [US1] Implement the bottom-panel split container that renders commit details on the left and files changed on the right in `webview-ui/src/components/CommitDetailsPanel.tsx`
-- [ ] T006 [US1] Add automatic flex-based width allocation and minimum usable section widths for split mode in `webview-ui/src/components/CommitDetailsPanel.tsx`
-- [ ] T007 [US1] Add independent overflow handling so both split sections remain usable with long metadata and long file lists in `webview-ui/src/components/CommitDetailsPanel.tsx`
+- [x] T005 [US1] Implement the bottom-panel split container that renders commit details on the left and files changed on the right in `webview-ui/src/components/CommitDetailsPanel.tsx`
+- [x] T006 [US1] Add automatic flex-based width allocation and minimum usable section widths for split mode in `webview-ui/src/components/CommitDetailsPanel.tsx`
+- [x] T007 [US1] Add independent overflow handling so both split sections remain usable with long metadata and long file lists in `webview-ui/src/components/CommitDetailsPanel.tsx`
 
 **Checkpoint**: User Story 1 should be fully functional and independently testable
 
@@ -59,8 +59,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T008 [US2] Implement the responsive cutoff and stacked fallback path for narrow bottom panels in `webview-ui/src/components/CommitDetailsPanel.tsx`
-- [ ] T009 [US2] Preserve selected commit content, file view mode, and existing file interactions while switching between split and stacked bottom layouts in `webview-ui/src/components/CommitDetailsPanel.tsx`
+- [x] T008 [US2] Implement the responsive cutoff and stacked fallback path for narrow bottom panels in `webview-ui/src/components/CommitDetailsPanel.tsx`
+- [x] T009 [US2] Preserve selected commit content, file view mode, and existing file interactions while switching between split and stacked bottom layouts in `webview-ui/src/components/CommitDetailsPanel.tsx`
 
 **Checkpoint**: User Stories 1 and 2 should both work independently in the bottom panel
 
@@ -74,7 +74,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T010 [US3] Route right-position rendering through the unchanged stacked layout path in `webview-ui/src/components/CommitDetailsPanel.tsx`
+- [x] T010 [US3] Route right-position rendering through the unchanged stacked layout path in `webview-ui/src/components/CommitDetailsPanel.tsx`
 - [ ] T011 [US3] Adjust the panel integration only if needed to preserve right-side behavior in `webview-ui/src/App.tsx`
 
 **Checkpoint**: All three user stories should now be independently functional
@@ -85,7 +85,7 @@
 
 **Purpose**: Final cleanup and validation across all stories
 
-- [ ] T012 Clean up duplicated layout conditionals and helper naming in `webview-ui/src/components/CommitDetailsPanel.tsx`
+- [x] T012 Clean up duplicated layout conditionals and helper naming in `webview-ui/src/components/CommitDetailsPanel.tsx`
 - [ ] T013 [P] Update verification notes and changed-file expectations in `specs/029-split-commit-panel/quickstart.md`
 - [ ] T014 Validate wide and narrow bottom-panel behavior with a representative commit containing long metadata and 100+ changed files using the scenarios in `specs/029-split-commit-panel/quickstart.md`
 - [ ] T015 Run `pnpm typecheck` from `/home/onlineeric/repos/speedy-git-ext/.worktrees/029-split-commit-panel`
