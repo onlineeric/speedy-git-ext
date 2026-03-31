@@ -29,6 +29,8 @@ export class GitLogService {
 
     // Add branch filter(s) or --all flag
     if (filters?.branches && filters.branches.length > 0) {
+      // Use '--' to prevent branch names starting with '-' from being interpreted as flags
+      args.push('--');
       for (const branch of filters.branches) {
         args.push(branch);
       }

@@ -12,16 +12,19 @@ export function ControlBar() {
 
   // Reconcile selected branches when branch list changes (e.g., after fetch/prune)
   useEffect(() => {
-    const selected = filters.branches;
+    const currentFilters = useGraphStore.getState().filters;
+    const selected = currentFilters.branches;
     if (!selected || selected.length === 0) return;
     const branchNames = new Set(
       branches.flatMap((b) => [b.name, ...(b.remote ? [`${b.remote}/${b.name}`] : [])]),
     );
     const valid = selected.filter((name) => branchNames.has(name));
     if (valid.length !== selected.length) {
-      setFilters({ branches: valid.length > 0 ? valid : undefined });
+      const newBranches = valid.length > 0 ? valid : undefined;
+      setFilters({ branches: newBranches });
+      rpcClient.getCommits({ ...currentFilters, branches: newBranches });
     }
-  }, [branches, filters.branches, setFilters]);
+  }, [branches, setFilters]);
 
   const handleBranchToggle = (branch: string) => {
     const current = filters.branches ?? [];
