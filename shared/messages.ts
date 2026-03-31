@@ -54,7 +54,7 @@ export type RequestMessage =
   | { type: 'isCommitPushed'; payload: { hash: string } }
   | { type: 'getCommitParents'; payload: { hashes: string[] } }
   // Pagination & settings
-  | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branch?: string; author?: string } } }
+  | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branches?: string[]; author?: string } } }
   | { type: 'openSettings'; payload: Record<string, never> }
   | { type: 'switchRepo'; payload: { repoPath: string } }
   | { type: 'getSettings'; payload: Record<string, never> }
