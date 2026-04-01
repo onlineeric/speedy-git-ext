@@ -449,7 +449,7 @@ export class WebviewProvider {
     switch (message.type) {
       case 'getCommits': {
         if (message.payload.filters) {
-          this.currentFilters = { ...this.currentFilters, ...message.payload.filters };
+          this.currentFilters = { maxCount: this.currentFilters.maxCount, ...message.payload.filters };
         }
         this.postMessage({ type: 'loading', payload: { loading: true } });
         const batchSize = this.getBatchSize();
@@ -614,7 +614,7 @@ export class WebviewProvider {
       }
       case 'fetch': {
         if (message.payload.filters) {
-          this.currentFilters = { ...this.currentFilters, ...message.payload.filters };
+          this.currentFilters = { maxCount: this.currentFilters.maxCount, ...message.payload.filters };
         }
         const result = await this.gitBranchService.fetch(
           message.payload.remote,
@@ -687,7 +687,7 @@ export class WebviewProvider {
       }
       case 'refresh': {
         if (message.payload.filters) {
-          this.currentFilters = { ...this.currentFilters, ...message.payload.filters };
+          this.currentFilters = { maxCount: this.currentFilters.maxCount, ...message.payload.filters };
         }
         await this.sendInitialData(message.payload.filters, true);
         break;
