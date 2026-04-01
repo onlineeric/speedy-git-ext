@@ -309,16 +309,16 @@ export class WebviewProvider {
         this.sendSettingsData(settings);
       }
 
-      // Check if the filtered branch still exists before fetching commits
-      if (effectiveFilters.branch) {
+      // Check if the filtered branches still exist before fetching commits
+      if (effectiveFilters.branches && effectiveFilters.branches.length > 0) {
         const branchResult = await this.gitLogService.getBranches();
         if (branchResult.success) {
-          const branchExists = branchResult.value.some(
-            (b) => b.name === effectiveFilters.branch || `${b.remote}/${b.name}` === effectiveFilters.branch
+          const branchNames = new Set(
+            branchResult.value.flatMap((b) => [b.name, ...(b.remote ? [`${b.remote}/${b.name}`] : [])])
           );
-          if (!branchExists) {
-            const { branch: _, ...rest } = this.currentFilters;
-            this.currentFilters = rest;
+          const validBranches = effectiveFilters.branches.filter((name) => branchNames.has(name));
+          if (validBranches.length !== effectiveFilters.branches.length) {
+            this.currentFilters = { ...this.currentFilters, branches: validBranches.length > 0 ? validBranches : undefined };
             effectiveFilters = this.currentFilters;
           }
         }
@@ -449,7 +449,7 @@ export class WebviewProvider {
     switch (message.type) {
       case 'getCommits': {
         if (message.payload.filters) {
-          this.currentFilters = { ...this.currentFilters, ...message.payload.filters };
+          this.currentFilters = { maxCount: this.currentFilters.maxCount, ...message.payload.filters };
         }
         this.postMessage({ type: 'loading', payload: { loading: true } });
         const batchSize = this.getBatchSize();
@@ -614,7 +614,7 @@ export class WebviewProvider {
       }
       case 'fetch': {
         if (message.payload.filters) {
-          this.currentFilters = { ...this.currentFilters, ...message.payload.filters };
+          this.currentFilters = { maxCount: this.currentFilters.maxCount, ...message.payload.filters };
         }
         const result = await this.gitBranchService.fetch(
           message.payload.remote,
@@ -687,7 +687,7 @@ export class WebviewProvider {
       }
       case 'refresh': {
         if (message.payload.filters) {
-          this.currentFilters = { ...this.currentFilters, ...message.payload.filters };
+          this.currentFilters = { maxCount: this.currentFilters.maxCount, ...message.payload.filters };
         }
         await this.sendInitialData(message.payload.filters, true);
         break;
@@ -1274,6 +1274,10 @@ export class WebviewProvider {
 
         this.fetchGeneration++;
         const currentGeneration = this.fetchGeneration;
+
+        // Repo switches reset branch filtering in the webview, so clear the
+        // backend's remembered filters before reloading commits.
+        this.currentFilters = { maxCount: this.currentFilters.maxCount };
 
         // Reinitialize services and clear submodule stack for the new repo
         // (switchActiveRepo also calls discovery.setActiveRepo internally)

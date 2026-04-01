@@ -101,5 +101,7 @@ Built with **Vite** + React plugin → `dist/webview/`
 - VS Code `context.globalState` (key-value, JSON-serializable, global across workspaces) (026-persist-ui-state)
 - TypeScript 5.x (strict) + React 18, Zustand, Radix UI (AlertDialog), Tailwind CSS, esbuild (backend), Vite (frontend) (027-ui-enhancements-merge-inline)
 - N/A (no persistence changes) (027-ui-enhancements-merge-inline)
+- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand, @radix-ui/react-popover, @tanstack/react-virtual, esbuild (backend), Vite (frontend) (028-multi-branch-filter)
+- N/A (in-memory Zustand store, transient selections) (028-multi-branch-filter)
 
 ## Recent Changes

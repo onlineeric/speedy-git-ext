@@ -109,7 +109,7 @@ export interface GraphState {
 }
 
 export interface GraphFilters {
-  branch?: string;
+  branches?: string[];
   author?: string;
   maxCount: number;
   skip?: number;
