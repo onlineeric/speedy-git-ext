@@ -20,6 +20,7 @@ export interface UserSettings {
   showRemoteBranches: boolean;
   showTags: boolean;
   batchCommitSize: number;
+  overScan: number;
 }
 
 export interface SearchState {
@@ -64,6 +65,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   showRemoteBranches: true,
   showTags: true,
   batchCommitSize: 500,
+  overScan: 20,
 };
 
 export interface Commit {

@@ -13,7 +13,6 @@ import { CommitTooltip } from './CommitTooltip';
 import { useTooltipHover } from '../hooks/useTooltipHover';
 
 const ROW_HEIGHT = 28;
-const OVERSCAN = 10;
 const LANE_WIDTH = 16;
 
 interface GraphContainerProps {
@@ -43,6 +42,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
   const selectedCommitIndex = useGraphStore((state) => state.selectedCommitIndex);
   const searchState = useGraphStore((state) => state.searchState);
   const hoveredCommitHash = useGraphStore((state) => state.hoveredCommitHash);
+  const userSettings = useGraphStore((state) => state.userSettings);
   const containerRef = useRef<HTMLDivElement>(null);
   const { onNodeMouseEnter, onNodeMouseLeave, onTooltipMouseEnter, onTooltipMouseLeave, dismissImmediate } = useTooltipHover();
 
@@ -83,7 +83,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
     count: commits.length,
     getScrollElement: () => containerRef.current,
     estimateSize: () => ROW_HEIGHT,
-    overscan: OVERSCAN,
+    overscan: userSettings.overScan,
   });
 
   const virtualItems = virtualizer.getVirtualItems();
@@ -172,7 +172,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
         <SearchWidget />
       </div>
       <SubmoduleSection submodules={submodules} />
-      <div ref={containerRef} className="flex-1 overflow-auto">
+      <div ref={containerRef} className="flex-1 overflow-auto bg-[var(--vscode-list-background)]">
         <div className="relative w-full" style={{ height: totalSize }}>
           {virtualItems.map((virtualItem) => {
             const commit = commits[virtualItem.index];
@@ -192,6 +192,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
                 graphWidth={graphWidth}
                 rowHeight={ROW_HEIGHT}
                 maxVisibleRefs={maxVisibleRefs}
+                userSettings={userSettings}
                 isSelected={isSelected}
                 isMultiSelected={isMultiSelected}
                 isSearchMatch={isSearchMatch}
