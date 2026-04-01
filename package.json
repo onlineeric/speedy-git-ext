@@ -2,7 +2,7 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "publisher": "onlineeric",
   "license": "MIT",
   "repository": {
@@ -30,7 +30,7 @@
     "commands": [
       {
         "command": "speedyGit.showGraph",
-        "title": "Show Speedy Git Graph",
+        "title": "Show Speedy Git",
         "category": "Speedy Git"
       },
       {
@@ -100,6 +100,13 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Show tag labels in the graph."
+        },
+        "speedyGit.overScan": {
+          "type": "number",
+          "default": 50,
+          "minimum": 0,
+          "maximum": 200,
+          "markdownDescription": "Number of commit rows to render above and below the visible graph viewport. Higher values reduce blank-row flicker during fast scrolling at the cost of more DOM nodes. Lower values use less memory but may show empty rows when scrolling quickly."
         }
       }
     }

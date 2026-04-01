@@ -232,8 +232,8 @@ export class WebviewProvider {
     }
 
     this.panel = vscode.window.createWebviewPanel(
-      'speedyGitGraph',
-      'Speedy Git Graph',
+      'speedyGit',
+      'Speedy Git',
       vscode.ViewColumn.One,
       {
         enableScripts: true,
@@ -297,6 +297,13 @@ export class WebviewProvider {
   }
 
   private async sendInitialData(filters?: Partial<GraphFilters>, includeStashes = false, isAutoRefresh = false) {
+    // Notify VS Code's Source Control panel to refresh after extension-initiated git operations.
+    // Skip during auto-refreshes since those are already triggered by VS Code detecting git changes.
+    if (!isAutoRefresh) {
+      vscode.commands.executeCommand('git.refresh').then(undefined, (err: unknown) => {
+        this.log.debug(`git.refresh command failed (vscode.git may not be active): ${err}`);
+      });
+    }
     this.isRefreshing = true;
     try {
       // Send persisted UI state first so the webview can hydrate before first render
@@ -1415,7 +1422,7 @@ export class WebviewProvider {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src https://www.gravatar.com https://secure.gravatar.com https://avatars.githubusercontent.com;">
   <link rel="stylesheet" href="${styleUri}">
-  <title>Speedy Git Graph</title>
+  <title>Speedy Git</title>
 </head>
 <body>
   <div id="root"></div>

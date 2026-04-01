@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import type { Commit } from '@shared/types';
+import type { Commit, UserSettings } from '@shared/types';
 import type { GraphTopology } from '../utils/graphTopology';
 import { GraphCell } from './GraphCell';
 import { CommitContextMenu } from './CommitContextMenu';
@@ -12,7 +12,6 @@ import { renderInlineCode } from '../utils/inlineCodeRenderer';
 import { mergeRefs, displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
 import { formatAbsoluteDateTime, formatRelativeDate } from '../utils/formatDate';
 import { AuthorAvatar } from './AuthorAvatar';
-import { useGraphStore } from '../stores/graphStore';
 import { getColor, getLaneColorStyle, DEFAULT_GRAPH_PALETTE } from '../utils/colorUtils';
 
 interface CommitRowProps {
@@ -23,6 +22,7 @@ interface CommitRowProps {
   graphWidth: number;
   rowHeight: number;
   maxVisibleRefs?: number;
+  userSettings: UserSettings;
   isSelected: boolean;
   isMultiSelected?: boolean;
   isSearchMatch?: boolean;
@@ -41,6 +41,7 @@ export const CommitRow = memo(function CommitRow({
   graphWidth,
   rowHeight,
   maxVisibleRefs = 3,
+  userSettings,
   isSelected,
   isMultiSelected = false,
   isSearchMatch = false,
@@ -50,7 +51,7 @@ export const CommitRow = memo(function CommitRow({
   onNodeMouseLeave,
   style,
 }: CommitRowProps) {
-  const { avatarsEnabled, dateFormat, showRemoteBranches, showTags, graphColors } = useGraphStore((state) => state.userSettings);
+  const { avatarsEnabled, dateFormat, showRemoteBranches, showTags, graphColors } = userSettings;
   const isStash = commit.refs.some((r) => r.type === 'stash');
   const stashIndex = isStash ? parseStashIndex(commit.refs) : -1;
 

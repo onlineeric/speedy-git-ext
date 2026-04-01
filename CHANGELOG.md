@@ -4,6 +4,18 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.6.1] - 2026-04-01
+
+### Added
+- Speedy Git now explicitly notifies VS Code's Source Control panel to refresh after every extension-initiated git operation (checkout, fetch, push, pull, stash, merge, rebase, cherry-pick, revert, reset, tag, remote, and worktree operations), keeping the Source Control panel in sync immediately rather than waiting for filesystem watcher detection.
+- `speedyGit.overScan` setting controls how many commit rows are rendered above and below the visible graph viewport. Increase for smoother fast-scroll experience; decrease to reduce DOM node count on lower-end hardware. Changes apply immediately without reloading.
+
+### Changed
+- Extension display name and panel title unified to "Speedy Git" across all surfaces (package.json, panel title, webview title, and tooltips), removing the redundant "Graph" suffix.
+- `speedyGit.overScan` default raised from `10` to `50` for smoother scrolling out of the box; maximum capped at `200` in both the settings schema and the normalizer.
+- `CommitRow` now receives `userSettings` as a prop from `GraphContainer` instead of subscribing to the Zustand store independently — eliminates one store subscription per visible row, reducing unnecessary re-renders during settings changes.
+- Graph scroll container background explicitly set to `--vscode-list-background` to stay consistent with VS Code theme colors.
+
 ## [1.6.0] - 2026-03-31
 
 ### Added
