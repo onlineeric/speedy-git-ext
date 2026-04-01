@@ -355,7 +355,7 @@ export class ExtensionController {
   }
 
   private normalizeOverScan(value: number): number {
-    return Number.isFinite(value) && value >= 0 ? Math.floor(value) : DEFAULT_USER_SETTINGS.overScan;
+    return Number.isFinite(value) && value >= 0 ? Math.min(Math.floor(value), 200) : DEFAULT_USER_SETTINGS.overScan;
   }
 }
 
