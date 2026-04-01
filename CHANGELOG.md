@@ -21,6 +21,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Branch selections automatically reconcile when the branch list changes (e.g., after fetch or prune) — deleted branches are silently removed from the selection.
 - Full keyboard navigation preserved in multi-select mode: Tab to enter list, arrow keys to navigate, Enter to toggle selection, type-to-redirect back to filter input.
 
+### Fixed
+- Switching repositories now fully resets the branch filter to "All Branches" in both the dropdown UI and the underlying commit query, preventing stale branch-filtered results from carrying across repos or reappearing when switching back.
+
 ## [1.5.1] - 2026-03-30
 
 ### Fixed

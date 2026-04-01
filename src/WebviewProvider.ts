@@ -1275,6 +1275,10 @@ export class WebviewProvider {
         this.fetchGeneration++;
         const currentGeneration = this.fetchGeneration;
 
+        // Repo switches reset branch filtering in the webview, so clear the
+        // backend's remembered filters before reloading commits.
+        this.currentFilters = { maxCount: this.currentFilters.maxCount };
+
         // Reinitialize services and clear submodule stack for the new repo
         // (switchActiveRepo also calls discovery.setActiveRepo internally)
         this.onSwitchRepo?.(repoPath);

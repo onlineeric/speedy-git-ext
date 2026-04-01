@@ -26,21 +26,7 @@ export class GitLogService {
     this.log.info('Fetching commits');
     const maxCount = filters?.maxCount ?? 500;
     const args = ['log'];
-
-    // Add branch filter(s) or --all flag
-    if (filters?.branches && filters.branches.length > 0) {
-      // Use '--' to prevent branch names starting with '-' from being interpreted as flags
-      args.push('--');
-      for (const branch of filters.branches) {
-        args.push(branch);
-      }
-    } else {
-      // Exclude stash refs — stashes are fetched separately via GitStashService
-      // and merged into the graph by the frontend. Without this exclusion,
-      // stash internal commits (index, untracked) pollute the graph and the
-      // latest stash appears as a duplicate merge node.
-      args.push('--exclude=refs/stash', '--all');
-    }
+    const revisionArgs: string[] = [];
 
     if (filters?.skip && filters.skip > 0) {
       args.push(`--skip=${filters.skip}`);
@@ -55,7 +41,19 @@ export class GitLogService {
       args.push(`--author=${filters.author}`);
     }
 
+    // Add branch filter(s) or --all flag after options so refs are parsed as revisions.
+    if (filters?.branches && filters.branches.length > 0) {
+      revisionArgs.push(...filters.branches);
+    } else {
+      // Exclude stash refs — stashes are fetched separately via GitStashService
+      // and merged into the graph by the frontend. Without this exclusion,
+      // stash internal commits (index, untracked) pollute the graph and the
+      // latest stash appears as a duplicate merge node.
+      args.push('--exclude=refs/stash', '--all');
+    }
+
     // Separate revisions from paths to avoid ambiguous argument errors
+    args.push(...revisionArgs);
     args.push('--');
 
     const result = await this.executor.execute({
