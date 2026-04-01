@@ -21,6 +21,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Branch selections automatically reconcile when the branch list changes (e.g., after fetch or prune) — deleted branches are silently removed from the selection.
 - Full keyboard navigation preserved in multi-select mode: Tab to enter list, arrow keys to navigate, Enter to toggle selection, type-to-redirect back to filter input.
 
+### Changed
+- Fetch button now shows "Fetching..." label with a disabled state while the fetch operation is in progress, re-enabling automatically on success, error, or after a 30-second safety timeout.
+- Filter updates (getCommits, fetch, refresh) now retain the existing `maxCount` value instead of allowing incoming filter payloads to overwrite it, preventing the loaded commit count from resetting unexpectedly during filter changes.
+
 ### Fixed
 - Switching repositories now fully resets the branch filter to "All Branches" in both the dropdown UI and the underlying commit query, preventing stale branch-filtered results from carrying across repos or reappearing when switching back.
 
