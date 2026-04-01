@@ -74,7 +74,7 @@ export class ExtensionController {
     // Create status bar item
     const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1);
     statusBar.text = '$(zap) Speedy Git';
-    statusBar.tooltip = 'Open Speedy Git Graph';
+    statusBar.tooltip = 'Open Speedy Git';
     statusBar.command = 'speedyGit.showGraph';
     this.statusBarItem = statusBar;
     this.context.subscriptions.push(statusBar);

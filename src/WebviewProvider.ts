@@ -232,8 +232,8 @@ export class WebviewProvider {
     }
 
     this.panel = vscode.window.createWebviewPanel(
-      'speedyGitGraph',
-      'Speedy Git Graph',
+      'speedyGit',
+      'Speedy Git',
       vscode.ViewColumn.One,
       {
         enableScripts: true,
@@ -1415,7 +1415,7 @@ export class WebviewProvider {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src https://www.gravatar.com https://secure.gravatar.com https://avatars.githubusercontent.com;">
   <link rel="stylesheet" href="${styleUri}">
-  <title>Speedy Git Graph</title>
+  <title>Speedy Git</title>
 </head>
 <body>
   <div id="root"></div>
