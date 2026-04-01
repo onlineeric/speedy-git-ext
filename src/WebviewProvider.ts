@@ -296,13 +296,30 @@ export class WebviewProvider {
     return commits.map((c) => c.hash).join(',');
   }
 
+  /** Refresh the VS Code Source Control panel for the current repo without prompting the user.
+   * Uses the git extension API directly to target the specific repository by path. */
+  private refreshVSCodeSourceControl(): void {
+    try {
+      const ext = vscode.extensions.getExtension('vscode.git');
+      if (!ext?.isActive) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const gitApi: any = ext.exports.getAPI(1);
+      const repo = gitApi?.getRepository(vscode.Uri.file(this.currentRepoPath));
+      if (repo) {
+        (repo.status() as Promise<void>).then(undefined, (err: unknown) => {
+          this.log.debug(`VS Code git repo.status() failed: ${err}`);
+        });
+      }
+    } catch (err) {
+      this.log.debug(`VS Code git refresh failed: ${err}`);
+    }
+  }
+
   private async sendInitialData(filters?: Partial<GraphFilters>, includeStashes = false, isAutoRefresh = false) {
     // Notify VS Code's Source Control panel to refresh after extension-initiated git operations.
     // Skip during auto-refreshes since those are already triggered by VS Code detecting git changes.
     if (!isAutoRefresh) {
-      vscode.commands.executeCommand('git.refresh').then(undefined, (err: unknown) => {
-        this.log.debug(`git.refresh command failed (vscode.git may not be active): ${err}`);
-      });
+      this.refreshVSCodeSourceControl();
     }
     this.isRefreshing = true;
     try {
