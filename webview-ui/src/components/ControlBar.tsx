@@ -46,8 +46,24 @@ export function ControlBar() {
     rpcClient.refresh(filters);
   };
 
+  const [fetching, setFetching] = useState(false);
+
   const handleFetch = () => {
+    setFetching(true);
+
     rpcClient.fetch(undefined, true, filters);
+
+    // Reset after success/error response or timeout (30s safety net)
+    const timeout = setTimeout(() => setFetching(false), 30_000);
+    const prevSuccess = useGraphStore.getState().successMessage;
+    const prevError = useGraphStore.getState().error;
+    const unsub = useGraphStore.subscribe((state) => {
+      if (state.successMessage !== prevSuccess || state.error !== prevError) {
+        setFetching(false);
+        clearTimeout(timeout);
+        unsub();
+      }
+    });
   };
 
   const buttonSecondaryClass =
@@ -74,11 +90,11 @@ export function ControlBar() {
 
       <button
         onClick={handleFetch}
-        disabled={loading}
+        disabled={fetching || loading}
         className={buttonSecondaryClass}
         title="Fetch all remotes"
       >
-        Fetch
+        {fetching ? 'Fetching...' : 'Fetch'}
       </button>
 
       <button
