@@ -297,6 +297,13 @@ export class WebviewProvider {
   }
 
   private async sendInitialData(filters?: Partial<GraphFilters>, includeStashes = false, isAutoRefresh = false) {
+    // Notify VS Code's Source Control panel to refresh after extension-initiated git operations.
+    // Skip during auto-refreshes since those are already triggered by VS Code detecting git changes.
+    if (!isAutoRefresh) {
+      vscode.commands.executeCommand('git.refresh').then(undefined, (err: unknown) => {
+        this.log.debug(`git.refresh command failed (vscode.git may not be active): ${err}`);
+      });
+    }
     this.isRefreshing = true;
     try {
       // Send persisted UI state first so the webview can hydrate before first render

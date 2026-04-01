@@ -4,6 +4,14 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.6.1] - 2026-04-01
+
+### Added
+- Speedy Git now explicitly notifies VS Code's Source Control panel to refresh after every extension-initiated git operation (checkout, fetch, push, pull, stash, merge, rebase, cherry-pick, revert, reset, tag, remote, and worktree operations), keeping the Source Control panel in sync immediately rather than waiting for filesystem watcher detection.
+
+### Changed
+- Extension display name and panel title unified to "Speedy Git" across all surfaces (package.json, panel title, webview title, and tooltips), removing the redundant "Graph" suffix.
+
 ## [1.6.0] - 2026-03-31
 
 ### Added
