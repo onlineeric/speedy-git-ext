@@ -100,6 +100,12 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Show tag labels in the graph."
+        },
+        "speedyGit.overScan": {
+          "type": "number",
+          "default": 20,
+          "minimum": 0,
+          "markdownDescription": "Number of commit rows to render above and below the visible graph viewport. Higher values reduce blank-row flicker during fast scrolling at the cost of more DOM nodes. Lower values use less memory but may show empty rows when scrolling quickly."
         }
       }
     }

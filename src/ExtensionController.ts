@@ -322,6 +322,9 @@ export class ExtensionController {
     const batchCommitSize = this.normalizeBatchCommitSize(
       config.get<number>('batchCommitSize', DEFAULT_USER_SETTINGS.batchCommitSize)
     );
+    const overScan = this.normalizeOverScan(
+      config.get<number>('overScan', DEFAULT_USER_SETTINGS.overScan)
+    );
 
     return {
       graphColors,
@@ -330,6 +333,7 @@ export class ExtensionController {
       showRemoteBranches: config.get<boolean>('showRemoteBranches', DEFAULT_USER_SETTINGS.showRemoteBranches),
       showTags: config.get<boolean>('showTags', DEFAULT_USER_SETTINGS.showTags),
       batchCommitSize,
+      overScan,
     };
   }
 
@@ -348,6 +352,10 @@ export class ExtensionController {
 
   private normalizeBatchCommitSize(value: number): number {
     return Number.isFinite(value) && value >= 1 ? value : DEFAULT_USER_SETTINGS.batchCommitSize;
+  }
+
+  private normalizeOverScan(value: number): number {
+    return Number.isFinite(value) && value >= 0 ? Math.floor(value) : DEFAULT_USER_SETTINGS.overScan;
   }
 }
 

@@ -13,7 +13,6 @@ import { CommitTooltip } from './CommitTooltip';
 import { useTooltipHover } from '../hooks/useTooltipHover';
 
 const ROW_HEIGHT = 28;
-const OVERSCAN = 10;
 const LANE_WIDTH = 16;
 
 interface GraphContainerProps {
@@ -43,6 +42,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
   const selectedCommitIndex = useGraphStore((state) => state.selectedCommitIndex);
   const searchState = useGraphStore((state) => state.searchState);
   const hoveredCommitHash = useGraphStore((state) => state.hoveredCommitHash);
+  const overScan = useGraphStore((state) => state.userSettings.overScan);
   const containerRef = useRef<HTMLDivElement>(null);
   const { onNodeMouseEnter, onNodeMouseLeave, onTooltipMouseEnter, onTooltipMouseLeave, dismissImmediate } = useTooltipHover();
 
@@ -83,7 +83,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
     count: commits.length,
     getScrollElement: () => containerRef.current,
     estimateSize: () => ROW_HEIGHT,
-    overscan: OVERSCAN,
+    overscan: overScan,
   });
 
   const virtualItems = virtualizer.getVirtualItems();
