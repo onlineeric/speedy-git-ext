@@ -162,6 +162,102 @@ export function MoveBottomIcon({ className }: IconProps) {
   );
 }
 
+/** Funnel/filter shape — 12×12, inherits text color via currentColor */
+export function FilterIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path
+        d="M 1.5 2.5 H 10.5 L 7 6.5 V 10 L 5 9 V 6.5 Z"
+        stroke="currentColor"
+        strokeWidth={1.2}
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+/** Two-branch compare/diff shape — 12×12, inherits text color via currentColor */
+export function CompareIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      {/* Left branch line */}
+      <line x1={3} y1={2} x2={3} y2={10} stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" />
+      {/* Right branch line */}
+      <line x1={9} y1={2} x2={9} y2={10} stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" />
+      {/* Connecting arrows */}
+      <path d="M 3 3.5 H 7.5 M 6 2 L 7.5 3.5 L 6 5" stroke="currentColor" strokeWidth={1.1} strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M 9 8.5 H 4.5 M 6 7 L 4.5 8.5 L 6 10" stroke="currentColor" strokeWidth={1.1} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Gear/settings shape — 12×12, inherits text color via currentColor */
+export function SettingsIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <circle cx={6} cy={6} r={1.8} stroke="currentColor" strokeWidth={1.2} />
+      <path
+        d="M 6 1 L 6.8 2.5 L 8.5 2 L 9 3.7 L 10.5 4.5 L 10 6 L 10.5 7.5 L 9 8.3 L 8.5 10 L 6.8 9.5 L 6 11 L 5.2 9.5 L 3.5 10 L 3 8.3 L 1.5 7.5 L 2 6 L 1.5 4.5 L 3 3.7 L 3.5 2 L 5.2 2.5 Z"
+        stroke="currentColor"
+        strokeWidth={1.1}
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+/** Magnifier/search shape — 12×12, inherits text color via currentColor */
+export function SearchIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <circle cx={5} cy={5} r={3.2} stroke="currentColor" strokeWidth={1.3} />
+      <line x1={7.3} y1={7.3} x2={10.5} y2={10.5} stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Circular refresh arrow — 12×12, inherits text color via currentColor */
+export function RefreshIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path
+        d="M 10.5 6 A 4.5 4.5 0 1 1 9.2 2.8"
+        stroke="currentColor"
+        strokeWidth={1.3}
+        strokeLinecap="round"
+        fill="none"
+      />
+      <path
+        d="M 8 0.8 L 10.8 2.8 L 8 4.8"
+        transform="rotate(25 10.5 2.8)"
+        stroke="currentColor"
+        strokeWidth={1.3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+/** Cloud with download arrow for fetch — 12×12, inherits text color via currentColor */
+export function FetchIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path
+        d="M 3 8.5 C 1.8 8.5 1 7.7 1 6.5 C 1 5.4 1.7 4.6 2.7 4.4 C 3 3.1 4.2 2.2 5.8 2.2 C 7.4 2.2 8.6 3.1 8.9 4.4 C 9.9 4.6 10.6 5.4 10.6 6.5 C 10.6 7.7 9.8 8.5 8.6 8.5"
+        stroke="currentColor"
+        strokeWidth={1.2}
+        strokeLinecap="round"
+        fill="none"
+      />
+      <path d="M 5.8 7.5 V 12 M 4 10.3 L 5.8 12 L 7.6 10.3" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** Filled target/bullseye for HEAD indicator — 12×12, inherits text color via currentColor */
 export function HeadIcon({ className, style }: IconProps) {
   return (

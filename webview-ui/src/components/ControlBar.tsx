@@ -4,10 +4,17 @@ import { rpcClient } from '../rpc/rpcClient';
 import { RemoteManagementDialog } from './RemoteManagementDialog';
 import { RepoSelector } from './RepoSelector';
 import { MultiBranchDropdown } from './MultiBranchDropdown';
-import { CloudIcon } from './icons';
+import { CloudIcon, FilterIcon, CompareIcon, SettingsIcon, SearchIcon, RefreshIcon, FetchIcon } from './icons';
+
+const TOGGLE_BUTTON_COLORS = {
+  inactive: 'text-[var(--vscode-icon-foreground)] opacity-70 hover:opacity-100',
+  active: 'text-yellow-500 opacity-100',
+  filtered: 'text-red-500 opacity-100',
+} as const;
 
 export function ControlBar() {
-  const { branches, filters, setFilters, mergedCommits, loading, totalLoadedWithoutFilter, searchState, openSearch, closeSearch } = useGraphStore();
+  const { branches, filters, setFilters, mergedCommits, loading, totalLoadedWithoutFilter, setActiveToggleWidget, activeToggleWidget } = useGraphStore();
+  const graphFilters = useGraphStore((state) => state.filters);
   const [remoteDialogOpen, setRemoteDialogOpen] = useState(false);
 
   // Reconcile selected branches when branch list changes (e.g., after fetch/prune)
@@ -66,11 +73,24 @@ export function ControlBar() {
     });
   };
 
-  const buttonSecondaryClass =
-    'px-3 py-1 text-sm bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] rounded hover:bg-[var(--vscode-button-secondaryHoverBackground)] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed';
+  const iconButtonClass =
+    'flex items-center justify-center p-1.5 rounded focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--vscode-toolbar-hoverBackground)]';
+  const iconClass = 'w-6 h-6';
+
+  const filterHasBranchFilter = (graphFilters.branches?.length ?? 0) > 0;
+  const filterColor =
+    activeToggleWidget === 'filter'
+      ? TOGGLE_BUTTON_COLORS.active
+      : filterHasBranchFilter
+        ? TOGGLE_BUTTON_COLORS.filtered
+        : TOGGLE_BUTTON_COLORS.inactive;
+  const searchColor =
+    activeToggleWidget === 'search' ? TOGGLE_BUTTON_COLORS.active : TOGGLE_BUTTON_COLORS.inactive;
+  const compareColor =
+    activeToggleWidget === 'compare' ? TOGGLE_BUTTON_COLORS.active : TOGGLE_BUTTON_COLORS.inactive;
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)]">
+    <div className="flex items-center gap-1 px-2 py-1.5 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)]">
       <RepoSelector />
 
       <MultiBranchDropdown
@@ -81,50 +101,66 @@ export function ControlBar() {
       />
 
       <button
+        onClick={() => setActiveToggleWidget('filter')}
+        className={`${iconButtonClass} ${filterColor}`}
+        title="Filter"
+      >
+        <FilterIcon className={iconClass} />
+      </button>
+
+      <button
         onClick={handleRefresh}
-        className="px-3 py-1 text-sm bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] rounded hover:bg-[var(--vscode-button-hoverBackground)] focus:outline-none"
+        className={`${iconButtonClass} ${TOGGLE_BUTTON_COLORS.inactive}`}
         title="Refresh"
       >
-        Refresh
+        <RefreshIcon className={iconClass} />
       </button>
 
       <button
         onClick={handleFetch}
         disabled={fetching || loading}
-        className={buttonSecondaryClass}
+        className={`${iconButtonClass} ${TOGGLE_BUTTON_COLORS.inactive}`}
         title="Fetch all remotes"
       >
-        {fetching ? 'Fetching...' : 'Fetch'}
+        <FetchIcon className={iconClass} />
       </button>
 
       <button
-        onClick={() => (searchState.isOpen ? closeSearch() : openSearch())}
-        className={buttonSecondaryClass}
-        title="Search commits"
+        onClick={() => setActiveToggleWidget('compare')}
+        className={`${iconButtonClass} ${compareColor}`}
+        title="Compare"
       >
-        Search
+        <CompareIcon className={iconClass} />
       </button>
 
-      <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)]">
-        {totalLoadedWithoutFilter !== null ? totalLoadedWithoutFilter : mergedCommits.length} loaded commits
+      <button
+        onClick={() => setActiveToggleWidget('search')}
+        className={`${iconButtonClass} ${searchColor}`}
+        title="Search commits"
+      >
+        <SearchIcon className={iconClass} />
+      </button>
+
+      <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)] px-1">
+        {totalLoadedWithoutFilter !== null ? totalLoadedWithoutFilter : mergedCommits.length} loaded
       </span>
 
       <button
         onClick={() => setRemoteDialogOpen(true)}
         aria-label="Manage Remotes"
-        className={buttonSecondaryClass}
+        className={`${iconButtonClass} ${TOGGLE_BUTTON_COLORS.inactive}`}
         title="Manage Remotes"
       >
-        <CloudIcon />
+        <CloudIcon className={iconClass} />
       </button>
 
       <button
         onClick={() => rpcClient.openSettings()}
         aria-label="Open extension settings"
-        className={buttonSecondaryClass}
+        className={`${iconButtonClass} ${TOGGLE_BUTTON_COLORS.inactive}`}
         title="Extension settings"
       >
-        ⚙
+        <SettingsIcon className={iconClass} />
       </button>
 
       <RemoteManagementDialog open={remoteDialogOpen} onClose={() => setRemoteDialogOpen(false)} />

@@ -3,7 +3,7 @@
 ```cmd
 cd test-repo
 gh repo delete onlineeric/test-repo --yes
-gh repo create onlineeric/test-repo --private --source=. --push
+gh repo create onlineeric/test-repo --public --source=. --push
 git push -u --all origin && git push --tags origin
 ```
 

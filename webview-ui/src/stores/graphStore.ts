@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type {
+  ActiveToggleWidget,
   Branch,
   CherryPickOptions,
   Commit,
@@ -65,6 +66,7 @@ interface GraphStore {
   userSettings: UserSettings;
   pendingUserSettings: UserSettings | undefined;
   searchState: SearchState;
+  activeToggleWidget: ActiveToggleWidget;
   gitHubAvatarUrls: Record<string, string>;
   submodules: Submodule[];
   submoduleStack: SubmoduleNavEntry[];
@@ -128,6 +130,7 @@ interface GraphStore {
   setUserSettings: (settings: UserSettings) => void;
   openSearch: () => void;
   closeSearch: () => void;
+  setActiveToggleWidget: (widget: ActiveToggleWidget) => void;
   setSearchQuery: (query: string) => void;
   setSearchMatches: (matchIndices: number[]) => void;
   nextMatch: () => void;
@@ -236,6 +239,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   userSettings: { ...DEFAULT_USER_SETTINGS },
   pendingUserSettings: undefined,
   searchState: defaultSearchState,
+  activeToggleWidget: null,
   gitHubAvatarUrls: {},
   submodules: [],
   submoduleStack: [],
@@ -491,13 +495,26 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       : { userSettings: settings, pendingUserSettings: undefined, filters: { ...state.filters, maxCount: settings.batchCommitSize } }
   )),
   openSearch: () => set((state) => ({
-    searchState: {
-      ...state.searchState,
-      isOpen: true,
-    },
+    searchState: { ...state.searchState, isOpen: true },
+    activeToggleWidget: 'search',
   })),
-  closeSearch: () => set({
+  closeSearch: () => set((state) => ({
     searchState: defaultSearchState,
+    activeToggleWidget: state.activeToggleWidget === 'search' ? null : state.activeToggleWidget,
+  })),
+  setActiveToggleWidget: (widget) => set((state) => {
+    // Toggle off if clicking the same widget again
+    const next: ActiveToggleWidget = state.activeToggleWidget === widget ? null : widget;
+    const openingSearch = next === 'search';
+    const closingSearch = !openingSearch && state.searchState.isOpen;
+    return {
+      activeToggleWidget: next,
+      searchState: openingSearch
+        ? { ...state.searchState, isOpen: true }
+        : closingSearch
+          ? defaultSearchState
+          : state.searchState,
+    };
   }),
   setSearchQuery: (query) => set((state) => ({
     searchState: {

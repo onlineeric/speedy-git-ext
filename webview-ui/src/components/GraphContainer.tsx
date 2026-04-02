@@ -7,7 +7,7 @@ import { rpcClient } from '../rpc/rpcClient';
 import { CommitRow } from './CommitRow';
 import { CherryPickConflictBanner } from './CherryPickConflictBanner';
 import { RebaseConflictBanner } from './RebaseConflictBanner';
-import { SearchWidget } from './SearchWidget';
+import { TogglePanel } from './TogglePanel';
 import { SubmoduleBreadcrumb } from './SubmoduleBreadcrumb';
 import { CommitTooltip } from './CommitTooltip';
 import { useTooltipHover } from '../hooks/useTooltipHover';
@@ -150,9 +150,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
         <CherryPickConflictBanner />
         <RebaseConflictBanner />
         <SubmoduleBreadcrumb />
-        <div className="px-4 pt-3">
-          <SearchWidget />
-        </div>
+        <TogglePanel />
         <SubmoduleSection submodules={submodules} />
         <div className="flex flex-1 items-center justify-center text-[var(--vscode-descriptionForeground)]">
           No commits found
@@ -168,9 +166,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
       <CherryPickConflictBanner />
       <RebaseConflictBanner />
       <SubmoduleBreadcrumb />
-      <div className="px-4 pt-3">
-        <SearchWidget />
-      </div>
+      <TogglePanel />
       <SubmoduleSection submodules={submodules} />
       <div ref={containerRef} className="flex-1 overflow-auto bg-[var(--vscode-list-background)]">
         <div className="relative w-full" style={{ height: totalSize }}>
