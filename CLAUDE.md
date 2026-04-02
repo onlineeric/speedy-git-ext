@@ -93,15 +93,7 @@ Built with **Vite** + React plugin → `dist/webview/`
 - **Git**: NEVER commit, branch, or merge; only readonly operations (`git log`, `git status`, `git diff`) and create PR only if I ask you to do so.
 
 ## Active Technologies
-- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) with a VS Code Extension backend (`esbuild`, VS Code API) and Vite React 18 webview frontend, using Zustand and Tailwind CSS UI patterns.
-- Shared libraries across features include Radix UI (`react-context-menu`, `react-dialog`, `react-alert-dialog`, `react-popover`), `@tanstack/react-virtual`, and `headless-tree`; local git is the runtime source, and app state/caches are kept in-memory (`Zustand`/component state, e.g., reused `gravatar.ts`) with no persistent feature-level state.
-- TypeScript 5.x (strict) + React 18, Zustand, `@radix-ui/react-popover` (already installed), `@tanstack/react-virtual`, esbuild (backend), Vite (frontend) (025-commit-node-tooltip)
-- In-memory caches (Zustand store + component state) (025-commit-node-tooltip)
-- TypeScript 5.x (strict) + VS Code Extension API, React 18, Zustand, esbuild, Vite (026-persist-ui-state)
-- VS Code `context.globalState` (key-value, JSON-serializable, global across workspaces) (026-persist-ui-state)
-- TypeScript 5.x (strict) + React 18, Zustand, Radix UI (AlertDialog), Tailwind CSS, esbuild (backend), Vite (frontend) (027-ui-enhancements-merge-inline)
-- N/A (no persistence changes) (027-ui-enhancements-merge-inline)
-- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand, @radix-ui/react-popover, @tanstack/react-virtual, esbuild (backend), Vite (frontend) (028-multi-branch-filter)
-- N/A (in-memory Zustand store, transient selections) (028-multi-branch-filter)
+- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, and `noImplicitReturns`) powers both the VS Code extension backend (`esbuild`, VS Code API) and the React 18 webview frontend (`Vite`), with Zustand and Tailwind CSS used across the UI.
+- Shared frontend libraries include Radix UI (`react-context-menu`, `react-dialog`, `react-alert-dialog`, `react-popover`), `@tanstack/react-virtual`, and `headless-tree`; git data comes from the local repository, with application state kept primarily in memory and only selective UI preferences persisted via VS Code `context.globalState`.
 
 ## Recent Changes
