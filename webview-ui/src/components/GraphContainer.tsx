@@ -1,16 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Submodule } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { CommitRow } from './CommitRow';
+import { CommitTableHeader } from './CommitTableHeader';
+import { CommitTableRow } from './CommitTableRow';
 import { CherryPickConflictBanner } from './CherryPickConflictBanner';
 import { RebaseConflictBanner } from './RebaseConflictBanner';
-import { SearchWidget } from './SearchWidget';
+import { TogglePanel } from './TogglePanel';
 import { SubmoduleBreadcrumb } from './SubmoduleBreadcrumb';
 import { CommitTooltip } from './CommitTooltip';
 import { useTooltipHover } from '../hooks/useTooltipHover';
+import { resolveCommitTableLayout } from '../utils/commitTableLayout';
 
 const ROW_HEIGHT = 28;
 const LANE_WIDTH = 16;
@@ -33,6 +36,8 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
   const hasMore = useGraphStore((state) => state.hasMore);
   const lastBatchStartIndex = useGraphStore((state) => state.lastBatchStartIndex);
   const selectedCommits = useGraphStore((state) => state.selectedCommits);
+  const commitListMode = useGraphStore((state) => state.commitListMode);
+  const commitTableLayout = useGraphStore((state) => state.commitTableLayout);
   const selectedCommitsSet = useMemo(() => new Set(selectedCommits), [selectedCommits]);
   const toggleSelectedCommit = useGraphStore((state) => state.toggleSelectedCommit);
   const selectCommitRange = useGraphStore((state) => state.selectCommitRange);
@@ -44,6 +49,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
   const hoveredCommitHash = useGraphStore((state) => state.hoveredCommitHash);
   const userSettings = useGraphStore((state) => state.userSettings);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
   const { onNodeMouseEnter, onNodeMouseLeave, onTooltipMouseEnter, onTooltipMouseLeave, dismissImmediate } = useTooltipHover();
 
   const hoveredCommit = useMemo(
@@ -64,6 +70,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
 
     const observer = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width ?? 0;
+      setContainerWidth(width);
       setMaxVisibleRefs(computeMaxVisibleRefs(width));
     });
     observer.observe(element);
@@ -144,15 +151,24 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
     onSelectCommit(hash);
   };
 
+  const graphWidth = Math.max(LANE_WIDTH * (topology.maxLanes + 1), 40);
+  const resolvedTableLayout = useMemo(
+    () =>
+      resolveCommitTableLayout({
+        layout: commitTableLayout,
+        containerWidth,
+      }),
+    [commitTableLayout, containerWidth]
+  );
+  const tableMode = commitListMode === 'table';
+
   if (commits.length === 0) {
     return (
       <div className="flex h-full flex-col">
         <CherryPickConflictBanner />
         <RebaseConflictBanner />
         <SubmoduleBreadcrumb />
-        <div className="px-4 pt-3">
-          <SearchWidget />
-        </div>
+        <TogglePanel />
         <SubmoduleSection submodules={submodules} />
         <div className="flex flex-1 items-center justify-center text-[var(--vscode-descriptionForeground)]">
           No commits found
@@ -161,19 +177,30 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
     );
   }
 
-  const graphWidth = Math.max(LANE_WIDTH * (topology.maxLanes + 1), 40);
-
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <CherryPickConflictBanner />
       <RebaseConflictBanner />
       <SubmoduleBreadcrumb />
-      <div className="px-4 pt-3">
-        <SearchWidget />
-      </div>
+      <TogglePanel />
       <SubmoduleSection submodules={submodules} />
-      <div ref={containerRef} className="flex-1 overflow-auto bg-[var(--vscode-list-background)]">
-        <div className="relative w-full" style={{ height: totalSize }}>
+      {tableMode && (
+        <div className="overflow-hidden bg-[var(--vscode-editor-background)]">
+          <CommitTableHeader layout={resolvedTableLayout} />
+        </div>
+      )}
+      <div
+        ref={containerRef}
+        className={`flex-1 bg-[var(--vscode-list-background)] ${tableMode ? 'overflow-y-auto overflow-x-hidden' : 'overflow-auto'}`}
+      >
+        <div
+          className={`relative ${tableMode ? '' : 'w-full'}`}
+          style={{
+            height: totalSize,
+            width: tableMode ? resolvedTableLayout.tableWidth : undefined,
+            minWidth: tableMode ? resolvedTableLayout.minimumTableWidth : undefined,
+          }}
+        >
           {virtualItems.map((virtualItem) => {
             const commit = commits[virtualItem.index];
             const currentMatch = searchState.matchIndices[searchState.currentMatchIndex];
@@ -181,6 +208,38 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
             const isMultiSelected = selectedCommitsSet.has(commit.hash);
             const isCurrentSearchMatch = currentMatch === virtualItem.index;
             const isSearchMatch = visibleMatchIndices.has(virtualItem.index);
+            const rowStyle = {
+              position: 'absolute' as const,
+              top: 0,
+              left: 0,
+              width: tableMode ? resolvedTableLayout.tableWidth : '100%',
+              height: ROW_HEIGHT,
+              transform: `translateY(${virtualItem.start}px)`,
+            };
+
+            if (tableMode) {
+              return (
+                <CommitTableRow
+                  key={commit.hash}
+                  commit={commit}
+                  commits={commits}
+                  index={virtualItem.index}
+                  topology={topology}
+                  rowHeight={ROW_HEIGHT}
+                  layout={resolvedTableLayout}
+                  maxVisibleRefs={maxVisibleRefs}
+                  userSettings={userSettings}
+                  isSelected={isSelected}
+                  isMultiSelected={isMultiSelected}
+                  isSearchMatch={isSearchMatch}
+                  isCurrentSearchMatch={isCurrentSearchMatch}
+                  onClick={(event) => handleCommitClick(commit.hash, virtualItem.index, event)}
+                  onNodeMouseEnter={stableOnNodeMouseEnter}
+                  onNodeMouseLeave={stableOnNodeMouseLeave}
+                  style={rowStyle}
+                />
+              );
+            }
 
             return (
               <CommitRow
@@ -200,14 +259,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
                 onClick={(event) => handleCommitClick(commit.hash, virtualItem.index, event)}
                 onNodeMouseEnter={stableOnNodeMouseEnter}
                 onNodeMouseLeave={stableOnNodeMouseLeave}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: ROW_HEIGHT,
-                  transform: `translateY(${virtualItem.start}px)`,
-                }}
+                style={rowStyle}
               />
             );
           })}

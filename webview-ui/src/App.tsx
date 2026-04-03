@@ -9,14 +9,14 @@ import { ToastContainer } from './components/ToastContainer';
 
 export function App() {
   const rootRef = useRef<HTMLDivElement>(null);
-  const { loading, detailsPanelOpen, detailsPanelPosition, mergedCommits, selectedCommitIndex, searchState } = useGraphStore();
+  const { loading, detailsPanelOpen, detailsPanelPosition, mergedCommits, selectedCommitIndex } = useGraphStore();
+  const activeToggleWidget = useGraphStore((state) => state.activeToggleWidget);
+  const setActiveToggleWidget = useGraphStore((state) => state.setActiveToggleWidget);
   const setSelectedCommit = useGraphStore((state) => state.setSelectedCommit);
   const setCommitDetails = useGraphStore((state) => state.setCommitDetails);
   const setDetailsPanelOpen = useGraphStore((state) => state.setDetailsPanelOpen);
   const moveSelection = useGraphStore((state) => state.moveSelection);
   const selectCommit = useGraphStore((state) => state.selectCommit);
-  const openSearch = useGraphStore((state) => state.openSearch);
-  const closeSearch = useGraphStore((state) => state.closeSearch);
 
   useEffect(() => {
     rpcClient.initialize();
@@ -52,13 +52,13 @@ export function App() {
 
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
       event.preventDefault();
-      openSearch();
+      setActiveToggleWidget('search');
       return;
     }
 
     if (isFormControl) {
-      if (event.key === 'Escape' && searchState.isOpen) {
-        closeSearch();
+      if (event.key === 'Escape' && activeToggleWidget !== null) {
+        setActiveToggleWidget(null);
       }
       return;
     }
@@ -74,8 +74,8 @@ export function App() {
         setDetailsPanelOpen(false);
         return;
       }
-      if (searchState.isOpen) {
-        closeSearch();
+      if (activeToggleWidget !== null) {
+        setActiveToggleWidget(null);
       }
       return;
     }
