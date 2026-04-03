@@ -7,11 +7,16 @@
 
 Add a second commit-list presentation mode that renders commits as a customizable table with resizable, reorderable, and hideable columns while keeping the existing classic row layout as the fallback. The table uses five columns — graph, hash, message, author, and date — with ref badges rendering inline in the message column (matching classic mode) rather than occupying a separate column. The implementation keeps virtualization in `GraphContainer`, introduces a shared table-layout model for header and row alignment, surfaces column controls from an in-webview settings popover integrated with the existing `activeToggleWidget` toggle system, and persists mode/layout preferences through the existing `PersistedUIState` flow in `WebviewProvider`.
 
+**Post-implementation refinements**:
+1. Default view mode is `'table'` so new/upgraded users experience the feature immediately.
+2. Column configuration controls (visibility toggles, drag-to-reorder) are disabled when Classic mode is active.
+3. Column layout preferences (widths, order, visibility) are stored per repository instead of globally, since different repos benefit from independent column configurations. The view mode (classic/table) remains global.
+
 ## Technical Context
 
 **Language/Version**: TypeScript 5.x (strict, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`)  
 **Primary Dependencies**: VS Code Extension API, React 18, Zustand, `@tanstack/react-virtual`, `@radix-ui/react-popover`, `@dnd-kit/core`, `@dnd-kit/sortable`, Vite, esbuild  
-**Storage**: VS Code `context.globalState` via the existing persisted UI state object  
+**Storage**: VS Code `context.globalState` — global UI state for view mode, per-repo keyed entries for column layout  
 **Testing**: Manual smoke test via VS Code "Run Extension" launch config; `pnpm typecheck`; `pnpm lint`; `pnpm build`  
 **Target Platform**: VS Code 1.85+ desktop extension host + sandboxed webview  
 **Project Type**: VS Code extension (desktop app with extension-host/backend and React webview/frontend)  
@@ -95,8 +100,8 @@ See [data-model.md](data-model.md).
 Core additions:
 - `CommitListMode = 'classic' | 'table'`
 - `CommitTableColumnId = 'graph' | 'hash' | 'message' | 'author' | 'date'`
-- `CommitTableLayout` with persisted order, visibility, and preferred widths
-- `PersistedUIState` extended with `commitListMode` and `commitTableLayout`
+- `CommitTableLayout` with persisted order, visibility, and preferred widths (stored per repo)
+- `PersistedUIState` extended with `commitListMode` (global) and `commitTableLayout` (per-repo, combined into the same message payload)
 - `ActiveToggleWidget` extended with `'commitListSettings'`
 
 ### Interface Contracts
@@ -106,6 +111,7 @@ See [contracts/messages.md](contracts/messages.md).
 Contract impact:
 - No new message names are needed.
 - Existing `persistedUIState` and `updatePersistedUIState` payloads expand to include commit-list mode and table layout.
+- `WebviewProvider` routes `commitListMode` to global storage and `commitTableLayout` to per-repo storage, combining both into the same message payload sent to the webview.
 - `WebviewProvider` remains responsible for per-field validation and default fallback before sending state to the webview.
 
 ### Rendering / Interaction Design

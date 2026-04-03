@@ -324,6 +324,10 @@ export interface PersistedUIState {
   bottomPanelHeight: number;
   rightPanelWidth: number;
   commitListMode: CommitListMode;
+  /**
+   * Column layout is stored per repository on the backend, but included in the
+   * hydration payload so the webview receives it alongside global UI state.
+   */
   commitTableLayout: CommitTableLayout;
 }
 
@@ -333,7 +337,7 @@ export const DEFAULT_PERSISTED_UI_STATE: PersistedUIState = {
   fileViewMode: 'list',
   bottomPanelHeight: 280,
   rightPanelWidth: 400,
-  commitListMode: 'classic',
+  commitListMode: 'table',
   commitTableLayout: createDefaultCommitTableLayout(),
 };
 

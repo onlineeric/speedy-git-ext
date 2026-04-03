@@ -65,22 +65,36 @@ export interface CommitTableLayout {
 
 ## Persisted UI State Changes
 
-### `PersistedUIState`
+### `PersistedUIState` (Global)
 
 **Location**: `shared/types.ts`
 
-Add:
+The global persisted UI state includes the view mode but **not** the column table layout:
 
 ```typescript
 commitListMode: CommitListMode;
-commitTableLayout: CommitTableLayout;
 ```
 
 **Default state**:
 
 | Field | Default |
 |-------|---------|
-| `commitListMode` | `'classic'` |
+| `commitListMode` | `'table'` |
+
+### Per-Repository Column Layout
+
+**Location**: `src/WebviewProvider.ts` (storage), `shared/types.ts` (types)
+
+Column layout preferences are stored per repository using a repo-path-keyed `globalState` entry. This allows different repos to have different column configurations suited to their graph density, author name lengths, and branch naming conventions.
+
+**Storage key pattern**: `speedyGit.repoTableLayout.<sha256-hash-of-repo-path>`
+
+Uses SHA-256 hash of the repo path to avoid issues with special characters in file paths as globalState keys.
+
+**Default state** (per repo, when no saved layout exists):
+
+| Field | Default |
+|-------|---------|
 | `commitTableLayout.order` | `['graph', 'hash', 'message', 'author', 'date']` |
 | `graph.preferredWidth` | `120` |
 | `hash.preferredWidth` | `72` |
@@ -88,6 +102,12 @@ commitTableLayout: CommitTableLayout;
 | `author.preferredWidth` | `160` |
 | `date.preferredWidth` | `120` |
 | optional column visibility | all visible by default |
+
+### Migration
+
+When upgrading from a version that stored `commitTableLayout` in the global `PersistedUIState`:
+- The global `commitListMode` defaults to `'table'` (new default for upgraded users).
+- The previously global `commitTableLayout` is ignored; each repo starts fresh with defaults until the user customizes it.
 
 ## Frontend-Derived View Models
 
@@ -151,13 +171,15 @@ Local UI state only:
 
 | Action | Result |
 |--------|--------|
-| Switch to table mode | `commitListMode = 'table'`; current `commitTableLayout` is reused |
-| Resize non-message column | Update that column's `preferredWidth`; message column recomputes effective width as space allows |
-| Resize message column | Update `message.preferredWidth`; later viewport growth restores toward that saved value |
-| Hide optional column | Set `visible = false`; keep its `preferredWidth` and position in `order` |
-| Show optional column | Set `visible = true`; restore at saved `order` position with saved `preferredWidth` |
-| Reorder optional columns | Update `order`; `'graph'` remains first |
+| Switch to table mode | `commitListMode = 'table'` (global); current repo's `commitTableLayout` is reused |
+| Switch to classic mode | `commitListMode = 'classic'` (global); column config controls become disabled |
+| Resize non-message column | Update that column's `preferredWidth` in per-repo layout; message column recomputes effective width as space allows |
+| Resize message column | Update `message.preferredWidth` in per-repo layout; later viewport growth restores toward that saved value |
+| Hide optional column | Set `visible = false` in per-repo layout; keep its `preferredWidth` and position in `order` |
+| Show optional column | Set `visible = true` in per-repo layout; restore at saved `order` position with saved `preferredWidth` |
+| Reorder optional columns | Update `order` in per-repo layout; `'graph'` remains first |
+| Switch repository | Load the target repo's saved `commitTableLayout` (or defaults); `commitListMode` stays unchanged (global) |
 | Narrow container | Message column shrinks first to its minimum; after minimum table width is reached, table width stops shrinking |
 | Narrow graph column below topology width | Graph content clips naturally; minimum width is independent of topology |
-| Double-click resize handle | Compute auto-fit width via `canvas.measureText()` across all commits; update that column's `preferredWidth`; persist immediately |
+| Double-click resize handle | Compute auto-fit width via `canvas.measureText()` across all commits; update that column's `preferredWidth` in per-repo layout; persist immediately |
 

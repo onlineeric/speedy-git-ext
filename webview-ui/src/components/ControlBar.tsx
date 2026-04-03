@@ -123,6 +123,16 @@ export function ControlBar() {
       </button>
 
       <button
+        onClick={() => setActiveToggleWidget('search')}
+        className={`${iconButtonClass} ${searchColor}`}
+        title="Search commits"
+      >
+        <SearchIcon className={iconClass} />
+      </button>
+
+      <span>|</span>
+
+      <button
         onClick={handleRefresh}
         className={`${iconButtonClass} ${refreshing ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}`}
         title="Refresh"
@@ -145,14 +155,6 @@ export function ControlBar() {
         title="Compare"
       >
         <CompareIcon className={iconClass} />
-      </button>
-
-      <button
-        onClick={() => setActiveToggleWidget('search')}
-        className={`${iconButtonClass} ${searchColor}`}
-        title="Search commits"
-      >
-        <SearchIcon className={iconClass} />
       </button>
 
       <CommitListSettingsPopover />

@@ -63,7 +63,19 @@ pnpm build
 - In table mode, resize at least two columns and hide one optional column.
 - Reload the webview or reopen the panel.
 - Verify the previous mode, column widths, order, and visibility restore on first render.
-- Switch repositories and confirm the same layout is reused.
+- Switch repositories and confirm each repo has its own independent column layout.
+- Customize columns differently in two repos, switch between them, and verify each restores its own layout.
+
+### 6. Default to Table View
+
+- Clear persisted state (or test with a fresh extension install).
+- Open the commit list and verify it defaults to Table view, not Classic.
+
+### 7. Classic Mode Disables Column Config
+
+- Switch to Classic mode in the settings popover.
+- Verify that column visibility toggles and drag-to-reorder controls are visually disabled and non-interactive.
+- Switch back to Table mode and verify controls become interactive again.
 
 ### 5. Regression Checks
 

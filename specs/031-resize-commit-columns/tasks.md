@@ -103,6 +103,19 @@
 
 ---
 
+## Phase 7: Post-Implementation Refinements
+
+**Purpose**: Default to Table view, disable column config in Classic mode, and move column layout to per-repo storage.
+
+- [X] T030 Change `DEFAULT_PERSISTED_UI_STATE.commitListMode` from `'classic'` to `'table'` in `shared/types.ts` so first-time and upgraded users default to Table view. Update the fallback in `src/WebviewProvider.ts` validation to use `'table'` as the default for invalid `commitListMode` values.
+- [X] T031 Disable column configuration controls (visibility toggles, drag-to-reorder) in `webview-ui/src/components/CommitListSettingsPopover.tsx` when Classic mode is selected. Controls should be visually dimmed and non-interactive, re-enabling when Table mode is selected.
+- [X] T032 Move `commitTableLayout` from the global `PersistedUIState` to per-repository storage in `src/WebviewProvider.ts`. Use a `globalState` key pattern `speedyGit.repoTableLayout.<sha256-hash-of-repo-path>` to store each repo's column layout independently. Load the active repo's layout when building the `persistedUIState` payload, and route `commitTableLayout` updates to the per-repo key on save. Remove `commitTableLayout` from the global `PersistedUIState` interface and default state.
+- [X] T033 Update `webview-ui/src/stores/graphStore.ts` hydration logic so that when the repo changes (`switchRepo`), the new repo's column layout is applied from the incoming `persistedUIState` message.
+- [X] T034 Update `src/__tests__/WebviewProvider.test.ts` to cover per-repo layout storage: verify layout is loaded/saved per repo path, verify repo switch loads the correct layout, verify missing per-repo layout falls back to defaults.
+- [X] T035 Run `pnpm typecheck`, `pnpm lint`, and `pnpm build` to verify all changes compile and pass checks.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

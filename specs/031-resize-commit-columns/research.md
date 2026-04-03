@@ -88,3 +88,41 @@
 - **DOM-based measurement**: Rejected because virtual scrolling only renders a subset of rows, making DOM measurement inaccurate.
 - **Temporary off-screen rendering**: Rejected because it's complex and slow for hundreds of rows.
 - **Fixed heuristic widths**: Rejected because they can't adapt to actual data length variations across repositories.
+
+## R7: Default View Mode for New/Upgraded Users
+
+**Decision**: Default `commitListMode` to `'table'` instead of `'classic'` so that users upgrading to this version immediately see the new table-style view.
+
+**Rationale**:
+- The table-style view is the primary value of this feature. Defaulting to classic would hide the feature from users who don't discover the settings popover.
+- Users who prefer the classic view can switch back with one click in the settings popover.
+
+**Alternatives considered**:
+- **Default to classic**: Rejected because it hides the new feature and requires users to discover the mode switch on their own.
+
+## R8: Disable Column Config in Classic Mode
+
+**Decision**: When Classic mode is selected, visually disable and make non-interactive all column configuration controls (visibility toggles, drag-to-reorder) in the settings popover.
+
+**Rationale**:
+- Column layout settings only affect the table-style view. Allowing changes in Classic mode would be confusing since the user can't see the effect.
+- Disabling rather than hiding preserves discoverability — users can see what controls are available and understand they become active when switching to Table mode.
+
+**Alternatives considered**:
+- **Hide column controls entirely in Classic mode**: Rejected because it reduces discoverability of the table feature and makes the popover look empty.
+- **Allow changes in Classic mode**: Rejected because it would confuse users who don't see any effect from their changes.
+
+## R9: Per-Repository Column Layout Storage
+
+**Decision**: Store column layout preferences (widths, order, visibility) per repository using a hashed repo-path key in `globalState`, while keeping the view mode (classic/table) global.
+
+**Rationale**:
+- Different repositories have different graph densities, author name lengths, branch naming conventions, and overall structure. A layout optimized for one repo may not suit another.
+- The view mode preference is user-level ("I prefer table view") while column layout is repo-level ("this repo needs a wider graph column").
+- Using `globalState` with a per-repo key pattern keeps the implementation simple — no new persistence mechanism is needed.
+- The key uses a SHA-256 hash of the repo path to avoid issues with special characters in file system paths used as storage keys.
+
+**Alternatives considered**:
+- **Keep layout global**: Rejected because user feedback indicates column widths need to differ between repos with different characteristics.
+- **Use `workspaceState` instead of keyed `globalState`**: Rejected because `workspaceState` is tied to the workspace folder, not the individual repo, and multi-root workspaces with multiple repos would share state.
+- **Persist layout in the repo itself** (e.g., `.vscode/settings.json`): Rejected because this is UI preference data that shouldn't be committed to version control.

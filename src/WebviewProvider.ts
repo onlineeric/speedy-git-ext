@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as crypto from 'crypto';
 import * as path from 'path';
 import type { RequestMessage, ResponseMessage } from '../shared/messages.js';
 import type {
@@ -35,6 +36,11 @@ import type { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService
 import { GitError } from '../shared/errors.js';
 import { GitExecutor } from './services/GitExecutor.js';
 import { GitHubAvatarService } from './services/GitHubAvatarService.js';
+
+function repoLayoutKey(repoPath: string): string {
+  const hash = crypto.createHash('sha256').update(repoPath).digest('hex').slice(0, 16);
+  return `speedyGit.repoTableLayout.${hash}`;
+}
 
 function clonePersistedUIStateDefaults(): PersistedUIState {
   return {
@@ -228,6 +234,8 @@ export class WebviewProvider {
     this.gitSubmoduleService = gitSubmoduleService;
     this.gitWorktreeService = gitWorktreeService;
     this.currentRepoPath = currentRepoPath;
+    // Invalidate UI state cache so per-repo column layout is reloaded for the new repo
+    this.uiStateCache = undefined;
     this.gitHubAvatarService = null;
     this.gitHubAvatarInitialized = false;
     this.lastCommitFingerprint = '';
@@ -275,14 +283,20 @@ export class WebviewProvider {
     const defaults = clonePersistedUIStateDefaults();
 
     if (!stored || typeof stored !== 'object' || stored === null) {
-      this.uiStateCache = defaults;
+      this.uiStateCache = {
+        ...defaults,
+        commitTableLayout: cloneCommitTableLayout(this.loadRepoTableLayout()),
+      };
       return this.uiStateCache;
     }
 
     const raw = stored as Record<string, unknown>;
 
     if (raw.version !== defaults.version) {
-      this.uiStateCache = defaults;
+      this.uiStateCache = {
+        ...defaults,
+        commitTableLayout: cloneCommitTableLayout(this.loadRepoTableLayout()),
+      };
       return this.uiStateCache;
     }
 
@@ -308,19 +322,45 @@ export class WebviewProvider {
         isCommitListMode(raw.commitListMode)
           ? raw.commitListMode
           : defaults.commitListMode,
-      commitTableLayout: validateCommitTableLayout(
-        raw.commitTableLayout,
-        defaults.commitTableLayout
-      ),
+      // Column layout is loaded from per-repo storage, not global state
+      commitTableLayout: cloneCommitTableLayout(this.loadRepoTableLayout()),
     };
     return this.uiStateCache;
+  }
+
+  /** Load per-repo column table layout from globalState, falling back to defaults. */
+  private loadRepoTableLayout(): CommitTableLayout {
+    const defaults = clonePersistedUIStateDefaults();
+    const key = repoLayoutKey(this.currentRepoPath);
+    const stored = this.context.globalState.get<unknown>(key);
+    return validateCommitTableLayout(stored, defaults.commitTableLayout);
+  }
+
+  /** Save per-repo column table layout to globalState. */
+  private saveRepoTableLayout(layout: CommitTableLayout) {
+    const key = repoLayoutKey(this.currentRepoPath);
+    void this.context.globalState.update(key, cloneCommitTableLayout(layout));
   }
 
   private savePersistedUIState(partial: Partial<Omit<PersistedUIState, 'version'>>) {
     const current = this.loadPersistedUIState();
     const defaults = clonePersistedUIStateDefaults();
-    // Validate incoming fields before merging to prevent storing invalid values
-    const validated: Partial<Omit<PersistedUIState, 'version'>> = {
+
+    // Route commitTableLayout to per-repo storage
+    if (partial.commitTableLayout !== undefined) {
+      const validatedLayout = validateCommitTableLayout(
+        partial.commitTableLayout,
+        current.commitTableLayout
+      );
+      this.saveRepoTableLayout(validatedLayout);
+      // Update cache with the new layout
+      if (this.uiStateCache) {
+        this.uiStateCache.commitTableLayout = cloneCommitTableLayout(validatedLayout);
+      }
+    }
+
+    // Validate and save global-only fields
+    const globalValidated: Partial<Omit<PersistedUIState, 'version' | 'commitTableLayout'>> = {
       ...(partial.detailsPanelPosition === 'bottom' || partial.detailsPanelPosition === 'right'
         ? { detailsPanelPosition: partial.detailsPanelPosition }
         : {}),
@@ -340,24 +380,22 @@ export class WebviewProvider {
               : defaults.commitListMode,
           }
         : {}),
-      ...(partial.commitTableLayout !== undefined
-        ? {
-            commitTableLayout: validateCommitTableLayout(
-              partial.commitTableLayout,
-              current.commitTableLayout
-            ),
-          }
-        : {}),
     };
-    // Update cache synchronously so back-to-back saves see the latest state
-    this.uiStateCache = {
-      ...current,
-      ...validated,
-      commitTableLayout: validated.commitTableLayout
-        ? cloneCommitTableLayout(validated.commitTableLayout)
-        : cloneCommitTableLayout(current.commitTableLayout),
-    };
-    void this.context.globalState.update(WebviewProvider.UI_STATE_KEY, this.uiStateCache);
+
+    // Only update global state if there are global fields to save
+    if (Object.keys(globalValidated).length > 0) {
+      this.uiStateCache = {
+        ...current,
+        ...globalValidated,
+        // Keep the current (possibly just-updated) repo layout in cache
+        commitTableLayout: this.uiStateCache?.commitTableLayout
+          ? cloneCommitTableLayout(this.uiStateCache.commitTableLayout)
+          : cloneCommitTableLayout(current.commitTableLayout),
+      };
+      // Save global state without commitTableLayout
+      const { commitTableLayout: _excluded, ...globalState } = this.uiStateCache;
+      void this.context.globalState.update(WebviewProvider.UI_STATE_KEY, globalState);
+    }
   }
 
   async show() {

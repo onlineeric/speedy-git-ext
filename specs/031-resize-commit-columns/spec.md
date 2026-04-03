@@ -12,7 +12,9 @@
 - Q: What should happen when the table-style column layout cannot fit within the available commit list width, even after optional columns are narrowed to their minimum widths? → A: The commit message column is the primary flexible column and should adjust its width as the available space changes. Once the table reaches its minimum viable width, it should stop shrinking further and may extend off the right side rather than introducing a horizontal scrollbar.
 - Q: When the user manually resizes the message column, how should that width behave after the panel is later resized narrower or wider? → A: The user-set message width is the preferred width. If space gets tight, the message column shrinks as needed down to its minimum, and if space returns, it expands back toward the saved preferred width.
 - Q: When should column layout changes be persisted for reuse across reloads? → A: Save each resize, reorder, visibility change, and mode switch immediately as it happens.
-- Q: Should the saved table-style mode and column layout be shared across all repositories, or stored separately per repository? → A: Store one shared layout per user and reuse it across all repositories.
+- Q: Should the saved table-style mode and column layout be shared across all repositories, or stored separately per repository? → A: The view mode (classic/table) is stored globally per user. Column layout preferences (widths, order, visibility) are stored per repository, since different repos have different graph densities, author name lengths, and branch naming conventions that warrant independent column configurations.
+- Q: What should the default view mode be for users upgrading to this version for the first time? → A: Default to Table view so new/upgraded users experience the new feature immediately.
+- Q: When Classic mode is selected, should column configuration controls still be interactive? → A: No. When Classic mode is active, column visibility toggles, drag-to-reorder, and other column config controls should be visually disabled and non-interactive, since they only apply to the table-style view.
 - Q: When a user hides an optional column and later shows it again, how should that column be restored? → A: Restore the column with its last saved width and last saved order position.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -80,7 +82,7 @@ A developer returns to the commit list after reloading the webview or reopening 
 ### Functional Requirements
 
 - **FR-001**: System MUST provide two commit list presentation modes: a classic view and a customizable table-style view.
-- **FR-002**: System MUST default to the classic view for users who have not chosen a different commit list mode.
+- **FR-002**: System MUST default to the table-style view for users who have not previously chosen a commit list mode (including users upgrading to this version for the first time).
 - **FR-003**: Users MUST be able to switch between the classic view and the table-style view from a settings control within the commit list UI.
 - **FR-004**: The classic view MUST remain available as an unchanged fallback when users do not want column customization.
 - **FR-005**: The table-style view MUST display the same core commit information currently available in the commit list: graph, hash, message (with inline ref badges), author, and date. Refs are not a separate column; they render inline in the message column, matching the classic view.
@@ -93,7 +95,8 @@ A developer returns to the commit list after reloading the webview or reopening 
 - **FR-011**: Users MUST be able to show or hide optional columns from a column chooser while in the table-style view.
 - **FR-012**: System MUST immediately reflect column visibility changes in both the table header and the commit rows.
 - **FR-013**: System MUST preserve the user's selected commit list mode across webview reloads.
-- **FR-014**: System MUST preserve the user's table-style column widths, column order, and column visibility preferences across webview reloads and reuse the same saved table-style layout across repositories for that user.
+- **FR-014**: System MUST preserve the user's table-style column widths, column order, and column visibility preferences per repository across webview reloads. Each repository maintains its own independent column layout. The selected view mode (classic/table) is persisted globally.
+- **FR-014b**: When column configuration controls (visibility toggles, drag-to-reorder) are displayed while Classic mode is active, they MUST be visually disabled and non-interactive, since column layout only applies to the table-style view.
 - **FR-014a**: System MUST persist each table-style layout change immediately as the user performs it, including resize, reorder, visibility, and mode-switch actions, so the latest state is available after reload.
 - **FR-015**: When no saved table-style preferences exist, system MUST start from a default column layout that preserves the current commit list information hierarchy.
 - **FR-016**: Switching between classic and table-style views MUST preserve existing commit-list interactions, including commit selection, scrolling, search highlighting, and context menu access.
@@ -123,7 +126,7 @@ A developer returns to the commit list after reloading the webview or reopening 
 ## Assumptions
 
 - The classic commit list remains available indefinitely as a supported fallback, not just as a temporary migration aid.
-- Column layout preferences are saved per user and reused across repositories unless a later feature introduces repository-specific layouts.
+- Column layout preferences (widths, order, visibility) are saved per repository. The view mode (classic/table) is saved globally per user.
 - Column layout and mode preferences are saved incrementally as soon as the user changes them, rather than waiting for an explicit save or panel close event.
 - The graph column is required for orientation in the commit list and therefore cannot be hidden or moved away from the first position.
 - All non-graph columns are optional for visibility purposes, including hash, author, and date.

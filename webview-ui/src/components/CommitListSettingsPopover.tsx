@@ -146,12 +146,14 @@ export function CommitListSettingsPopover() {
 
             <div className="border-t border-[var(--vscode-panel-border)]" />
 
-            <section>
+            <section className={commitListMode === 'classic' ? 'opacity-50 pointer-events-none' : ''}>
               <div className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--vscode-descriptionForeground)]">
                 Columns
               </div>
               <p className="mb-3 text-xs text-[var(--vscode-descriptionForeground)]">
-                Graph stays first and always visible. Drag optional columns to reorder them.
+                {commitListMode === 'classic'
+                  ? 'Switch to Table mode to configure columns.'
+                  : 'Graph stays first and always visible. Drag optional columns to reorder them.'}
               </p>
 
               <div className="mb-2 flex items-center justify-between rounded border border-[var(--vscode-panel-border)] px-2 py-1.5 text-sm">
@@ -169,6 +171,7 @@ export function CommitListSettingsPopover() {
                         label={COLUMN_LABELS[columnId]}
                         visible={commitTableLayout.columns[columnId].visible}
                         onVisibilityChange={handleVisibilityChange}
+                        disabled={commitListMode === 'classic'}
                       />
                     ))}
                   </div>
@@ -212,14 +215,17 @@ function SortableColumnRow({
   label,
   visible,
   onVisibilityChange,
+  disabled,
 }: {
   columnId: CommitTableColumnId;
   label: string;
   visible: boolean;
   onVisibilityChange: (columnId: CommitTableColumnId, visible: boolean) => void;
+  disabled?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: columnId,
+    disabled,
   });
 
   return (
@@ -236,9 +242,10 @@ function SortableColumnRow({
         type="button"
         {...attributes}
         {...listeners}
-        className="cursor-grab px-1 text-base leading-none text-[var(--vscode-descriptionForeground)]"
+        className={`px-1 text-base leading-none text-[var(--vscode-descriptionForeground)] ${disabled ? 'cursor-default' : 'cursor-grab'}`}
         title={`Drag to reorder ${label}`}
         aria-label={`Drag to reorder ${label}`}
+        disabled={disabled}
       >
         ⠿
       </button>
@@ -252,6 +259,7 @@ function SortableColumnRow({
           checked={visible}
           onChange={(event) => onVisibilityChange(columnId, event.target.checked)}
           className="h-3.5 w-3.5"
+          disabled={disabled}
         />
       </label>
     </div>
