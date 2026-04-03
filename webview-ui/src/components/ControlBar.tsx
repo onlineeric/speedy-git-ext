@@ -127,6 +127,7 @@ export function ControlBar() {
         onClick={() => setActiveToggleWidget('filter')}
         className={`${iconButtonClass} ${filterColor}`}
         title="Filter"
+        style={{ display: 'none' }} // TODO: remove this once the filter button is wired to the toggle panel
       >
         <FilterIcon className={iconClass} />
       </button>
@@ -162,6 +163,7 @@ export function ControlBar() {
         onClick={() => setActiveToggleWidget('compare')}
         className={`${iconButtonClass} ${compareColor}`}
         title="Compare"
+        style={{ display: 'none' }} // TODO: remove this once the compare button is wired to the toggle panel
       >
         <CompareIcon className={iconClass} />
       </button>
