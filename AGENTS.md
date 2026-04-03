@@ -1,1 +1,101 @@
-CLAUDE.md
+# Project Agent Instructions
+
+This file provides guidance for AI coding agents (Claude Code, Codex CLI, etc.) when working in this repository.
+
+(If you are Claude Code, this is your CLAUDE.md. If you are Codex CLI or other AI coding agents, this is loaded via AGENTS.md.)
+
+## Build & Development Commands
+
+```bash
+pnpm build              # Build extension + webview
+pnpm build:prod         # Production build (minified, no sourcemaps)
+pnpm build:ext          # Build extension only (esbuild)
+pnpm build:webview      # Build webview only (Vite)
+pnpm watch              # Watch mode for both (uses concurrently)
+pnpm lint               # ESLint on src/
+pnpm typecheck          # TypeScript type checking
+pnpm generate-test-repo # Generate deterministic test repo at test-repo/
+```
+
+To debug: use VS Code launch configs "Run Extension" or "Run Extension (Watch)" in `.vscode/launch.json`.
+
+## Architecture
+
+This is a VS Code extension with a **backend** (Node.js, extension host) and **frontend** (React webview), communicating via VS Code's message passing API.
+
+### Backend (`src/`)
+
+- **extension.ts** → Entry point, registers `speedyGit.showGraph` command
+- **ExtensionController.ts** → Orchestrates WebviewProvider and all service lifecycles
+- **WebviewProvider.ts** → Creates webview panel, handles bidirectional message passing, serves initial data, opens diff/file editors
+- **services/GitExecutor.ts** → Spawns git processes with timeout (30s), returns `Result<T, GitError>`
+- **services/GitLogService.ts** → Parses git log (null-byte separated format), branches, current branch. Default 500 commits max
+- **services/GitDiffService.ts** → Commit details, file changes (diff-tree), file content at revision, uncommitted changes
+- **services/GitBranchService.ts** → Checkout branches (local/remote), fetch remotes
+- **utils/gitParsers.ts** → Parsers for git log output lines, refs (%D), branch list
+
+Built with **esbuild** → `dist/extension.js` (CommonJS, node18, externalizes `vscode`)
+
+### Frontend (`webview-ui/src/`)
+
+- **App.tsx** → Root: ControlBar + GraphContainer + CommitDetailsPanel, layout switches between bottom/right panel position
+- **GraphContainer.tsx** → Virtual scrolling via `@tanstack/react-virtual` (ROW_HEIGHT: 28px, OVERSCAN: 10)
+- **CommitRow.tsx** → Renders graph cell + commit metadata (memoized), wraps rows in CommitContextMenu, refs in BranchContextMenu
+- **GraphCell.tsx** → SVG git graph rendering (LANE_WIDTH: 16px, 8 cycling colors)
+- **CommitDetailsPanel.tsx** → Resizable panel (bottom or right) showing commit metadata + file changes with diff links
+- **CommitContextMenu.tsx** → Radix UI context menu: Copy Hash, Copy Short Hash, Copy Message
+- **BranchContextMenu.tsx** → Radix UI context menu: Checkout branch, Copy branch/tag name
+- **stores/graphStore.ts** → Zustand store: commits, branches, topology, filters, selectedCommit, commitDetails, detailsPanelPosition
+- **rpc/rpcClient.ts** → Singleton for webview↔extension communication via `acquireVsCodeApi()`, handles all Phase 1+2 message types
+- **utils/graphTopology.ts** → Core graph algorithm (~470 lines): assigns lanes/colors, computes connections, pre-computes passing lanes for O(1) render lookup
+
+Built with **Vite** + React plugin → `dist/webview/`
+
+### Shared Types (`shared/`)
+
+- **types.ts** → Commit, Branch, RefInfo, GraphState, GraphFilters, CommitDetails, FileChange, DetailsPanelPosition
+- **messages.ts** → RequestMessage/ResponseMessage types with type guards
+- **errors.ts** → Result<T,E> monad, GitError class, GitErrorCode enum
+
+### Path Alias
+
+`@shared/*` → `shared/*` (configured in webview tsconfig and Vite)
+
+## Key Design Decisions
+
+- Our project is Performance First Principles. We aim to provide a fast, responsive, and efficient user experience.
+- Extension backend uses esbuild (fast, CJS for Node); webview uses Vite (ESM, React)
+- Graph topology computed in the webview (frontend), not the backend
+- TypeScript strict mode with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`
+- Uses `Result<T, E>` pattern instead of throwing exceptions in git operations
+
+## Coding Preferences / Guidelines
+
+### Code Quality
+
+- Write clean, readable, self-documenting code with clear naming, human-readaable, easy to understand, easy to maintain.
+- Follow single responsibility principle; keep classes, functions and files small and focused
+- DRY: extract reusable logic into shared functions, components, or libraries
+- Prefer explicit over implicit; avoid clever or cryptic solutions
+- Use purpose-built libraries (e.g., `cheerio` for HTML, `date-fns` for dates) instead of manual implementations.
+- Refactor when needed to improve structure and readability
+- Use TypeScript types to document intent and catch errors early
+
+### Package Selection
+
+- Prefer popular, battle-tested packages over manual implementations
+- Avoid regex for parsing structured data (HTML, JSON, XML), use purpose-built libraries instead.
+- When choosing packages, prefer: active maintenance, TypeScript support, readable API
+
+### Restrictions
+
+- **Packages**: NEVER auto-install; provide install commands for me to run manually
+- **Git**: NEVER commit or merge; only readonly operations (`git log`, `git status`, `git diff`) and create PR, create branch only if I ask you to do so, or if speckit workflow requires it.
+
+## Active Technologies
+- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, and `noImplicitReturns`) powers both the VS Code extension backend (`esbuild`, VS Code API) and the React 18 webview frontend (`Vite`), with Zustand and Tailwind CSS used across the UI.
+- Shared frontend libraries include Radix UI (`react-context-menu`, `react-dialog`, `react-alert-dialog`, `react-popover`), `@tanstack/react-virtual`, and `headless-tree`; git data comes from the local repository, with application state kept primarily in memory and only selective UI preferences persisted via VS Code `context.globalState`.
+- TypeScript 5.x (strict, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + VS Code Extension API, React 18, Zustand, `@tanstack/react-virtual`, `@radix-ui/react-popover`, `@dnd-kit/core`, `@dnd-kit/sortable`, Vite, esbuild (031-resize-commit-columns)
+- VS Code `context.globalState` via the existing persisted UI state object (031-resize-commit-columns)
+
+## Recent Changes
