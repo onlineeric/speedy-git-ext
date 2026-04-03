@@ -8,8 +8,9 @@ import { CloudIcon, FilterIcon, CompareIcon, SettingsIcon, SearchIcon, RefreshIc
 
 const TOGGLE_BUTTON_COLORS = {
   inactive: 'text-[var(--vscode-icon-foreground)] opacity-70 hover:opacity-100',
-  active: 'text-yellow-500 opacity-100',
-  filtered: 'text-red-500 opacity-100',
+  active: 'text-sky-400 opacity-100',
+  filtered: 'text-yellow-400 opacity-100',
+  processing: 'text-yellow-400 opacity-100',
 } as const;
 
 export function ControlBar() {
@@ -49,8 +50,20 @@ export function ControlBar() {
     rpcClient.getCommits({ ...filters, branches: undefined });
   };
 
+  const [refreshing, setRefreshing] = useState(false);
+
   const handleRefresh = () => {
+    setRefreshing(true);
     rpcClient.refresh(filters);
+
+    const timeout = setTimeout(() => setRefreshing(false), 30_000);
+    const unsub = useGraphStore.subscribe((state) => {
+      if (!state.loading) {
+        setRefreshing(false);
+        clearTimeout(timeout);
+        unsub();
+      }
+    });
   };
 
   const [fetching, setFetching] = useState(false);
@@ -110,7 +123,7 @@ export function ControlBar() {
 
       <button
         onClick={handleRefresh}
-        className={`${iconButtonClass} ${TOGGLE_BUTTON_COLORS.inactive}`}
+        className={`${iconButtonClass} ${refreshing ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}`}
         title="Refresh"
       >
         <RefreshIcon className={iconClass} />
@@ -119,7 +132,7 @@ export function ControlBar() {
       <button
         onClick={handleFetch}
         disabled={fetching || loading}
-        className={`${iconButtonClass} ${TOGGLE_BUTTON_COLORS.inactive}`}
+        className={`${iconButtonClass} ${fetching ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}`}
         title="Fetch all remotes"
       >
         <FetchIcon className={iconClass} />
