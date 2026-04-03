@@ -74,3 +74,5 @@ Sent whenever the user changes mode, width, order, or visibility. The payload re
 
 - `shared/messages.ts` keeps the same request and response names.
 - Commit fetching, selection, search, and context-menu messages are unchanged.
+- The commit-list settings popover open state is local to the webview and is not part of any persisted or cross-boundary payload.
+- The toolbar separator rendering change is purely visual and does not affect message contracts.

@@ -343,7 +343,7 @@ export const DEFAULT_PERSISTED_UI_STATE: PersistedUIState = {
 
 export type RebaseState = 'idle' | 'in-progress';
 
-export type ActiveToggleWidget = 'search' | 'filter' | 'compare' | 'commitListSettings' | null;
+export type ActiveToggleWidget = 'search' | 'filter' | 'compare' | null;
 
 export interface RebaseConflictInfo {
   conflictedFiles: string[];

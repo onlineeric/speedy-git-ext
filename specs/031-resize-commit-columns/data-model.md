@@ -1,6 +1,6 @@
 # Data Model: Resizable Commit Columns
 
-**Date**: 2026-04-03
+**Date**: 2026-04-04
 
 ## Shared Persistent Types
 
@@ -164,7 +164,7 @@ Local UI state only:
 
 | Field | Description |
 |-------|-------------|
-| popover open/closed | Whether the settings popover is visible |
+| popover open/closed | Whether the settings popover is visible; this state is independent from the exclusive filter/search/compare toggle state |
 | active drag item | Temporary sortable-list state during reorder |
 
 ## State Transition Rules
@@ -173,13 +173,15 @@ Local UI state only:
 |--------|--------|
 | Switch to table mode | `commitListMode = 'table'` (global); current repo's `commitTableLayout` is reused |
 | Switch to classic mode | `commitListMode = 'classic'` (global); column config controls become disabled |
+| Open settings popover | Local popover state becomes open; filter, search, and compare panel state remain unchanged |
+| Close settings popover | Local popover state becomes closed; filter, search, and compare panel state remain unchanged |
 | Resize non-message column | Update that column's `preferredWidth` in per-repo layout; message column recomputes effective width as space allows |
 | Resize message column | Update `message.preferredWidth` in per-repo layout; later viewport growth restores toward that saved value |
 | Hide optional column | Set `visible = false` in per-repo layout; keep its `preferredWidth` and position in `order` |
 | Show optional column | Set `visible = true` in per-repo layout; restore at saved `order` position with saved `preferredWidth` |
 | Reorder optional columns | Update `order` in per-repo layout; `'graph'` remains first |
 | Switch repository | Load the target repo's saved `commitTableLayout` (or defaults); `commitListMode` stays unchanged (global) |
+| Open or close filter/search/compare panel | `activeToggleWidget` changes among the exclusive toggle panels or clears; settings popover state remains unchanged |
 | Narrow container | Message column shrinks first to its minimum; after minimum table width is reached, table width stops shrinking |
 | Narrow graph column below topology width | Graph content clips naturally; minimum width is independent of topology |
 | Double-click resize handle | Compute auto-fit width via `canvas.measureText()` across all commits; update that column's `preferredWidth` in per-repo layout; persist immediately |
-

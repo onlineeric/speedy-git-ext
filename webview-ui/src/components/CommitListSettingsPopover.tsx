@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import {
   DndContext,
@@ -39,9 +39,7 @@ const buttonBaseClass =
   'rounded px-2.5 py-1 text-xs transition-colors focus:outline-none';
 
 export function CommitListSettingsPopover() {
-  const activeToggleWidget = useGraphStore((state) => state.activeToggleWidget);
-  const setActiveToggleWidget = useGraphStore((state) => state.setActiveToggleWidget);
-  const open = activeToggleWidget === 'commitListSettings';
+  const [open, setOpen] = useState(false);
   const commitListMode = useGraphStore((state) => state.commitListMode);
   const commitTableLayout = useGraphStore((state) => state.commitTableLayout);
   const setCommitListMode = useGraphStore((state) => state.setCommitListMode);
@@ -93,18 +91,11 @@ export function CommitListSettingsPopover() {
     ? 'text-sky-400 opacity-100'
     : 'text-[var(--vscode-icon-foreground)] opacity-70 hover:opacity-100';
 
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (nextOpen) {
-      setActiveToggleWidget('commitListSettings');
-    } else if (open) {
-      setActiveToggleWidget(null);
-    }
-  };
-
   return (
-    <Popover.Root open={open} onOpenChange={handleOpenChange}>
+    <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button
+          type="button"
           className={`flex items-center justify-center rounded p-1.5 hover:bg-[var(--vscode-toolbar-hoverBackground)] focus:outline-none ${triggerColor}`}
           title="Commit list settings"
           aria-label="Commit list settings"

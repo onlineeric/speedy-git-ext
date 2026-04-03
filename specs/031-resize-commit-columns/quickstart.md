@@ -1,6 +1,6 @@
 # Quickstart: Resizable Commit Columns
 
-**Date**: 2026-04-03
+**Date**: 2026-04-04
 
 ## Prerequisites
 
@@ -66,23 +66,34 @@ pnpm build
 - Switch repositories and confirm each repo has its own independent column layout.
 - Customize columns differently in two repos, switch between them, and verify each restores its own layout.
 
-### 6. Default to Table View
+### 5. Default to Table View
 
 - Clear persisted state (or test with a fresh extension install).
 - Open the commit list and verify it defaults to Table view, not Classic.
 
-### 7. Classic Mode Disables Column Config
+### 6. Classic Mode Disables Column Config
 
 - Switch to Classic mode in the settings popover.
 - Verify that column visibility toggles and drag-to-reorder controls are visually disabled and non-interactive.
 - Switch back to Table mode and verify controls become interactive again.
 
-### 5. Regression Checks
+### 7. Independent Settings Popover and Toolbar Layout
+
+- Open the filter panel, then open the commit-list settings popover.
+- Verify the filter panel remains open while the settings popover opens.
+- Close the settings popover and verify the filter panel state is unchanged.
+- Open the settings popover, then switch between filter, search, and compare.
+- Verify the settings popover does not close unless the user explicitly closes it.
+- Verify the commit-list settings button appears between the loaded-count indicator and Manage Remotes.
+- Verify the settings button uses its active color only when its own popover is open.
+- Verify the divider between icon-button groups appears visually aligned with adjacent icon buttons across supported themes.
+
+### 8. Regression Checks
 
 - Verify search highlight, row selection, and keyboard navigation still work in both modes.
 - Open commit and ref context menus in both modes.
 - Confirm long refs and long messages truncate within their columns instead of overlapping adjacent content.
-- Verify the commit-list settings button highlights active (sky-400) when its popover is open and deactivates when closed or when another toggle widget opens.
+- Verify the commit-list settings button highlights active (sky-400) when its popover is open and deactivates when the popover closes.
 - Confirm table body column borders match the header border color.
 
 ## Files Expected to Change
@@ -97,5 +108,5 @@ pnpm build
 | `webview-ui/src/components/CommitTableHeader.tsx` | Add table header and resize handles |
 | `webview-ui/src/components/CommitTableRow.tsx` | Render aligned table rows with existing interactions |
 | `webview-ui/src/components/CommitListSettingsPopover.tsx` | Mode switch, visibility toggles, and reorder UI |
+| `webview-ui/src/components/icons.tsx` | Shared toolbar icons, including the dedicated separator rendering |
 | `webview-ui/src/utils/commitTableLayout.ts` | Shared width-resolution and visible-column helpers |
-

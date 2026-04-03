@@ -17,6 +17,12 @@
 - Q: When Classic mode is selected, should column configuration controls still be interactive? → A: No. When Classic mode is active, column visibility toggles, drag-to-reorder, and other column config controls should be visually disabled and non-interactive, since they only apply to the table-style view.
 - Q: When a user hides an optional column and later shows it again, how should that column be restored? → A: Restore the column with its last saved width and last saved order position.
 
+### Session 2026-04-04
+
+- Q: How should the commit list settings control interact with the exclusive filter/search/compare toolbar toggles? → A: It should behave as an independent popover control. Opening or closing the commit list settings popover must not change the state of the filter/search/compare toggles or their panels, and those toggles must not change the settings popover state.
+- Q: Where should the commit list settings control appear in the toolbar? → A: Place it in the right-aligned utility controls, between the loaded-record count and the Manage Remotes button.
+- Q: How should the toolbar separator between icon-button groups appear? → A: It should render as a vertically aligned divider that visually matches the adjacent icon-button height, rather than a short text-height separator.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Adjust Column Widths to Fit the Task (Priority: P1)
@@ -69,6 +75,23 @@ A developer returns to the commit list after reloading the webview or reopening 
 
 ---
 
+### User Story 4 - Open Commit List Settings Without Disrupting Other Toolbar Panels (Priority: P2)
+
+A developer uses the commit list settings popover while also working with toolbar controls such as filter, search, or compare and expects the settings control to behave like an independent utility action instead of a mutually exclusive toggle.
+
+**Why this priority**: The settings popover is a supporting control, but its placement and interaction model must avoid disrupting other toolbar workflows or collapsing panels the user is actively using.
+
+**Independent Test**: Can be fully tested by opening a toggle-based toolbar panel, opening and closing the commit list settings popover, and confirming both controls preserve their own state while the settings button remains positioned with the right-aligned utility controls.
+
+**Acceptance Scenarios**:
+
+1. **Given** a filter, search, or compare panel is already open, **When** the user opens the commit list settings popover, **Then** the existing toggle button state and panel remain unchanged.
+2. **Given** the commit list settings popover is already open, **When** the user opens or closes a filter, search, or compare panel, **Then** the settings popover state remains unchanged unless the user directly closes it.
+3. **Given** the commit list toolbar is rendered, **When** the user scans the right-aligned utility controls, **Then** the commit list settings button appears between the loaded-record count and the Manage Remotes button.
+4. **Given** the toolbar displays separated icon-button groups, **When** the user views the divider between groups, **Then** the separator is visually aligned with the adjacent icon buttons and reads as a full-height divider rather than a short text glyph.
+
+---
+
 ### Edge Cases
 
 - What happens when the commit list area becomes very narrow? The table-style view should preserve usability by enforcing minimum widths, keeping the graph visible, preventing columns from visually colliding, and shrinking the message column as the primary flexible column until the table reaches its minimum viable width. After that point, the table may extend off the right side rather than shrinking further.
@@ -76,6 +99,8 @@ A developer returns to the commit list after reloading the webview or reopening 
 - What happens when commit data is unusually long, such as many refs or a long commit subject? Content should remain clipped or truncated within its column rather than overlapping adjacent columns. Ref badges in the message column maintain their fixed size and the commit message text truncates as needed.
 - What happens when the user switches between classic and table-style views while a commit is selected? The current selection should remain visible and actionable after the view switch.
 - What happens when the commit list is scrolled and the user customizes columns? The list should stay stable enough that the user does not lose their place.
+- What happens when the commit list settings popover is opened while another toolbar panel is already open? Each control should preserve its own open or closed state independently, without forcing the other closed.
+- What happens when toolbar spacing or font metrics would make a separator appear shorter than adjacent icon buttons? The divider should still render with visual height and alignment that matches the surrounding toolbar controls.
 
 ## Requirements *(mandatory)*
 
@@ -84,6 +109,7 @@ A developer returns to the commit list after reloading the webview or reopening 
 - **FR-001**: System MUST provide two commit list presentation modes: a classic view and a customizable table-style view.
 - **FR-002**: System MUST default to the table-style view for users who have not previously chosen a commit list mode (including users upgrading to this version for the first time).
 - **FR-003**: Users MUST be able to switch between the classic view and the table-style view from a settings control within the commit list UI.
+- **FR-003a**: The commit list settings control MUST remain available as a dedicated utility popover within the commit list toolbar.
 - **FR-004**: The classic view MUST remain available as an unchanged fallback when users do not want column customization.
 - **FR-005**: The table-style view MUST display the same core commit information currently available in the commit list: graph, hash, message (with inline ref badges), author, and date. Refs are not a separate column; they render inline in the message column, matching the classic view.
 - **FR-006**: Users MUST be able to resize visible columns in the table-style view through direct manipulation of column boundaries.
@@ -105,6 +131,10 @@ A developer returns to the commit list after reloading the webview or reopening 
 - **FR-019**: When a user manually resizes the message column, the system MUST treat that value as the preferred width for the column, temporarily shrinking it only when needed before the table reaches its minimum viable width and restoring it toward the saved preferred width as space becomes available again.
 - **FR-020**: When the table-style view reaches its minimum viable width, the system MUST stop shrinking the table further and allow the rendered table to extend off the right side rather than introducing a horizontal scrollbar.
 - **FR-021**: When a previously hidden optional column is shown again, the system MUST restore that column using its last saved width and last saved order position.
+- **FR-022**: The commit list settings popover MUST operate independently from the exclusive filter, search, and compare toolbar toggles. Opening or closing the settings popover MUST NOT change the state of those toggles or their panels, and changes to those toggles MUST NOT change the settings popover state.
+- **FR-023**: The commit list toolbar MUST place the commit list settings control in the right-aligned utility group between the loaded-record indicator and the Manage Remotes control.
+- **FR-024**: The commit list settings control MUST preserve the same visual open and closed state treatment it already uses, including the active-state color cue when its popover is open.
+- **FR-025**: Toolbar separators between icon-button groups MUST render as vertically aligned dividers that visually match the surrounding icon-button height.
 
 ### Key Entities
 
@@ -112,6 +142,7 @@ A developer returns to the commit list after reloading the webview or reopening 
 - **Column Layout Preference**: The user's saved table-style configuration, including column widths, display order, and which optional columns are hidden.
 - **Commit Column**: A visible section of the commit list representing one category of commit metadata, such as graph, hash, message, author, or date. Ref badges display inline within the message column rather than occupying their own column.
 - **Column Chooser**: A control that lets the user decide which optional commit columns remain visible in the table-style view.
+- **Commit List Settings Control**: The toolbar control that opens the commit list settings popover for switching commit list modes and configuring table columns.
 
 ## Success Criteria *(mandatory)*
 
@@ -122,6 +153,8 @@ A developer returns to the commit list after reloading the webview or reopening 
 - **SC-003**: After a user customizes the table-style view and reloads the webview, the same commit list mode and column layout are restored on first render.
 - **SC-004**: In manual smoke testing, the table-style view shows no header-to-row misalignment and no overlapping column content across narrow, medium, and wide panel sizes, and it stops shrinking once the table reaches its minimum viable width.
 - **SC-005**: In manual smoke testing, switching between classic and table-style views introduces no regressions in commit selection, search highlighting, scrolling, or context menu access.
+- **SC-006**: In manual smoke testing, opening and closing the commit list settings popover does not change the open or closed state of filter, search, or compare toolbar panels.
+- **SC-007**: In manual smoke testing, the commit list settings control appears in the right-aligned utility group and the toolbar separator reads as visually aligned with adjacent icon buttons across supported themes.
 
 ## Assumptions
 
@@ -137,3 +170,4 @@ A developer returns to the commit list after reloading the webview or reopening 
 - A manually resized message column represents the user's preferred width, not a permanently fixed width that overrides viewport-fit behavior.
 - Once the table-style layout reaches its minimum viable width, the UI may overflow to the right rather than continue compressing columns or introducing a horizontal scrollbar.
 - A restored optional column reuses its last saved width and order position rather than resetting to a default placement.
+- The commit list settings popover is a standalone utility control in the toolbar, not part of the mutually exclusive filter/search/compare toggle group.

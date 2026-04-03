@@ -1,6 +1,6 @@
 # Research: Resizable Commit Columns
 
-**Date**: 2026-04-03
+**Date**: 2026-04-04
 
 ## R1: Commit-List Mode and Column Settings Entry Point
 
@@ -17,12 +17,12 @@
 
 ## R2: Persistence Model
 
-**Decision**: Extend the existing `PersistedUIState` object to store both `commitListMode` and `commitTableLayout`, and keep using the current `persistedUIState` / `updatePersistedUIState` message flow.
+**Decision**: Keep using the current `persistedUIState` / `updatePersistedUIState` message flow, with `commitListMode` stored globally and `commitTableLayout` stored per repository in extension-host state.
 
 **Rationale**:
-- The persistence pipeline already exists, is global across repositories, and is validated in `WebviewProvider`.
+- The persistence pipeline already exists and is validated in `WebviewProvider`.
 - Column widths, visibility, and order are structured UI preferences better suited to `globalState` than to user-editable VS Code settings.
-- Reusing the existing message flow avoids introducing new transport concepts or a second persistence mechanism.
+- Reusing the existing message flow avoids introducing new transport concepts or a second persistence mechanism while still allowing repo-specific layouts.
 
 **Alternatives considered**:
 - **Store mode in `UserSettings` and layout in `PersistedUIState`**: Rejected because it splits one feature across two persistence systems and complicates hydration order.
@@ -126,3 +126,29 @@
 - **Keep layout global**: Rejected because user feedback indicates column widths need to differ between repos with different characteristics.
 - **Use `workspaceState` instead of keyed `globalState`**: Rejected because `workspaceState` is tied to the workspace folder, not the individual repo, and multi-root workspaces with multiple repos would share state.
 - **Persist layout in the repo itself** (e.g., `.vscode/settings.json`): Rejected because this is UI preference data that shouldn't be committed to version control.
+
+## R10: Independent Commit-List Settings Popover State
+
+**Decision**: Keep the commit-list settings popover outside the exclusive filter/search/compare toggle state. Its open or closed state is managed locally by the popover control and does not read from or write to `activeToggleWidget`.
+
+**Rationale**:
+- The updated spec requires the settings control to operate as an independent utility action rather than a mutually exclusive panel toggle.
+- Decoupling it prevents the filter, search, or compare panel from being closed as a side effect of opening settings, and vice versa.
+- The color treatment can still reflect the local popover open state without introducing more shared-toolbar state.
+
+**Alternatives considered**:
+- **Keep using `activeToggleWidget` for settings**: Rejected because it violates the updated requirement that the settings popover must not close other toggle panels.
+- **Create a second shared toolbar-state store just for utility controls**: Rejected because local popover state is simpler and avoids unnecessary global coupling.
+
+## R11: Toolbar Divider Rendering
+
+**Decision**: Replace the short text separator between toolbar icon groups with a dedicated visual divider rendered at icon-button height.
+
+**Rationale**:
+- A text glyph separator is aligned to the font box rather than the icon-button affordance, which makes it look visually short in the toolbar.
+- A dedicated divider component or icon allows consistent alignment, thickness, and theming without depending on text metrics.
+- This keeps the control bar visually coherent as more utility controls are added.
+
+**Alternatives considered**:
+- **Keep the `|` text separator and adjust line-height**: Rejected because it remains font-metric dependent and fragile across themes and zoom levels.
+- **Remove the divider entirely**: Rejected because the visual grouping between exclusive toolbar actions and adjacent controls would become weaker.

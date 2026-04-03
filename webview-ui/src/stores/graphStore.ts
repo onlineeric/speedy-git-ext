@@ -525,7 +525,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     activeToggleWidget: state.activeToggleWidget === 'search' ? null : state.activeToggleWidget,
   })),
   setActiveToggleWidget: (widget) => set((state) => {
-    // Toggle off if clicking the same widget again
     const next: ActiveToggleWidget = state.activeToggleWidget === widget ? null : widget;
     const openingSearch = next === 'search';
     const closingSearch = !openingSearch && state.searchState.isOpen;

@@ -98,7 +98,7 @@
 - [X] T023 Run `pnpm lint` for the repository sources configured from `package.json`
 - [X] T024 Run `pnpm build` for the extension and webview build targets in `package.json`
 - [ ] T025 Manual smoke test via the VS Code launch configuration in `.vscode/launch.json` for mode switching, resize, reorder, visibility, persistence, and no-horizontal-scroll behavior
-- [X] T026 Bug fixes from smoke test round 1: (1) commit list settings button uses activeToggleWidget for proper toggle behavior, (2) graph column min width reduced from 64px, (3) removed Refs column — refs badges now render inline in Message column matching classic mode, (4) table body border color aligned with header border color
+- [X] T026 Bug fixes from smoke test round 1: graph column min width reduced from 64px, removed Refs column so refs badges render inline in Message column matching classic mode, and table body border color aligned with header border color
 - [X] T027 Bug fixes from smoke test round 2: (1) graph column min width set to 52px (enough for header label, graph clips when narrowed below topology width), (2) ref badges wrapped in shrink-0 container with whitespace-nowrap so they maintain fixed size regardless of message column width
 
 ---
@@ -116,6 +116,23 @@
 
 ---
 
+## Phase 8: User Story 4 - Open Commit List Settings Without Disrupting Other Toolbar Panels (Priority: P2)
+
+**Goal**: Make the commit-list settings popover operate independently from the exclusive filter/search/compare toolbar toggles, move it into the right-aligned utility group, and improve the toolbar separator rendering.
+
+**Independent Test**: Open a filter/search/compare panel, open the commit-list settings popover, and confirm both controls preserve their own state while the settings trigger appears between the loaded-count indicator and Manage Remotes with a full-height divider separating toolbar groups.
+
+- [X] T036 [US4] Refactor `webview-ui/src/components/CommitListSettingsPopover.tsx` so the popover manages its own open state locally, preserves the existing active-color treatment while open, and no longer reads from or writes to `activeToggleWidget`
+- [X] T037 [US4] Update `shared/types.ts` and `webview-ui/src/stores/graphStore.ts` to remove any `commitListSettings` dependency from the exclusive toolbar toggle state while preserving existing filter/search/compare panel coordination
+- [X] T038 [US4] Update `webview-ui/src/components/ControlBar.tsx` to move the commit-list settings trigger into the right-aligned utility group between the loaded-count indicator and Manage Remotes without changing the other utility button behaviors
+- [X] T039 [P] [US4] Add a dedicated full-height toolbar separator rendering in `webview-ui/src/components/icons/index.tsx` and apply it from `webview-ui/src/components/ControlBar.tsx` so the divider aligns visually with adjacent icon buttons
+- [ ] T040 [US4] Manually smoke test the independent settings-popover behavior, right-aligned placement, active-state coloring, and full-height toolbar divider via the VS Code launch configuration in `.vscode/launch.json`
+- [X] T041 [US4] Run `pnpm typecheck`, `pnpm lint`, and `pnpm build` after the toolbar/settings changes
+
+**Checkpoint**: The commit-list settings control behaves as an independent utility popover, sits in the right utility group, and the toolbar divider matches the surrounding icon-button height.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -125,19 +142,22 @@
 - **US1 (Phase 3)**: Depends on Phase 2.
 - **US2 (Phase 4)**: Depends on Phase 2.
 - **US3 (Phase 5)**: Depends on Phase 2 and is best validated after US1 and US2 are complete.
-- **Polish (Phase 6)**: Depends on all desired user stories being complete.
+- **US4 (Phase 8)**: Depends on the existing settings-popover baseline from Phases 2, 3, and 4.
+- **Polish / Refinement Phases (6-8)**: Run after the relevant user-story work they validate or refine.
 
 ### User Story Dependencies
 
 - **US1 (P1)**: Independent after foundation. Delivers the first usable table-mode MVP.
 - **US2 (P1)**: Independent after foundation. Builds on the same table shell but does not require US1 completion to start.
 - **US3 (P2)**: Depends on the persisted mode/layout fields introduced in foundation and is fully validated once US1 and US2 interactions are saving real data.
+- **US4 (P2)**: Depends on the existing settings-popover and toolbar shell, but remains independent from persistence and can be implemented without changing the completed table-layout stories.
 
 ### Parallel Opportunities
 
 - T005 can run in parallel with T003 and T004 after T002 defines the shared types.
 - T008 and T009 can run in parallel after T006 defines the table component interfaces.
 - T020 and T021 can run in parallel after implementation is complete.
+- T038 and T039 can run in parallel once T036 establishes the decoupled settings-popover behavior.
 
 ---
 
@@ -174,7 +194,8 @@ Task T014: "Implement sortable reorder list in CommitListSettingsPopover.tsx"
 2. US1: resizeable table mode
 3. US2: reorder and visibility controls
 4. US3: reload/reopen persistence validation
-5. Polish: full validation and cleanup
+5. US4: independent settings-popover behavior and toolbar polish
+6. Polish: full validation and cleanup
 
 ---
 
@@ -184,5 +205,5 @@ Task T014: "Implement sortable reorder list in CommitListSettingsPopover.tsx"
 - The graph column is never hidden or reordered. Its minimum width (52px) is independent of the rendered topology; graph content clips when the column is narrowed below the topology's rendered width.
 - The message column is the only primary flexible column when width becomes constrained. Ref badges render inline in the message column (matching classic view) with fixed size (shrink-0, whitespace-nowrap); only the commit message text truncates.
 - Refs are not a separate column. The table uses five columns: graph, hash, message, author, date.
-- The commit-list settings popover button integrates with `activeToggleWidget` (`'commitListSettings'`) for consistent toggle behavior with filter/search/compare.
+- The commit-list settings popover is now an independent toolbar utility control and no longer participates in `activeToggleWidget` exclusivity with filter/search/compare.
 - No automated test tasks are included because the spec did not request TDD or explicit new test coverage.

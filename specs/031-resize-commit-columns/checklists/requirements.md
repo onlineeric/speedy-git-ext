@@ -2,7 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-04-03
-**Updated**: 2026-04-03
+**Updated**: 2026-04-04
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -32,6 +32,6 @@
 
 ## Notes
 
-- All checklist items pass on the initial validation pass.
-- Key assumptions locked into the spec: classic view remains supported, the graph column is always visible and first, and column layout preferences are user-wide rather than repository-specific.
-- Ready for `/speckit.plan`.
+- All checklist items pass after the 2026-04-04 amendment validation pass.
+- Key assumptions locked into the spec: classic view remains supported, the graph column is always visible and first, column layout preferences are stored per repository while view mode remains global, and the commit list settings popover is independent from the filter/search/compare toggle group.
+- Ready for downstream plan or implementation alignment updates.

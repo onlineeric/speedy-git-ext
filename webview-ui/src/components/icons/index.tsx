@@ -258,6 +258,23 @@ export function FetchIcon({ className }: IconProps) {
   );
 }
 
+/** Vertical toolbar divider aligned to icon-button height */
+export function ToolbarSeparatorIcon({ className }: IconProps) {
+  return (
+    <svg width={8} height={24} viewBox="0 0 8 24" fill="none" className={className} aria-hidden>
+      <line
+        x1={4}
+        y1={3}
+        x2={4}
+        y2={21}
+        stroke="currentColor"
+        strokeWidth={1.2}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 /** Table/columns layout icon — 12×12, inherits text color via currentColor */
 export function ColumnsIcon({ className }: IconProps) {
   return (
