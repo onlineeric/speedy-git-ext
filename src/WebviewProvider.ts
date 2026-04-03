@@ -1,8 +1,23 @@
 import * as vscode from 'vscode';
+import * as crypto from 'crypto';
 import * as path from 'path';
 import type { RequestMessage, ResponseMessage } from '../shared/messages.js';
-import type { Commit, GraphFilters, PersistedUIState, RepoInfo, SubmoduleNavEntry, UserSettings } from '../shared/types.js';
-import { DEFAULT_PERSISTED_UI_STATE } from '../shared/types.js';
+import type {
+  Commit,
+  CommitListMode,
+  CommitTableColumnId,
+  CommitTableLayout,
+  GraphFilters,
+  PersistedUIState,
+  RepoInfo,
+  SubmoduleNavEntry,
+  UserSettings,
+} from '../shared/types.js';
+import {
+  COMMIT_TABLE_COLUMN_IDS,
+  DEFAULT_PERSISTED_UI_STATE,
+  cloneCommitTableLayout,
+} from '../shared/types.js';
 import type { GitLogService } from './services/GitLogService.js';
 import type { GitDiffService } from './services/GitDiffService.js';
 import type { GitBranchService } from './services/GitBranchService.js';
@@ -21,6 +36,103 @@ import type { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService
 import { GitError } from '../shared/errors.js';
 import { GitExecutor } from './services/GitExecutor.js';
 import { GitHubAvatarService } from './services/GitHubAvatarService.js';
+
+function repoLayoutKey(repoPath: string): string {
+  const hash = crypto.createHash('sha256').update(repoPath).digest('hex').slice(0, 16);
+  return `speedyGit.repoTableLayout.${hash}`;
+}
+
+function clonePersistedUIStateDefaults(): PersistedUIState {
+  return {
+    ...DEFAULT_PERSISTED_UI_STATE,
+    commitTableLayout: cloneCommitTableLayout(DEFAULT_PERSISTED_UI_STATE.commitTableLayout),
+  };
+}
+
+function isCommitListMode(value: unknown): value is CommitListMode {
+  return value === 'classic' || value === 'table';
+}
+
+function isCommitTableColumnId(value: unknown): value is CommitTableColumnId {
+  return typeof value === 'string' && COMMIT_TABLE_COLUMN_IDS.includes(value as CommitTableColumnId);
+}
+
+function validateCommitTableLayout(
+  value: unknown,
+  fallback: CommitTableLayout
+): CommitTableLayout {
+  const defaults = DEFAULT_PERSISTED_UI_STATE.commitTableLayout;
+  const baseLayout = cloneCommitTableLayout(fallback);
+
+  if (!value || typeof value !== 'object') {
+    return baseLayout;
+  }
+
+  const raw = value as Record<string, unknown>;
+  let nextOrder = [...baseLayout.order];
+  if (raw.order !== undefined) {
+    if (Array.isArray(raw.order)) {
+      const uniqueIds = new Set<CommitTableColumnId>();
+      const parsedOrder: CommitTableColumnId[] = [];
+
+      for (const item of raw.order) {
+        if (!isCommitTableColumnId(item) || uniqueIds.has(item)) {
+          parsedOrder.length = 0;
+          break;
+        }
+        uniqueIds.add(item);
+        parsedOrder.push(item);
+      }
+
+      nextOrder = parsedOrder.length === COMMIT_TABLE_COLUMN_IDS.length
+        ? parsedOrder
+        : [...defaults.order];
+    } else {
+      nextOrder = [...defaults.order];
+    }
+  }
+
+  const nextColumns = cloneCommitTableLayout(baseLayout).columns;
+  const rawColumns = raw.columns;
+  for (const columnId of COMMIT_TABLE_COLUMN_IDS) {
+    const defaultColumn = defaults.columns[columnId];
+    const baseColumn = baseLayout.columns[columnId];
+    const rawColumn = rawColumns && typeof rawColumns === 'object'
+      ? (rawColumns as Record<string, unknown>)[columnId]
+      : undefined;
+
+    if (!rawColumn || typeof rawColumn !== 'object') {
+      nextColumns[columnId] = { ...baseColumn };
+      continue;
+    }
+
+    const columnRecord = rawColumn as Record<string, unknown>;
+    nextColumns[columnId] = {
+      visible: columnId === 'graph'
+        ? true
+        : typeof columnRecord.visible === 'boolean'
+          ? columnRecord.visible
+          : columnRecord.visible !== undefined
+            ? defaultColumn.visible
+            : baseColumn.visible,
+      preferredWidth:
+        typeof columnRecord.preferredWidth === 'number'
+        && isFinite(columnRecord.preferredWidth)
+        && columnRecord.preferredWidth > 0
+          ? Math.round(columnRecord.preferredWidth)
+          : columnRecord.preferredWidth !== undefined
+            ? defaultColumn.preferredWidth
+            : baseColumn.preferredWidth,
+    };
+  }
+
+  nextColumns.graph.visible = true;
+
+  return {
+    order: nextOrder,
+    columns: nextColumns,
+  };
+}
 
 export class WebviewProvider {
   private panel: vscode.WebviewPanel | undefined;
@@ -122,6 +234,8 @@ export class WebviewProvider {
     this.gitSubmoduleService = gitSubmoduleService;
     this.gitWorktreeService = gitWorktreeService;
     this.currentRepoPath = currentRepoPath;
+    // Invalidate UI state cache so per-repo column layout is reloaded for the new repo
+    this.uiStateCache = undefined;
     this.gitHubAvatarService = null;
     this.gitHubAvatarInitialized = false;
     this.lastCommitFingerprint = '';
@@ -166,17 +280,23 @@ export class WebviewProvider {
     if (this.uiStateCache) return this.uiStateCache;
 
     const stored = this.context.globalState.get<unknown>(WebviewProvider.UI_STATE_KEY);
-    const defaults = DEFAULT_PERSISTED_UI_STATE;
+    const defaults = clonePersistedUIStateDefaults();
 
     if (!stored || typeof stored !== 'object' || stored === null) {
-      this.uiStateCache = { ...defaults };
+      this.uiStateCache = {
+        ...defaults,
+        commitTableLayout: cloneCommitTableLayout(this.loadRepoTableLayout()),
+      };
       return this.uiStateCache;
     }
 
     const raw = stored as Record<string, unknown>;
 
     if (raw.version !== defaults.version) {
-      this.uiStateCache = { ...defaults };
+      this.uiStateCache = {
+        ...defaults,
+        commitTableLayout: cloneCommitTableLayout(this.loadRepoTableLayout()),
+      };
       return this.uiStateCache;
     }
 
@@ -198,15 +318,49 @@ export class WebviewProvider {
         typeof raw.rightPanelWidth === 'number' && isFinite(raw.rightPanelWidth) && raw.rightPanelWidth >= WebviewProvider.MIN_PANEL_SIZE
           ? raw.rightPanelWidth
           : defaults.rightPanelWidth,
+      commitListMode:
+        isCommitListMode(raw.commitListMode)
+          ? raw.commitListMode
+          : defaults.commitListMode,
+      // Column layout is loaded from per-repo storage, not global state
+      commitTableLayout: cloneCommitTableLayout(this.loadRepoTableLayout()),
     };
     return this.uiStateCache;
   }
 
+  /** Load per-repo column table layout from globalState, falling back to defaults. */
+  private loadRepoTableLayout(): CommitTableLayout {
+    const defaults = clonePersistedUIStateDefaults();
+    const key = repoLayoutKey(this.currentRepoPath);
+    const stored = this.context.globalState.get<unknown>(key);
+    return validateCommitTableLayout(stored, defaults.commitTableLayout);
+  }
+
+  /** Save per-repo column table layout to globalState. */
+  private saveRepoTableLayout(layout: CommitTableLayout) {
+    const key = repoLayoutKey(this.currentRepoPath);
+    void this.context.globalState.update(key, cloneCommitTableLayout(layout));
+  }
+
   private savePersistedUIState(partial: Partial<Omit<PersistedUIState, 'version'>>) {
     const current = this.loadPersistedUIState();
-    const defaults = DEFAULT_PERSISTED_UI_STATE;
-    // Validate incoming fields before merging to prevent storing invalid values
-    const validated: Partial<Omit<PersistedUIState, 'version'>> = {
+    const defaults = clonePersistedUIStateDefaults();
+
+    // Route commitTableLayout to per-repo storage
+    if (partial.commitTableLayout !== undefined) {
+      const validatedLayout = validateCommitTableLayout(
+        partial.commitTableLayout,
+        current.commitTableLayout
+      );
+      this.saveRepoTableLayout(validatedLayout);
+      // Update cache with the new layout
+      if (this.uiStateCache) {
+        this.uiStateCache.commitTableLayout = cloneCommitTableLayout(validatedLayout);
+      }
+    }
+
+    // Validate and save global-only fields
+    const globalValidated: Partial<Omit<PersistedUIState, 'version' | 'commitTableLayout'>> = {
       ...(partial.detailsPanelPosition === 'bottom' || partial.detailsPanelPosition === 'right'
         ? { detailsPanelPosition: partial.detailsPanelPosition }
         : {}),
@@ -219,10 +373,29 @@ export class WebviewProvider {
       ...(typeof partial.rightPanelWidth === 'number' && isFinite(partial.rightPanelWidth)
         ? { rightPanelWidth: Math.max(WebviewProvider.MIN_PANEL_SIZE, partial.rightPanelWidth) }
         : partial.rightPanelWidth !== undefined ? { rightPanelWidth: defaults.rightPanelWidth } : {}),
+      ...(partial.commitListMode !== undefined
+        ? {
+            commitListMode: isCommitListMode(partial.commitListMode)
+              ? partial.commitListMode
+              : defaults.commitListMode,
+          }
+        : {}),
     };
-    // Update cache synchronously so back-to-back saves see the latest state
-    this.uiStateCache = { ...current, ...validated };
-    void this.context.globalState.update(WebviewProvider.UI_STATE_KEY, this.uiStateCache);
+
+    // Only update global state if there are global fields to save
+    if (Object.keys(globalValidated).length > 0) {
+      this.uiStateCache = {
+        ...current,
+        ...globalValidated,
+        // Keep the current (possibly just-updated) repo layout in cache
+        commitTableLayout: this.uiStateCache?.commitTableLayout
+          ? cloneCommitTableLayout(this.uiStateCache.commitTableLayout)
+          : cloneCommitTableLayout(current.commitTableLayout),
+      };
+      // Save global state without commitTableLayout
+      const { commitTableLayout: _excluded, ...globalState } = this.uiStateCache;
+      void this.context.globalState.update(WebviewProvider.UI_STATE_KEY, globalState);
+    }
   }
 
   async show() {

@@ -20,15 +20,25 @@ A performance-first Git graph, Git history viewer, and history-editing tool buil
 
 ## Features
 
+### New UI in v2
+We have a new UI in v2, with a new control bar and toggle panel for Filter, Search, and Compare. The commit list is now a table-style view with resizable columns, column reordering, and column visibility controls.
+
+### Upcoming features in v2
+- Compare branches, commits, HEAD, etc.
+- Filter by Author, date range.
+- Search result switch between highlight and filter.
+
 ### Git Graph & Commit History
 
 - Fast, interactive commit graph with color-coded branch lanes and virtual scrolling for repositories of any size.
-- Commit details panel (bottom or right, resizable) with file change list, per-file addition/deletion counts, and inline diff viewer.
+- Table-style commit list view with resizable columns, column reordering, and column visibility controls — customize which commit metadata (graph, hash, message, author, date) is shown and how wide each column appears. Double-click a column boundary to auto-fit width.
+- Commit details panel (bottom or right, resizable) with file change list, per-file addition/deletion counts, and inline diff viewer. Automatically switches to side-by-side layout when the bottom panel is wide enough.
 - List and tree view toggle for file changes — tree view groups by directory with automatic folder compaction.
 - Hover tooltip on commit nodes showing branches, tags, stashes, worktree status, and clickable GitHub PR/issue links.
 - Inline code styling for backtick-delimited text in commit messages (e.g., `functionName` renders with code background).
 - Client-side search and filter by commit message, hash, or author name with match counter and auto-scroll navigation.
-- Branch filter dropdown with real-time text search and keyboard-first selection.
+- Branch filter dropdown with multi-select support, real-time text search, and keyboard-first selection — view commits from multiple branches at once.
+
 
 ### Branch, Tag & Stash Operations
 
@@ -61,6 +71,7 @@ Every major dialog (merge, cherry-pick, rebase, reset, push, tag, delete, drop) 
 
 - Push dialog with upstream config, force-push modes (`--force-with-lease`, `--force`), and multi-remote support.
 - Fetch, pull, and remote management (add, remove, edit remotes) without leaving the extension.
+- Git operations automatically notify VS Code's Source Control panel to refresh, keeping it in sync immediately.
 
 ### Personalization
 
@@ -115,7 +126,7 @@ All shortcuts are customizable in VS Code's Keyboard Shortcuts editor.
 | Submodule support | Status, navigation, init, update | Varies | Rarely |
 | Startup overhead | Lightweight, single-panel | Extension suite, multiple views | Lightweight |
 
-## Contributing & Feedback
+## Issues, feature requests & Feedback
 
 - Issues and feature requests: [GitHub Issues](https://github.com/onlineeric/speedy-git-ext/issues)
 - Source code: [github.com/onlineeric/speedy-git-ext](https://github.com/onlineeric/speedy-git-ext)

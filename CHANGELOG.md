@@ -4,6 +4,33 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- Filter by Author, date range.
+- Search result switch between highlight and filter.
+- Compare branches, commits, HEAD, etc.
+
+## [2.0.0] - 2026-04-04
+
+### Added
+- Table-style commit list view with resizable columns, column reordering, and column visibility controls — customize which commit metadata (graph, hash, message, author, date) is shown and how wide each column appears.
+- Double-click a column boundary to auto-fit the column width to its widest content across all loaded commits.
+- Column chooser to show or hide optional columns; hidden columns restore with their last saved width and position when re-enabled.
+- Per-repository column layout preferences (widths, order, visibility) persist across sessions and webview reloads.
+- Commit list settings popover in the toolbar for switching between classic and table-style views and configuring table columns, operating independently from filter/search/compare panels.
+- Icon-only buttons for all control bar actions (Filter, Search, Refresh, Fetch, Compare, Manage Remotes, Settings) with tooltips on hover, replacing text labels for a cleaner toolbar.
+- Toggle panel below the control bar that displays one widget at a time — click Filter, Search, or Compare to open the corresponding panel; click again to close.
+- Clicking a different toggle button while a panel is open switches to the new widget automatically.
+- Toggle button color states: inactive (gray), active/panel-open (highlighted), and a distinct filter-applied color on the Filter button when filters are active but the panel is closed.
+- Filter and Compare placeholder panels within the toggle panel, ready for future functionality.
+- Existing search widget relocated into the toggle panel with identical highlight and clear-on-close behavior.
+
+### Changed
+- Default commit list view is now the table-style layout for new and upgrading users.
+- Toolbar separators between icon-button groups now render as full-height vertical dividers matching adjacent button height.
+- Message column acts as the primary flexible column, shrinking first when space is tight and expanding back toward the user's preferred width as space returns.
+
 ## [1.6.1] - 2026-04-01
 
 ### Added
