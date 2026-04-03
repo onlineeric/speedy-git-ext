@@ -1,8 +1,22 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import type { RequestMessage, ResponseMessage } from '../shared/messages.js';
-import type { Commit, GraphFilters, PersistedUIState, RepoInfo, SubmoduleNavEntry, UserSettings } from '../shared/types.js';
-import { DEFAULT_PERSISTED_UI_STATE } from '../shared/types.js';
+import type {
+  Commit,
+  CommitListMode,
+  CommitTableColumnId,
+  CommitTableLayout,
+  GraphFilters,
+  PersistedUIState,
+  RepoInfo,
+  SubmoduleNavEntry,
+  UserSettings,
+} from '../shared/types.js';
+import {
+  COMMIT_TABLE_COLUMN_IDS,
+  DEFAULT_PERSISTED_UI_STATE,
+  cloneCommitTableLayout,
+} from '../shared/types.js';
 import type { GitLogService } from './services/GitLogService.js';
 import type { GitDiffService } from './services/GitDiffService.js';
 import type { GitBranchService } from './services/GitBranchService.js';
@@ -21,6 +35,98 @@ import type { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService
 import { GitError } from '../shared/errors.js';
 import { GitExecutor } from './services/GitExecutor.js';
 import { GitHubAvatarService } from './services/GitHubAvatarService.js';
+
+function clonePersistedUIStateDefaults(): PersistedUIState {
+  return {
+    ...DEFAULT_PERSISTED_UI_STATE,
+    commitTableLayout: cloneCommitTableLayout(DEFAULT_PERSISTED_UI_STATE.commitTableLayout),
+  };
+}
+
+function isCommitListMode(value: unknown): value is CommitListMode {
+  return value === 'classic' || value === 'table';
+}
+
+function isCommitTableColumnId(value: unknown): value is CommitTableColumnId {
+  return typeof value === 'string' && COMMIT_TABLE_COLUMN_IDS.includes(value as CommitTableColumnId);
+}
+
+function validateCommitTableLayout(
+  value: unknown,
+  fallback: CommitTableLayout
+): CommitTableLayout {
+  const defaults = DEFAULT_PERSISTED_UI_STATE.commitTableLayout;
+  const baseLayout = cloneCommitTableLayout(fallback);
+
+  if (!value || typeof value !== 'object') {
+    return baseLayout;
+  }
+
+  const raw = value as Record<string, unknown>;
+  let nextOrder = [...baseLayout.order];
+  if (raw.order !== undefined) {
+    if (Array.isArray(raw.order)) {
+      const uniqueIds = new Set<CommitTableColumnId>();
+      const parsedOrder: CommitTableColumnId[] = [];
+
+      for (const item of raw.order) {
+        if (!isCommitTableColumnId(item) || uniqueIds.has(item)) {
+          parsedOrder.length = 0;
+          break;
+        }
+        uniqueIds.add(item);
+        parsedOrder.push(item);
+      }
+
+      nextOrder = parsedOrder.length === COMMIT_TABLE_COLUMN_IDS.length
+        ? parsedOrder
+        : [...defaults.order];
+    } else {
+      nextOrder = [...defaults.order];
+    }
+  }
+
+  const nextColumns = cloneCommitTableLayout(baseLayout).columns;
+  const rawColumns = raw.columns;
+  for (const columnId of COMMIT_TABLE_COLUMN_IDS) {
+    const defaultColumn = defaults.columns[columnId];
+    const baseColumn = baseLayout.columns[columnId];
+    const rawColumn = rawColumns && typeof rawColumns === 'object'
+      ? (rawColumns as Record<string, unknown>)[columnId]
+      : undefined;
+
+    if (!rawColumn || typeof rawColumn !== 'object') {
+      nextColumns[columnId] = { ...baseColumn };
+      continue;
+    }
+
+    const columnRecord = rawColumn as Record<string, unknown>;
+    nextColumns[columnId] = {
+      visible: columnId === 'graph'
+        ? true
+        : typeof columnRecord.visible === 'boolean'
+          ? columnRecord.visible
+          : columnRecord.visible !== undefined
+            ? defaultColumn.visible
+            : baseColumn.visible,
+      preferredWidth:
+        typeof columnRecord.preferredWidth === 'number'
+        && isFinite(columnRecord.preferredWidth)
+        && columnRecord.preferredWidth > 0
+          ? Math.round(columnRecord.preferredWidth)
+          : columnRecord.preferredWidth !== undefined
+            ? defaultColumn.preferredWidth
+            : baseColumn.preferredWidth,
+    };
+  }
+
+  nextColumns.graph.visible = true;
+
+  return {
+    order: nextOrder,
+    columns: nextColumns,
+  };
+}
 
 export class WebviewProvider {
   private panel: vscode.WebviewPanel | undefined;
@@ -166,17 +272,17 @@ export class WebviewProvider {
     if (this.uiStateCache) return this.uiStateCache;
 
     const stored = this.context.globalState.get<unknown>(WebviewProvider.UI_STATE_KEY);
-    const defaults = DEFAULT_PERSISTED_UI_STATE;
+    const defaults = clonePersistedUIStateDefaults();
 
     if (!stored || typeof stored !== 'object' || stored === null) {
-      this.uiStateCache = { ...defaults };
+      this.uiStateCache = defaults;
       return this.uiStateCache;
     }
 
     const raw = stored as Record<string, unknown>;
 
     if (raw.version !== defaults.version) {
-      this.uiStateCache = { ...defaults };
+      this.uiStateCache = defaults;
       return this.uiStateCache;
     }
 
@@ -198,13 +304,21 @@ export class WebviewProvider {
         typeof raw.rightPanelWidth === 'number' && isFinite(raw.rightPanelWidth) && raw.rightPanelWidth >= WebviewProvider.MIN_PANEL_SIZE
           ? raw.rightPanelWidth
           : defaults.rightPanelWidth,
+      commitListMode:
+        isCommitListMode(raw.commitListMode)
+          ? raw.commitListMode
+          : defaults.commitListMode,
+      commitTableLayout: validateCommitTableLayout(
+        raw.commitTableLayout,
+        defaults.commitTableLayout
+      ),
     };
     return this.uiStateCache;
   }
 
   private savePersistedUIState(partial: Partial<Omit<PersistedUIState, 'version'>>) {
     const current = this.loadPersistedUIState();
-    const defaults = DEFAULT_PERSISTED_UI_STATE;
+    const defaults = clonePersistedUIStateDefaults();
     // Validate incoming fields before merging to prevent storing invalid values
     const validated: Partial<Omit<PersistedUIState, 'version'>> = {
       ...(partial.detailsPanelPosition === 'bottom' || partial.detailsPanelPosition === 'right'
@@ -219,9 +333,30 @@ export class WebviewProvider {
       ...(typeof partial.rightPanelWidth === 'number' && isFinite(partial.rightPanelWidth)
         ? { rightPanelWidth: Math.max(WebviewProvider.MIN_PANEL_SIZE, partial.rightPanelWidth) }
         : partial.rightPanelWidth !== undefined ? { rightPanelWidth: defaults.rightPanelWidth } : {}),
+      ...(partial.commitListMode !== undefined
+        ? {
+            commitListMode: isCommitListMode(partial.commitListMode)
+              ? partial.commitListMode
+              : defaults.commitListMode,
+          }
+        : {}),
+      ...(partial.commitTableLayout !== undefined
+        ? {
+            commitTableLayout: validateCommitTableLayout(
+              partial.commitTableLayout,
+              current.commitTableLayout
+            ),
+          }
+        : {}),
     };
     // Update cache synchronously so back-to-back saves see the latest state
-    this.uiStateCache = { ...current, ...validated };
+    this.uiStateCache = {
+      ...current,
+      ...validated,
+      commitTableLayout: validated.commitTableLayout
+        ? cloneCommitTableLayout(validated.commitTableLayout)
+        : cloneCommitTableLayout(current.commitTableLayout),
+    };
     void this.context.globalState.update(WebviewProvider.UI_STATE_KEY, this.uiStateCache);
   }
 

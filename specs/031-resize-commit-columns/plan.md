@@ -5,7 +5,7 @@
 
 ## Summary
 
-Add a second commit-list presentation mode that renders commits as a customizable table with resizable, reorderable, and hideable columns while keeping the existing classic row layout as the fallback. The implementation keeps virtualization in `GraphContainer`, introduces a shared table-layout model for header and row alignment, surfaces column controls from an in-webview settings popover, and persists mode/layout preferences through the existing `PersistedUIState` flow in `WebviewProvider`.
+Add a second commit-list presentation mode that renders commits as a customizable table with resizable, reorderable, and hideable columns while keeping the existing classic row layout as the fallback. The table uses five columns — graph, hash, message, author, and date — with ref badges rendering inline in the message column (matching classic mode) rather than occupying a separate column. The implementation keeps virtualization in `GraphContainer`, introduces a shared table-layout model for header and row alignment, surfaces column controls from an in-webview settings popover integrated with the existing `activeToggleWidget` toggle system, and persists mode/layout preferences through the existing `PersistedUIState` flow in `WebviewProvider`.
 
 ## Technical Context
 
@@ -17,7 +17,7 @@ Add a second commit-list presentation mode that renders commits as a customizabl
 **Project Type**: VS Code extension (desktop app with extension-host/backend and React webview/frontend)  
 **Performance Goals**: Preserve virtualized scrolling performance on 500+ commit histories; keep resize/reorder/visibility interactions visually immediate; add no new git round-trips for layout changes  
 **Constraints**: No new npm packages; classic view must remain available and unchanged as fallback; graph column stays visible and first; no horizontal scrollbar introduced in table mode; existing selection/search/context-menu interactions must continue working  
-**Scale/Scope**: One new commit-list mode, six configurable columns, one shared persisted layout object, primarily webview changes plus extension-host validation for persisted state
+**Scale/Scope**: One new commit-list mode, five configurable columns (graph, hash, message, author, date), one shared persisted layout object, primarily webview changes plus extension-host validation for persisted state
 
 ## Constitution Check
 
@@ -94,9 +94,10 @@ See [data-model.md](data-model.md).
 
 Core additions:
 - `CommitListMode = 'classic' | 'table'`
-- `CommitTableColumnId = 'graph' | 'hash' | 'refs' | 'message' | 'author' | 'date'`
+- `CommitTableColumnId = 'graph' | 'hash' | 'message' | 'author' | 'date'`
 - `CommitTableLayout` with persisted order, visibility, and preferred widths
 - `PersistedUIState` extended with `commitListMode` and `commitTableLayout`
+- `ActiveToggleWidget` extended with `'commitListSettings'`
 
 ### Interface Contracts
 
@@ -111,7 +112,7 @@ Contract impact:
 
 ```text
 ControlBar
-└── CommitListSettingsPopover
+└── CommitListSettingsPopover     # trigger uses activeToggleWidget ('commitListSettings')
     ├── mode switch (classic / table)
     ├── optional-column visibility toggles
     └── sortable optional-column order list
@@ -122,7 +123,12 @@ GraphContainer
 └── table mode
     ├── CommitTableHeader          # non-virtualized header, resize handles
     └── virtualized CommitTableRow # same resolved grid template as header
+                                   # ref badges render inline in message column (shrink-0, fixed size)
 ```
+
+### Double-Click Auto-Fit
+
+When the user double-clicks a column resize handle, the system computes the optimal width for that column using `canvas.measureText()` across all loaded commits and sets the column's preferred width to that value. See [research.md](research.md) R6 for the measurement strategy per column. The auto-fit result is persisted immediately via the existing `persistUIState` flow.
 
 ### Responsive Width Rules
 
@@ -131,15 +137,15 @@ Inputs:
 - persisted preferred widths
 - column minimum widths
 - current container width
-- current graph-content width from topology
 
 Rules:
-1. graph effective width = max(saved graph width, required graph width, graph min width)
+1. graph effective width = max(saved graph width, graph min width) — graph content clips when column is narrower than topology requires
 2. non-message columns keep preferred width unless explicitly resized
 3. message effective width expands toward its saved preferred width when space exists
 4. when width is tight, message shrinks first down to its minimum
 5. if more compression is needed, other visible optional columns may shrink toward their minimum widths while graph remains protected
 6. once minimum table width is reached, the table stops shrinking and may extend off the right edge
+7. ref badges in the message column maintain fixed size (shrink-0); only the commit message text truncates
 ```
 
 ## Complexity Tracking

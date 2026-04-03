@@ -30,6 +30,7 @@ A developer viewing the commit list switches to a table-style view and resizes c
 1. **Given** the user is in the table-style commit list view, **When** they drag a column boundary, **Then** the affected column width updates and the commit list reflows without overlapping content.
 2. **Given** the user has widened or narrowed one or more columns, **When** they continue browsing the commit list, **Then** rows, headers, and commit data remain aligned.
 3. **Given** the commit graph requires more space than usual, **When** the user widens the graph column, **Then** the graph remains fully visible without forcing other columns to overlap it.
+4. **Given** the user is in the table-style commit list view and the cursor is on a column boundary (col-resize cursor visible), **When** they double-click, **Then** the column auto-sizes to fit its widest content across all loaded commits, clamped to the column minimum width.
 
 ---
 
@@ -70,7 +71,7 @@ A developer returns to the commit list after reloading the webview or reopening 
 
 - What happens when the commit list area becomes very narrow? The table-style view should preserve usability by enforcing minimum widths, keeping the graph visible, preventing columns from visually colliding, and shrinking the message column as the primary flexible column until the table reaches its minimum viable width. After that point, the table may extend off the right side rather than shrinking further.
 - What happens when a user hides every optional column except one? The table-style view should continue rendering a valid layout with the graph column still visible and anchored first.
-- What happens when commit data is unusually long, such as many refs or a long commit subject? Content should remain clipped or truncated within its column rather than overlapping adjacent columns.
+- What happens when commit data is unusually long, such as many refs or a long commit subject? Content should remain clipped or truncated within its column rather than overlapping adjacent columns. Ref badges in the message column maintain their fixed size and the commit message text truncates as needed.
 - What happens when the user switches between classic and table-style views while a commit is selected? The current selection should remain visible and actionable after the view switch.
 - What happens when the commit list is scrolled and the user customizes columns? The list should stay stable enough that the user does not lose their place.
 
@@ -82,10 +83,11 @@ A developer returns to the commit list after reloading the webview or reopening 
 - **FR-002**: System MUST default to the classic view for users who have not chosen a different commit list mode.
 - **FR-003**: Users MUST be able to switch between the classic view and the table-style view from a settings control within the commit list UI.
 - **FR-004**: The classic view MUST remain available as an unchanged fallback when users do not want column customization.
-- **FR-005**: The table-style view MUST display the same core commit information currently available in the commit list: graph, hash, refs, message, author, and date.
+- **FR-005**: The table-style view MUST display the same core commit information currently available in the commit list: graph, hash, message (with inline ref badges), author, and date. Refs are not a separate column; they render inline in the message column, matching the classic view.
 - **FR-006**: Users MUST be able to resize visible columns in the table-style view through direct manipulation of column boundaries.
+- **FR-006a**: Users MUST be able to double-click a column boundary to auto-fit the column width to its widest content across all loaded commits. The auto-fit width is clamped to the column's minimum width and is persisted as the new preferred width.
 - **FR-007**: System MUST keep headers and row cells aligned while columns are resized.
-- **FR-008**: System MUST prevent column resizing from making the table-style view unusable, including preserving visibility of the graph column, preventing overlapping column content, shrinking the message column first, allowing other visible optional columns to compress to their minimum widths as needed, and enforcing minimum viable widths for visible columns.
+- **FR-008**: System MUST prevent column resizing from making the table-style view unusable, including preserving visibility of the graph column, preventing overlapping column content, shrinking the message column first, allowing other visible optional columns to compress to their minimum widths as needed, and enforcing minimum viable widths for visible columns. The graph column's minimum width is independent of the rendered topology; the graph content clips naturally when the column is narrowed below the graph's rendered width.
 - **FR-009**: Users MUST be able to reorder optional columns in the table-style view.
 - **FR-010**: The graph column MUST remain visible and fixed in the first position regardless of user customization.
 - **FR-011**: Users MUST be able to show or hide optional columns from a column chooser while in the table-style view.
@@ -105,7 +107,7 @@ A developer returns to the commit list after reloading the webview or reopening 
 
 - **Commit List View Preference**: The user's selected presentation mode for the commit list, either classic or table-style.
 - **Column Layout Preference**: The user's saved table-style configuration, including column widths, display order, and which optional columns are hidden.
-- **Commit Column**: A visible section of the commit list representing one category of commit metadata, such as graph, hash, refs, message, author, or date.
+- **Commit Column**: A visible section of the commit list representing one category of commit metadata, such as graph, hash, message, author, or date. Ref badges display inline within the message column rather than occupying their own column.
 - **Column Chooser**: A control that lets the user decide which optional commit columns remain visible in the table-style view.
 
 ## Success Criteria *(mandatory)*
@@ -124,8 +126,10 @@ A developer returns to the commit list after reloading the webview or reopening 
 - Column layout preferences are saved per user and reused across repositories unless a later feature introduces repository-specific layouts.
 - Column layout and mode preferences are saved incrementally as soon as the user changes them, rather than waiting for an explicit save or panel close event.
 - The graph column is required for orientation in the commit list and therefore cannot be hidden or moved away from the first position.
-- All non-graph columns are optional for visibility purposes, including refs, author, and date.
+- All non-graph columns are optional for visibility purposes, including hash, author, and date.
+- Ref badges display inline within the message column (matching classic view) rather than occupying their own column. Ref badges maintain a fixed size and do not resize when the message column width changes.
 - The default table-style layout keeps the same relative information priority users see today so that first-time use feels familiar.
+- The graph column's minimum width is just enough to display its header label; the graph content clips when the column is narrower than the topology requires.
 - The message column is the primary flexible column for responsive width adjustments until the table-style view reaches its minimum viable width.
 - A manually resized message column represents the user's preferred width, not a permanently fixed width that overrides viewport-fit behavior.
 - Once the table-style layout reaches its minimum viable width, the UI may overflow to the right rather than continue compressing columns or introducing a horizontal scrollbar.

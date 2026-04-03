@@ -24,11 +24,12 @@ export type CommitListMode = 'classic' | 'table';
 export type CommitTableColumnId =
   | 'graph'
   | 'hash'
-  | 'refs'
   | 'message'
   | 'author'
   | 'date';
 ```
+
+**Note**: Refs are not a separate column. Ref badges render inline within the message column, matching the classic view layout.
 
 ### `CommitTableColumnPreference`
 
@@ -60,6 +61,7 @@ export interface CommitTableLayout {
 - `order[0]` is always `'graph'`.
 - `columns.graph.visible` is always `true`.
 - Hidden optional columns stay in `order`, which preserves their last saved position for later restore.
+- Ref badges render inline in the message column (matching classic view) and are not a separate column.
 
 ## Persisted UI State Changes
 
@@ -79,11 +81,10 @@ commitTableLayout: CommitTableLayout;
 | Field | Default |
 |-------|---------|
 | `commitListMode` | `'classic'` |
-| `commitTableLayout.order` | `['graph', 'hash', 'refs', 'message', 'author', 'date']` |
+| `commitTableLayout.order` | `['graph', 'hash', 'message', 'author', 'date']` |
 | `graph.preferredWidth` | `120` |
 | `hash.preferredWidth` | `72` |
-| `refs.preferredWidth` | `220` |
-| `message.preferredWidth` | `320` |
+| `message.preferredWidth` | `400` |
 | `author.preferredWidth` | `160` |
 | `date.preferredWidth` | `120` |
 | optional column visibility | all visible by default |
@@ -96,7 +97,6 @@ commitTableLayout: CommitTableLayout;
 
 Derived per render from:
 - persisted layout
-- current topology-derived graph width
 - available container width
 
 Expected fields:
@@ -158,4 +158,6 @@ Local UI state only:
 | Show optional column | Set `visible = true`; restore at saved `order` position with saved `preferredWidth` |
 | Reorder optional columns | Update `order`; `'graph'` remains first |
 | Narrow container | Message column shrinks first to its minimum; after minimum table width is reached, table width stops shrinking |
+| Narrow graph column below topology width | Graph content clips naturally; minimum width is independent of topology |
+| Double-click resize handle | Compute auto-fit width via `canvas.measureText()` across all commits; update that column's `preferredWidth`; persist immediately |
 

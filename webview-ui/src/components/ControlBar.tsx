@@ -4,6 +4,7 @@ import { rpcClient } from '../rpc/rpcClient';
 import { RemoteManagementDialog } from './RemoteManagementDialog';
 import { RepoSelector } from './RepoSelector';
 import { MultiBranchDropdown } from './MultiBranchDropdown';
+import { CommitListSettingsPopover } from './CommitListSettingsPopover';
 import { CloudIcon, FilterIcon, CompareIcon, SettingsIcon, SearchIcon, RefreshIcon, FetchIcon } from './icons';
 
 const TOGGLE_BUTTON_COLORS = {
@@ -153,6 +154,8 @@ export function ControlBar() {
       >
         <SearchIcon className={iconClass} />
       </button>
+
+      <CommitListSettingsPopover />
 
       <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)] px-1">
         {totalLoadedWithoutFilter !== null ? totalLoadedWithoutFilter : mergedCommits.length} loaded

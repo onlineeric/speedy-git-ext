@@ -43,12 +43,12 @@
 
 ## R4: Width Resolution Strategy
 
-**Decision**: Persist per-column preferred widths, but compute effective rendered widths in a shared layout helper where the message column is the primary flexible column and the graph column's effective width never drops below the space required by the rendered topology.
+**Decision**: Persist per-column preferred widths, but compute effective rendered widths in a shared layout helper where the message column is the primary flexible column. The graph column's minimum width is a fixed constant (enough to display the header label); the graph content clips naturally when the user narrows the column below the topology's rendered width.
 
 **Rationale**:
 - The spec distinguishes between a saved preferred width and the effective width when space gets tight.
 - A shared width-resolution helper keeps header and row cells aligned because both consume the same computed result.
-- Using the current topology-derived graph width prevents dense histories from clipping the graph when users switch repositories or narrow the panel.
+- The graph column uses a fixed minimum width rather than a topology-derived floor, allowing users to crop the graph when they prefer more space for other columns. This avoids forcing a very wide graph column in dense repositories.
 
 **Alternatives considered**:
 - **Treat all columns as equally shrinkable**: Rejected because the spec explicitly makes the message column the primary flexible column.
@@ -66,3 +66,25 @@
 **Alternatives considered**:
 - **Replace virtualization with a semantic `<table>`**: Rejected because it would regress performance on large histories.
 - **Use horizontal scrolling for narrow widths**: Rejected because the spec explicitly disallows introducing a horizontal scrollbar.
+
+## R6: Double-Click Auto-Fit Column Width
+
+**Decision**: Use `canvas.measureText()` to compute the maximum content width across all loaded commits for the target column, then set the column's preferred width to that value. For the graph column, derive the width from the maximum lane count in the topology.
+
+**Rationale**:
+- All commit data is already available in the Zustand store, so no async work or additional git calls are needed.
+- `canvas.measureText()` is synchronous and fast even for 500+ commits, avoiding DOM measurement complexity.
+- Virtual scrolling means only a subset of rows are in the DOM at any time, so DOM-based measurement would be inaccurate. Data-driven measurement is both more accurate and more performant.
+- The existing `setCommitTableColumnPreferredWidth` and `persistUIState` flow handles persistence with no new plumbing.
+
+**Per-column measurement strategy**:
+- `graph`: Max lane count × LANE_WIDTH, clamped to min width.
+- `hash`: Monospace text measurement of the longest `abbreviatedHash`.
+- `message`: Measurement of the longest `commit.subject` plus a fixed padding estimate for inline ref badges and icons.
+- `author`: Measurement of the longest `commit.author` plus avatar width if enabled.
+- `date`: Measurement of the longest formatted date string using the current date format setting.
+
+**Alternatives considered**:
+- **DOM-based measurement**: Rejected because virtual scrolling only renders a subset of rows, making DOM measurement inaccurate.
+- **Temporary off-screen rendering**: Rejected because it's complex and slow for hundreds of rows.
+- **Fixed heuristic widths**: Rejected because they can't adapt to actual data length variations across repositories.

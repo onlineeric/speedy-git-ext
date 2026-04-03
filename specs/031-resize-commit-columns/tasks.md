@@ -19,7 +19,7 @@
 
 **Purpose**: Establish the reusable layout helper that all table-mode rendering will depend on.
 
-- [ ] T001 Create `webview-ui/src/utils/commitTableLayout.ts` with default column order, default widths, minimum widths, visible-column helpers, and responsive width-resolution logic for the message column
+- [X] T001 Create `webview-ui/src/utils/commitTableLayout.ts` with default column order, default widths, minimum widths, visible-column helpers, and responsive width-resolution logic for the message column
 
 ---
 
@@ -29,11 +29,11 @@
 
 **⚠️ CRITICAL**: User-story work depends on these shared types, store actions, and rendering entry points.
 
-- [ ] T002 Add `CommitListMode`, `CommitTableColumnId`, `CommitTableColumnPreference`, `CommitTableLayout`, and updated `DEFAULT_PERSISTED_UI_STATE` values to `shared/types.ts`
-- [ ] T003 Extend persisted UI-state validation and save logic for `commitListMode` and `commitTableLayout` in `src/WebviewProvider.ts`
-- [ ] T004 Add commit-list mode and commit-table layout state plus mutation/hydration actions to `webview-ui/src/stores/graphStore.ts`
-- [ ] T005 [P] Add the commit-list settings popover trigger to `webview-ui/src/components/ControlBar.tsx` and implement the base popover shell in `webview-ui/src/components/CommitListSettingsPopover.tsx`
-- [ ] T006 Add classic/table rendering branching to `webview-ui/src/components/GraphContainer.tsx` and create the initial component interfaces in `webview-ui/src/components/CommitTableHeader.tsx` and `webview-ui/src/components/CommitTableRow.tsx` for the graph, hash, refs, message, author, and date columns
+- [X] T002 Add `CommitListMode`, `CommitTableColumnId`, `CommitTableColumnPreference`, `CommitTableLayout`, and updated `DEFAULT_PERSISTED_UI_STATE` values to `shared/types.ts`
+- [X] T003 Extend persisted UI-state validation and save logic for `commitListMode` and `commitTableLayout` in `src/WebviewProvider.ts`
+- [X] T004 Add commit-list mode and commit-table layout state plus mutation/hydration actions to `webview-ui/src/stores/graphStore.ts`
+- [X] T005 [P] Add the commit-list settings popover trigger to `webview-ui/src/components/ControlBar.tsx` and implement the base popover shell in `webview-ui/src/components/CommitListSettingsPopover.tsx`
+- [X] T006 Add classic/table rendering branching to `webview-ui/src/components/GraphContainer.tsx` and create the initial component interfaces in `webview-ui/src/components/CommitTableHeader.tsx` and `webview-ui/src/components/CommitTableRow.tsx` for the graph, hash, message, author, and date columns (refs render inline in the message column)
 
 **Checkpoint**: The persisted mode/layout foundation and the basic table rendering shell exist, so mode switching and full table behavior can be completed in the user-story phases.
 
@@ -45,12 +45,15 @@
 
 **Independent Test**: Open table mode, resize the graph and message columns, and confirm the list stays aligned with no overlapping content.
 
-- [ ] T007 [US1] Implement the classic/table mode selector and immediate mode persistence in `webview-ui/src/components/CommitListSettingsPopover.tsx`
-- [ ] T008 [P] [US1] Implement header cells for graph, hash, refs, message, author, and date plus pointer-driven resize handles in `webview-ui/src/components/CommitTableHeader.tsx`
-- [ ] T009 [P] [US1] Implement table row rendering for graph, hash, refs, message, author, and date in `webview-ui/src/components/CommitTableRow.tsx`, reusing graph rendering, selection styling, ref badges, author display, date display, and context-menu behavior from the current commit row
-- [ ] T010 [US1] Update `webview-ui/src/components/GraphContainer.tsx` and `webview-ui/src/utils/commitTableLayout.ts` so the table header and virtualized rows share one resolved grid template, the message column shrinks first as the viewport narrows, other visible optional columns may then compress to their minimum widths, and scroll position remains stable during mode switches and column layout updates
-- [ ] T011 [US1] Persist column-width changes on resize end from `webview-ui/src/components/CommitTableHeader.tsx` via `rpcClient.persistUIState(...)`, including restoring the saved message-column preferred width when space returns
-- [ ] T012 [US1] Enforce narrow-width behavior in `webview-ui/src/components/GraphContainer.tsx` and `webview-ui/src/utils/commitTableLayout.ts` so the message column shrinks first, other visible optional columns may compress to their minimum widths, and the table then stops shrinking at its minimum viable width and extends off the right edge without introducing a horizontal scrollbar
+- [X] T007 [US1] Implement the classic/table mode selector and immediate mode persistence in `webview-ui/src/components/CommitListSettingsPopover.tsx`
+- [X] T008 [P] [US1] Implement header cells for graph, hash, message, author, and date plus pointer-driven resize handles in `webview-ui/src/components/CommitTableHeader.tsx`
+- [X] T009 [P] [US1] Implement table row rendering for graph, hash, message (with inline ref badges), author, and date in `webview-ui/src/components/CommitTableRow.tsx`, reusing graph rendering, selection styling, ref badges, author display, date display, and context-menu behavior from the current commit row
+- [X] T010 [US1] Update `webview-ui/src/components/GraphContainer.tsx` and `webview-ui/src/utils/commitTableLayout.ts` so the table header and virtualized rows share one resolved grid template, the message column shrinks first as the viewport narrows, other visible optional columns may then compress to their minimum widths, and scroll position remains stable during mode switches and column layout updates
+- [X] T011 [US1] Persist column-width changes on resize end from `webview-ui/src/components/CommitTableHeader.tsx` via `rpcClient.persistUIState(...)`, including restoring the saved message-column preferred width when space returns
+- [X] T012 [US1] Enforce narrow-width behavior in `webview-ui/src/components/GraphContainer.tsx` and `webview-ui/src/utils/commitTableLayout.ts` so the message column shrinks first, other visible optional columns may compress to their minimum widths, and the table then stops shrinking at its minimum viable width and extends off the right edge without introducing a horizontal scrollbar
+
+- [X] T028 [US1] Create `computeAutoFitWidth(columnId, commits, topology, userSettings)` utility in `webview-ui/src/utils/commitTableLayout.ts` that uses `canvas.measureText()` to compute the optimal column width across all loaded commits: graph uses max lane count × LANE_WIDTH, hash measures longest `abbreviatedHash`, message measures longest `commit.subject` plus ref badge padding, author measures longest `commit.author` plus avatar width, date measures longest formatted date string
+- [X] T029 [US1] Add `onDoubleClick` handler to resize handle buttons in `webview-ui/src/components/CommitTableHeader.tsx` that calls `computeAutoFitWidth`, updates the column preferred width in the store, and persists immediately via `rpcClient.persistUIState(...)`
 
 **Checkpoint**: Table mode is usable, resizable, aligned, and satisfies the MVP behavior.
 
@@ -62,10 +65,10 @@
 
 **Independent Test**: In table mode, reorder optional columns, hide one, restore it, and verify the graph column stays visible and first.
 
-- [ ] T013 [US2] Implement optional-column visibility toggles in `webview-ui/src/components/CommitListSettingsPopover.tsx` with the graph column locked visible and first
-- [ ] T014 [US2] Implement sortable optional-column reordering with `@dnd-kit/sortable` in `webview-ui/src/components/CommitListSettingsPopover.tsx`
-- [ ] T015 [US2] Update `webview-ui/src/utils/commitTableLayout.ts` and `webview-ui/src/components/GraphContainer.tsx` to derive visible column order from the persisted layout while restoring previously hidden columns to their saved width and order position
-- [ ] T016 [US2] Persist column visibility and reorder changes immediately from `webview-ui/src/components/CommitListSettingsPopover.tsx` via `rpcClient.persistUIState(...)`
+- [X] T013 [US2] Implement optional-column visibility toggles in `webview-ui/src/components/CommitListSettingsPopover.tsx` with the graph column locked visible and first
+- [X] T014 [US2] Implement sortable optional-column reordering with `@dnd-kit/sortable` in `webview-ui/src/components/CommitListSettingsPopover.tsx`
+- [X] T015 [US2] Update `webview-ui/src/utils/commitTableLayout.ts` and `webview-ui/src/components/GraphContainer.tsx` to derive visible column order from the persisted layout while restoring previously hidden columns to their saved width and order position
+- [X] T016 [US2] Persist column visibility and reorder changes immediately from `webview-ui/src/components/CommitListSettingsPopover.tsx` via `rpcClient.persistUIState(...)`
 
 **Checkpoint**: Optional columns can be reordered and hidden/restored without breaking table validity.
 
@@ -77,9 +80,9 @@
 
 **Independent Test**: Change mode, resize/reorder/hide columns, reload the webview, and verify the same layout returns on first render.
 
-- [ ] T017 [US3] Extend `webview-ui/src/stores/graphStore.ts` hydration logic so commit-list mode and commit-table layout restore atomically with the existing persisted UI state defaults
-- [ ] T018 [US3] Harden `src/WebviewProvider.ts` layout validation so partial or invalid saved column data falls back per field to defaults without discarding valid saved values
-- [ ] T019 [US3] Ensure `src/WebviewProvider.ts` continues sending `persistedUIState` before commit data so restored table mode and layout are available on first render after reload or repo switch
+- [X] T017 [US3] Extend `webview-ui/src/stores/graphStore.ts` hydration logic so commit-list mode and commit-table layout restore atomically with the existing persisted UI state defaults
+- [X] T018 [US3] Harden `src/WebviewProvider.ts` layout validation so partial or invalid saved column data falls back per field to defaults without discarding valid saved values
+- [X] T019 [US3] Ensure `src/WebviewProvider.ts` continues sending `persistedUIState` before commit data so restored table mode and layout are available on first render after reload or repo switch
 
 **Checkpoint**: The user's preferred mode and column layout restore consistently across sessions and repositories.
 
@@ -89,12 +92,14 @@
 
 **Purpose**: Final regression checks, styling cleanup, and validation across all stories.
 
-- [ ] T020 [P] Refine truncation, alignment, highlight styling, and scroll continuity in `webview-ui/src/components/CommitTableHeader.tsx`, `webview-ui/src/components/CommitTableRow.tsx`, and `webview-ui/src/components/GraphContainer.tsx` so search highlights, selection, long content, and viewport position remain stable in both modes
-- [ ] T021 [P] Verify edge-case handling for dense graph histories, hidden-column restore, and minimum-width overflow behavior in `webview-ui/src/utils/commitTableLayout.ts` and `src/WebviewProvider.ts`
-- [ ] T022 Run `pnpm typecheck` for the repository TypeScript projects defined by `package.json`
-- [ ] T023 Run `pnpm lint` for the repository sources configured from `package.json`
-- [ ] T024 Run `pnpm build` for the extension and webview build targets in `package.json`
+- [X] T020 [P] Refine truncation, alignment, highlight styling, and scroll continuity in `webview-ui/src/components/CommitTableHeader.tsx`, `webview-ui/src/components/CommitTableRow.tsx`, and `webview-ui/src/components/GraphContainer.tsx` so search highlights, selection, long content, and viewport position remain stable in both modes
+- [X] T021 [P] Verify edge-case handling for dense graph histories, hidden-column restore, and minimum-width overflow behavior in `webview-ui/src/utils/commitTableLayout.ts` and `src/WebviewProvider.ts`
+- [X] T022 Run `pnpm typecheck` for the repository TypeScript projects defined by `package.json`
+- [X] T023 Run `pnpm lint` for the repository sources configured from `package.json`
+- [X] T024 Run `pnpm build` for the extension and webview build targets in `package.json`
 - [ ] T025 Manual smoke test via the VS Code launch configuration in `.vscode/launch.json` for mode switching, resize, reorder, visibility, persistence, and no-horizontal-scroll behavior
+- [X] T026 Bug fixes from smoke test round 1: (1) commit list settings button uses activeToggleWidget for proper toggle behavior, (2) graph column min width reduced from 64px, (3) removed Refs column — refs badges now render inline in Message column matching classic mode, (4) table body border color aligned with header border color
+- [X] T027 Bug fixes from smoke test round 2: (1) graph column min width set to 52px (enough for header label, graph clips when narrowed below topology width), (2) ref badges wrapped in shrink-0 container with whitespace-nowrap so they maintain fixed size regardless of message column width
 
 ---
 
@@ -163,6 +168,8 @@ Task T014: "Implement sortable reorder list in CommitListSettingsPopover.tsx"
 ## Notes
 
 - `CommitRow.tsx` remains the classic-view fallback; the new table view should not regress it.
-- The graph column is never hidden or reordered.
-- The message column is the only primary flexible column when width becomes constrained.
+- The graph column is never hidden or reordered. Its minimum width (52px) is independent of the rendered topology; graph content clips when the column is narrowed below the topology's rendered width.
+- The message column is the only primary flexible column when width becomes constrained. Ref badges render inline in the message column (matching classic view) with fixed size (shrink-0, whitespace-nowrap); only the commit message text truncates.
+- Refs are not a separate column. The table uses five columns: graph, hash, message, author, date.
+- The commit-list settings popover button integrates with `activeToggleWidget` (`'commitListSettings'`) for consistent toggle behavior with filter/search/compare.
 - No automated test tasks are included because the spec did not request TDD or explicit new test coverage.

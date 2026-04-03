@@ -26,9 +26,9 @@ interface PersistedUIState {
   rightPanelWidth: number;
   commitListMode: 'classic' | 'table';
   commitTableLayout: {
-    order: Array<'graph' | 'hash' | 'refs' | 'message' | 'author' | 'date'>;
+    order: Array<'graph' | 'hash' | 'message' | 'author' | 'date'>;
     columns: Record<
-      'graph' | 'hash' | 'refs' | 'message' | 'author' | 'date',
+      'graph' | 'hash' | 'message' | 'author' | 'date',
       {
         visible: boolean;
         preferredWidth: number;
@@ -54,7 +54,7 @@ Sent whenever the user changes mode, width, order, or visibility. The payload re
 ## Validation Expectations in `WebviewProvider`
 
 - Invalid `commitListMode` values fall back to `'classic'`.
-- Invalid or incomplete `commitTableLayout.order` values fall back to the default full order.
+- Invalid or incomplete `commitTableLayout.order` values fall back to the default full order (`['graph', 'hash', 'message', 'author', 'date']`). Saved layouts from older versions that include `'refs'` will fail validation and fall back to defaults.
 - `columns.graph.visible` is always coerced to `true`.
 - Any invalid `preferredWidth` falls back to that column's default width.
 - Missing optional column entries are restored from defaults instead of discarding the whole saved layout.

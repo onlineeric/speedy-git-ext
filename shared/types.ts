@@ -154,6 +154,72 @@ export type DetailsPanelPosition = 'bottom' | 'right';
 
 export type FileViewMode = 'list' | 'tree';
 
+export type CommitListMode = 'classic' | 'table';
+
+export const COMMIT_TABLE_COLUMN_IDS = [
+  'graph',
+  'hash',
+  'message',
+  'author',
+  'date',
+] as const;
+
+export type CommitTableColumnId = (typeof COMMIT_TABLE_COLUMN_IDS)[number];
+
+export interface CommitTableColumnPreference {
+  visible: boolean;
+  preferredWidth: number;
+}
+
+export interface CommitTableLayout {
+  order: CommitTableColumnId[];
+  columns: Record<CommitTableColumnId, CommitTableColumnPreference>;
+}
+
+export const DEFAULT_COMMIT_TABLE_COLUMN_ORDER: CommitTableColumnId[] = [
+  'graph',
+  'hash',
+  'message',
+  'author',
+  'date',
+];
+
+export const DEFAULT_COMMIT_TABLE_COLUMN_PREFERENCES: Record<CommitTableColumnId, CommitTableColumnPreference> = {
+  graph: { visible: true, preferredWidth: 120 },
+  hash: { visible: true, preferredWidth: 72 },
+  message: { visible: true, preferredWidth: 400 },
+  author: { visible: true, preferredWidth: 160 },
+  date: { visible: true, preferredWidth: 120 },
+};
+
+export function createDefaultCommitTableLayout(): CommitTableLayout {
+  return {
+    order: [...DEFAULT_COMMIT_TABLE_COLUMN_ORDER],
+    columns: {
+      graph: { ...DEFAULT_COMMIT_TABLE_COLUMN_PREFERENCES.graph },
+      hash: { ...DEFAULT_COMMIT_TABLE_COLUMN_PREFERENCES.hash },
+      message: { ...DEFAULT_COMMIT_TABLE_COLUMN_PREFERENCES.message },
+      author: { ...DEFAULT_COMMIT_TABLE_COLUMN_PREFERENCES.author },
+      date: { ...DEFAULT_COMMIT_TABLE_COLUMN_PREFERENCES.date },
+    },
+  };
+}
+
+export function cloneCommitTableLayout(layout: CommitTableLayout): CommitTableLayout {
+  return {
+    order: [...layout.order],
+    columns: {
+      graph: { ...layout.columns.graph },
+      hash: { ...layout.columns.hash },
+      message: { ...layout.columns.message },
+      author: { ...layout.columns.author },
+      date: { ...layout.columns.date },
+    },
+  };
+}
+
+export const DEFAULT_COMMIT_TABLE_LAYOUT: CommitTableLayout = createDefaultCommitTableLayout();
+
 export interface RemoteInfo {
   name: string;
   fetchUrl: string;
@@ -257,6 +323,8 @@ export interface PersistedUIState {
   fileViewMode: FileViewMode;
   bottomPanelHeight: number;
   rightPanelWidth: number;
+  commitListMode: CommitListMode;
+  commitTableLayout: CommitTableLayout;
 }
 
 export const DEFAULT_PERSISTED_UI_STATE: PersistedUIState = {
@@ -265,11 +333,13 @@ export const DEFAULT_PERSISTED_UI_STATE: PersistedUIState = {
   fileViewMode: 'list',
   bottomPanelHeight: 280,
   rightPanelWidth: 400,
+  commitListMode: 'classic',
+  commitTableLayout: createDefaultCommitTableLayout(),
 };
 
 export type RebaseState = 'idle' | 'in-progress';
 
-export type ActiveToggleWidget = 'search' | 'filter' | 'compare' | null;
+export type ActiveToggleWidget = 'search' | 'filter' | 'compare' | 'commitListSettings' | null;
 
 export interface RebaseConflictInfo {
   conflictedFiles: string[];
