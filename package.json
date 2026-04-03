@@ -2,7 +2,7 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "1.6.1",
+  "version": "2.0.0",
   "publisher": "onlineeric",
   "license": "MIT",
   "repository": {

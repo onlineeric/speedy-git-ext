@@ -5,6 +5,8 @@ import type {
   CherryPickOptions,
   Commit,
   CommitDetails,
+  CommitListMode,
+  CommitTableLayout,
   CommitSignatureInfo,
   ContainingBranchesResult,
   DetailsPanelPosition,
@@ -22,7 +24,11 @@ import type {
   UserSettings,
   WorktreeInfo,
 } from '@shared/types';
-import { DEFAULT_USER_SETTINGS, DEFAULT_PERSISTED_UI_STATE } from '@shared/types';
+import {
+  DEFAULT_USER_SETTINGS,
+  DEFAULT_PERSISTED_UI_STATE,
+  cloneCommitTableLayout,
+} from '@shared/types';
 import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
 
 interface GraphStore {
@@ -73,6 +79,8 @@ interface GraphStore {
   fileViewMode: FileViewMode;
   bottomPanelHeight: number;
   rightPanelWidth: number;
+  commitListMode: CommitListMode;
+  commitTableLayout: CommitTableLayout;
   // Tooltip state
   hoveredCommitHash: string | null;
   tooltipAnchorRect: DOMRect | null;
@@ -86,6 +94,9 @@ interface GraphStore {
   setFileViewMode: (mode: FileViewMode) => void;
   setBottomPanelHeight: (height: number) => void;
   setRightPanelWidth: (width: number) => void;
+  setCommitListMode: (mode: CommitListMode) => void;
+  setCommitTableLayout: (layout: CommitTableLayout) => void;
+  updateCommitTableLayout: (updater: (layout: CommitTableLayout) => CommitTableLayout) => void;
   hydratePersistedUIState: (state: PersistedUIState) => void;
   setGitHubAvatarUrls: (urls: Record<string, string>) => void;
   setCommits: (commits: Commit[]) => void;
@@ -246,6 +257,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   fileViewMode: DEFAULT_PERSISTED_UI_STATE.fileViewMode,
   bottomPanelHeight: DEFAULT_PERSISTED_UI_STATE.bottomPanelHeight,
   rightPanelWidth: DEFAULT_PERSISTED_UI_STATE.rightPanelWidth,
+  commitListMode: DEFAULT_PERSISTED_UI_STATE.commitListMode,
+  commitTableLayout: cloneCommitTableLayout(DEFAULT_PERSISTED_UI_STATE.commitTableLayout),
   hoveredCommitHash: null,
   tooltipAnchorRect: null,
   worktreeList: [],
@@ -272,11 +285,20 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setFileViewMode: (mode) => set({ fileViewMode: mode }),
   setBottomPanelHeight: (bottomPanelHeight) => set({ bottomPanelHeight }),
   setRightPanelWidth: (rightPanelWidth) => set({ rightPanelWidth }),
+  setCommitListMode: (commitListMode) => set({ commitListMode }),
+  setCommitTableLayout: (commitTableLayout) => set({
+    commitTableLayout: cloneCommitTableLayout(commitTableLayout),
+  }),
+  updateCommitTableLayout: (updater) => set((state) => ({
+    commitTableLayout: cloneCommitTableLayout(updater(state.commitTableLayout)),
+  })),
   hydratePersistedUIState: (state) => set({
     detailsPanelPosition: state.detailsPanelPosition,
     fileViewMode: state.fileViewMode,
     bottomPanelHeight: state.bottomPanelHeight,
     rightPanelWidth: state.rightPanelWidth,
+    commitListMode: state.commitListMode,
+    commitTableLayout: cloneCommitTableLayout(state.commitTableLayout),
   }),
   setGitHubAvatarUrls: (urls) => set((state) => ({
     gitHubAvatarUrls: { ...state.gitHubAvatarUrls, ...urls },
@@ -503,7 +525,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     activeToggleWidget: state.activeToggleWidget === 'search' ? null : state.activeToggleWidget,
   })),
   setActiveToggleWidget: (widget) => set((state) => {
-    // Toggle off if clicking the same widget again
     const next: ActiveToggleWidget = state.activeToggleWidget === widget ? null : widget;
     const openingSearch = next === 'search';
     const closingSearch = !openingSearch && state.searchState.isOpen;

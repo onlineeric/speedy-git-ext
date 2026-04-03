@@ -4,7 +4,17 @@ import { rpcClient } from '../rpc/rpcClient';
 import { RemoteManagementDialog } from './RemoteManagementDialog';
 import { RepoSelector } from './RepoSelector';
 import { MultiBranchDropdown } from './MultiBranchDropdown';
-import { CloudIcon, FilterIcon, CompareIcon, SettingsIcon, SearchIcon, RefreshIcon, FetchIcon } from './icons';
+import { CommitListSettingsPopover } from './CommitListSettingsPopover';
+import {
+  CloudIcon,
+  FilterIcon,
+  CompareIcon,
+  SettingsIcon,
+  SearchIcon,
+  RefreshIcon,
+  FetchIcon,
+  ToolbarSeparatorIcon,
+} from './icons';
 
 const TOGGLE_BUTTON_COLORS = {
   inactive: 'text-[var(--vscode-icon-foreground)] opacity-70 hover:opacity-100',
@@ -122,6 +132,16 @@ export function ControlBar() {
       </button>
 
       <button
+        onClick={() => setActiveToggleWidget('search')}
+        className={`${iconButtonClass} ${searchColor}`}
+        title="Search commits"
+      >
+        <SearchIcon className={iconClass} />
+      </button>
+
+      <ToolbarSeparatorIcon className="h-6 w-4 text-[var(--vscode-panel-border)] opacity-90" />
+
+      <button
         onClick={handleRefresh}
         className={`${iconButtonClass} ${refreshing ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}`}
         title="Refresh"
@@ -146,17 +166,11 @@ export function ControlBar() {
         <CompareIcon className={iconClass} />
       </button>
 
-      <button
-        onClick={() => setActiveToggleWidget('search')}
-        className={`${iconButtonClass} ${searchColor}`}
-        title="Search commits"
-      >
-        <SearchIcon className={iconClass} />
-      </button>
-
       <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)] px-1">
         {totalLoadedWithoutFilter !== null ? totalLoadedWithoutFilter : mergedCommits.length} loaded
       </span>
+
+      <CommitListSettingsPopover />
 
       <button
         onClick={() => setRemoteDialogOpen(true)}

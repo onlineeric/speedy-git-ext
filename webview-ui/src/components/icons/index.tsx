@@ -258,6 +258,34 @@ export function FetchIcon({ className }: IconProps) {
   );
 }
 
+/** Vertical toolbar divider aligned to icon-button height */
+export function ToolbarSeparatorIcon({ className }: IconProps) {
+  return (
+    <svg width={8} height={24} viewBox="0 0 8 24" fill="none" className={className} aria-hidden>
+      <line
+        x1={4}
+        y1={3}
+        x2={4}
+        y2={21}
+        stroke="currentColor"
+        strokeWidth={1.2}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/** Table/columns layout icon — 12×12, inherits text color via currentColor */
+export function ColumnsIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <rect x={1} y={2} width={10} height={8} rx={1} stroke="currentColor" strokeWidth={1.2} />
+      <line x1={4} y1={2} x2={4} y2={10} stroke="currentColor" strokeWidth={1.2} />
+      <line x1={8} y1={2} x2={8} y2={10} stroke="currentColor" strokeWidth={1.2} />
+    </svg>
+  );
+}
+
 /** Filled target/bullseye for HEAD indicator — 12×12, inherits text color via currentColor */
 export function HeadIcon({ className, style }: IconProps) {
   return (
