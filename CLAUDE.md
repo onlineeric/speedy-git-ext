@@ -90,7 +90,7 @@ Built with **Vite** + React plugin → `dist/webview/`
 ### Restrictions
 
 - **Packages**: NEVER auto-install; provide install commands for me to run manually
-- **Git**: NEVER commit, branch, or merge; only readonly operations (`git log`, `git status`, `git diff`) and create PR only if I ask you to do so.
+- **Git**: NEVER commit or merge; only readonly operations (`git log`, `git status`, `git diff`) and create PR, create branch only if I ask you to do so, or if speckit workflow requires it.
 
 ## Active Technologies
 - TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, and `noImplicitReturns`) powers both the VS Code extension backend (`esbuild`, VS Code API) and the React 18 webview frontend (`Vite`), with Zustand and Tailwind CSS used across the UI.
