@@ -224,17 +224,18 @@ const CELL_HORIZONTAL_PADDING = 16; // px-2 on each side = 8 + 8
 const AVATAR_WIDTH = 24; // h-6 w-6
 const AVATAR_GAP = 8; // gap-2
 
-let cachedCanvas: HTMLCanvasElement | undefined;
+let cachedCtx: CanvasRenderingContext2D | undefined;
 
-function getCanvasContext(): CanvasRenderingContext2D {
-  if (!cachedCanvas) {
-    cachedCanvas = document.createElement('canvas');
+function getCanvasContext(): CanvasRenderingContext2D | undefined {
+  if (!cachedCtx) {
+    cachedCtx = document.createElement('canvas').getContext('2d') ?? undefined;
   }
-  return cachedCanvas.getContext('2d')!;
+  return cachedCtx;
 }
 
-function measureMaxTextWidth(texts: string[], font: string): number {
+function measureMaxTextWidth(texts: string[], font: string): number | undefined {
   const ctx = getCanvasContext();
+  if (!ctx) return undefined;
   ctx.font = font;
   let max = 0;
   for (const text of texts) {
@@ -270,11 +271,13 @@ export function computeAutoFitWidth(
     case 'hash': {
       const texts = commits.map((c) => c.abbreviatedHash);
       const textWidth = measureMaxTextWidth(texts, '12px monospace');
+      if (textWidth === undefined) return minWidth;
       return Math.max(minWidth, Math.round(textWidth + CELL_HORIZONTAL_PADDING));
     }
     case 'message': {
       const texts = commits.map((c) => c.subject);
       const textWidth = measureMaxTextWidth(texts, '14px sans-serif');
+      if (textWidth === undefined) return minWidth;
       // Add some padding for inline ref badges and icons
       const refPadding = 60;
       return Math.max(minWidth, Math.round(textWidth + refPadding + CELL_HORIZONTAL_PADDING));
@@ -282,6 +285,7 @@ export function computeAutoFitWidth(
     case 'author': {
       const texts = commits.map((c) => c.author);
       const textWidth = measureMaxTextWidth(texts, '12px sans-serif');
+      if (textWidth === undefined) return minWidth;
       const avatarExtra = userSettings.avatarsEnabled ? AVATAR_WIDTH + AVATAR_GAP : 0;
       return Math.max(minWidth, Math.round(textWidth + avatarExtra + CELL_HORIZONTAL_PADDING));
     }
@@ -292,6 +296,7 @@ export function computeAutoFitWidth(
           : formatRelativeDate(c.authorDate)
       );
       const textWidth = measureMaxTextWidth(texts, '12px sans-serif');
+      if (textWidth === undefined) return minWidth;
       return Math.max(minWidth, Math.round(textWidth + CELL_HORIZONTAL_PADDING));
     }
     default:

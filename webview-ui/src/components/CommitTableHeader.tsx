@@ -69,6 +69,7 @@ export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
 
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
       document.body.style.removeProperty('cursor');
       document.body.style.removeProperty('user-select');
     };
