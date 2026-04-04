@@ -56,9 +56,9 @@ As a user who has selected branches in the branch filter dropdown, I want to see
 
 **Acceptance Scenarios**:
 
-1. **Given** branches are selected in the branch filter dropdown, **When** I open the filter panel, **Then** I see badges for each selected branch displayed in the "Branch filtered" row.
+1. **Given** branches are selected in the branch filter dropdown, **When** I open the filter panel, **Then** I see badges for each selected branch displayed in the "Branch filtered" row, using the same badge component and graph-line-based colors as the commit list.
 2. **Given** a branch badge is displayed in the filter panel, **When** I click its X button, **Then** that branch is removed from the branch filter and the commit list updates.
-3. **Given** both a local and remote version of a branch are selected, **When** I look at the filter panel, **Then** a single combined badge is shown (matching the commit list badge style).
+3. **Given** both a local and remote version of a branch are selected, **When** I look at the filter panel, **Then** a single combined badge is shown (reusing the same component as the commit list badges, with matching graph-line color).
 4. **Given** no branches are selected (showing all branches), **When** I open the filter panel, **Then** the branch filter row shows no badges or an indication that all branches are shown.
 
 ---
@@ -96,7 +96,7 @@ As a user with multiple filters active, I want a clear visual layout of all filt
 
 1. **Given** the filter panel is open, **When** I look at the panel, **Then** I see three sections: branch filter badges, author filter with dropdown and badges, and date range filter fields, laid out in the specified arrangement.
 2. **Given** author and date filters are active, **When** I click the "Reset All" button, **Then** author and date filters are cleared but branch filter selections remain unchanged.
-3. **Given** filter badges (branch or author) exceed the panel width, **When** the badges wrap to multiple lines, **Then** the panel height adjusts automatically to fit all content.
+3. **Given** filter badges (branch or author) wrap to multiple lines, **When** the badge area exceeds approximately 3–4 lines, **Then** that specific badge area (branch or author) scrolls independently while the rest of the filter panel remains fully visible without scrolling.
 4. **Given** filters are active, **When** I look at the filter button in the control bar, **Then** the icon color reflects the combined filter state (filtered color when any filter is active, active color when panel is open, inactive when no filters applied).
 
 ---
@@ -124,7 +124,7 @@ As a user viewing author information, I want a consistent author badge appearanc
 - What happens when the author list is very large (hundreds of contributors)? The dropdown should still be performant with the search/filter field allowing users to narrow down quickly.
 - What happens when the user enters an invalid date manually? The date field shows a validation indicator and does not apply the invalid date as a filter.
 - What happens when multiple filters are combined (branch + author + date)? All filters are AND-ed together, showing only commits matching all active filter criteria.
-- What happens when branch filter badges wrap to many lines? The filter panel height adjusts dynamically up to a cap of ~3–4 lines, then scrolls internally.
+- What happens when branch filter badges or author badges wrap to many lines? Each badge area independently caps at ~3–4 lines of height and scrolls within that area; the filter panel itself does not scroll.
 
 ## Requirements *(mandatory)*
 
@@ -137,7 +137,7 @@ As a user viewing author information, I want a consistent author badge appearanc
 - **FR-005**: System MUST provide From Date and To Date fields that support both date picker selection and manual date input, with optional time component.
 - **FR-006**: System MUST validate manual date input and prevent time-only entries (date is required when time is provided).
 - **FR-007**: System MUST apply date filters server-side: From Date filters commits from that date/time onward; To Date filters commits up to and including that date/time.
-- **FR-008**: System MUST display branch filter selections as styled badges in the filter panel, matching the commit list badge style, with X buttons to remove individual branches.
+- **FR-008**: System MUST display branch filter selections as styled badges in the filter panel by reusing the `RefLabel` component used in the commit table rows. Each branch badge MUST use the same color as its corresponding graph line (determined by the lane the branch occupies), ensuring visual consistency between the filter panel and the commit list. Each badge MUST include an X button to remove that branch from the filter.
 - **FR-009**: System MUST combine branch badges when both local and remote versions of a branch are selected (showing one combined badge).
 - **FR-010**: System MUST provide a "Reset All" button that clears author and date range filters but preserves branch filter selections. The button MUST be visible but disabled/grayed out when no author or date filters are active.
 - **FR-011**: System MUST apply all filter types with AND logic (branch AND author AND date range). When filters produce zero matching commits, the commit list MUST display an empty state message (e.g., "No commits match the current filters").
@@ -149,7 +149,7 @@ As a user viewing author information, I want a consistent author badge appearanc
 - **FR-017**: System MUST use a shared author badge component between the filter panel and the commit details panel, with the details panel version omitting the remove button.
 - **FR-018**: System MUST extract a generic multi-select dropdown component used by both the branch filter and author filter dropdowns.
 - **FR-019**: System MUST debounce date field changes (150ms) before triggering a data reload.
-- **FR-020**: System MUST auto-adjust the filter panel height based on content (wrapped badges, multiple lines), up to a maximum height of approximately 3–4 lines. When content exceeds the maximum height, the panel MUST scroll internally.
+- **FR-020**: The filter panel itself MUST NOT have a fixed height or panel-level scrolling. Instead, only the two variable-height sections — the branch badge display area and the author badge display area — MUST each independently cap their height at approximately 3–4 lines. Within each badge area, badges MUST wrap into multiple lines using flex-wrap. When either badge area exceeds its capped height, that specific area MUST scroll independently (overflow-y: auto). All other filter panel sections (date range inputs, buttons) do not scroll and take their natural height.
 - **FR-021**: When right-clicking a date and selecting "Filter from this date", the system MUST set the From Date to the date portion only (time defaults to 00:00).
 - **FR-022**: When right-clicking a date and selecting "Filter to this date", the system MUST set the To Date to the date portion only (end-of-day behavior applied).
 - **FR-023**: System MUST NOT implement filter features specifically for the classic (non-table) commit list view. Classic view is pending deprecation.
@@ -189,7 +189,8 @@ As a user viewing author information, I want a consistent author badge appearanc
 ### Session 2026-04-04
 
 - Q: Should filter state (authors, date range, branches) persist across sessions? → A: No. All filters (including branch filter) reset to defaults on each session/panel open. Filter state is transient.
-- Q: Should the filter panel have a maximum height? → A: Yes. Cap at approximately 3–4 lines of height; content scrolls internally when it overflows.
 - Q: How should filter resets be triggered across different scenarios (session open, repo change, manual reset)? → A: A single centralized reset method/event must handle all filter resets atomically. Previous version had bugs where partial resets occurred (e.g., dropdown reset but graph still filtered, or vice versa). All reset triggers must go through this centralized method.
 - Q: What is the Reset All button state when no non-branch filters are active? → A: Visible but disabled/grayed out.
 - Q: What should the user see when filters produce zero matching commits? → A: An empty state message (e.g., "No commits match the current filters") displayed in the commit list area.
+- Q: Should branch badges in the filter panel reuse the same component as the commit list? → A: Yes. Reuse the same badge component (e.g., RefLabel) with graph-line-based colors. The color of each badge matches the lane color its branch occupies in the graph.
+- Q: Should the filter panel itself have a max height and scroll? → A: No. The filter panel has no fixed height and no panel-level scrolling. Only the branch badge area and author badge area each independently cap at ~3–4 lines and scroll when overflowed. Other sections (date inputs, buttons) take their natural height.

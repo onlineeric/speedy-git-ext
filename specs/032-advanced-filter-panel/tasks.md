@@ -57,7 +57,7 @@
 
 ### Implementation for User Story 1
 
-- [ ] T010 [US1] Rewrite `FilterWidget` in `webview-ui/src/components/FilterWidget.tsx` with the author filter section. Read `authorList`, `authorListLoading`, `filters` from the Zustand store. Render: (1) a `MultiSelectDropdown<Author>` for selecting authors — `getKey` returns `email`, `getSearchText` returns `name + email`, `renderItem` shows avatar + name + email, `clearAllLabel` is "All Authors"; (2) below the dropdown, render a flex-wrap row of `AuthorBadge` components for each selected author (from `filters.authors`), each with an `onRemove` callback that removes that email from `filters.authors` and triggers `rpcClient.getCommits()`. When `filters.authors` is empty or undefined, show "All authors" text. On author toggle in dropdown: update `filters.authors` via `store.setFilters()` and call `rpcClient.getCommits()`. Apply the panel container styling: `px-4 py-2 border-b border-[var(--vscode-panel-border)]` with `max-height` ~160px and `overflow-y: auto` (FR-020).
+- [ ] T010 [US1] Rewrite `FilterWidget` in `webview-ui/src/components/FilterWidget.tsx` with the author filter section. Read `authorList`, `authorListLoading`, `filters` from the Zustand store. Render: (1) a `MultiSelectDropdown<Author>` for selecting authors — `getKey` returns `email`, `getSearchText` returns `name + email`, `renderItem` shows avatar + name + email, `clearAllLabel` is "All Authors"; (2) below the dropdown, render a flex-wrap container of `AuthorBadge` components for each selected author (from `filters.authors`), each with an `onRemove` callback that removes that email from `filters.authors` and triggers `rpcClient.getCommits()`. The author badge area MUST have `max-height` of ~96-112px (approximately 3-4 lines of badges) and `overflow-y: auto` so it scrolls independently when many authors are selected (FR-020). When `filters.authors` is empty or undefined, show "All authors" text. On author toggle in dropdown: update `filters.authors` via `store.setFilters()` and call `rpcClient.getCommits()`. Apply the panel container styling: `px-4 py-2 border-b border-[var(--vscode-panel-border)]`. The panel itself has NO fixed height and NO panel-level scrolling.
 - [ ] T011 [US1] Unhide the filter button in `webview-ui/src/components/ControlBar.tsx`. Remove `style={{ display: 'none' }}` from the filter button (line ~130). Note: filterColor logic update for all filter types is handled in T013 (US5) to avoid duplicate edits.
 
 **Checkpoint**: User Story 1 is functional — authors can be selected/deselected, commits filter server-side, badges show active selections. Filter button visible and reflects author filter state.
@@ -72,7 +72,7 @@
 
 ### Implementation for User Story 5
 
-- [ ] T012 [US5] Extend `FilterWidget` in `webview-ui/src/components/FilterWidget.tsx` to add the full three-section layout and Reset All button. Add: (1) a "Date Range" row placeholder (actual date inputs come in US2 — for now render the label and empty fields); (2) a "Branches" row placeholder (actual badges come in US3 — for now render the label and "All branches" text); (3) a "Reset All" button that calls `store.resetAllFilters({ preserveBranches: true })` then `rpcClient.getCommits(store.filters)`. The button is `disabled` when `!(filters.authors?.length || filters.afterDate || filters.beforeDate)`. (4) a close button (X) that calls `store.setActiveToggleWidget(null)`. Use flexbox layout with three distinct rows, each with a label column and content column.
+- [ ] T012 [US5] Extend `FilterWidget` in `webview-ui/src/components/FilterWidget.tsx` to add the full three-section layout and Reset All button. Add: (1) a "Date Range" row placeholder (actual date inputs come in US2 — for now render the label and empty fields); (2) a "Branches" row placeholder (actual badges come in US3 — for now render the label and "All branches" text); (3) a "Reset All" button that calls `store.resetAllFilters({ preserveBranches: true })` then `rpcClient.getCommits(store.filters)`. The button is `disabled` when `!(filters.authors?.length || filters.afterDate || filters.beforeDate)`. (4) a close button (X) that calls `store.setActiveToggleWidget(null)`. Use flexbox layout with three distinct rows, each with a label column and content column. The panel itself has NO fixed height and NO panel-level scrolling — only badge areas within each row scroll independently (FR-020).
 - [ ] T013 [US5] Update filter icon color in `webview-ui/src/components/ControlBar.tsx` to check all filter types. Change `filterColor` logic: `filtered` (yellow) state when `filterHasBranchFilter || (filters.authors?.length ?? 0) > 0 || !!filters.afterDate || !!filters.beforeDate`. This ensures the icon reflects the combined state of all active filters (FR-013).
 
 **Checkpoint**: Filter panel has complete 3-section layout with labels, Reset All button works atomically, filter icon color reflects all filter types.
@@ -96,15 +96,16 @@
 
 ## Phase 6: User Story 3 - View Branch Filter Badges in Filter Panel (Priority: P2)
 
-**Goal**: Branch filter selections from the ControlBar dropdown appear as badges in the filter panel's "Branches" row, with X buttons to remove individual branches.
+**Goal**: Branch filter selections from the ControlBar dropdown appear as badges in the filter panel's "Branches" row, with X buttons to remove individual branches. Badges reuse the `RefLabel` component with graph-line colors.
 
-**Independent Test**: Select branches in the branch dropdown, open filter panel — verify selected branches appear as badges. Click X on a badge — verify that branch is removed from the filter and commits update. Verify combined local+remote branches show as a single combined badge.
+**Independent Test**: Select branches in the branch dropdown, open filter panel — verify selected branches appear as badges with matching graph-line colors. Click X on a badge — verify that branch is removed from the filter and commits update. Verify combined local+remote branches show as a single combined badge.
 
 ### Implementation for User Story 3
 
-- [ ] T016 [US3] Implement branch filter badges in `FilterWidget` (`webview-ui/src/components/FilterWidget.tsx`). In the "Branches" row, render badges for each branch in `filters.branches`. Each badge shows the branch name styled consistently with commit list badge style (use existing ref badge CSS patterns from `CommitTableRow`/`RefLabel`). Each badge has an X button that removes that branch from `filters.branches` via `store.setFilters()` and triggers `rpcClient.getCommits()`. When both local and remote versions of a branch are selected (e.g., `main` and `origin/main`), show a single combined badge (FR-009). When no branches are filtered, show "All branches" text. Use `flex-wrap: wrap` for badge layout.
+- [ ] T016 [P] [US3] Create `getBranchLaneColorStyle()` utility function in `webview-ui/src/utils/filterUtils.ts`. This function takes a branch name, the `mergedCommits` array, the `topology` (GraphTopology), and the color palette (string[]), and returns `React.CSSProperties | undefined`. Implementation: find the first commit in `mergedCommits` whose refs contain the branch name → get the `CommitNode` from `topology.nodes` using that commit's hash → extract `node.colorIndex` → resolve the hex color via `getColor(colorIndex, palette)` → return the CSS style via `getLaneColorStyle(hexColor)`. Return `undefined` if no commit is found for that branch (RefLabel will use its fallback VS Code badge colors).
+- [ ] T017 [US3] Implement branch filter badges in `FilterWidget` (`webview-ui/src/components/FilterWidget.tsx`). In the "Branches" row, render badges for each branch in `filters.branches` using the existing `RefLabel` component (from `webview-ui/src/components/RefLabel.tsx`) with `laneColorStyle` resolved via `getBranchLaneColorStyle()` from `filterUtils.ts`. Read `mergedCommits`, `topology`, and `userSettings.graphColors` from the Zustand store to compute the color. Each badge wraps a `RefLabel` + an X button that removes that branch from `filters.branches` via `store.setFilters()` and triggers `rpcClient.getCommits()`. When both local and remote versions of a branch are selected (e.g., `main` and `origin/main`), show a single combined badge using `DisplayRef` type `'merged-branch'` (FR-009). When no branches are filtered, show "All branches" text. The branch badge area MUST have `max-height` of ~96-112px and `overflow-y: auto` for independent scrolling when many branches are selected (FR-020). Use `flex-wrap: wrap` for badge layout.
 
-**Checkpoint**: Branch filter selections visible and manageable from within the filter panel. Combined badges work correctly.
+**Checkpoint**: Branch filter selections visible and manageable from within the filter panel. RefLabel component reused with matching graph-line colors. Combined badges work correctly. Badge area scrolls independently.
 
 ---
 
@@ -116,7 +117,7 @@
 
 ### Implementation for User Story 6
 
-- [ ] T017 [US6] Update `webview-ui/src/components/CommitDetailsPanel.tsx` to replace the plain-text author display with the `AuthorBadge` component. Use the display-only variant (no `onRemove` prop). Pass `name` from `commitDetails.author` and `email` from `commitDetails.authorEmail`. This ensures visual consistency between the filter panel and the details panel (FR-017).
+- [ ] T018 [US6] Update `webview-ui/src/components/CommitDetailsPanel.tsx` to replace the plain-text author display with the `AuthorBadge` component. Use the display-only variant (no `onRemove` prop). Pass `name` from `commitDetails.author` and `email` from `commitDetails.authorEmail`. This ensures visual consistency between the filter panel and the details panel (FR-017).
 
 **Checkpoint**: Author display is visually consistent across filter panel and commit details panel.
 
@@ -130,9 +131,9 @@
 
 ### Implementation for User Story 4
 
-- [ ] T018 [US4] Add author filter context menu items to `webview-ui/src/components/CommitTableRow.tsx` (table view only, per FR-023 — no classic view changes). Wrap the author cell content in a Radix `ContextMenu.Root` / `ContextMenu.Trigger`. The menu shows "Add Author to filter" when the commit's `authorEmail` is NOT in `filters.authors`, or "Remove Author from filter" when it IS. On click: toggle the author email in `filters.authors` via `store.setFilters()` and call `rpcClient.getCommits()`. The inner context menu takes priority over the outer `CommitContextMenu` for right-clicks on the author cell.
-- [ ] T019 [US4] Add date filter context menu items to `webview-ui/src/components/CommitTableRow.tsx`. Wrap the date cell content in a Radix `ContextMenu.Root` / `ContextMenu.Trigger`. The menu shows two items: "Filter from this date" (sets `afterDate` to the commit's date portion at `T00:00:00`, FR-021) and "Filter to this date" (sets `beforeDate` to the commit's date portion, FR-022). On click: call `store.setFilters()` and `rpcClient.getCommits()`. Extract the date-only portion from the commit's `authorDate` timestamp (unix seconds → `YYYY-MM-DD`).
-- [ ] T020 [US4] Add branch filter context menu items to `webview-ui/src/components/BranchContextMenu.tsx`. Add "Add branch to filter" / "Remove branch from filter" items (conditional on whether the branch is currently in `filters.branches`). For local branches: add/remove just the local branch name. For remote branches: add/remove just the remote ref (e.g., `origin/main`). For combined local+remote badges: add/remove both the local name and the remote ref (FR-016). Read `filters.branches` from the Zustand store to determine which item to show.
+- [ ] T019 [US4] Add author filter context menu items to `webview-ui/src/components/CommitTableRow.tsx` (table view only, per FR-023 — no classic view changes). Wrap the author cell content in a Radix `ContextMenu.Root` / `ContextMenu.Trigger`. The menu shows "Add Author to filter" when the commit's `authorEmail` is NOT in `filters.authors`, or "Remove Author from filter" when it IS. On click: toggle the author email in `filters.authors` via `store.setFilters()` and call `rpcClient.getCommits()`. The inner context menu takes priority over the outer `CommitContextMenu` for right-clicks on the author cell.
+- [ ] T020 [US4] Add date filter context menu items to `webview-ui/src/components/CommitTableRow.tsx`. Wrap the date cell content in a Radix `ContextMenu.Root` / `ContextMenu.Trigger`. The menu shows two items: "Filter from this date" (sets `afterDate` to the commit's date portion at `T00:00:00`, FR-021) and "Filter to this date" (sets `beforeDate` to the commit's date portion, FR-022). On click: call `store.setFilters()` and `rpcClient.getCommits()`. Extract the date-only portion from the commit's `authorDate` timestamp (unix seconds -> `YYYY-MM-DD`).
+- [ ] T021 [US4] Add branch filter context menu items to `webview-ui/src/components/BranchContextMenu.tsx`. Add "Add branch to filter" / "Remove branch from filter" items (conditional on whether the branch is currently in `filters.branches`). For local branches: add/remove just the local branch name. For remote branches: add/remove just the remote ref (e.g., `origin/main`). For combined local+remote badges: add/remove both the local name and the remote ref (FR-016). Read `filters.branches` from the Zustand store to determine which item to show.
 
 **Checkpoint**: All context menu filtering actions work — author, date, and branch quick filters are fully functional.
 
@@ -142,11 +143,11 @@
 
 **Purpose**: Empty state message, build validation, and final cleanup.
 
-- [ ] T021 [P] Add empty state message to `webview-ui/src/components/GraphContainer.tsx`. When `mergedCommits.length === 0 && !loading` and any filter is active (`filters.branches?.length || filters.authors?.length || filters.afterDate || filters.beforeDate`), display "No commits match the current filters" centered in the commit list area (FR-011). When no filters are active and no commits, show existing empty behavior.
-- [ ] T022 Run `pnpm typecheck` — verify zero TypeScript errors across all modified/new files.
-- [ ] T023 Run `pnpm lint` — verify zero ESLint errors.
-- [ ] T024 Run `pnpm build` — verify clean production build of both extension and webview.
-- [ ] T025 Manual smoke test via VS Code "Run Extension" launch config. Verify: (1) filter button visible and toggles panel, (2) author dropdown loads and filters work, (3) date range inputs filter correctly with debounce, (4) branch badges display in panel with X removal, (5) Reset All clears author+date but preserves branches, (6) context menus on author/date/branch cells work, (7) author badge in details panel matches filter panel style, (8) empty state shows when no commits match, (9) filter icon color reflects combined filter state, (10) filters reset on session open/repo change.
+- [ ] T022 [P] Add empty state message to `webview-ui/src/components/GraphContainer.tsx`. When `mergedCommits.length === 0 && !loading` and any filter is active (`filters.branches?.length || filters.authors?.length || filters.afterDate || filters.beforeDate`), display "No commits match the current filters" centered in the commit list area (FR-011). When no filters are active and no commits, show existing empty behavior.
+- [ ] T023 Run `pnpm typecheck` — verify zero TypeScript errors across all modified/new files.
+- [ ] T024 Run `pnpm lint` — verify zero ESLint errors.
+- [ ] T025 Run `pnpm build` — verify clean production build of both extension and webview.
+- [ ] T026 Manual smoke test via VS Code "Run Extension" launch config. Verify: (1) filter button visible and toggles panel, (2) author dropdown loads and filters work, (3) date range inputs filter correctly with debounce, (4) branch badges display in panel with graph-line colors matching commit table and X removal, (5) branch and author badge areas scroll independently when many badges present, (6) Reset All clears author+date but preserves branches, (7) context menus on author/date/branch cells work, (8) author badge in details panel matches filter panel style, (9) empty state shows when no commits match, (10) filter icon color reflects combined filter state, (11) filters reset on session open/repo change.
 
 ---
 
@@ -184,7 +185,8 @@
 
 - T001 and T002 can run in parallel (different files: types.ts vs messages.ts)
 - T005 and T007 can run in parallel (different new files: MultiSelectDropdown vs AuthorBadge)
-- T018 and T019 must run sequentially (same file: CommitTableRow.tsx)
+- T016 and T017 must run sequentially (T017 depends on T016's utility function)
+- T019 and T020 must run sequentially (same file: CommitTableRow.tsx)
 - US2 and US3 can run in parallel after US5 (both need the 3-section layout from T012)
 - US6 can run in parallel with US1+ (only depends on Foundational T007)
 
@@ -210,10 +212,10 @@ Task T009: "Extend rpcClient with getAuthors and extended filter handling"
 ```bash
 # These stories can run in parallel after US5 completes (T012 creates 3-section layout):
 Story US2: "Date range filtering (T014, T015)"
-Story US3: "Branch filter badges (T016)"
+Story US3: "Branch filter badges (T016, T017)"
 
 # US6 can start any time after Foundational (depends only on T007):
-Story US6: "Author badge in details panel (T017)"
+Story US6: "Author badge in details panel (T018)"
 ```
 
 ---
@@ -230,13 +232,13 @@ Story US6: "Author badge in details panel (T017)"
 
 ### Incremental Delivery
 
-1. Setup + Foundational → Foundation ready
-2. US1 (Author Filtering) → Test independently → MVP!
-3. US5 (Panel UI + Reset) → Test Reset All, layout, icon colors
-4. US2 (Date Range) + US3 (Branch Badges) → Can run in parallel after US5
-5. US6 (Author Badge) → Can run any time after Foundational (independent)
-6. US4 (Context Menus) → Test right-click filtering
-7. Polish → Empty state, build validation, smoke test
+1. Setup + Foundational -> Foundation ready
+2. US1 (Author Filtering) -> Test independently -> MVP!
+3. US5 (Panel UI + Reset) -> Test Reset All, layout, icon colors
+4. US2 (Date Range) + US3 (Branch Badges) -> Can run in parallel after US5
+5. US6 (Author Badge) -> Can run any time after Foundational (independent)
+6. US4 (Context Menus) -> Test right-click filtering
+7. Polish -> Empty state, build validation, smoke test
 
 ---
 
@@ -249,3 +251,5 @@ Story US6: "Author badge in details panel (T017)"
 - All filters are server-side (git flags) — no client-side filtering
 - Centralized `resetAllFilters()` prevents the partial reset bugs from previous versions
 - Filter state is transient — resets on session open/repo change (FR-024)
+- Branch badges in filter panel reuse `RefLabel` with graph-line colors via `getBranchLaneColorStyle()` utility (FR-008)
+- Filter panel has NO fixed height — only branch and author badge areas independently cap at ~3-4 lines with overflow scrolling (FR-020)

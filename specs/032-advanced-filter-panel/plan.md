@@ -1,60 +1,35 @@
 # Implementation Plan: Advanced Filter Panel
 
-**Branch**: `032-advanced-filter-panel` | **Date**: 2026-04-04 | **Spec**: [spec.md](./spec.md)
+**Branch**: `032-advanced-filter-panel` | **Date**: 2026-04-04 | **Spec**: [spec.md](spec.md)
 **Input**: Feature specification from `/specs/032-advanced-filter-panel/spec.md`
-
-**Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
 
 ## Summary
 
-Add an advanced filter panel to the VS Code extension webview that enables filtering commits by author (multi-select), date range (from/to with optional time), and displays branch filter badges — all with AND logic. The panel is toggled via the existing hidden filter button in the ControlBar. Right-click context menus on author, date, and branch cells provide quick add/remove filter actions. A centralized reset mechanism ensures atomic filter state management across all reset triggers (session open, repo change, manual reset).
+Add an advanced filter panel to the commit graph view with three filter dimensions (author, date range, branch badges), right-click context menu integration, a centralized reset mechanism, and reusable shared components (generic MultiSelectDropdown, AuthorBadge). All filtering is server-side via git flags. The filter panel has no fixed height — only the branch badge and author badge display areas independently cap at ~3-4 lines with overflow scrolling. Branch badges in the filter panel reuse the same `RefLabel` component with graph-line-based colors from the commit table.
 
 ## Technical Context
 
 **Language/Version**: TypeScript 5.x (strict mode with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`)
 **Primary Dependencies**: React 18, Zustand (state), Radix UI (popovers, context menus), @tanstack/react-virtual (virtual scrolling), Vite (webview build), esbuild (extension build)
 **Storage**: In-memory (Zustand store); filter state is transient, not persisted across sessions
-**Testing**: Manual smoke testing via VS Code "Run Extension" launch config
-**Target Platform**: VS Code Extension (1.80+), webview runs in Chromium sandbox
-**Project Type**: VS Code extension (desktop-app) with dual-process architecture (Node.js backend + React webview frontend)
-**Performance Goals**: Filter results update within 2 seconds on 10,000+ commit repositories
-**Constraints**: Git process timeout 30s (via GitExecutor), virtual scrolling required for lists, graph topology computed in frontend
-**Scale/Scope**: Repositories with 500+ commits, many branches, potentially hundreds of authors
+**Testing**: Manual smoke test via VS Code "Run Extension" launch config; `pnpm typecheck`, `pnpm lint`, `pnpm build`
+**Target Platform**: VS Code Extension (webview runs in Chromium)
+**Project Type**: VS Code extension (dual-process: Node.js backend + React webview frontend)
+**Performance Goals**: Filter results within 2 seconds on 10K+ commit repos; 150ms debounce on date inputs
+**Constraints**: No new packages; reuse existing Radix UI, native Chromium date picker; server-side filtering only
+**Scale/Scope**: Supports repos with 10K+ commits, hundreds of contributors
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-### Pre-Research Check
-
 | Principle | Status | Notes |
 |-----------|--------|-------|
-| I. Performance First | PASS | Author/date filtering uses git's native `--author`/`--after`/`--before` flags (server-side). Author dropdown uses existing popover pattern with search filtering. No new expensive client-side computation. |
-| II. Clean Code & Simplicity | PASS | Spec explicitly requires DRY: shared AuthorBadge component (FR-017), generic MultiSelectDropdown (FR-018), centralized reset (FR-025). Will extract reusable patterns from existing MultiBranchDropdown. |
-| III. Type Safety & Explicit Error Handling | PASS | New types added to `shared/types.ts` (Author, extended GraphFilters). Message contracts updated in `shared/messages.ts`. Result monad used for new git operations. |
-| IV. Library-First & Purpose-Built Tools | PASS | Uses Chromium's native date input (`<input type="date">`/`<input type="time">`) — no third-party date picker needed. Radix UI for popovers/context menus (already in stack). |
-| V. Dual-Process Architecture Integrity | PASS | Author list fetched via backend git command, sent to frontend via message passing. Date/author filters passed to backend via existing `getCommits` message. No git subprocess spawning in webview. |
-
-### Agent Restrictions Check
-
-| Restriction | Status |
-|-------------|--------|
-| No auto-install packages | PASS — no new packages required |
-| No git commits/merges | PASS — readonly operations only |
-
-**Gate result**: ALL PASS — proceed to Phase 0.
-
-### Post-Design Re-Check (after Phase 1)
-
-| Principle | Status | Notes |
-|-----------|--------|-------|
-| I. Performance First | PASS | All filtering server-side via git flags. Author list fetched once, not per-filter-change. Date input debounced 150ms. No new expensive client-side computation. |
-| II. Clean Code & Simplicity | PASS | DRY enforced: MultiSelectDropdown shared by branch/author dropdowns, AuthorBadge shared by filter panel/details panel, centralized resetAllFilters() prevents code duplication across reset triggers. |
-| III. Type Safety & Explicit Error Handling | PASS | New `Author` type and extended `GraphFilters` in `shared/types.ts`. New message types with exhaustive map updates. Result monad for `getAuthors()`. |
-| IV. Library-First & Purpose-Built Tools | PASS | No new packages. Uses Chromium native date inputs and existing Radix UI. |
-| V. Dual-Process Architecture Integrity | PASS | Author list fetched via backend git command. All filter parameters passed via message passing. No git operations in webview. New types in `shared/`. |
-
-**Post-design gate result**: ALL PASS.
+| I. Performance First | PASS | All filtering server-side via git flags. No client-side filtering. Debounce on date inputs. Badge areas scroll independently (no full-panel re-layout). |
+| II. Clean Code & Simplicity | PASS | Generic MultiSelectDropdown extracted (DRY). AuthorBadge shared component. RefLabel reused for branch badges. No over-engineering. |
+| III. Type Safety & Explicit Error Handling | PASS | New types in `shared/types.ts`. New messages in `shared/messages.ts`. Result<T> pattern for git ops. |
+| IV. Library-First & Purpose-Built Tools | PASS | Uses existing Radix UI for dropdowns/menus. Native Chromium date picker. No new packages needed. |
+| V. Dual-Process Architecture Integrity | PASS | Backend handles git I/O (GitLogService). Frontend handles rendering. Communication via VS Code message passing. Shared types in `shared/`. |
 
 ## Project Structure
 
@@ -62,12 +37,14 @@ Add an advanced filter panel to the VS Code extension webview that enables filte
 
 ```text
 specs/032-advanced-filter-panel/
-├── plan.md              # This file (/speckit.plan command output)
-├── research.md          # Phase 0 output (/speckit.plan command)
-├── data-model.md        # Phase 1 output (/speckit.plan command)
-├── quickstart.md        # Phase 1 output (/speckit.plan command)
-├── contracts/           # Phase 1 output (/speckit.plan command)
-└── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
+├── plan.md              # This file
+├── research.md          # Phase 0 output — research decisions
+├── data-model.md        # Phase 1 output — entity definitions
+├── quickstart.md        # Phase 1 output — implementation order reference
+├── contracts/
+│   ├── messages.md      # Phase 1 output — message protocol contracts
+│   └── components.md    # Phase 1 output — React component contracts
+└── tasks.md             # Phase 2 output — implementation tasks
 ```
 
 ### Source Code (repository root)
@@ -75,38 +52,47 @@ specs/032-advanced-filter-panel/
 ```text
 # Backend (extension host)
 src/
+├── extension.ts                    # Entry point (unchanged)
+├── ExtensionController.ts          # Lifecycle orchestration (unchanged)
+├── WebviewProvider.ts              # Handle getAuthors message, pass new filters
 ├── services/
-│   ├── GitLogService.ts          # MODIFY: Add --after/--before args, add getAuthors() method
-│   └── GitExecutor.ts            # No changes needed
-├── WebviewProvider.ts            # MODIFY: Handle new message types (getAuthors), pass date filters
-└── ExtensionController.ts        # No changes expected
+│   ├── GitExecutor.ts              # Git process spawning (unchanged)
+│   ├── GitLogService.ts            # Add getAuthors(), extend getCommits() with author/date flags
+│   ├── GitDiffService.ts           # Unchanged
+│   └── GitBranchService.ts         # Unchanged
+└── utils/
+    └── gitParsers.ts               # Unchanged
 
 # Frontend (webview)
 webview-ui/src/
 ├── components/
-│   ├── FilterWidget.tsx           # REWRITE: Full filter panel (branch badges, author filter, date range)
-│   ├── AuthorBadge.tsx            # NEW: Shared author badge component (avatar + name, optional remove)
-│   ├── MultiSelectDropdown.tsx    # NEW: Generic multi-select dropdown extracted from MultiBranchDropdown
-│   ├── MultiBranchDropdown.tsx    # MODIFY: Refactor to use MultiSelectDropdown internally
-│   ├── CommitTableRow.tsx         # MODIFY: Add context menu triggers for author/date cells
-│   ├── CommitContextMenu.tsx      # MODIFY: Add author filter and date filter context menu items
-│   ├── BranchContextMenu.tsx      # MODIFY: Add "Add/Remove branch to/from filter" items
-│   ├── ControlBar.tsx             # MODIFY: Unhide filter button, update filter color logic
-│   ├── CommitDetailsPanel.tsx     # MODIFY: Replace plain-text author with AuthorBadge component
-│   └── GraphContainer.tsx         # MODIFY: Show empty state message when filters produce zero commits
+│   ├── MultiSelectDropdown.tsx     # NEW: Generic multi-select dropdown
+│   ├── AuthorBadge.tsx             # NEW: Shared author badge (avatar + name + optional X)
+│   ├── FilterWidget.tsx            # REWRITE: Full 3-section filter panel
+│   ├── MultiBranchDropdown.tsx     # REFACTOR: Use MultiSelectDropdown<Branch>
+│   ├── ControlBar.tsx              # MODIFY: Unhide filter button, update filterColor
+│   ├── CommitDetailsPanel.tsx      # MODIFY: Use AuthorBadge for author display
+│   ├── CommitTableRow.tsx          # MODIFY: Context menu triggers on author/date cells
+│   ├── BranchContextMenu.tsx       # MODIFY: Add branch filter menu items
+│   ├── GraphContainer.tsx          # MODIFY: Empty state for filtered zero results
+│   ├── RefLabel.tsx                # REUSE: Branch badges in filter panel use this component
+│   └── ...
 ├── stores/
-│   └── graphStore.ts              # MODIFY: Add author/date filter state, centralized reset, author list
+│   └── graphStore.ts               # MODIFY: authorList, resetAllFilters(), extended hasFilter
 ├── rpc/
-│   └── rpcClient.ts               # MODIFY: Add getAuthors(), update getCommits() signature for date filters
+│   └── rpcClient.ts                # MODIFY: getAuthors(), authorList handling, extended filters
+├── utils/
+│   ├── colorUtils.ts               # REUSE: getLaneColorStyle() for branch badge colors
+│   ├── graphTopology.ts            # REUSE: topology.nodes for branch→lane→color lookup
+│   └── filterUtils.ts              # NEW: Utility for branch-to-color resolution
+└── types/
+    └── displayRefs.ts              # REUSE: DisplayRef types for branch badges
 
-# Shared types
+# Shared (cross-boundary contracts)
 shared/
-├── types.ts                       # MODIFY: Extend GraphFilters (afterDate, beforeDate, authors), add Author type
-└── messages.ts                    # MODIFY: Add getAuthors request, authorList response, update filter payloads
+├── types.ts                        # MODIFY: Add Author, extend GraphFilters
+├── messages.ts                     # MODIFY: Add getAuthors/authorList, update exhaustive maps
+└── errors.ts                       # Unchanged
 ```
 
-**Structure Decision**: Follows existing dual-process architecture. No new directories — all new components live alongside existing ones in `webview-ui/src/components/`. Shared types extended in existing `shared/types.ts`. Backend changes isolated to `GitLogService` and `WebviewProvider`.
-
-## Complexity Tracking
-
-> No constitution violations detected. No complexity justifications needed.
+**Structure Decision**: Follows existing dual-process architecture. No structural changes — new files are added within existing directory conventions. Branch badge color resolution uses existing `graphTopology` → `colorUtils` pipeline.

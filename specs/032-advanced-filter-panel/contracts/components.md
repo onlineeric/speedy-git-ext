@@ -82,12 +82,15 @@ The advanced filter panel displayed in the TogglePanel area.
 FilterWidget
 ├── Branch Filter Row
 │   ├── Label: "Branches"
-│   └── Badge list: BranchBadge[] (from filters.branches, with X to remove)
+│   └── Badge area (max-height ~96-112px, overflow-y: auto, flex-wrap: wrap):
+│       ├── RefLabel[] (reused from commit table, with laneColorStyle from graph topology)
+│       │   └── Each wrapped with X button for removal
 │       └── Empty state: "All branches" text when no branches filtered
 ├── Author Filter Row
 │   ├── Label: "Authors"
 │   ├── MultiSelectDropdown<Author> (for selecting authors)
-│   └── Badge list: AuthorBadge[] (from filters.authors, with X to remove)
+│   └── Badge area (max-height ~96-112px, overflow-y: auto, flex-wrap: wrap):
+│       ├── AuthorBadge[] (from filters.authors, with X to remove)
 │       └── Empty state: "All authors" text when no authors filtered
 ├── Date Range Row
 │   ├── Label: "Date Range"
@@ -96,6 +99,17 @@ FilterWidget
 │   └── Reset All button (disabled when no author/date filters active)
 └── Close button (X) to close the filter panel
 ```
+
+**Height management (FR-020)**:
+- The filter panel itself has NO fixed height and NO panel-level scrolling.
+- Only the branch badge area and author badge area have `max-height` (~96-112px, approximately 3-4 lines of badges) and `overflow-y: auto`.
+- Date range inputs, Reset All button, and labels take their natural height.
+
+**Branch badge colors (FR-008)**:
+- Each branch badge uses the `RefLabel` component with `laneColorStyle` prop.
+- Color is resolved by: finding a commit with that branch ref in the topology → extracting `node.colorIndex` → resolving via `getColor(colorIndex, palette)` → building CSS style via `getLaneColorStyle()`.
+- A helper `getBranchLaneColorStyle(branchName, commits, topology, palette)` in `filterUtils.ts` encapsulates this lookup.
+- When a branch has no commit in the current topology, RefLabel falls back to default VS Code badge colors.
 
 ## Modified Components
 
@@ -113,13 +127,16 @@ interface MultiBranchDropdownProps {
 }
 ```
 
-### CommitContextMenu
+### CommitTableRow (context menu additions)
 
-Extended with author and date filter actions. These are added alongside existing menu items.
+Author and date filter actions are added as **nested Radix ContextMenu** triggers directly in CommitTableRow, not via CommitContextMenu. The inner context menus take priority over the outer CommitContextMenu for right-clicks on specific cells.
 
-**New menu items** (conditional based on which cell was right-clicked):
-- When right-clicking author cell: "Add Author to filter" / "Remove Author from filter"
-- When right-clicking date cell: "Filter from this date" / "Filter to this date"
+**Author cell context menu**:
+- "Add Author to filter" / "Remove Author from filter" (conditional on whether the commit's author email is in `filters.authors`)
+
+**Date cell context menu**:
+- "Filter from this date" (sets `afterDate` to date portion at `T00:00:00`)
+- "Filter to this date" (sets `beforeDate` to date portion)
 
 ### BranchContextMenu
 

@@ -121,18 +121,19 @@
 
 ### R8: Filter Panel Layout and Height Management (FR-020)
 
-**Decision**: Use CSS flexbox layout with `max-height` and `overflow-y: auto` for the filter panel.
+**Decision**: The filter panel has no fixed height or panel-level scrolling. Only the branch badge area and author badge area independently cap their height at ~3-4 lines (~96-112px based on badge height) with `overflow-y: auto`. All other sections (date inputs, buttons) take their natural height.
 
 **Rationale**:
 - The filter panel sits in the `TogglePanel` area (between ControlBar and commit list), same as SearchWidget.
 - Panel content: three rows — (1) branch filter badges, (2) author filter with dropdown + badges, (3) date range fields + Reset All button.
-- Badges within each row use `flex-wrap: wrap` so they flow to multiple lines naturally.
-- `max-height` capped at approximately 3-4 lines of content (~120-160px). When content exceeds this, `overflow-y: auto` enables internal scrolling (FR-020).
-- Panel height adjusts dynamically based on content up to the cap.
+- Badges within each badge area use `flex-wrap: wrap` so they flow to multiple lines naturally.
+- Only badge areas can grow unbounded (many branches or authors selected). Date inputs, Reset All button, and labels have fixed natural height.
+- Each badge area independently has `max-height` (~96-112px) and `overflow-y: auto`. This prevents one large badge area from pushing other sections out of view.
+- The panel itself takes the combined natural height of all its children — no panel-level scrolling.
 
 **Alternatives considered**:
-- Fixed height panel: Rejected — wastes space when few filters are active. Dynamic height provides better UX.
-- Accordion/collapsible sections: Rejected — adds interaction complexity for minimal benefit. The panel is already compact with 3 rows.
+- Panel-level max-height with panel-wide scrolling: Rejected — scrolling the entire panel hides date inputs and Reset All button, degrading usability. Badge-area-only scrolling keeps controls always visible.
+- Accordion/collapsible sections: Rejected — adds interaction complexity for minimal benefit.
 
 ### R9: Author Badge Component Design (FR-017)
 
@@ -147,9 +148,25 @@
 **Alternatives considered**:
 - Two separate components: Rejected — violates DRY and FR-017's explicit requirement for a shared component.
 
-### R10: Empty State When Filters Produce Zero Commits (FR-011)
+### R10: Branch Badge Component Reuse in Filter Panel (FR-008)
 
-**Decision**: Show an empty state message in the commit list area (both table and classic views) when active filters result in zero matching commits.
+**Decision**: Reuse the existing `RefLabel` component for branch badges in the filter panel, with graph-line-based colors resolved via the topology → colorUtils pipeline.
+
+**Rationale**:
+- FR-008 requires branch badges in the filter panel to use the same component and colors as the commit table.
+- `RefLabel` already accepts a `laneColorStyle` prop (backgroundColor, color, borderColor) and renders badges with correct icons and labels for local/remote/merged/tag types.
+- Color resolution pipeline: for each filtered branch, find a commit that has that ref → get the `CommitNode` from `topology.nodes` → extract `node.colorIndex` → resolve hex color via `getColor(colorIndex, palette)` → convert to CSS style via `getLaneColorStyle()`.
+- The palette is available from `userSettings.graphColors` in the Zustand store (with `DEFAULT_GRAPH_PALETTE` fallback).
+- A utility function `getBranchLaneColorStyle()` should be created in `filterUtils.ts` to encapsulate the branch → commit → node → color lookup, since this logic is needed in the filter panel but not directly available from the topology.
+- When a branch has no commit visible in the current topology (edge case), fall back to RefLabel's default badge styling (VS Code badge colors).
+
+**Alternatives considered**:
+- Create a separate `BranchBadge` component: Rejected — violates DRY and FR-008's explicit requirement to reuse the same component.
+- Assign colors by branch name hash: Rejected — colors must match graph lines, not be independently derived. The topology lane color is the source of truth.
+
+### R11: Empty State When Filters Produce Zero Commits (FR-011)
+
+**Decision**: Show an empty state message in the commit list area when active filters result in zero matching commits.
 
 **Rationale**:
 - Currently, when `mergedCommits.length === 0` and `loading === false`, no special message is shown.

@@ -28,10 +28,9 @@
 
 ### Phase 4: Context Menus & Polish (frontend)
 
-13. **Update `CommitTableRow`** — Add context menu triggers on author and date cells.
-14. **Update `CommitContextMenu`** — Add author filter and date filter menu items.
-15. **Update `BranchContextMenu`** — Add branch filter menu items.
-16. **Add empty state** — Show "No commits match the current filters" in `GraphContainer`/`CommitTable` when filtered results are empty.
+13. **Update `CommitTableRow`** — Add nested Radix context menu triggers on author and date cells with filter actions.
+14. **Update `BranchContextMenu`** — Add branch filter menu items.
+15. **Add empty state** — Show "No commits match the current filters" in `GraphContainer` when filtered results are empty.
 
 ### Phase 5: Validation
 
@@ -54,9 +53,9 @@
 | `webview-ui/src/components/MultiBranchDropdown.tsx` | Modify | Refactor to use MultiSelectDropdown |
 | `webview-ui/src/components/ControlBar.tsx` | Modify | Unhide button, update colors |
 | `webview-ui/src/components/CommitDetailsPanel.tsx` | Modify | AuthorBadge for author display |
-| `webview-ui/src/components/CommitTableRow.tsx` | Modify | Context menu triggers |
-| `webview-ui/src/components/CommitContextMenu.tsx` | Modify | Author/date filter items |
+| `webview-ui/src/components/CommitTableRow.tsx` | Modify | Nested context menus for author/date filter actions |
 | `webview-ui/src/components/BranchContextMenu.tsx` | Modify | Branch filter items |
+| `webview-ui/src/utils/filterUtils.ts` | Create | `getBranchLaneColorStyle()` utility for branch badge colors |
 | `webview-ui/src/components/GraphContainer.tsx` | Modify | Empty state |
 | `webview-ui/src/stores/graphStore.ts` | Modify | Author list, centralized reset |
 | `webview-ui/src/rpc/rpcClient.ts` | Modify | getAuthors, authorList handling |
@@ -68,3 +67,5 @@
 3. **Generic MultiSelectDropdown**: Shared between branch and author dropdowns to avoid duplication.
 4. **No new packages**: Uses Chromium native date input and existing Radix UI.
 5. **Transient state**: All filters reset on session/panel open — no persistence.
+6. **Branch badge reuse**: Filter panel branch badges reuse the `RefLabel` component with `laneColorStyle` from graph topology (same component + colors as commit table).
+7. **Badge-area-only scrolling**: The filter panel has no fixed height. Only branch badge and author badge areas independently cap at ~3-4 lines with overflow scrolling. Date inputs, buttons stay always visible.
