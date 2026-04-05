@@ -37,13 +37,8 @@ export class GitLogService {
       '--date-order'
     );
 
-    if (filters?.authors && filters.authors.length > 0) {
-      for (const email of filters.authors) {
-        args.push(`--author=${email}`);
-      }
-    } else if (filters?.author) {
-      args.push(`--author=${filters.author}`);
-    }
+    // Author filtering is handled client-side (visibility filter) — never pass --author to git.
+    // This ensures the frontend has full commit ancestry for topology computation.
 
     if (filters?.afterDate) {
       args.push(`--after=${filters.afterDate}`);
@@ -86,7 +81,7 @@ export class GitLogService {
       }
     }
 
-    const hasFilter = !!(filters?.branches?.length || filters?.author || filters?.authors?.length || filters?.afterDate || filters?.beforeDate);
+    const hasFilter = !!(filters?.branches?.length || filters?.afterDate || filters?.beforeDate);
     return ok({
       commits,
       totalLoadedWithoutFilter: hasFilter ? undefined : commits.length,

@@ -56,8 +56,15 @@ class RpcClient {
         store.appendCommits(message.payload.commits, message.payload.totalLoadedWithoutFilter);
         store.setHasMore(message.payload.hasMore);
         store.setPrefetching(false);
-        // Catch-up is handled by GraphContainer's useEffect which re-runs when
-        // lastBatchStartIndex or prefetching changes.
+        // Auto-retry: if batch yielded no visible commits and cap not reached, fetch more
+        const updatedStore = useGraphStore.getState();
+        if (
+          updatedStore.consecutiveEmptyBatches > 0 &&
+          updatedStore.consecutiveEmptyBatches < 3 &&
+          updatedStore.hasMore
+        ) {
+          this.firePrefetch();
+        }
         break;
       }
       case 'repoList':
@@ -489,8 +496,9 @@ class RpcClient {
     const store = useGraphStore.getState();
     if (!store.hasMore || store.prefetching) return;
     store.setPrefetching(true);
-    const { branches, author, authors, afterDate, beforeDate } = store.filters;
-    this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branches, author, authors, afterDate, beforeDate });
+    // Author filtering is done client-side — never pass author/authors to backend
+    const { branches, afterDate, beforeDate } = store.filters;
+    this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branches, afterDate, beforeDate });
   }
 }
 

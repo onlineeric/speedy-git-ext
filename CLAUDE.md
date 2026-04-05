@@ -93,9 +93,7 @@ Built with **Vite** + React plugin → `dist/webview/`
 - **Git**: NEVER commit or merge; only readonly operations (`git log`, `git status`, `git diff`) and create PR, create branch only if I ask you to do so, or if speckit workflow requires it.
 
 ## Active Technologies
-- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, and `noImplicitReturns`) powers both the VS Code extension backend (`esbuild`, VS Code API) and the React 18 webview frontend (`Vite`), with Zustand and Tailwind CSS used across the UI.
-- Shared frontend libraries include Radix UI (`react-context-menu`, `react-dialog`, `react-alert-dialog`, `react-popover`), `@tanstack/react-virtual`, and `headless-tree`; git data comes from the local repository, with application state kept primarily in memory and only selective UI preferences persisted via VS Code `context.globalState`.
-- TypeScript 5.x (strict mode with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand (state), Radix UI (popovers, context menus), @tanstack/react-virtual (virtual scrolling), Vite (webview build), esbuild (extension build) (032-advanced-filter-panel)
-- In-memory (Zustand store); filter state is transient, not persisted across sessions (032-advanced-filter-panel)
+- TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) powers both the VS Code extension backend (`esbuild`, VS Code API) and the React 18 webview frontend (`Vite`), with Zustand and Tailwind CSS used across the UI.
+- Shared frontend libraries include Radix UI (`react-context-menu`, `react-dialog`, `react-alert-dialog`, `react-popover`), `@tanstack/react-virtual`, and `headless-tree`; git data comes from the local repository, with application state kept primarily in memory (Zustand store, transient per session) and only selective UI preferences persisted via VS Code `context.globalState`.
 
 ## Recent Changes

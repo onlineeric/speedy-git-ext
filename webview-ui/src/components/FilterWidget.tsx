@@ -23,6 +23,7 @@ export function FilterWidget() {
   const filters = useGraphStore((s) => s.filters);
   const authorList = useGraphStore((s) => s.authorList);
   const setFilters = useGraphStore((s) => s.setFilters);
+  const recomputeVisibility = useGraphStore((s) => s.recomputeVisibility);
   const resetAllFilters = useGraphStore((s) => s.resetAllFilters);
   const setActiveToggleWidget = useGraphStore((s) => s.setActiveToggleWidget);
   const mergedCommits = useGraphStore((s) => s.mergedCommits);
@@ -109,15 +110,15 @@ export function FilterWidget() {
         : [...current, author.email];
       const authors = next.length > 0 ? next : undefined;
       setFilters({ authors });
-      rpcClient.getCommits({ ...useGraphStore.getState().filters, authors });
+      recomputeVisibility();
     },
-    [setFilters],
+    [setFilters, recomputeVisibility],
   );
 
   const handleAuthorClear = useCallback(() => {
     setFilters({ authors: undefined });
-    rpcClient.getCommits({ ...useGraphStore.getState().filters, authors: undefined });
-  }, [setFilters]);
+    recomputeVisibility();
+  }, [setFilters, recomputeVisibility]);
 
   const handleAuthorRemove = useCallback(
     (email: string) => {
@@ -125,9 +126,9 @@ export function FilterWidget() {
       const next = current.filter((e) => e !== email);
       const authors = next.length > 0 ? next : undefined;
       setFilters({ authors });
-      rpcClient.getCommits({ ...useGraphStore.getState().filters, authors });
+      recomputeVisibility();
     },
-    [setFilters],
+    [setFilters, recomputeVisibility],
   );
 
   // Branch badge removal (accepts multiple names for combined local+remote badges)
@@ -145,9 +146,15 @@ export function FilterWidget() {
 
   // Reset All handler
   const handleResetAll = useCallback(() => {
+    const filters = useGraphStore.getState().filters;
+    const hadStructuralFilters = !!(filters.branches?.length || filters.afterDate || filters.beforeDate);
     resetAllFilters({ preserveBranches: false });
-    rpcClient.getCommits(useGraphStore.getState().filters);
-  }, [resetAllFilters]);
+    recomputeVisibility();
+    // Only re-fetch from backend if structural filters were active
+    if (hadStructuralFilters) {
+      rpcClient.getCommits(useGraphStore.getState().filters);
+    }
+  }, [resetAllFilters, recomputeVisibility]);
 
   const hasAnyFilters = !!(filters.branches?.length || filters.authors?.length || filters.afterDate || filters.beforeDate);
 
