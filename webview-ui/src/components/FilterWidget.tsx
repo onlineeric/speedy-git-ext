@@ -227,16 +227,28 @@ export function FilterWidget() {
                   topology,
                   graphColors,
                 );
+                const removeBtnStyle: React.CSSProperties = colorStyle
+                  ? { backgroundColor: colorStyle.backgroundColor, color: colorStyle.color, borderColor: colorStyle.borderColor }
+                  : {};
+                const removeBtnFallback = !colorStyle
+                  ? 'border-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]'
+                  : '';
                 return (
-                  <span key={badge.key} className="inline-flex items-center gap-0.5">
-                    <RefLabel displayRef={toDisplayRef(badge)} laneColorStyle={colorStyle} className="whitespace-nowrap" />
+                  <span key={badge.key} className="inline-flex items-stretch">
+                    <RefLabel
+                      displayRef={toDisplayRef(badge)}
+                      laneColorStyle={colorStyle}
+                      className="whitespace-nowrap !rounded-r-none"
+                      style={{ borderRightWidth: 0 }}
+                    />
                     <button
                       onClick={() => {
                         for (const name of badge.allNames) {
                           handleBranchRemove(name);
                         }
                       }}
-                      className="ml-0.5 flex-shrink-0 hover:text-[var(--vscode-errorForeground)] focus:outline-none"
+                      className={`flex-shrink-0 px-1 py-0.5 text-xs border rounded-r flex items-center hover:brightness-75 focus:outline-none ${removeBtnFallback}`}
+                      style={{ ...removeBtnStyle, borderLeftWidth: 0 }}
                       title={`Remove ${badge.primaryName}`}
                       aria-label={`Remove ${badge.primaryName} from filter`}
                     >
