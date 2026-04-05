@@ -118,15 +118,17 @@ export function FilterWidget() {
     [setFilters],
   );
 
-  // Branch badge removal
+  // Branch badge removal (accepts multiple names for combined local+remote badges)
   const handleBranchRemove = useCallback(
-    (branchName: string) => {
-      const current = filters.branches ?? [];
-      const next = current.filter((b) => b !== branchName);
-      setFilters({ branches: next.length > 0 ? next : undefined });
-      rpcClient.getCommits({ ...useGraphStore.getState().filters, branches: next.length > 0 ? next : undefined });
+    (branchNames: string[]) => {
+      const removeSet = new Set(branchNames);
+      const current = useGraphStore.getState().filters.branches ?? [];
+      const next = current.filter((b) => !removeSet.has(b));
+      const branches = next.length > 0 ? next : undefined;
+      setFilters({ branches });
+      rpcClient.getCommits({ ...useGraphStore.getState().filters, branches });
     },
-    [filters.branches, setFilters],
+    [setFilters],
   );
 
   // Reset All handler
@@ -242,11 +244,7 @@ export function FilterWidget() {
                       style={{ borderRightWidth: 0 }}
                     />
                     <button
-                      onClick={() => {
-                        for (const name of badge.allNames) {
-                          handleBranchRemove(name);
-                        }
-                      }}
+                      onClick={() => handleBranchRemove(badge.allNames)}
                       className={`flex-shrink-0 px-1 py-0.5 text-xs border rounded-r flex items-center hover:brightness-75 focus:outline-none ${removeBtnFallback}`}
                       style={{ ...removeBtnStyle, borderLeftWidth: 0 }}
                       title={`Remove ${badge.primaryName}`}
