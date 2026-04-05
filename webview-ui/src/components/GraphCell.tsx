@@ -81,6 +81,7 @@ export const GraphCell = memo(function GraphCell({
         const fromX = getLaneX(incoming.fromLane);
         const toX = nodeX;
         const incomingColor = getColor(incoming.colorIndex, palette);
+        const incomingDottedProps = incoming.isDotted ? { strokeDasharray: '4 3', opacity: 0.7 } : {};
 
         if (incoming.fromLane === node.lane) {
           // Same lane - straight line from top to node
@@ -93,6 +94,7 @@ export const GraphCell = memo(function GraphCell({
               y2={nodeY - NODE_RADIUS}
               stroke={incomingColor}
               strokeWidth={2}
+              {...incomingDottedProps}
             />
           );
         } else {
@@ -104,6 +106,7 @@ export const GraphCell = memo(function GraphCell({
               stroke={incomingColor}
               strokeWidth={2}
               fill="none"
+              {...incomingDottedProps}
             />
           );
         }
@@ -148,7 +151,7 @@ export const GraphCell = memo(function GraphCell({
             </g>
           );
         } else {
-          if (!hasMerge || conn.reReserved) {
+          if ((!hasMerge && !conn.isMergeProxy) || conn.reReserved) {
             // For regular branch commits, keep child row straight and let the parent row
             // render the split curve via incomingConnections (matches Git Graph style).
             return (

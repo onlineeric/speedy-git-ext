@@ -21,11 +21,15 @@ export interface CommitNode {
     isDotted?: boolean;
     /** Number of hidden commits between the two visible commits */
     hiddenCount?: number;
+    /** True when this connection is a proxy for a hidden merge commit's secondary parent */
+    isMergeProxy?: boolean;
   }[];
   /** Connections coming INTO this commit from ABOVE (from child commits) */
   incomingConnections: {
     fromLane: number;
     colorIndex: number;
+    /** True when the incoming connection spans hidden (filtered-out) commits */
+    isDotted?: boolean;
   }[];
   /** Whether a same-lane child commit above connects down to this commit */
   hasConnectionFromAbove: boolean;
@@ -312,7 +316,13 @@ export function calculateTopology(commits: Commit[], hiddenHashes?: Set<string>,
   // Skip-connection post-pass: create dotted connections through hidden commits.
   // For each visible node, if a parent is hidden, walk through hidden parents
   // following the first parent (mainline) until a visible ancestor is found.
+  // Also detects hidden merge commits and creates proxy connections to their
+  // visible secondary parents, so filtered-out merges don't leave branches disconnected.
   if (commitByHash && hiddenHashes && hiddenHashes.size > 0) {
+    // Track processed hidden merge secondary parents to avoid duplicate proxy connections
+    // when multiple visible nodes walk through the same hidden merge.
+    const processedMergeParents = new Set<string>();
+
     for (const node of nodes.values()) {
       const updatedConnections: CommitNode['parentConnections'] = [];
       for (const conn of node.parentConnections) {
@@ -320,8 +330,51 @@ export function calculateTopology(commits: Commit[], hiddenHashes?: Set<string>,
           // Parent is hidden — walk through hidden parents to find visible ancestor
           let current = commitByHash.get(conn.parentHash);
           let hiddenCount = 0;
+          let mainlineAncestorHash: string | undefined;
+
           while (current && hiddenHashes.has(current.hash)) {
             hiddenCount++;
+
+            // Check if this hidden commit is a merge with secondary parents.
+            // Create dotted proxy connections to visible secondary parents
+            // so the merged branches remain visually connected.
+            if (current.parents.length > 1) {
+              for (let p = 1; p < current.parents.length; p++) {
+                const secParentHash = current.parents[p];
+                const mergeParentKey = `${current.hash}:${p}`;
+
+                if (!processedMergeParents.has(mergeParentKey)) {
+                  processedMergeParents.add(mergeParentKey);
+
+                  // Walk secondary parent chain to find visible ancestor
+                  let secCurrent = commitByHash.get(secParentHash);
+                  let secHiddenCount = 0;
+
+                  while (secCurrent && hiddenHashes.has(secCurrent.hash)) {
+                    secHiddenCount++;
+                    if (secCurrent.parents.length === 0) {
+                      secCurrent = undefined;
+                      break;
+                    }
+                    secCurrent = commitByHash.get(secCurrent.parents[0]);
+                  }
+
+                  if (secCurrent && nodes.has(secCurrent.hash)) {
+                    const secAncestorNode = nodes.get(secCurrent.hash)!;
+                    updatedConnections.push({
+                      parentHash: secCurrent.hash,
+                      fromLane: conn.fromLane,
+                      toLane: secAncestorNode.lane,
+                      colorIndex: secAncestorNode.colorIndex,
+                      isDotted: true,
+                      hiddenCount: hiddenCount + secHiddenCount,
+                      isMergeProxy: true,
+                    });
+                  }
+                }
+              }
+            }
+
             // Follow first parent (mainline) only
             if (current.parents.length === 0) {
               current = undefined;
@@ -330,6 +383,7 @@ export function calculateTopology(commits: Commit[], hiddenHashes?: Set<string>,
             current = commitByHash.get(current.parents[0]);
           }
           if (current && nodes.has(current.hash)) {
+            mainlineAncestorHash = current.hash;
             // Found a visible ancestor — create dotted skip connection
             const ancestorNode = nodes.get(current.hash)!;
             updatedConnections.push({
@@ -339,6 +393,17 @@ export function calculateTopology(commits: Commit[], hiddenHashes?: Set<string>,
               isDotted: true,
               hiddenCount,
             });
+          }
+          // Remove proxy connections that point to the same target as the mainline skip-connection
+          // (can happen in diamond merge patterns)
+          if (mainlineAncestorHash) {
+            for (let j = updatedConnections.length - 1; j >= 0; j--) {
+              const c = updatedConnections[j];
+              if (c !== updatedConnections[updatedConnections.length - 1] &&
+                  c.parentHash === mainlineAncestorHash && c.isDotted) {
+                updatedConnections.splice(j, 1);
+              }
+            }
           }
           // If no visible ancestor found, connection is removed (commit becomes root-like)
         } else {
@@ -393,7 +458,7 @@ function buildIncomingConnections(
   nodes: Map<string, CommitNode>,
   commitIndexByHash: Map<string, number>
 ) {
-  const incomingByHash = new Map<string, { fromLane: number; colorIndex: number }[]>();
+  const incomingByHash = new Map<string, { fromLane: number; colorIndex: number; isDotted?: boolean }[]>();
   const hasSameLaneIncoming = new Set<string>();
 
   for (const commit of commits) {
@@ -411,7 +476,7 @@ function buildIncomingConnections(
       let incomingLane: number;
       if (conn.fromLane === conn.toLane) {
         incomingLane = conn.toLane;
-      } else if (isMergeCommit && !conn.reReserved) {
+      } else if ((isMergeCommit || conn.isMergeProxy) && !conn.reReserved) {
         // Merge rows already bend onto toLane on the child row.
         incomingLane = conn.toLane;
       } else {
@@ -419,7 +484,7 @@ function buildIncomingConnections(
         incomingLane = conn.fromLane;
       }
 
-      addIncomingConnection(incomingByHash, conn.parentHash, incomingLane, conn.colorIndex);
+      addIncomingConnection(incomingByHash, conn.parentHash, incomingLane, conn.colorIndex, conn.isDotted);
       if (incomingLane === parentNode.lane) {
         hasSameLaneIncoming.add(conn.parentHash);
       }
@@ -479,7 +544,7 @@ function computePassingLanes(
           const continuationLane =
             conn.fromLane === conn.toLane
               ? conn.toLane
-              : (isMergeCommit && !conn.reReserved)
+              : ((isMergeCommit || conn.isMergeProxy) && !conn.reReserved)
               ? conn.toLane
               : conn.fromLane;
 
@@ -544,13 +609,14 @@ function reReserveParent(
 }
 
 function addIncomingConnection(
-  map: Map<string, { fromLane: number; colorIndex: number }[]>,
+  map: Map<string, { fromLane: number; colorIndex: number; isDotted?: boolean }[]>,
   hash: string,
   fromLane: number,
-  colorIndex: number
+  colorIndex: number,
+  isDotted?: boolean
 ) {
   const existing = map.get(hash) || [];
-  existing.push({ fromLane, colorIndex });
+  existing.push({ fromLane, colorIndex, isDotted });
   map.set(hash, existing);
 }
 
