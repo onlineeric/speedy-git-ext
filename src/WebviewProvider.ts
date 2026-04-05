@@ -557,6 +557,7 @@ export class WebviewProvider {
       }
 
       await this.handleMessage({ type: 'getBranches', payload: {} });
+      await this.handleMessage({ type: 'getAuthors', payload: {} });
       await this.handleMessage({ type: 'getRemotes', payload: {} });
       await this.handleMessage({ type: 'getSubmodules', payload: {} });
       await this.handleMessage({ type: 'getWorktreeList', payload: {} });
@@ -644,6 +645,15 @@ export class WebviewProvider {
   private async handleMessage(message: RequestMessage) {
     this.log.debug(`Received message: ${message.type}`);
     switch (message.type) {
+      case 'getAuthors': {
+        const result = await this.gitLogService.getAuthors();
+        if (result.success) {
+          this.postMessage({ type: 'authorList', payload: { authors: result.value } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
       case 'getCommits': {
         if (message.payload.filters) {
           this.currentFilters = { maxCount: this.currentFilters.maxCount, ...message.payload.filters };

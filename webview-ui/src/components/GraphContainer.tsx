@@ -68,14 +68,19 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
     const element = containerRef.current;
     if (!element) return;
 
-    const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width ?? 0;
+    const updateWidth = (width: number) => {
       setContainerWidth(width);
       setMaxVisibleRefs(computeMaxVisibleRefs(width));
+    };
+
+    updateWidth(element.clientWidth);
+
+    const observer = new ResizeObserver((entries) => {
+      updateWidth(entries[0]?.contentRect.width ?? element.clientWidth ?? 0);
     });
     observer.observe(element);
     return () => observer.disconnect();
-  }, [setMaxVisibleRefs]);
+  }, [setMaxVisibleRefs, commits.length]);
 
   // Dismiss tooltip on scroll
   useEffect(() => {
@@ -162,20 +167,11 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
   );
   const tableMode = commitListMode === 'table';
 
-  if (commits.length === 0) {
-    return (
-      <div className="flex h-full flex-col">
-        <CherryPickConflictBanner />
-        <RebaseConflictBanner />
-        <SubmoduleBreadcrumb />
-        <TogglePanel />
-        <SubmoduleSection submodules={submodules} />
-        <div className="flex flex-1 items-center justify-center text-[var(--vscode-descriptionForeground)]">
-          No commits found
-        </div>
-      </div>
-    );
-  }
+  const filters = useGraphStore((state) => state.filters);
+  const loading = useGraphStore((state) => state.loading);
+
+  const hasActiveFilter = !!(filters.branches?.length || filters.authors?.length || filters.afterDate || filters.beforeDate);
+  const isEmpty = commits.length === 0;
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -184,96 +180,104 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
       <SubmoduleBreadcrumb />
       <TogglePanel />
       <SubmoduleSection submodules={submodules} />
-      {tableMode && (
-        <div className="overflow-hidden bg-[var(--vscode-editor-background)]">
-          <CommitTableHeader layout={resolvedTableLayout} />
+      {isEmpty ? (
+        <div className="flex flex-1 items-center justify-center text-[var(--vscode-descriptionForeground)]">
+          {loading ? 'Loading…' : hasActiveFilter ? 'No commits match the current filters' : 'No commits found'}
         </div>
-      )}
-      <div
-        ref={containerRef}
-        className={`flex-1 bg-[var(--vscode-list-background)] ${tableMode ? 'overflow-y-auto overflow-x-hidden' : 'overflow-auto'}`}
-      >
-        <div
-          className={`relative ${tableMode ? '' : 'w-full'}`}
-          style={{
-            height: totalSize,
-            width: tableMode ? resolvedTableLayout.tableWidth : undefined,
-            minWidth: tableMode ? resolvedTableLayout.minimumTableWidth : undefined,
-          }}
-        >
-          {virtualItems.map((virtualItem) => {
-            const commit = commits[virtualItem.index];
-            const currentMatch = searchState.matchIndices[searchState.currentMatchIndex];
-            const isSelected = selectedCommit === commit.hash;
-            const isMultiSelected = selectedCommitsSet.has(commit.hash);
-            const isCurrentSearchMatch = currentMatch === virtualItem.index;
-            const isSearchMatch = visibleMatchIndices.has(virtualItem.index);
-            const rowStyle = {
-              position: 'absolute' as const,
-              top: 0,
-              left: 0,
-              width: tableMode ? resolvedTableLayout.tableWidth : '100%',
-              height: ROW_HEIGHT,
-              transform: `translateY(${virtualItem.start}px)`,
-            };
+      ) : (
+        <>
+          {tableMode && (
+            <div className="overflow-hidden bg-[var(--vscode-editor-background)]">
+              <CommitTableHeader layout={resolvedTableLayout} />
+            </div>
+          )}
+          <div
+            ref={containerRef}
+            className={`flex-1 bg-[var(--vscode-list-background)] ${tableMode ? 'overflow-y-auto overflow-x-hidden' : 'overflow-auto'}`}
+          >
+            <div
+              className={`relative ${tableMode ? '' : 'w-full'}`}
+              style={{
+                height: totalSize,
+                width: tableMode ? resolvedTableLayout.tableWidth : undefined,
+                minWidth: tableMode ? resolvedTableLayout.minimumTableWidth : undefined,
+              }}
+            >
+              {virtualItems.map((virtualItem) => {
+                const commit = commits[virtualItem.index];
+                const currentMatch = searchState.matchIndices[searchState.currentMatchIndex];
+                const isSelected = selectedCommit === commit.hash;
+                const isMultiSelected = selectedCommitsSet.has(commit.hash);
+                const isCurrentSearchMatch = currentMatch === virtualItem.index;
+                const isSearchMatch = visibleMatchIndices.has(virtualItem.index);
+                const rowStyle = {
+                  position: 'absolute' as const,
+                  top: 0,
+                  left: 0,
+                  width: tableMode ? resolvedTableLayout.tableWidth : '100%',
+                  height: ROW_HEIGHT,
+                  transform: `translateY(${virtualItem.start}px)`,
+                };
 
-            if (tableMode) {
-              return (
-                <CommitTableRow
-                  key={commit.hash}
-                  commit={commit}
-                  commits={commits}
-                  index={virtualItem.index}
-                  topology={topology}
-                  rowHeight={ROW_HEIGHT}
-                  layout={resolvedTableLayout}
-                  maxVisibleRefs={maxVisibleRefs}
-                  userSettings={userSettings}
-                  isSelected={isSelected}
-                  isMultiSelected={isMultiSelected}
-                  isSearchMatch={isSearchMatch}
-                  isCurrentSearchMatch={isCurrentSearchMatch}
-                  onClick={(event) => handleCommitClick(commit.hash, virtualItem.index, event)}
-                  onNodeMouseEnter={stableOnNodeMouseEnter}
-                  onNodeMouseLeave={stableOnNodeMouseLeave}
-                  style={rowStyle}
-                />
-              );
-            }
+                if (tableMode) {
+                  return (
+                    <CommitTableRow
+                      key={commit.hash}
+                      commit={commit}
+                      commits={commits}
+                      index={virtualItem.index}
+                      topology={topology}
+                      rowHeight={ROW_HEIGHT}
+                      layout={resolvedTableLayout}
+                      maxVisibleRefs={maxVisibleRefs}
+                      userSettings={userSettings}
+                      isSelected={isSelected}
+                      isMultiSelected={isMultiSelected}
+                      isSearchMatch={isSearchMatch}
+                      isCurrentSearchMatch={isCurrentSearchMatch}
+                      onClick={(event) => handleCommitClick(commit.hash, virtualItem.index, event)}
+                      onNodeMouseEnter={stableOnNodeMouseEnter}
+                      onNodeMouseLeave={stableOnNodeMouseLeave}
+                      style={rowStyle}
+                    />
+                  );
+                }
 
-            return (
-              <CommitRow
-                key={commit.hash}
-                commit={commit}
-                commits={commits}
-                index={virtualItem.index}
-                topology={topology}
-                graphWidth={graphWidth}
-                rowHeight={ROW_HEIGHT}
-                maxVisibleRefs={maxVisibleRefs}
-                userSettings={userSettings}
-                isSelected={isSelected}
-                isMultiSelected={isMultiSelected}
-                isSearchMatch={isSearchMatch}
-                isCurrentSearchMatch={isCurrentSearchMatch}
-                onClick={(event) => handleCommitClick(commit.hash, virtualItem.index, event)}
-                onNodeMouseEnter={stableOnNodeMouseEnter}
-                onNodeMouseLeave={stableOnNodeMouseLeave}
-                style={rowStyle}
-              />
-            );
-          })}
-        </div>
-      </div>
-      <CommitTooltip
-        commit={hoveredCommit}
-        onMouseEnter={onTooltipMouseEnter}
-        onMouseLeave={onTooltipMouseLeave}
-      />
-      {prefetching && (
-        <div className="flex items-center justify-center py-2 text-xs text-[var(--vscode-descriptionForeground)]">
-          Loading…
-        </div>
+                return (
+                  <CommitRow
+                    key={commit.hash}
+                    commit={commit}
+                    commits={commits}
+                    index={virtualItem.index}
+                    topology={topology}
+                    graphWidth={graphWidth}
+                    rowHeight={ROW_HEIGHT}
+                    maxVisibleRefs={maxVisibleRefs}
+                    userSettings={userSettings}
+                    isSelected={isSelected}
+                    isMultiSelected={isMultiSelected}
+                    isSearchMatch={isSearchMatch}
+                    isCurrentSearchMatch={isCurrentSearchMatch}
+                    onClick={(event) => handleCommitClick(commit.hash, virtualItem.index, event)}
+                    onNodeMouseEnter={stableOnNodeMouseEnter}
+                    onNodeMouseLeave={stableOnNodeMouseLeave}
+                    style={rowStyle}
+                  />
+                );
+              })}
+            </div>
+          </div>
+          <CommitTooltip
+            commit={hoveredCommit}
+            onMouseEnter={onTooltipMouseEnter}
+            onMouseLeave={onTooltipMouseLeave}
+          />
+          {prefetching && (
+            <div className="flex items-center justify-center py-2 text-xs text-[var(--vscode-descriptionForeground)]">
+              Loading…
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -95,5 +95,7 @@ Built with **Vite** + React plugin → `dist/webview/`
 ## Active Technologies
 - TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, and `noImplicitReturns`) powers both the VS Code extension backend (`esbuild`, VS Code API) and the React 18 webview frontend (`Vite`), with Zustand and Tailwind CSS used across the UI.
 - Shared frontend libraries include Radix UI (`react-context-menu`, `react-dialog`, `react-alert-dialog`, `react-popover`), `@tanstack/react-virtual`, and `headless-tree`; git data comes from the local repository, with application state kept primarily in memory and only selective UI preferences persisted via VS Code `context.globalState`.
+- TypeScript 5.x (strict mode with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) + React 18, Zustand (state), Radix UI (popovers, context menus), @tanstack/react-virtual (virtual scrolling), Vite (webview build), esbuild (extension build) (032-advanced-filter-panel)
+- In-memory (Zustand store); filter state is transient, not persisted across sessions (032-advanced-filter-panel)
 
 ## Recent Changes

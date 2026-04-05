@@ -9,7 +9,7 @@ import { ToastContainer } from './components/ToastContainer';
 
 export function App() {
   const rootRef = useRef<HTMLDivElement>(null);
-  const { loading, detailsPanelOpen, detailsPanelPosition, mergedCommits, selectedCommitIndex } = useGraphStore();
+  const { detailsPanelOpen, detailsPanelPosition, mergedCommits, selectedCommitIndex } = useGraphStore();
   const activeToggleWidget = useGraphStore((state) => state.activeToggleWidget);
   const setActiveToggleWidget = useGraphStore((state) => state.setActiveToggleWidget);
   const setSelectedCommit = useGraphStore((state) => state.setSelectedCommit);
@@ -120,16 +120,10 @@ export function App() {
       <ControlBar />
       <div className={`flex flex-1 overflow-hidden ${isBottom ? 'flex-col' : 'flex-row'}`}>
         <div className="relative flex-1 overflow-hidden">
-          {loading ? (
-            <div className="flex h-full items-center justify-center text-[var(--vscode-descriptionForeground)]">
-              Loading commits...
-            </div>
-          ) : (
-            <GraphContainer
-              selectedCommit={selectedCommit}
-              onSelectCommit={handleCommitSelect}
-            />
-          )}
+          <GraphContainer
+            selectedCommit={selectedCommit}
+            onSelectCommit={handleCommitSelect}
+          />
           {isLoadingRepo && (
             <div
               aria-busy="true"
