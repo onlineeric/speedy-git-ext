@@ -68,14 +68,19 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
     const element = containerRef.current;
     if (!element) return;
 
-    const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width ?? 0;
+    const updateWidth = (width: number) => {
       setContainerWidth(width);
       setMaxVisibleRefs(computeMaxVisibleRefs(width));
+    };
+
+    updateWidth(element.clientWidth);
+
+    const observer = new ResizeObserver((entries) => {
+      updateWidth(entries[0]?.contentRect.width ?? element.clientWidth ?? 0);
     });
     observer.observe(element);
     return () => observer.disconnect();
-  }, [setMaxVisibleRefs]);
+  }, [setMaxVisibleRefs, commits.length]);
 
   // Dismiss tooltip on scroll
   useEffect(() => {
