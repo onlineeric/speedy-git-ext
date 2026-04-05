@@ -179,6 +179,10 @@ class RpcClient {
       case 'persistedUIState':
         store.hydratePersistedUIState(message.payload.uiState);
         break;
+      case 'authorList':
+        store.setAuthorList(message.payload.authors);
+        store.setAuthorListLoading(false);
+        break;
     }
   }
 
@@ -186,8 +190,13 @@ class RpcClient {
     this.vscode?.postMessage(message);
   }
 
-  getCommits(filters?: Partial<{ branches?: string[]; author?: string; maxCount: number }>) {
+  getCommits(filters?: Partial<{ branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string; maxCount: number }>) {
     this.send({ type: 'getCommits', payload: { filters } });
+  }
+
+  getAuthors() {
+    useGraphStore.getState().setAuthorListLoading(true);
+    this.send({ type: 'getAuthors', payload: {} });
   }
 
   getBranches() {
@@ -472,7 +481,7 @@ class RpcClient {
   }
 
   // Pagination
-  loadMoreCommits(skip: number, generation: number, filters: { branches?: string[]; author?: string }) {
+  loadMoreCommits(skip: number, generation: number, filters: { branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string }) {
     this.send({ type: 'loadMoreCommits', payload: { skip, generation, filters } });
   }
 
@@ -480,8 +489,8 @@ class RpcClient {
     const store = useGraphStore.getState();
     if (!store.hasMore || store.prefetching) return;
     store.setPrefetching(true);
-    const { branches, author } = store.filters;
-    this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branches, author });
+    const { branches, author, authors, afterDate, beforeDate } = store.filters;
+    this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branches, author, authors, afterDate, beforeDate });
   }
 }
 

@@ -100,11 +100,14 @@ export function ControlBar() {
     'flex items-center justify-center p-1.5 rounded focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--vscode-toolbar-hoverBackground)]';
   const iconClass = 'w-6 h-6';
 
-  const filterHasBranchFilter = (graphFilters.branches?.length ?? 0) > 0;
+  const hasAnyFilter = (graphFilters.branches?.length ?? 0) > 0
+    || (graphFilters.authors?.length ?? 0) > 0
+    || !!graphFilters.afterDate
+    || !!graphFilters.beforeDate;
   const filterColor =
     activeToggleWidget === 'filter'
       ? TOGGLE_BUTTON_COLORS.active
-      : filterHasBranchFilter
+      : hasAnyFilter
         ? TOGGLE_BUTTON_COLORS.filtered
         : TOGGLE_BUTTON_COLORS.inactive;
   const searchColor =
@@ -127,7 +130,6 @@ export function ControlBar() {
         onClick={() => setActiveToggleWidget('filter')}
         className={`${iconButtonClass} ${filterColor}`}
         title="Filter"
-        style={{ display: 'none' }} // TODO: remove this once the filter button is wired to the toggle panel
       >
         <FilterIcon className={iconClass} />
       </button>

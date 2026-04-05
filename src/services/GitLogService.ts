@@ -2,7 +2,7 @@ import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { parseCommitLine, parseBranchLine } from '../utils/gitParsers.js';
 import { type Result, ok } from '../../shared/errors.js';
-import type { Commit, Branch, GraphFilters } from '../../shared/types.js';
+import type { Author, Commit, Branch, GraphFilters } from '../../shared/types.js';
 
 export interface CommitsResult {
   commits: Commit[];
@@ -37,8 +37,19 @@ export class GitLogService {
       '--date-order'
     );
 
-    if (filters?.author) {
+    if (filters?.authors && filters.authors.length > 0) {
+      for (const email of filters.authors) {
+        args.push(`--author=${email}`);
+      }
+    } else if (filters?.author) {
       args.push(`--author=${filters.author}`);
+    }
+
+    if (filters?.afterDate) {
+      args.push(`--after=${filters.afterDate}`);
+    }
+    if (filters?.beforeDate) {
+      args.push(`--before=${filters.beforeDate}`);
     }
 
     // Add branch filter(s) or --all flag after options so refs are parsed as revisions.
@@ -75,11 +86,40 @@ export class GitLogService {
       }
     }
 
-    const hasFilter = !!(filters?.branches?.length || filters?.author);
+    const hasFilter = !!(filters?.branches?.length || filters?.author || filters?.authors?.length || filters?.afterDate || filters?.beforeDate);
     return ok({
       commits,
       totalLoadedWithoutFilter: hasFilter ? undefined : commits.length,
     });
+  }
+
+  async getAuthors(): Promise<Result<Author[]>> {
+    this.log.info('Fetching authors');
+    const result = await this.executor.execute({
+      args: ['log', '--all', '--format=%an%x00%ae'],
+      cwd: this.workspacePath,
+    });
+
+    if (!result.success) {
+      return result;
+    }
+
+    const lines = result.value.stdout.trim().split('\n').filter(Boolean);
+    const authorsByEmail = new Map<string, string>();
+
+    for (const line of lines) {
+      const sepIndex = line.indexOf('\0');
+      if (sepIndex === -1) continue;
+      const name = line.substring(0, sepIndex);
+      const email = line.substring(sepIndex + 1);
+      if (!authorsByEmail.has(email)) {
+        authorsByEmail.set(email, name);
+      }
+    }
+
+    const authors: Author[] = Array.from(authorsByEmail, ([email, name]) => ({ name, email }));
+    authors.sort((a, b) => a.name.localeCompare(b.name));
+    return ok(authors);
   }
 
   async getBranches(): Promise<Result<Branch[]>> {

@@ -224,6 +224,13 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                 </ContextMenu.Item>
               </>
             )}
+
+            {isBranch && (
+              <>
+                <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                <BranchFilterMenuItem refInfo={refInfo} />
+              </>
+            )}
           </ContextMenu.Content>
         </ContextMenu.Portal>
       </ContextMenu.Root>
@@ -352,5 +359,55 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         targetRef={displayName}
       />
     </>
+  );
+}
+
+function BranchFilterMenuItem({ refInfo }: { refInfo: RefInfo }) {
+  const filters = useGraphStore((s) => s.filters);
+  const setFilters = useGraphStore((s) => s.setFilters);
+  const branches = useGraphStore((s) => s.branches);
+
+  // Build the list of branch names to toggle (local name + remote refs if combined)
+  const branchNames = useMemo(() => {
+    const names: string[] = [];
+    if (refInfo.type === 'branch') {
+      names.push(refInfo.name);
+      // Also include remote counterparts
+      for (const b of branches) {
+        if (b.remote && b.name === refInfo.name) {
+          names.push(`${b.remote}/${b.name}`);
+        }
+      }
+    } else if (refInfo.type === 'remote' && refInfo.remote) {
+      names.push(`${refInfo.remote}/${refInfo.name}`);
+      // Also include local counterpart if it exists
+      const hasLocal = branches.some((b) => !b.remote && b.name === refInfo.name);
+      if (hasLocal) {
+        names.push(refInfo.name);
+      }
+    }
+    return names;
+  }, [refInfo, branches]);
+
+  const isFiltered = branchNames.some((name) => filters.branches?.includes(name));
+
+  const handleToggle = () => {
+    const current = filters.branches ?? [];
+    let next: string[];
+    if (isFiltered) {
+      next = current.filter((b) => !branchNames.includes(b));
+    } else {
+      const toAdd = branchNames.filter((n) => !current.includes(n));
+      next = [...current, ...toAdd];
+    }
+    const newBranches = next.length > 0 ? next : undefined;
+    setFilters({ branches: newBranches });
+    rpcClient.getCommits({ ...useGraphStore.getState().filters, branches: newBranches });
+  };
+
+  return (
+    <ContextMenu.Item className={menuItemClass} onSelect={handleToggle}>
+      {isFiltered ? 'Remove branch from filter' : 'Add branch to filter'}
+    </ContextMenu.Item>
   );
 }

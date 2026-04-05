@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type {
   ActiveToggleWidget,
+  Author,
   Branch,
   CherryPickOptions,
   Commit,
@@ -85,6 +86,8 @@ interface GraphStore {
   hoveredCommitHash: string | null;
   tooltipAnchorRect: DOMRect | null;
   worktreeList: WorktreeInfo[];
+  authorList: Author[];
+  authorListLoading: boolean;
   worktreeByHead: Map<string, WorktreeInfo>;
   containingBranchesCache: Map<string, ContainingBranchesResult>;
   setHoveredCommit: (hash: string | null, anchorRect: DOMRect | null) => void;
@@ -146,6 +149,9 @@ interface GraphStore {
   setSearchMatches: (matchIndices: number[]) => void;
   nextMatch: () => void;
   prevMatch: () => void;
+  setAuthorList: (authors: Author[]) => void;
+  setAuthorListLoading: (loading: boolean) => void;
+  resetAllFilters: (options?: { preserveBranches?: boolean }) => void;
   setSubmodules: (submodules: Submodule[], stack?: SubmoduleNavEntry[]) => void;
   pushSubmodule: (entry: SubmoduleNavEntry) => void;
   popSubmodule: () => void;
@@ -261,6 +267,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   commitTableLayout: cloneCommitTableLayout(DEFAULT_PERSISTED_UI_STATE.commitTableLayout),
   hoveredCommitHash: null,
   tooltipAnchorRect: null,
+  authorList: [],
+  authorListLoading: false,
   worktreeList: [],
   worktreeByHead: new Map(),
   containingBranchesCache: new Map(),
@@ -340,7 +348,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const { commits, stashes, filters, totalLoadedWithoutFilter: existingTotal, selectedCommit } = get();
     const allCommits = [...commits, ...newCommits];
     const { mergedCommits, topology } = computeMergedTopology(allCommits, stashes);
-    const hasFilter = !!(filters.branches?.length || filters.author);
+    const hasFilter = !!(filters.branches?.length || filters.author || filters.authors?.length || filters.afterDate || filters.beforeDate);
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
       : -1;
@@ -483,14 +491,15 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setPendingCommitCheckout: (pendingCommitCheckout) => set({ pendingCommitCheckout }),
   setPendingForceDeleteBranch: (pending) => set({ pendingForceDeleteBranch: pending }),
   setRepos: (repos, activeRepoPath) => {
-    const { activeRepoPath: prevPath, filters } = get();
+    const { activeRepoPath: prevPath } = get();
     const repoChanged = prevPath !== '' && prevPath !== activeRepoPath;
+    if (repoChanged) {
+      get().resetAllFilters({ preserveBranches: false });
+    }
     set({
       repos,
       activeRepoPath,
-      ...(repoChanged
-        ? { filters: { maxCount: filters.maxCount }, totalLoadedWithoutFilter: null, pendingCommitCheckout: null }
-        : {}),
+      ...(repoChanged ? { pendingCommitCheckout: null } : {}),
     });
   },
   setActiveRepo: (repoPath) => {
@@ -568,6 +577,18 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         ...state.searchState,
         currentMatchIndex: (currentMatchIndex - 1 + matchIndices.length) % matchIndices.length,
       },
+    };
+  }),
+  setAuthorList: (authors) => set({ authorList: authors }),
+  setAuthorListLoading: (authorListLoading) => set({ authorListLoading }),
+  resetAllFilters: (options) => set((state) => {
+    const preserveBranches = options?.preserveBranches ?? false;
+    return {
+      filters: {
+        maxCount: state.filters.maxCount,
+        ...(preserveBranches && state.filters.branches ? { branches: state.filters.branches } : {}),
+      },
+      totalLoadedWithoutFilter: null,
     };
   }),
   setSubmodules: (submodules, stack) => set((state) => ({
