@@ -35,6 +35,10 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
   const prefetching = useGraphStore((state) => state.prefetching);
   const hasMore = useGraphStore((state) => state.hasMore);
   const lastBatchStartIndex = useGraphStore((state) => state.lastBatchStartIndex);
+  const hiddenCommitHashes = useGraphStore((state) => state.hiddenCommitHashes);
+  const showGapIndicator = useGraphStore((state) => state.showGapIndicator);
+  const filteredOutCount = useGraphStore((state) => state.filteredOutCount);
+  const allCommitsCount = useGraphStore((state) => state.commits.length);
   const selectedCommits = useGraphStore((state) => state.selectedCommits);
   const commitListMode = useGraphStore((state) => state.commitListMode);
   const commitTableLayout = useGraphStore((state) => state.commitTableLayout);
@@ -104,10 +108,51 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
 
   useEffect(() => {
     if (!hasMore || prefetching) return;
-    if (rangeEnd !== undefined && rangeEnd >= lastBatchStartIndex) {
-      rpcClient.firePrefetch();
+    if (rangeEnd === undefined) return;
+
+    const hasVisibilityFilter = hiddenCommitHashes.size > 0;
+    if (hasVisibilityFilter) {
+      // With visibility filters: trigger based on visible row proximity to end
+      const threshold = userSettings.overScan;
+      if (rangeEnd >= commits.length - threshold) {
+        // If gap indicator is showing, don't auto-prefetch — wait for scroll-past
+        if (!showGapIndicator) {
+          rpcClient.firePrefetch();
+        }
+      }
+    } else {
+      // Without visibility filters: use existing batch-boundary trigger
+      if (rangeEnd >= lastBatchStartIndex) {
+        rpcClient.firePrefetch();
+      }
     }
-  }, [rangeEnd, lastBatchStartIndex, prefetching, hasMore]);
+  }, [rangeEnd, lastBatchStartIndex, prefetching, hasMore, hiddenCommitHashes.size, commits.length, userSettings.overScan, showGapIndicator]);
+
+  // Scroll-past-gap-indicator: when user scrolls to the very bottom with gap showing, reset and fetch
+  useEffect(() => {
+    if (!showGapIndicator || !hasMore || prefetching) return;
+    if (rangeEnd === undefined) return;
+    if (rangeEnd < commits.length - 1) return;
+
+    const el = containerRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 10;
+      if (atBottom) {
+        // Reset gap state and trigger next batch
+        useGraphStore.setState({
+          consecutiveEmptyBatches: 0,
+          showGapIndicator: false,
+        });
+        rpcClient.firePrefetch();
+        el.removeEventListener('scroll', handleScroll);
+      }
+    };
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    // Also check immediately in case already at bottom
+    handleScroll();
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [showGapIndicator, hasMore, prefetching, rangeEnd, commits.length]);
 
   useEffect(() => {
     if (selectedCommitIndex >= 0) {
@@ -272,6 +317,14 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
             onMouseEnter={onTooltipMouseEnter}
             onMouseLeave={onTooltipMouseLeave}
           />
+          {showGapIndicator && hasMore && (
+            <div className="flex items-center justify-center py-3 px-4 text-xs text-[var(--vscode-descriptionForeground)] bg-[var(--vscode-editor-background)] border-t border-[var(--vscode-panel-border)]">
+              <span>
+                {filteredOutCount} commit{filteredOutCount !== 1 ? 's' : ''} filtered out of {allCommitsCount} loaded
+                {' \u2014 keep scrolling down to fetch next batch'}
+              </span>
+            </div>
+          )}
           {prefetching && (
             <div className="flex items-center justify-center py-2 text-xs text-[var(--vscode-descriptionForeground)]">
               Loading…

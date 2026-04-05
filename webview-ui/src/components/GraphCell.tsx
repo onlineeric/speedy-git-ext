@@ -39,6 +39,7 @@ export const GraphCell = memo(function GraphCell({
   const node = topology.nodes.get(commit.hash);
   const palette = graphColors.length > 0 ? graphColors : DEFAULT_GRAPH_PALETTE;
 
+
   if (!node) {
     return (
       <svg width={width} height={height} className="relative z-[1] flex-shrink-0">
@@ -71,6 +72,7 @@ export const GraphCell = memo(function GraphCell({
           y2={height}
           stroke={getColor(pl.colorIndex, palette)}
           strokeWidth={2}
+          {...(pl.isDotted ? { strokeDasharray: '4 3', opacity: 0.7 } : {})}
         />
       ))}
 
@@ -124,47 +126,60 @@ export const GraphCell = memo(function GraphCell({
         const fromX = getLaneX(conn.fromLane);
         const toX = getLaneX(conn.toLane);
         const connColor = getColor(conn.colorIndex, palette);
+        const dottedProps = conn.isDotted ? { strokeDasharray: '4 3', opacity: 0.7 } : {};
+        const tooltip = conn.isDotted && conn.hiddenCount
+          ? <title>{conn.hiddenCount} hidden commit{conn.hiddenCount !== 1 ? 's' : ''}</title>
+          : null;
 
         if (conn.fromLane === conn.toLane) {
           // Same lane - straight line down
           return (
-            <line
-              key={`parent-${idx}`}
-              x1={fromX}
-              y1={nodeY + NODE_RADIUS}
-              x2={toX}
-              y2={height}
-              stroke={connColor}
-              strokeWidth={2}
-            />
+            <g key={`parent-${idx}`}>
+              {tooltip}
+              <line
+                x1={fromX}
+                y1={nodeY + NODE_RADIUS}
+                x2={toX}
+                y2={height}
+                stroke={connColor}
+                strokeWidth={2}
+                {...dottedProps}
+              />
+            </g>
           );
         } else {
           if (!hasMerge || conn.reReserved) {
             // For regular branch commits, keep child row straight and let the parent row
             // render the split curve via incomingConnections (matches Git Graph style).
             return (
-              <line
-                key={`parent-${idx}`}
-                x1={fromX}
-                y1={nodeY + NODE_RADIUS}
-                x2={fromX}
-                y2={height}
-                stroke={connColor}
-                strokeWidth={2}
-              />
+              <g key={`parent-${idx}`}>
+                {tooltip}
+                <line
+                  x1={fromX}
+                  y1={nodeY + NODE_RADIUS}
+                  x2={fromX}
+                  y2={height}
+                  stroke={connColor}
+                  strokeWidth={2}
+                  {...dottedProps}
+                />
+              </g>
             );
           }
 
           // Different lane - curve from node to target lane
           const midY = nodeY + NODE_RADIUS + 4;
           return (
-            <path
-              key={`parent-${idx}`}
-              d={`M ${fromX} ${nodeY + NODE_RADIUS} L ${fromX} ${midY} Q ${fromX} ${height * 0.75} ${toX} ${height}`}
-              stroke={connColor}
-              strokeWidth={2}
-              fill="none"
-            />
+            <g key={`parent-${idx}`}>
+              {tooltip}
+              <path
+                d={`M ${fromX} ${nodeY + NODE_RADIUS} L ${fromX} ${midY} Q ${fromX} ${height * 0.75} ${toX} ${height}`}
+                stroke={connColor}
+                strokeWidth={2}
+                fill="none"
+                {...dottedProps}
+              />
+            </g>
           );
         }
       })}

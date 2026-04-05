@@ -17,6 +17,10 @@ export interface CommitNode {
     colorIndex: number;
     /** True when reReserveParent changed this from same-lane to cross-lane */
     reReserved?: boolean;
+    /** True when the connection spans hidden (filtered-out) commits */
+    isDotted?: boolean;
+    /** Number of hidden commits between the two visible commits */
+    hiddenCount?: number;
   }[];
   /** Connections coming INTO this commit from ABOVE (from child commits) */
   incomingConnections: {
@@ -31,7 +35,7 @@ export interface GraphTopology {
   nodes: Map<string, CommitNode>;
   maxLanes: number;
   /** Pre-computed passing lanes for each row index (O(1) lookup instead of O(n²)) */
-  passingLanesByRow: Map<number, { lane: number; colorIndex: number }[]>;
+  passingLanesByRow: Map<number, { lane: number; colorIndex: number; isDotted?: boolean }[]>;
   /** Hash to index map for O(1) lookups */
   commitIndexByHash: Map<string, number>;
 }
@@ -46,18 +50,26 @@ export interface GraphTopology {
  * 3. Colors are assigned per lane for consistency
  * 4. Handles lane reuse when branches end
  */
-export function calculateTopology(commits: Commit[]): GraphTopology {
+export function calculateTopology(commits: Commit[], hiddenHashes?: Set<string>, visibleCommitOrder?: Commit[]): GraphTopology {
   const nodes = new Map<string, CommitNode>();
 
   if (commits.length === 0) {
     return { nodes, maxLanes: 0, passingLanesByRow: new Map(), commitIndexByHash: new Map() };
   }
 
-  // Build commit index for quick lookup
-  const commitIndexByHash = new Map<string, number>();
+  // Build full commit index for quick lookup (includes hidden commits for lane assignment)
+  const fullIndexByHash = new Map<string, number>();
   for (let i = 0; i < commits.length; i++) {
-    commitIndexByHash.set(commits[i].hash, i);
+    fullIndexByHash.set(commits[i].hash, i);
   }
+
+  // Build commit-by-hash map for skip-connection walks through hidden commits
+  const commitByHash = hiddenHashes && hiddenHashes.size > 0
+    ? new Map<string, Commit>(commits.map(c => [c.hash, c]))
+    : undefined;
+
+  // The output commitIndexByHash maps only visible commits to visible row indices
+  const commitIndexByHash = new Map<string, number>();
 
   // activeLanes[i] = hash of commit that should appear next on lane i, or null if lane is free
   const activeLanes: (string | null)[] = [];
@@ -127,7 +139,7 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
       // prevents other commits from landing on this lane.
       stashIndices.push(i);
       if (parents.length > 0) {
-        const parentRow = commitIndexByHash.get(parents[0]);
+        const parentRow = fullIndexByHash.get(parents[0]);
         if (parentRow !== undefined) markBusyLane(busyLanes, assignedLane, parentRow);
       }
     } else if (parents.length === 0) {
@@ -135,7 +147,7 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
     } else if (parents.length === 1) {
       // Single parent
       const parentHash = parents[0];
-      const parentRow = commitIndexByHash.get(parentHash);
+      const parentRow = fullIndexByHash.get(parentHash);
 
       if (parentRow !== undefined) {
         const existingLane = reservedLane.get(parentHash);
@@ -181,7 +193,7 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
       // Merge commit - multiple parents
       for (let p = 0; p < parents.length; p++) {
         const parentHash = parents[p];
-        const parentRow = commitIndexByHash.get(parentHash);
+        const parentRow = fullIndexByHash.get(parentHash);
 
         if (parentRow === undefined) continue;
 
@@ -263,14 +275,18 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
       }
     }
 
-    nodes.set(hash, {
-      hash,
-      lane: assignedLane,
-      colorIndex,
-      parentConnections,
-      incomingConnections: [],
-      hasConnectionFromAbove: false,
-    });
+    // Hidden commits participate in lane assignment but are excluded from output nodes
+    const isHidden = hiddenHashes && hiddenHashes.has(hash);
+    if (!isHidden) {
+      nodes.set(hash, {
+        hash,
+        lane: assignedLane,
+        colorIndex,
+        parentConnections,
+        incomingConnections: [],
+        hasConnectionFromAbove: false,
+      });
+    }
 
   }
 
@@ -293,11 +309,67 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
     }
   }
 
+  // Skip-connection post-pass: create dotted connections through hidden commits.
+  // For each visible node, if a parent is hidden, walk through hidden parents
+  // following the first parent (mainline) until a visible ancestor is found.
+  if (commitByHash && hiddenHashes && hiddenHashes.size > 0) {
+    for (const node of nodes.values()) {
+      const updatedConnections: CommitNode['parentConnections'] = [];
+      for (const conn of node.parentConnections) {
+        if (!nodes.has(conn.parentHash) && hiddenHashes.has(conn.parentHash)) {
+          // Parent is hidden — walk through hidden parents to find visible ancestor
+          let current = commitByHash.get(conn.parentHash);
+          let hiddenCount = 0;
+          while (current && hiddenHashes.has(current.hash)) {
+            hiddenCount++;
+            // Follow first parent (mainline) only
+            if (current.parents.length === 0) {
+              current = undefined;
+              break;
+            }
+            current = commitByHash.get(current.parents[0]);
+          }
+          if (current && nodes.has(current.hash)) {
+            // Found a visible ancestor — create dotted skip connection
+            const ancestorNode = nodes.get(current.hash)!;
+            updatedConnections.push({
+              ...conn,
+              parentHash: current.hash,
+              toLane: ancestorNode.lane,
+              isDotted: true,
+              hiddenCount,
+            });
+          }
+          // If no visible ancestor found, connection is removed (commit becomes root-like)
+        } else {
+          updatedConnections.push(conn);
+        }
+      }
+      node.parentConnections = updatedConnections;
+    }
+  }
+
+  // Build visible commitIndexByHash — maps only visible commits to their visible row indices.
+  // When visibleCommitOrder is provided (stash-merged visible list from the store),
+  // use it so indices match the renderer's mergedCommits array.
+  const renderCommits = visibleCommitOrder
+    ?? (hiddenHashes && hiddenHashes.size > 0
+      ? commits.filter(c => nodes.has(c.hash))
+      : commits);
+
+  let visibleIndex = 0;
+  for (let i = 0; i < renderCommits.length; i++) {
+    const hash = renderCommits[i].hash;
+    if (nodes.has(hash)) {
+      commitIndexByHash.set(hash, visibleIndex++);
+    }
+  }
+
   // Build incoming connections from finalized parent connections so rendering
   // remains correct even when lane reservations are re-written later.
-  buildIncomingConnections(commits, nodes, commitIndexByHash);
+  buildIncomingConnections(renderCommits, nodes, commitIndexByHash);
 
-  // Calculate max lanes
+  // Calculate max lanes (include all lanes for correct layout, even hidden commit lanes)
   let maxLanes = 1;
   for (const node of nodes.values()) {
     maxLanes = Math.max(maxLanes, node.lane + 1);
@@ -305,9 +377,13 @@ export function calculateTopology(commits: Commit[]): GraphTopology {
       maxLanes = Math.max(maxLanes, conn.toLane + 1);
     }
   }
+  // Also account for hidden commits' lanes to prevent collisions
+  if (hiddenHashes && hiddenHashes.size > 0) {
+    maxLanes = Math.max(maxLanes, activeLanes.length);
+  }
 
   // Pre-compute passing lanes for each row (O(n) instead of O(n²) at render time)
-  const passingLanesByRow = computePassingLanes(commits, nodes, commitIndexByHash);
+  const passingLanesByRow = computePassingLanes(renderCommits, nodes, commitIndexByHash);
 
   return { nodes, maxLanes, passingLanesByRow, commitIndexByHash };
 }
@@ -364,19 +440,19 @@ function computePassingLanes(
   commits: Commit[],
   nodes: Map<string, CommitNode>,
   commitIndexByHash: Map<string, number>
-): Map<number, { lane: number; colorIndex: number }[]> {
-  const passingLanesByRow = new Map<number, { lane: number; colorIndex: number }[]>();
+): Map<number, { lane: number; colorIndex: number; isDotted?: boolean }[]> {
+  const passingLanesByRow = new Map<number, { lane: number; colorIndex: number; isDotted?: boolean }[]>();
 
-  // Track active connections: Map<toLane, { colorIndex, endRowIndex }>
+  // Track active connections: Map<toLane, { colorIndex, endRowIndex, isDotted }>
   // A connection is active from the row after the source commit until the parent row
-  const activeConnections = new Map<number, { colorIndex: number; endRowIndex: number }[]>();
+  const activeConnections = new Map<number, { colorIndex: number; endRowIndex: number; isDotted?: boolean }[]>();
 
   for (let i = 0; i < commits.length; i++) {
     const commit = commits[i];
     const node = nodes.get(commit.hash);
 
     // Collect passing lanes for this row (exclude the current node's lane)
-    const passingLanes: { lane: number; colorIndex: number }[] = [];
+    const passingLanes: { lane: number; colorIndex: number; isDotted?: boolean }[] = [];
     const currentLane = node?.lane ?? -1;
 
     for (const [lane, connections] of activeConnections.entries()) {
@@ -385,7 +461,7 @@ function computePassingLanes(
       // Check if any connection on this lane passes through this row
       for (const conn of connections) {
         if (i < conn.endRowIndex) {
-          passingLanes.push({ lane, colorIndex: conn.colorIndex });
+          passingLanes.push({ lane, colorIndex: conn.colorIndex, isDotted: conn.isDotted });
           break; // Only add lane once
         }
       }
@@ -408,7 +484,7 @@ function computePassingLanes(
               : conn.fromLane;
 
           const laneConnections = activeConnections.get(continuationLane) || [];
-          laneConnections.push({ colorIndex: conn.colorIndex, endRowIndex: parentIndex });
+          laneConnections.push({ colorIndex: conn.colorIndex, endRowIndex: parentIndex, isDotted: conn.isDotted });
           activeConnections.set(continuationLane, laneConnections);
         }
       }
@@ -536,7 +612,7 @@ export function getPassingLanes(
   rowIndex: number,
   _commits: Commit[],
   topology: GraphTopology
-): { lane: number; colorIndex: number }[] {
+): { lane: number; colorIndex: number; isDotted?: boolean }[] {
   // Use pre-computed passing lanes for O(1) lookup
   return topology.passingLanesByRow.get(rowIndex) || [];
 }
