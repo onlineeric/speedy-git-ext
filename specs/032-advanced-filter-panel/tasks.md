@@ -131,8 +131,8 @@
 
 ### Implementation for User Story 4
 
-- [ ] T019 [US4] **ROLLED BACK** — original approach (wrapping cells in Radix ContextMenu inside memoized CommitTableRow) corrupted graph rendering by adding Zustand store subscriptions to every row. Needs reimplementation with an approach that doesn't add store subscriptions inside CommitTableRow. Add author filter context menu items to `webview-ui/src/components/CommitTableRow.tsx` (table view only, per FR-023).
-- [ ] T020 [US4] **ROLLED BACK** — same root cause as T019. Needs reimplementation. Add date filter context menu items to `webview-ui/src/components/CommitTableRow.tsx`.
+- [x] T019 [US4] Add author filter context menu items to `webview-ui/src/components/CommitTableRow.tsx` (table view only, per FR-023). Reimplemented with lazy-mount pattern: `AuthorContextMenu` wrapper has zero store subscriptions; store access deferred to `ContextMenu.Content` children (mounted via Portal only when menu is open).
+- [x] T020 [US4] Add date filter context menu items to `webview-ui/src/components/CommitTableRow.tsx`. Reimplemented with same lazy-mount pattern as T019 via `DateContextMenu` component.
 - [x] T021 [US4] Add branch filter context menu items to `webview-ui/src/components/BranchContextMenu.tsx`. Add "Add branch to filter" / "Remove branch from filter" items (conditional on whether the branch is currently in `filters.branches`). For local branches: add/remove just the local branch name. For remote branches: add/remove just the remote ref (e.g., `origin/main`). For combined local+remote badges: add/remove both the local name and the remote ref (FR-016). Read `filters.branches` from the Zustand store to determine which item to show.
 
 **Checkpoint**: All context menu filtering actions work — author, date, and branch quick filters are fully functional.

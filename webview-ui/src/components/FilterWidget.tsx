@@ -36,16 +36,28 @@ export function FilterWidget() {
   const [toDate, setToDate] = useState('');
   const [toTime, setToTime] = useState('');
 
-  // Sync local date state with store (for Reset All) via Zustand subscription
+  // Sync local date state with store (handles external changes like context menu and Reset All)
   useEffect(() => {
     const unsub = useGraphStore.subscribe((state, prevState) => {
-      if (prevState.filters.afterDate && !state.filters.afterDate) {
-        setFromDate('');
-        setFromTime('');
+      if (state.filters.afterDate !== prevState.filters.afterDate) {
+        if (state.filters.afterDate) {
+          const [date, time] = state.filters.afterDate.split('T');
+          setFromDate(date);
+          setFromTime(time === '00:00:00' ? '' : time);
+        } else {
+          setFromDate('');
+          setFromTime('');
+        }
       }
-      if (prevState.filters.beforeDate && !state.filters.beforeDate) {
-        setToDate('');
-        setToTime('');
+      if (state.filters.beforeDate !== prevState.filters.beforeDate) {
+        if (state.filters.beforeDate) {
+          const [date, time] = state.filters.beforeDate.split('T');
+          setToDate(date);
+          setToTime(time === '23:59:59' ? '' : time);
+        } else {
+          setToDate('');
+          setToTime('');
+        }
       }
     });
     return unsub;

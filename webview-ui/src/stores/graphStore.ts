@@ -171,8 +171,12 @@ const defaultSearchState: SearchState = {
   currentMatchIndex: -1,
 };
 
-function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[]): Commit[] {
+function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[], filters?: GraphFilters): Commit[] {
   if (stashes.length === 0) return commits;
+
+  // Parse active date filters so stashes outside the range are excluded
+  const afterMs = filters?.afterDate ? new Date(filters.afterDate).getTime() : undefined;
+  const beforeMs = filters?.beforeDate ? new Date(filters.beforeDate).getTime() : undefined;
 
   const merged = [...commits];
   const commitIndexByHash = new Map<string, number>();
@@ -184,6 +188,10 @@ function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[]): Comm
   for (const stash of stashes) {
     const parentIndex = commitIndexByHash.get(stash.parentHash);
     if (parentIndex === undefined) continue;
+
+    // Skip stashes outside the active date range
+    if (afterMs && stash.date < afterMs) continue;
+    if (beforeMs && stash.date > beforeMs) continue;
 
     stashInsertions.push({
       index: parentIndex,
@@ -208,8 +216,8 @@ function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[]): Comm
   return merged;
 }
 
-function computeMergedTopology(commits: Commit[], stashes: StashEntry[]): { mergedCommits: Commit[]; topology: GraphTopology } {
-  const mergedCommits = mergeStashesIntoCommits(commits, stashes);
+function computeMergedTopology(commits: Commit[], stashes: StashEntry[], filters?: GraphFilters): { mergedCommits: Commit[]; topology: GraphTopology } {
+  const mergedCommits = mergeStashesIntoCommits(commits, stashes, filters);
   return { mergedCommits, topology: calculateTopology(mergedCommits) };
 }
 
@@ -312,7 +320,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     gitHubAvatarUrls: { ...state.gitHubAvatarUrls, ...urls },
   })),
   setCommits: (commits) => {
-    const { mergedCommits, topology } = computeMergedTopology(commits, get().stashes);
+    const { mergedCommits, topology } = computeMergedTopology(commits, get().stashes, get().filters);
     const selectedCommit = get().selectedCommit;
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
@@ -347,7 +355,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   appendCommits: (newCommits, totalLoadedWithoutFilter) => {
     const { commits, stashes, filters, totalLoadedWithoutFilter: existingTotal, selectedCommit } = get();
     const allCommits = [...commits, ...newCommits];
-    const { mergedCommits, topology } = computeMergedTopology(allCommits, stashes);
+    const { mergedCommits, topology } = computeMergedTopology(allCommits, stashes, filters);
     const hasFilter = !!(filters.branches?.length || filters.author || filters.authors?.length || filters.afterDate || filters.beforeDate);
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
@@ -436,7 +444,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setFilters: (filters) => set((state) => ({ filters: { ...state.filters, ...filters } })),
   setRemotes: (remotes) => set({ remotes }),
   setStashes: (stashes) => {
-    const { mergedCommits, topology } = computeMergedTopology(get().commits, stashes);
+    const { mergedCommits, topology } = computeMergedTopology(get().commits, stashes, get().filters);
     const selectedCommit = get().selectedCommit;
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)

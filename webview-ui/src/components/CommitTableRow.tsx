@@ -12,6 +12,8 @@ import { renderInlineCode } from '../utils/inlineCodeRenderer';
 import { mergeRefs, displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
 import { formatAbsoluteDateTime, formatRelativeDate } from '../utils/formatDate';
 import { AuthorAvatar } from './AuthorAvatar';
+import { AuthorContextMenu } from './AuthorContextMenu';
+import { DateContextMenu } from './DateContextMenu';
 import { getColor, getLaneColorStyle, DEFAULT_GRAPH_PALETTE } from '../utils/colorUtils';
 import type { ResolvedCommitTableLayout } from '../utils/commitTableLayout';
 
@@ -253,24 +255,28 @@ function renderColumn({
       );
     case 'author':
       return (
-        <div className="flex h-full items-center gap-2 overflow-hidden">
-          {avatarsEnabled && commit.author ? (
-            <AuthorAvatar author={commit.author} email={commit.authorEmail} />
-          ) : null}
-          <span className="truncate text-xs text-[var(--vscode-descriptionForeground)]" title={commit.author}>
-            {commit.author}
-          </span>
-        </div>
+        <AuthorContextMenu authorEmail={commit.authorEmail}>
+          <div className="flex h-full items-center gap-2 overflow-hidden">
+            {avatarsEnabled && commit.author ? (
+              <AuthorAvatar author={commit.author} email={commit.authorEmail} />
+            ) : null}
+            <span className="truncate text-xs text-[var(--vscode-descriptionForeground)]" title={commit.author}>
+              {commit.author}
+            </span>
+          </div>
+        </AuthorContextMenu>
       );
     case 'date':
       return (
-        <div className="flex h-full items-center justify-end">
-          <span className="truncate text-right text-xs text-[var(--vscode-descriptionForeground)]">
-            {dateFormat === 'absolute'
-              ? formatAbsoluteDateTime(commit.authorDate)
-              : formatRelativeDate(commit.authorDate)}
-          </span>
-        </div>
+        <DateContextMenu authorDate={commit.authorDate}>
+          <div className="flex h-full items-center justify-end">
+            <span className="truncate text-right text-xs text-[var(--vscode-descriptionForeground)]">
+              {dateFormat === 'absolute'
+                ? formatAbsoluteDateTime(commit.authorDate)
+                : formatRelativeDate(commit.authorDate)}
+            </span>
+          </div>
+        </DateContextMenu>
       );
     default:
       return null;
