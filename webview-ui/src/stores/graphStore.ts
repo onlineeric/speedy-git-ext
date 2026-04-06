@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type {
   ActiveToggleWidget,
+  Author,
   Branch,
   CherryPickOptions,
   Commit,
@@ -30,6 +31,26 @@ import {
   cloneCommitTableLayout,
 } from '@shared/types';
 import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
+
+/**
+ * Compute the set of commit hashes that should be hidden by active visibility filters.
+ * Currently only the author filter is a visibility filter.
+ * Stash entries are excluded (stashes are merged separately after filtering).
+ */
+function computeHiddenCommitHashes(commits: Commit[], filters: GraphFilters): Set<string> {
+  const hidden = new Set<string>();
+  if (!filters.authors || filters.authors.length === 0) return hidden;
+
+  const includedAuthors = new Set(filters.authors);
+  for (const commit of commits) {
+    // Stash entries are never hidden
+    if (commit.refs.some(r => r.type === 'stash')) continue;
+    if (!includedAuthors.has(commit.authorEmail)) {
+      hidden.add(commit.hash);
+    }
+  }
+  return hidden;
+}
 
 interface GraphStore {
   commits: Commit[];
@@ -85,8 +106,14 @@ interface GraphStore {
   hoveredCommitHash: string | null;
   tooltipAnchorRect: DOMRect | null;
   worktreeList: WorktreeInfo[];
+  authorList: Author[];
+  authorListLoading: boolean;
   worktreeByHead: Map<string, WorktreeInfo>;
   containingBranchesCache: Map<string, ContainingBranchesResult>;
+  hiddenCommitHashes: Set<string>;
+  consecutiveEmptyBatches: number;
+  filteredOutCount: number;
+  showGapIndicator: boolean;
   setHoveredCommit: (hash: string | null, anchorRect: DOMRect | null) => void;
   setWorktreeList: (list: WorktreeInfo[]) => void;
   setContainingBranches: (hash: string, result: ContainingBranchesResult) => void;
@@ -146,6 +173,10 @@ interface GraphStore {
   setSearchMatches: (matchIndices: number[]) => void;
   nextMatch: () => void;
   prevMatch: () => void;
+  setAuthorList: (authors: Author[]) => void;
+  setAuthorListLoading: (loading: boolean) => void;
+  recomputeVisibility: () => void;
+  resetAllFilters: (options?: { preserveBranches?: boolean }) => void;
   setSubmodules: (submodules: Submodule[], stack?: SubmoduleNavEntry[]) => void;
   pushSubmodule: (entry: SubmoduleNavEntry) => void;
   popSubmodule: () => void;
@@ -165,8 +196,12 @@ const defaultSearchState: SearchState = {
   currentMatchIndex: -1,
 };
 
-function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[]): Commit[] {
+function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[], filters?: GraphFilters): Commit[] {
   if (stashes.length === 0) return commits;
+
+  // Parse active date filters so stashes outside the range are excluded
+  const afterMs = filters?.afterDate ? new Date(filters.afterDate).getTime() : undefined;
+  const beforeMs = filters?.beforeDate ? new Date(filters.beforeDate).getTime() : undefined;
 
   const merged = [...commits];
   const commitIndexByHash = new Map<string, number>();
@@ -178,6 +213,10 @@ function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[]): Comm
   for (const stash of stashes) {
     const parentIndex = commitIndexByHash.get(stash.parentHash);
     if (parentIndex === undefined) continue;
+
+    // Skip stashes outside the active date range
+    if (afterMs && stash.date < afterMs) continue;
+    if (beforeMs && stash.date > beforeMs) continue;
 
     stashInsertions.push({
       index: parentIndex,
@@ -202,9 +241,17 @@ function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[]): Comm
   return merged;
 }
 
-function computeMergedTopology(commits: Commit[], stashes: StashEntry[]): { mergedCommits: Commit[]; topology: GraphTopology } {
-  const mergedCommits = mergeStashesIntoCommits(commits, stashes);
-  return { mergedCommits, topology: calculateTopology(mergedCommits) };
+function computeMergedTopology(commits: Commit[], stashes: StashEntry[], filters?: GraphFilters, hiddenHashes?: Set<string>): { mergedCommits: Commit[]; topology: GraphTopology } {
+  // When hidden hashes are provided, filter commits to visible-only before merging stashes,
+  // but pass the full commit list to calculateTopology for correct lane assignment.
+  const visibleCommits = hiddenHashes && hiddenHashes.size > 0
+    ? commits.filter(c => !hiddenHashes.has(c.hash))
+    : commits;
+  const mergedCommits = mergeStashesIntoCommits(visibleCommits, stashes, filters);
+  // Topology needs ALL commits (including hidden) for correct lane reservations.
+  // Merge stashes into the full list for topology too, so stash lane assignments work.
+  const allWithStashes = mergeStashesIntoCommits(commits, stashes, filters);
+  return { mergedCommits, topology: calculateTopology(allWithStashes, hiddenHashes, mergedCommits) };
 }
 
 export const useGraphStore = create<GraphStore>((set, get) => ({
@@ -261,9 +308,15 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   commitTableLayout: cloneCommitTableLayout(DEFAULT_PERSISTED_UI_STATE.commitTableLayout),
   hoveredCommitHash: null,
   tooltipAnchorRect: null,
+  authorList: [],
+  authorListLoading: false,
   worktreeList: [],
   worktreeByHead: new Map(),
   containingBranchesCache: new Map(),
+  hiddenCommitHashes: new Set<string>(),
+  consecutiveEmptyBatches: 0,
+  filteredOutCount: 0,
+  showGapIndicator: false,
   setHoveredCommit: (hash, anchorRect) => set({ hoveredCommitHash: hash, tooltipAnchorRect: anchorRect }),
   setWorktreeList: (list) => {
     const byHead = new Map<string, WorktreeInfo>();
@@ -304,7 +357,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     gitHubAvatarUrls: { ...state.gitHubAvatarUrls, ...urls },
   })),
   setCommits: (commits) => {
-    const { mergedCommits, topology } = computeMergedTopology(commits, get().stashes);
+    const filters = get().filters;
+    const hiddenCommitHashes = computeHiddenCommitHashes(commits, filters);
+    const { mergedCommits, topology } = computeMergedTopology(commits, get().stashes, filters, hiddenCommitHashes);
     const selectedCommit = get().selectedCommit;
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
@@ -319,6 +374,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       commits,
       mergedCommits,
       topology,
+      hiddenCommitHashes,
       selectedCommit: selectedCommitIndex >= 0 ? selectedCommit : undefined,
       selectedCommitIndex,
       selectedCommits: prevSelectedCommits.filter((h) => newHashSet.has(h)),
@@ -334,23 +390,50 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       containingBranchesCache: new Map(),
       hoveredCommitHash: null,
       tooltipAnchorRect: null,
+      consecutiveEmptyBatches: 0,
+      filteredOutCount: 0,
+      showGapIndicator: false,
     });
   },
   appendCommits: (newCommits, totalLoadedWithoutFilter) => {
     const { commits, stashes, filters, totalLoadedWithoutFilter: existingTotal, selectedCommit } = get();
     const allCommits = [...commits, ...newCommits];
-    const { mergedCommits, topology } = computeMergedTopology(allCommits, stashes);
-    const hasFilter = !!(filters.branches?.length || filters.author);
+    const hiddenCommitHashes = computeHiddenCommitHashes(allCommits, filters);
+    const { mergedCommits, topology } = computeMergedTopology(allCommits, stashes, filters, hiddenCommitHashes);
+    const hasFilter = !!(filters.branches?.length || filters.afterDate || filters.beforeDate);
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
       : -1;
+
+    // Count new visible commits in this batch for empty-batch tracking
+    const newVisibleCount = newCommits.filter(c => !hiddenCommitHashes.has(c.hash)).length;
+    const prevEmpty = get().consecutiveEmptyBatches;
+    const prevFilteredOut = get().filteredOutCount;
+
+    let consecutiveEmptyBatches: number;
+    let filteredOutCount: number;
+    let showGapIndicator: boolean;
+
+    if (newVisibleCount > 0) {
+      consecutiveEmptyBatches = 0;
+      filteredOutCount = 0;
+      showGapIndicator = false;
+    } else {
+      consecutiveEmptyBatches = prevEmpty + 1;
+      filteredOutCount = prevFilteredOut + newCommits.length;
+      showGapIndicator = consecutiveEmptyBatches >= 3;
+    }
 
     set({
       commits: allCommits,
       mergedCommits,
       topology,
+      hiddenCommitHashes,
       selectedCommitIndex,
       lastBatchStartIndex: commits.length,
+      consecutiveEmptyBatches,
+      filteredOutCount,
+      showGapIndicator,
       ...((!hasFilter && totalLoadedWithoutFilter !== undefined)
         ? { totalLoadedWithoutFilter: (existingTotal ?? 0) + totalLoadedWithoutFilter }
         : {}),
@@ -428,7 +511,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setFilters: (filters) => set((state) => ({ filters: { ...state.filters, ...filters } })),
   setRemotes: (remotes) => set({ remotes }),
   setStashes: (stashes) => {
-    const { mergedCommits, topology } = computeMergedTopology(get().commits, stashes);
+    const { mergedCommits, topology } = computeMergedTopology(get().commits, stashes, get().filters, get().hiddenCommitHashes);
     const selectedCommit = get().selectedCommit;
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
@@ -476,21 +559,26 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     return { selectedCommits };
   }),
   clearSelectedCommits: () => set({ selectedCommits: [], lastClickedHash: undefined }),
-  setHasMore: (hasMore) => set({ hasMore }),
+  setHasMore: (hasMore) => set({
+    hasMore,
+    // When repo is fully loaded, never show gap indicator
+    ...(!hasMore ? { showGapIndicator: false } : {}),
+  }),
   setPrefetching: (prefetching) => set({ prefetching }),
   setTotalLoadedWithoutFilter: (totalLoadedWithoutFilter) => set({ totalLoadedWithoutFilter }),
   setPendingCheckout: (pendingCheckout) => set({ pendingCheckout }),
   setPendingCommitCheckout: (pendingCommitCheckout) => set({ pendingCommitCheckout }),
   setPendingForceDeleteBranch: (pending) => set({ pendingForceDeleteBranch: pending }),
   setRepos: (repos, activeRepoPath) => {
-    const { activeRepoPath: prevPath, filters } = get();
+    const { activeRepoPath: prevPath } = get();
     const repoChanged = prevPath !== '' && prevPath !== activeRepoPath;
+    if (repoChanged) {
+      get().resetAllFilters({ preserveBranches: false });
+    }
     set({
       repos,
       activeRepoPath,
-      ...(repoChanged
-        ? { filters: { maxCount: filters.maxCount }, totalLoadedWithoutFilter: null, pendingCommitCheckout: null }
-        : {}),
+      ...(repoChanged ? { pendingCommitCheckout: null } : {}),
     });
   },
   setActiveRepo: (repoPath) => {
@@ -568,6 +656,37 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         ...state.searchState,
         currentMatchIndex: (currentMatchIndex - 1 + matchIndices.length) % matchIndices.length,
       },
+    };
+  }),
+  setAuthorList: (authors) => set({ authorList: authors }),
+  setAuthorListLoading: (authorListLoading) => set({ authorListLoading }),
+  recomputeVisibility: () => {
+    const { commits, stashes, filters } = get();
+    const hiddenCommitHashes = computeHiddenCommitHashes(commits, filters);
+    const { mergedCommits, topology } = computeMergedTopology(commits, stashes, filters, hiddenCommitHashes);
+    const selectedCommit = get().selectedCommit;
+    const selectedCommitIndex = selectedCommit
+      ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
+      : -1;
+    set({
+      hiddenCommitHashes,
+      mergedCommits,
+      topology,
+      selectedCommitIndex,
+      fetchGeneration: get().fetchGeneration + 1,
+      consecutiveEmptyBatches: 0,
+      filteredOutCount: 0,
+      showGapIndicator: false,
+    });
+  },
+  resetAllFilters: (options) => set((state) => {
+    const preserveBranches = options?.preserveBranches ?? false;
+    return {
+      filters: {
+        maxCount: state.filters.maxCount,
+        ...(preserveBranches && state.filters.branches ? { branches: state.filters.branches } : {}),
+      },
+      totalLoadedWithoutFilter: null,
     };
   }),
   setSubmodules: (submodules, stack) => set((state) => ({

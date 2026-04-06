@@ -16,7 +16,7 @@ export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
     const title = getRefTitle(displayRef);
     const icon = getRefIcon(displayRef);
 
-    const fallbackColor = !laneColorStyle ? ' border border-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]' : '';
+    const fallbackColor = !laneColorStyle ? ' border-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]' : '';
 
     return (
       <span

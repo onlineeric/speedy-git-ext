@@ -6,10 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Added
-- Filter by Author, date range.
-- Search result switch between highlight and filter.
+### future planned features
 - Compare branches, commits, HEAD, etc.
+
+### [2.1.0] - 2026-04-06 - pre-release
+
+#### Added
+- Advanced filter panel accessible from the toolbar filter toggle, with author, date range, and branch filter sections
+- Author filter with multi-select dropdown — filter commits by one or more authors, with search by name and email, avatar and email display per option, and "All Authors" to clear selections
+- Selected author badges displayed in the filter panel with remove buttons for quick filter management
+- Reusable author badge component (avatar icon + name) shared between the filter panel and commit details panel
+- Date range filter using react-datepicker with calendar dropdown, optional 24-hour time input, and manual typing support (YYYY-MM-DD or YYYY-MM-DD HH:mm format)
+- Date input validation rejects time-only and malformed entries with a red border indicator; clear button on each field removes the filter value with a single click
+- Branch filter badges in the filter panel reusing RefLabel with graph-line colors and combined badges for local+remote pairs, each with a remove button
+- "Reset All" button clears author and date range filters while preserving branch selections; disabled when no resettable filters are active
+- Right-click context menu on author names, dates, and branch badges in the commit list for quick add/remove filter actions
+- Filter icon color reflects combined state: yellow when any filter is active, blue when panel is open, gray when inactive
+- All filter types combined with AND logic; empty result set displays a "No commits match the current filters" message
+- Badge areas (branch and author) independently scroll when exceeding approximately 3–4 lines, keeping other filter panel sections visible
+- All filter state resets to defaults on each session/panel open via a centralized reset mechanism to prevent partial resets
+- Dotted lines in the git graph connect visible commits through filtered-out gaps, preserving visual branch continuity with matching lane colors
+- Tooltip on dotted line segments shows the count of hidden commits in the gap
+- Instant graph updates when toggling visibility filters — client-side author filtering with no backend data reload
+- Stash entries remain visible regardless of active visibility filters
+- Filter-aware scroll prefetch: automatically loads more batches when visible commits are sparse, stops after 3 consecutive empty batches, and shows a gap indicator with filtered-out count and scroll-to-continue action
 
 ## [2.0.0] - 2026-04-04
 

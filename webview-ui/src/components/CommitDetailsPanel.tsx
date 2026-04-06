@@ -7,6 +7,7 @@ import { renderInlineCode } from '../utils/inlineCodeRenderer';
 import { ListViewIcon, TreeViewIcon, CloseIcon, MoveRightIcon, MoveBottomIcon } from './icons';
 import { FileChangesTreeView } from './FileChangesTreeView';
 import { FileStatusBadge, FileChangeIndicators, FileActionIcons } from './FileChangeShared';
+import { AuthorBadge } from './AuthorBadge';
 
 const MIN_SIZE = 120;
 const MIN_GRAPH_WIDTH = 200;
@@ -285,10 +286,10 @@ function CommitMetadata({ details }: { details: CommitDetails }) {
           mono
         />
       )}
-      <MetadataRow
-        label="Author"
-        value={`${details.author} <${details.authorEmail}>`}
-      />
+      <div className="flex gap-2">
+        <span className="w-16 flex-shrink-0 text-[var(--vscode-descriptionForeground)]">Author:</span>
+        <AuthorBadge name={details.author} email={details.authorEmail} />
+      </div>
       <MetadataRow label="Date" value={formatRelativeDate(details.authorDate)} />
       {details.committer !== details.author && (
         <MetadataRow

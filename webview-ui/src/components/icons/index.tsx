@@ -268,7 +268,7 @@ export function ToolbarSeparatorIcon({ className }: IconProps) {
         x2={4}
         y2={21}
         stroke="currentColor"
-        strokeWidth={1.2}
+        strokeWidth={3}
         strokeLinecap="round"
       />
     </svg>

@@ -56,8 +56,15 @@ class RpcClient {
         store.appendCommits(message.payload.commits, message.payload.totalLoadedWithoutFilter);
         store.setHasMore(message.payload.hasMore);
         store.setPrefetching(false);
-        // Catch-up is handled by GraphContainer's useEffect which re-runs when
-        // lastBatchStartIndex or prefetching changes.
+        // Auto-retry: if batch yielded no visible commits and cap not reached, fetch more
+        const updatedStore = useGraphStore.getState();
+        if (
+          updatedStore.consecutiveEmptyBatches > 0 &&
+          updatedStore.consecutiveEmptyBatches < 3 &&
+          updatedStore.hasMore
+        ) {
+          this.firePrefetch();
+        }
         break;
       }
       case 'repoList':
@@ -179,6 +186,10 @@ class RpcClient {
       case 'persistedUIState':
         store.hydratePersistedUIState(message.payload.uiState);
         break;
+      case 'authorList':
+        store.setAuthorList(message.payload.authors);
+        store.setAuthorListLoading(false);
+        break;
     }
   }
 
@@ -186,8 +197,13 @@ class RpcClient {
     this.vscode?.postMessage(message);
   }
 
-  getCommits(filters?: Partial<{ branches?: string[]; author?: string; maxCount: number }>) {
+  getCommits(filters?: Partial<{ branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string; maxCount: number }>) {
     this.send({ type: 'getCommits', payload: { filters } });
+  }
+
+  getAuthors() {
+    useGraphStore.getState().setAuthorListLoading(true);
+    this.send({ type: 'getAuthors', payload: {} });
   }
 
   getBranches() {
@@ -472,7 +488,7 @@ class RpcClient {
   }
 
   // Pagination
-  loadMoreCommits(skip: number, generation: number, filters: { branches?: string[]; author?: string }) {
+  loadMoreCommits(skip: number, generation: number, filters: { branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string }) {
     this.send({ type: 'loadMoreCommits', payload: { skip, generation, filters } });
   }
 
@@ -480,8 +496,9 @@ class RpcClient {
     const store = useGraphStore.getState();
     if (!store.hasMore || store.prefetching) return;
     store.setPrefetching(true);
-    const { branches, author } = store.filters;
-    this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branches, author });
+    // Author filtering is done client-side — never pass author/authors to backend
+    const { branches, afterDate, beforeDate } = store.filters;
+    this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branches, afterDate, beforeDate });
   }
 }
 

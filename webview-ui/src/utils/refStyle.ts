@@ -7,9 +7,7 @@ export function getRefStyle(type: DisplayRefType): string {
     case 'remote-branch':
     case 'tag':
     case 'stash':
-      return '';
     case 'merged-branch':
-      // Border signals dual local+remote state; color applied via inline style
       return 'border';
   }
 }

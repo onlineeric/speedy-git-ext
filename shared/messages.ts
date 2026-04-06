@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, PersistedUIState } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, PersistedUIState, Author } from './types.js';
 import type { GitError } from './errors.js';
 
 export type RequestMessage =
@@ -53,8 +53,10 @@ export type RequestMessage =
   | { type: 'dropCommit'; payload: { hash: string } }
   | { type: 'isCommitPushed'; payload: { hash: string } }
   | { type: 'getCommitParents'; payload: { hashes: string[] } }
+  // Authors
+  | { type: 'getAuthors'; payload: Record<string, never> }
   // Pagination & settings
-  | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branches?: string[]; author?: string } } }
+  | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string } } }
   | { type: 'openSettings'; payload: Record<string, never> }
   | { type: 'switchRepo'; payload: { repoPath: string } }
   | { type: 'getSettings'; payload: Record<string, never> }
@@ -107,7 +109,8 @@ export type ResponseMessage =
   | { type: 'avatarUrls'; payload: { urls: AvatarUrlMap } }
   | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[] } }
   | { type: 'containingBranches'; payload: { hash: string; branches: string[]; status: 'loaded' | 'error' } }
-  | { type: 'persistedUIState'; payload: { uiState: PersistedUIState } };
+  | { type: 'persistedUIState'; payload: { uiState: PersistedUIState } }
+  | { type: 'authorList'; payload: { authors: Author[] } };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -133,7 +136,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   updateSubmodule: true, initSubmodule: true,
   stashAndCheckout: true, stashAndCheckoutCommit: true,
   getWorktreeList: true, getContainingBranches: true, openExternal: true,
-  openCurrentFile: true, updatePersistedUIState: true,
+  openCurrentFile: true, updatePersistedUIState: true, getAuthors: true,
 };
 
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
@@ -145,7 +148,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
   pushResult: true, avatarUrls: true, worktreeList: true, containingBranches: true,
-  persistedUIState: true,
+  persistedUIState: true, authorList: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {

@@ -110,9 +110,18 @@ export interface GraphState {
   filters: GraphFilters;
 }
 
+export interface Author {
+  name: string;
+  email: string;
+}
+
 export interface GraphFilters {
   branches?: string[];
+  /** @deprecated Use `authors` (plural) for multi-author filtering. Kept for backward compatibility with `loadMoreCommits`. */
   author?: string;
+  authors?: string[];
+  afterDate?: string;
+  beforeDate?: string;
   maxCount: number;
   skip?: number;
 }
