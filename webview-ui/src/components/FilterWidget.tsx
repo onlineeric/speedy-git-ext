@@ -59,8 +59,9 @@ export function FilterWidget() {
   const branches = useGraphStore((s) => s.branches);
 
   // Date range local state (Date objects for react-datepicker)
-  const [fromDate, setFromDate] = useState<Date | null>(null);
-  const [toDate, setToDate] = useState<Date | null>(null);
+  // Initialize from store so dates set while panel was closed are picked up on mount
+  const [fromDate, setFromDate] = useState<Date | null>(() => parseISOToDate(filters.afterDate));
+  const [toDate, setToDate] = useState<Date | null>(() => parseISOToDate(filters.beforeDate));
   const [fromValid, setFromValid] = useState(true);
   const [toValid, setToValid] = useState(true);
 
