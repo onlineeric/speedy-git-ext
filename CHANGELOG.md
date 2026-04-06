@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [2.1.1] - 2026-04-06
+No changes - justs a patch release to publish the pre-release 2.1.0 to the marketplace after testing.
+
 ## [2.1.0] - pre-release - 2026-04-06
 
 #### Added
