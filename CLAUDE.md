@@ -95,5 +95,7 @@ Built with **Vite** + React plugin → `dist/webview/`
 ## Active Technologies
 - TypeScript 5.x (strict with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) powers both the VS Code extension backend (`esbuild`, VS Code API) and the React 18 webview frontend (`Vite`), with Zustand and Tailwind CSS used across the UI.
 - Shared frontend libraries include Radix UI (`react-context-menu`, `react-dialog`, `react-alert-dialog`, `react-popover`), `@tanstack/react-virtual`, and `headless-tree`; git data comes from the local repository, with application state kept primarily in memory (Zustand store, transient per session) and only selective UI preferences persisted via VS Code `context.globalState`.
+- TypeScript 5.x (strict) + React 18, Zustand, react-datepicker 9.x (new), date-fns 4.x (transitive) (034-react-datepicker-filter)
+- N/A (in-memory Zustand store, transient per session) (034-react-datepicker-filter)
 
 ## Recent Changes
