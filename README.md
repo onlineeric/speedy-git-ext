@@ -20,13 +20,22 @@ A performance-first Git graph, Git history viewer, and history-editing tool buil
 
 ## Features
 
-### New UI in v2
+### New UI and features in v2
 We have a new UI in v2, with a new control bar and toggle panel for Filter, Search, and Compare. The commit list is now a table-style view with resizable columns, column reordering, and column visibility controls.
+
+### Advanced Filter
+In additonal to branch filter, we have a new advanced filter panel with
+- Authors filter
+- Date range filter
+
+![Speedy Git Advanced Filter screenshot](./resources/speedy-git-screenshot-filter.png)
+
+### Table View Commit List
+We have a new table-style commit list view with resizable columns, column reordering, and column visibility controls.
+![Speedy Git Table View Commit List screenshot](./resources/speedy-git-screenshot-table-view.png)
 
 ### Upcoming features in v2
 - Compare branches, commits, HEAD, etc.
-- Filter by Author, date range.
-- Search result switch between highlight and filter.
 
 ### Git Graph & Commit History
 

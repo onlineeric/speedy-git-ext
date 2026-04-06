@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
-### [2.1.0] - 2026-04-06 - pre-release
+## [2.1.0] - pre-release - 2026-04-06
 
 #### Added
 - Advanced filter panel accessible from the toolbar filter toggle, with author, date range, and branch filter sections
