@@ -1,0 +1,195 @@
+/* VS Code theme overrides for react-datepicker */
+
+/* Main container */
+.react-datepicker {
+  background-color: var(--vscode-dropdown-background);
+  border-color: var(--vscode-input-border);
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: 12px;
+}
+
+.react-datepicker__triangle {
+  display: none;
+}
+
+/* Header (month/year navigation) */
+.react-datepicker__header {
+  background-color: var(--vscode-dropdown-background);
+  border-bottom-color: var(--vscode-input-border);
+}
+
+.react-datepicker__current-month,
+.react-datepicker__day-name {
+  color: var(--vscode-foreground);
+}
+
+/* Navigation arrows */
+.react-datepicker__navigation-icon::before {
+  border-color: var(--vscode-foreground);
+}
+
+.react-datepicker__navigation:hover *::before {
+  border-color: var(--vscode-focusBorder);
+}
+
+/* Day cells */
+.react-datepicker__day {
+  color: var(--vscode-foreground);
+}
+
+.react-datepicker__day:hover {
+  background-color: var(--vscode-list-hoverBackground);
+  color: var(--vscode-foreground);
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.react-datepicker__day--selected:hover {
+  background-color: var(--vscode-list-activeSelectionBackground);
+}
+
+.react-datepicker__day--today {
+  font-weight: bold;
+}
+
+.react-datepicker__day--outside-month {
+  color: var(--vscode-disabledForeground);
+}
+
+.react-datepicker__day--disabled {
+  color: var(--vscode-disabledForeground);
+}
+
+/* Input field (compact to match filter panel) */
+.react-datepicker__input-container input {
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 0.25rem;
+  padding: 2px 4px;
+  font-size: 12px;
+  line-height: 1.25;
+  outline: none;
+  width: 100%;
+}
+
+.react-datepicker__input-container input:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+/* Clear button */
+.react-datepicker__close-icon {
+  padding-right: 4px;
+}
+
+.react-datepicker__close-icon::after {
+  background-color: var(--vscode-input-foreground);
+  color: var(--vscode-input-background);
+  font-size: 10px;
+  width: 14px;
+  height: 14px;
+  line-height: 1;
+}
+
+.react-datepicker__close-icon:hover::after {
+  background-color: var(--vscode-focusBorder);
+}
+
+/* Time select dropdown (showTimeSelect) */
+.react-datepicker__time-container {
+  border-left-color: var(--vscode-input-border);
+}
+
+.react-datepicker__time-container .react-datepicker__time {
+  background-color: var(--vscode-dropdown-background);
+}
+
+.react-datepicker__header--time {
+  background-color: var(--vscode-dropdown-background);
+  border-bottom-color: var(--vscode-input-border);
+  color: var(--vscode-foreground);
+}
+
+.react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list li.react-datepicker__time-list-item {
+  color: var(--vscode-foreground);
+}
+
+.react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list li.react-datepicker__time-list-item:hover {
+  background-color: var(--vscode-list-hoverBackground);
+  color: var(--vscode-foreground);
+}
+
+.react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list li.react-datepicker__time-list-item--selected {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list li.react-datepicker__time-list-item--selected:hover {
+  background-color: var(--vscode-list-activeSelectionBackground);
+}
+
+/* Today button */
+.react-datepicker__today-button {
+  background-color: var(--vscode-dropdown-background);
+  border-top-color: var(--vscode-input-border);
+  color: var(--vscode-foreground);
+  cursor: pointer;
+}
+
+.react-datepicker__today-button:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+/* Month & year dropdowns */
+.react-datepicker__month-dropdown-container,
+.react-datepicker__year-dropdown-container {
+  color: var(--vscode-foreground);
+}
+
+.react-datepicker__month-dropdown-container select,
+.react-datepicker__year-dropdown-container select {
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 0.25rem;
+  padding: 1px 2px;
+  font-size: 12px;
+  outline: none;
+}
+
+.react-datepicker__month-dropdown-container select:focus,
+.react-datepicker__year-dropdown-container select:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+.react-datepicker__month-dropdown,
+.react-datepicker__year-dropdown {
+  background-color: var(--vscode-dropdown-background);
+  border-color: var(--vscode-input-border);
+}
+
+.react-datepicker__month-option,
+.react-datepicker__year-option {
+  color: var(--vscode-foreground);
+}
+
+.react-datepicker__month-option:hover,
+.react-datepicker__year-option:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.react-datepicker__month-option--selected_month,
+.react-datepicker__year-option--selected_year {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+/* Validation: red border on invalid input */
+.react-datepicker__input-container input.invalid-date {
+  border-color: #ef4444;
+}

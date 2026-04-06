@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useEffect } from 'react';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import type { Author } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
@@ -8,6 +8,33 @@ import { AuthorAvatar } from './AuthorAvatar';
 import { RefLabel } from './RefLabel';
 import { getBranchLaneColorStyle } from '../utils/filterUtils';
 import { toDisplayRef, combineBranchRefs } from '../utils/filterUtils';
+import DatePicker from 'react-datepicker';
+import { format, parse, isValid } from 'date-fns';
+import 'react-datepicker/dist/react-datepicker.css';
+import './datepicker-overrides.css';
+
+const ISO_FORMAT = "yyyy-MM-dd'T'HH:mm:ss";
+
+function parseISOToDate(iso: string | undefined): Date | null {
+  if (!iso) return null;
+  const parsed = parse(iso, ISO_FORMAT, new Date());
+  return isValid(parsed) ? parsed : null;
+}
+
+function formatDateToISO(date: Date | null, defaultTime: string): string | undefined {
+  if (!date) return undefined;
+  // If the date has midnight time (00:00:00) and a default is provided, apply it
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const seconds = date.getSeconds();
+  if (hours === 0 && minutes === 0 && seconds === 0 && defaultTime !== '00:00:00') {
+    const [h, m, s] = defaultTime.split(':').map(Number);
+    const adjusted = new Date(date);
+    adjusted.setHours(h, m, s);
+    return format(adjusted, ISO_FORMAT);
+  }
+  return format(date, ISO_FORMAT);
+}
 
 // Stable module-level helpers for MultiSelectDropdown props (avoids inline arrow functions
 // that would defeat React.memo on every render).
@@ -31,55 +58,41 @@ export function FilterWidget() {
   const graphColors = useGraphStore((s) => s.userSettings.graphColors);
   const branches = useGraphStore((s) => s.branches);
 
-  // Date range local state
-  const [fromDate, setFromDate] = useState('');
-  const [fromTime, setFromTime] = useState('');
-  const [toDate, setToDate] = useState('');
-  const [toTime, setToTime] = useState('');
+  // Date range local state (Date objects for react-datepicker)
+  const [fromDate, setFromDate] = useState<Date | null>(null);
+  const [toDate, setToDate] = useState<Date | null>(null);
+  const [fromValid, setFromValid] = useState(true);
+  const [toValid, setToValid] = useState(true);
+
+  // Track raw input text for validation (onChangeRaw)
+  const fromRawRef = useRef('');
+  const toRawRef = useRef('');
 
   // Sync local date state with store (handles external changes like context menu and Reset All)
   useEffect(() => {
     const unsub = useGraphStore.subscribe((state, prevState) => {
       if (state.filters.afterDate !== prevState.filters.afterDate) {
-        if (state.filters.afterDate) {
-          const [date, time] = state.filters.afterDate.split('T');
-          setFromDate(date);
-          setFromTime(time === '00:00:00' ? '' : time);
-        } else {
-          setFromDate('');
-          setFromTime('');
-        }
+        const parsed = parseISOToDate(state.filters.afterDate);
+        setFromDate(parsed);
+        setFromValid(true);
+        fromRawRef.current = '';
       }
       if (state.filters.beforeDate !== prevState.filters.beforeDate) {
-        if (state.filters.beforeDate) {
-          const [date, time] = state.filters.beforeDate.split('T');
-          setToDate(date);
-          setToTime(time === '23:59:59' ? '' : time);
-        } else {
-          setToDate('');
-          setToTime('');
-        }
+        const parsed = parseISOToDate(state.filters.beforeDate);
+        setToDate(parsed);
+        setToValid(true);
+        toRawRef.current = '';
       }
     });
     return unsub;
   }, []);
 
-  // Derive validation (time without date is invalid)
-  const dateValidation = useMemo(
-    () => ({ from: !fromTime || !!fromDate, to: !toTime || !!toDate }),
-    [fromDate, fromTime, toDate, toTime],
-  );
-
   // Debounced date filter application
   useEffect(() => {
-    if (!dateValidation.from || !dateValidation.to) return;
+    if (!fromValid || !toValid) return;
 
-    const afterDate = fromDate
-      ? `${fromDate}T${fromTime || '00:00:00'}`
-      : undefined;
-    const beforeDate = toDate
-      ? `${toDate}T${toTime || '23:59:59'}`
-      : undefined;
+    const afterDate = formatDateToISO(fromDate, '00:00:00');
+    const beforeDate = formatDateToISO(toDate, '23:59:59');
 
     // Skip if store already matches (avoids unnecessary re-render loops on mount)
     const currentFilters = useGraphStore.getState().filters;
@@ -91,7 +104,7 @@ export function FilterWidget() {
     }, 150);
 
     return () => clearTimeout(timer);
-  }, [fromDate, fromTime, toDate, toTime, setFilters, dateValidation.from, dateValidation.to]);
+  }, [fromDate, toDate, setFilters, fromValid, toValid]);
 
   // Author dropdown helpers
   const selectedAuthors = useMemo(
@@ -320,48 +333,84 @@ export function FilterWidget() {
       {/* Date range row */}
       <div className="flex gap-2">
         <span className="text-[var(--vscode-descriptionForeground)] w-16 flex-shrink-0 pt-0.5">Dates</span>
-        <div className="flex-1 min-w-0 flex flex-col gap-1">
-          <div className="flex items-center gap-1">
-            <span className="text-[var(--vscode-descriptionForeground)] text-xs w-8">From</span>
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className={`px-1 py-0.5 text-xs bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border rounded focus:outline-none focus:border-[var(--vscode-focusBorder)] ${
-                dateValidation.from ? 'border-[var(--vscode-input-border)]' : 'border-red-500'
-              }`}
-            />
-            <input
-              type="time"
-              value={fromTime}
-              onChange={(e) => setFromTime(e.target.value)}
-              className={`px-1 py-0.5 text-xs bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border rounded focus:outline-none focus:border-[var(--vscode-focusBorder)] w-20 ${
-                dateValidation.from ? 'border-[var(--vscode-input-border)]' : 'border-red-500'
-              }`}
-            />
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="text-[var(--vscode-descriptionForeground)] text-xs w-8">To</span>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className={`px-1 py-0.5 text-xs bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border rounded focus:outline-none focus:border-[var(--vscode-focusBorder)] ${
-                dateValidation.to ? 'border-[var(--vscode-input-border)]' : 'border-red-500'
-              }`}
-            />
-            <input
-              type="time"
-              value={toTime}
-              onChange={(e) => setToTime(e.target.value)}
-              className={`px-1 py-0.5 text-xs bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border rounded focus:outline-none focus:border-[var(--vscode-focusBorder)] w-20 ${
-                dateValidation.to ? 'border-[var(--vscode-input-border)]' : 'border-red-500'
-              }`}
-            />
-          </div>
+        <div className="flex-1 min-w-0 flex items-center gap-2">
+          <span className="text-[var(--vscode-descriptionForeground)] text-xs">From</span>
+          <DatePicker
+            selected={fromDate}
+            onChange={(date: Date | null) => {
+              setFromDate(date);
+              setFromValid(true);
+              fromRawRef.current = '';
+            }}
+            onChangeRaw={(e) => {
+              // Only process actual input change events, not calendar click events
+              if (!e || !(e.target instanceof HTMLInputElement)) return;
+              const raw = e.target.value;
+              fromRawRef.current = raw;
+              if (raw === '') {
+                setFromValid(true);
+              } else {
+                const d1 = parse(raw, 'yyyy-MM-dd HH:mm', new Date());
+                const d2 = parse(raw, 'yyyy-MM-dd', new Date());
+                setFromValid(isValid(d1) || isValid(d2));
+              }
+            }}
+            dateFormat={['yyyy-MM-dd HH:mm', 'yyyy-MM-dd']}
+            placeholderText="YYYY-MM-DD HH:mm"
+            showTimeSelect
+            timeFormat="HH:mm"
+            timeIntervals={15}
+            timeCaption="Time"
+            todayButton="Today"
+            showMonthDropdown
+            showYearDropdown
+            shouldCloseOnSelect={false}
+            isClearable
+            strictParsing
+            autoComplete="off"
+            portalId="datepicker-portal"
+            className={!fromValid ? 'invalid-date' : ''}
+          />
+          <span className="text-[var(--vscode-descriptionForeground)] text-xs">To</span>
+          <DatePicker
+            selected={toDate}
+            onChange={(date: Date | null) => {
+              setToDate(date);
+              setToValid(true);
+              toRawRef.current = '';
+            }}
+            onChangeRaw={(e) => {
+              if (!e || !(e.target instanceof HTMLInputElement)) return;
+              const raw = e.target.value;
+              toRawRef.current = raw;
+              if (raw === '') {
+                setToValid(true);
+              } else {
+                const d1 = parse(raw, 'yyyy-MM-dd HH:mm', new Date());
+                const d2 = parse(raw, 'yyyy-MM-dd', new Date());
+                setToValid(isValid(d1) || isValid(d2));
+              }
+            }}
+            dateFormat={['yyyy-MM-dd HH:mm', 'yyyy-MM-dd']}
+            placeholderText="YYYY-MM-DD HH:mm"
+            showTimeSelect
+            timeFormat="HH:mm"
+            timeIntervals={15}
+            timeCaption="Time"
+            todayButton="Today"
+            showMonthDropdown
+            showYearDropdown
+            shouldCloseOnSelect={false}
+            isClearable
+            strictParsing
+            autoComplete="off"
+            portalId="datepicker-portal"
+            className={!toValid ? 'invalid-date' : ''}
+          />
         </div>
       </div>
 
+      <div id="datepicker-portal" />
     </div>
   );
 }
