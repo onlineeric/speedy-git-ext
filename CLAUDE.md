@@ -152,3 +152,10 @@ shared/                           # Shared types between backend & frontend
 
 - **Packages**: NEVER auto-install; provide install commands for me to run manually
 - **Git**: NEVER commit or merge; only readonly operations (`git log`, `git status`, `git diff`) and create PR, create branch only if I ask you to do so, or if speckit workflow requires it.
+
+## Active Technologies
+- TypeScript 5.x (strict) + React 18, Zustand, Tailwind CSS (035-text-filter)
+- N/A (in-memory Zustand state only) (035-text-filter)
+
+## Recent Changes
+- 035-text-filter: Added TypeScript 5.x (strict) + React 18, Zustand, Tailwind CSS
