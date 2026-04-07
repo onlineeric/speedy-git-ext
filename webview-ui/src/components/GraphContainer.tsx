@@ -128,6 +128,15 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
     }
   }, [rangeEnd, lastBatchStartIndex, prefetching, hasMore, hiddenCommitHashes.size, commits.length, userSettings.overScan, showGapIndicator]);
 
+  // Trigger prefetch when client-side filter hides ALL cached commits (virtualizer has 0 items)
+  useEffect(() => {
+    if (commits.length > 0) return;           // scroll trigger handles this case
+    if (!hasMore || prefetching) return;
+    if (hiddenCommitHashes.size === 0) return; // no filter active; genuinely 0 commits loaded
+    if (showGapIndicator) return;              // gap cap reached; "Load more" button handles this
+    rpcClient.firePrefetch();
+  }, [commits.length, hasMore, prefetching, hiddenCommitHashes.size, showGapIndicator]);
+
   // Scroll-past-gap-indicator: when user scrolls to the very bottom with gap showing, reset and fetch
   useEffect(() => {
     if (!showGapIndicator || !hasMore || prefetching) return;
@@ -149,8 +158,10 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
       }
     };
     el.addEventListener('scroll', handleScroll, { passive: true });
-    // Also check immediately in case already at bottom
-    handleScroll();
+    // Check immediately only if content overflows (user can actually scroll)
+    if (el.scrollHeight > el.clientHeight) {
+      handleScroll();
+    }
     return () => el.removeEventListener('scroll', handleScroll);
   }, [showGapIndicator, hasMore, prefetching, rangeEnd, commits.length]);
 
@@ -215,8 +226,16 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
   const filters = useGraphStore((state) => state.filters);
   const loading = useGraphStore((state) => state.loading);
 
-  const hasActiveFilter = !!(filters.branches?.length || filters.authors?.length || filters.afterDate || filters.beforeDate);
+  const hasActiveFilter = !!(filters.branches?.length || filters.authors?.length || filters.afterDate || filters.beforeDate || filters.textFilter);
   const isEmpty = commits.length === 0;
+
+  const handleLoadMore = useCallback(() => {
+    useGraphStore.setState({
+      consecutiveEmptyBatches: 0,
+      showGapIndicator: false,
+    });
+    rpcClient.firePrefetch();
+  }, []);
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -226,8 +245,22 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
       <TogglePanel />
       <SubmoduleSection submodules={submodules} />
       {isEmpty ? (
-        <div className="flex flex-1 items-center justify-center text-[var(--vscode-descriptionForeground)]">
-          {loading ? 'Loading…' : hasActiveFilter ? 'No commits match the current filters' : 'No commits found'}
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-[var(--vscode-descriptionForeground)]">
+          {loading || prefetching
+            ? 'Loading…'
+            : showGapIndicator && hasMore
+              ? <>
+                  <span>{filteredOutCount} commit{filteredOutCount !== 1 ? 's' : ''} filtered out of {allCommitsCount} loaded</span>
+                  <button
+                    className="px-3 py-1 text-xs rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                    onClick={handleLoadMore}
+                  >
+                    Load more commits
+                  </button>
+                </>
+              : hasActiveFilter
+                ? 'No commits match the current filters'
+                : 'No commits found'}
         </div>
       ) : (
         <>
@@ -318,11 +351,16 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
             onMouseLeave={onTooltipMouseLeave}
           />
           {showGapIndicator && hasMore && (
-            <div className="flex items-center justify-center py-3 px-4 text-xs text-[var(--vscode-descriptionForeground)] bg-[var(--vscode-editor-background)] border-t border-[var(--vscode-panel-border)]">
+            <div className="flex items-center justify-center gap-3 py-3 px-4 text-xs text-[var(--vscode-descriptionForeground)] bg-[var(--vscode-editor-background)] border-t border-[var(--vscode-panel-border)]">
               <span>
                 {filteredOutCount} commit{filteredOutCount !== 1 ? 's' : ''} filtered out of {allCommitsCount} loaded
-                {' \u2014 keep scrolling down to fetch next batch'}
               </span>
+              <button
+                className="px-3 py-1 rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                onClick={handleLoadMore}
+              >
+                Load more commits
+              </button>
             </div>
           )}
           {prefetching && (
