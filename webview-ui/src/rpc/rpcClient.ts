@@ -217,6 +217,15 @@ class RpcClient {
     this.send({ type: 'getCommitDetails', payload: { hash } });
   }
 
+  navigateMatch(direction: 'next' | 'prev') {
+    const store = useGraphStore.getState();
+    if (store.searchState.matchIndices.length === 0) return;
+    if (direction === 'next') store.nextMatch();
+    else store.prevMatch();
+    const hash = useGraphStore.getState().selectedCommit;
+    if (hash) this.getCommitDetails(hash);
+  }
+
   checkoutBranch(name: string, remote?: string) {
     this.send({ type: 'checkoutBranch', payload: { name, remote } });
   }

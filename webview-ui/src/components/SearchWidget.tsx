@@ -7,8 +7,6 @@ export function SearchWidget() {
   const commits = useGraphStore((state) => state.mergedCommits);
   const searchState = useGraphStore((state) => state.searchState);
   const closeSearch = useGraphStore((state) => state.closeSearch);
-  const nextMatch = useGraphStore((state) => state.nextMatch);
-  const prevMatch = useGraphStore((state) => state.prevMatch);
   const setSearchQuery = useGraphStore((state) => state.setSearchQuery);
   const setSearchMatches = useGraphStore((state) => state.setSearchMatches);
 
@@ -31,18 +29,6 @@ export function SearchWidget() {
   const totalMatches = searchState.matchIndices.length;
   const currentMatch = totalMatches > 0 ? searchState.currentMatchIndex + 1 : 0;
 
-  const handleNext = () => {
-    nextMatch();
-    const hash = useGraphStore.getState().selectedCommit;
-    if (hash) rpcClient.getCommitDetails(hash);
-  };
-
-  const handlePrev = () => {
-    prevMatch();
-    const hash = useGraphStore.getState().selectedCommit;
-    if (hash) rpcClient.getCommitDetails(hash);
-  };
-
   return (
     <div className="flex items-center gap-2 rounded-md border border-[var(--vscode-panel-border)] bg-[var(--vscode-editorWidget-background)] px-3 py-2 shadow-sm">
       <input
@@ -60,7 +46,7 @@ export function SearchWidget() {
 
       <button
         type="button"
-        onClick={handlePrev}
+        onClick={() => rpcClient.navigateMatch('prev')}
         disabled={totalMatches === 0}
         className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] disabled:opacity-50"
       >
@@ -69,7 +55,7 @@ export function SearchWidget() {
 
       <button
         type="button"
-        onClick={handleNext}
+        onClick={() => rpcClient.navigateMatch('next')}
         disabled={totalMatches === 0}
         className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] disabled:opacity-50"
       >

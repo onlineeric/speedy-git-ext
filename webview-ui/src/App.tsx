@@ -17,9 +17,6 @@ export function App() {
   const setDetailsPanelOpen = useGraphStore((state) => state.setDetailsPanelOpen);
   const moveSelection = useGraphStore((state) => state.moveSelection);
   const selectCommit = useGraphStore((state) => state.selectCommit);
-  const searchState = useGraphStore((state) => state.searchState);
-  const nextMatch = useGraphStore((state) => state.nextMatch);
-  const prevMatch = useGraphStore((state) => state.prevMatch);
 
   useEffect(() => {
     rpcClient.initialize();
@@ -65,17 +62,7 @@ export function App() {
 
     if (event.key === 'F3') {
       event.preventDefault();
-      if (searchState.isOpen) {
-        if (event.shiftKey) {
-          prevMatch();
-        } else {
-          nextMatch();
-        }
-        const hash = useGraphStore.getState().selectedCommit;
-        if (hash) {
-          rpcClient.getCommitDetails(hash);
-        }
-      }
+      rpcClient.navigateMatch(event.shiftKey ? 'prev' : 'next');
       return;
     }
 
