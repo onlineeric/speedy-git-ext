@@ -1,13 +1,12 @@
 import { useEffect } from 'react';
 import { useGraphStore } from '../stores/graphStore';
+import { rpcClient } from '../rpc/rpcClient';
 import { filterCommits } from '../utils/searchFilter';
 
 export function SearchWidget() {
   const commits = useGraphStore((state) => state.mergedCommits);
   const searchState = useGraphStore((state) => state.searchState);
   const closeSearch = useGraphStore((state) => state.closeSearch);
-  const nextMatch = useGraphStore((state) => state.nextMatch);
-  const prevMatch = useGraphStore((state) => state.prevMatch);
   const setSearchQuery = useGraphStore((state) => state.setSearchQuery);
   const setSearchMatches = useGraphStore((state) => state.setSearchMatches);
 
@@ -37,7 +36,7 @@ export function SearchWidget() {
         type="text"
         value={searchState.query}
         onChange={(event) => setSearchQuery(event.target.value)}
-        placeholder="Search commits"
+        placeholder="Search commits (Ctrl+F)"
         className="min-w-[220px] rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] px-2 py-1 text-sm text-[var(--vscode-input-foreground)] outline-none"
       />
 
@@ -47,29 +46,33 @@ export function SearchWidget() {
 
       <button
         type="button"
-        onClick={prevMatch}
+        onClick={() => rpcClient.navigateMatch('prev')}
         disabled={totalMatches === 0}
         className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] disabled:opacity-50"
       >
-        Prev
+        Prev (Shift+F3)
       </button>
 
       <button
         type="button"
-        onClick={nextMatch}
+        onClick={() => rpcClient.navigateMatch('next')}
         disabled={totalMatches === 0}
-        className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] disabled:opacity-50"
+        className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] disabled:opacity-50"
       >
-        Next
+        Next (F3)
       </button>
 
       <button
         type="button"
         onClick={closeSearch}
-        className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)]"
+        className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)]"
       >
-        Close
+        Close (Esc)
       </button>
+
+      <span className="whitespace-nowrap text-xs italic text-[var(--vscode-descriptionForeground)]">
+        Tips: You can filter message in Filter Panel
+      </span>
     </div>
   );
 }

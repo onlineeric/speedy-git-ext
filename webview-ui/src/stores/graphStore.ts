@@ -34,19 +34,34 @@ import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
 
 /**
  * Compute the set of commit hashes that should be hidden by active visibility filters.
- * Currently only the author filter is a visibility filter.
+ * Author and text filters are applied in a single pass (AND semantics).
  * Stash entries are excluded (stashes are merged separately after filtering).
  */
 function computeHiddenCommitHashes(commits: Commit[], filters: GraphFilters): Set<string> {
   const hidden = new Set<string>();
-  if (!filters.authors || filters.authors.length === 0) return hidden;
+  const hasAuthorFilter = !!filters.authors && filters.authors.length > 0;
+  const hasTextFilter = !!filters.textFilter;
 
-  const includedAuthors = new Set(filters.authors);
+  if (!hasAuthorFilter && !hasTextFilter) return hidden;
+
+  const includedAuthors = hasAuthorFilter ? new Set(filters.authors) : null;
+  const textLower = hasTextFilter ? filters.textFilter!.toLowerCase() : '';
+
   for (const commit of commits) {
     // Stash entries are never hidden
     if (commit.refs.some(r => r.type === 'stash')) continue;
-    if (!includedAuthors.has(commit.authorEmail)) {
+
+    if (includedAuthors && !includedAuthors.has(commit.authorEmail)) {
       hidden.add(commit.hash);
+      continue;
+    }
+
+    if (hasTextFilter) {
+      const subjectMatch = commit.subject.toLowerCase().includes(textLower);
+      const hashMatch = textLower.length >= 4 && commit.hash.startsWith(textLower);
+      if (!subjectMatch && !hashMatch) {
+        hidden.add(commit.hash);
+      }
     }
   }
   return hidden;
@@ -641,21 +656,35 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   nextMatch: () => set((state) => {
     const { matchIndices, currentMatchIndex } = state.searchState;
     if (matchIndices.length === 0) return {};
+    const newMatchIndex = (currentMatchIndex + 1) % matchIndices.length;
+    const commitIndex = matchIndices[newMatchIndex];
+    const commit = state.mergedCommits[commitIndex];
     return {
       searchState: {
         ...state.searchState,
-        currentMatchIndex: (currentMatchIndex + 1) % matchIndices.length,
+        currentMatchIndex: newMatchIndex,
       },
+      selectedCommit: commit?.hash,
+      selectedCommitIndex: commitIndex,
+      lastClickedHash: commit?.hash,
+      selectedCommits: [],
     };
   }),
   prevMatch: () => set((state) => {
     const { matchIndices, currentMatchIndex } = state.searchState;
     if (matchIndices.length === 0) return {};
+    const newMatchIndex = (currentMatchIndex - 1 + matchIndices.length) % matchIndices.length;
+    const commitIndex = matchIndices[newMatchIndex];
+    const commit = state.mergedCommits[commitIndex];
     return {
       searchState: {
         ...state.searchState,
-        currentMatchIndex: (currentMatchIndex - 1 + matchIndices.length) % matchIndices.length,
+        currentMatchIndex: newMatchIndex,
       },
+      selectedCommit: commit?.hash,
+      selectedCommitIndex: commitIndex,
+      lastClickedHash: commit?.hash,
+      selectedCommits: [],
     };
   }),
   setAuthorList: (authors) => set({ authorList: authors }),

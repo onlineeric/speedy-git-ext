@@ -9,6 +9,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [2.2.0] - 2026-04-07
+
+#### Added
+- Message text filter in the Filter panel — type to hide commits whose message doesn't match, narrowing the graph to only matching results with case-insensitive plain text matching
+- Hash prefix matching in the Message filter — commits whose hash starts with the entered text (4+ characters) are also shown
+- Clear button on the Message filter field to remove the filter text in a single click
+- Text filter combines with existing Author, Date Range, and Branch filters using AND logic for precise multi-criteria filtering
+- Debounced text input for responsive filtering without excessive recalculation during typing
+- Text filter automatically applies to newly loaded commit batches as they arrive via scroll prefetch
+- Stash entries remain visible regardless of Message filter value, consistent with existing filter behavior
+- "Reset All" clears the Message filter text along with all other resettable filters
+- Search navigation (Next/Prev buttons and F3/Shift+F3 hotkeys) now selects the matched commit, so closing the search panel leaves the last navigated match selected
+
+#### Fixed
+- Search panel focus: closing the panel via Esc, Ctrl+F, or Close button no longer loses keyboard focus — hotkeys continue to work immediately after closing
+
 ## [2.1.1] - 2026-04-06
 No changes - justs a patch release to publish the pre-release 2.1.0 to the marketplace after testing.
 

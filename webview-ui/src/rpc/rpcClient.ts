@@ -52,7 +52,10 @@ class RpcClient {
         this.firePrefetch();
         break;
       case 'commitsAppended': {
-        if (message.payload.generation !== store.fetchGeneration) break;
+        if (message.payload.generation !== store.fetchGeneration) {
+          store.setPrefetching(false);
+          break;
+        }
         store.appendCommits(message.payload.commits, message.payload.totalLoadedWithoutFilter);
         store.setHasMore(message.payload.hasMore);
         store.setPrefetching(false);
@@ -212,6 +215,15 @@ class RpcClient {
 
   getCommitDetails(hash: string) {
     this.send({ type: 'getCommitDetails', payload: { hash } });
+  }
+
+  navigateMatch(direction: 'next' | 'prev') {
+    const store = useGraphStore.getState();
+    if (store.searchState.matchIndices.length === 0) return;
+    if (direction === 'next') store.nextMatch();
+    else store.prevMatch();
+    const hash = useGraphStore.getState().selectedCommit;
+    if (hash) this.getCommitDetails(hash);
   }
 
   checkoutBranch(name: string, remote?: string) {

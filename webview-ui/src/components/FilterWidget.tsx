@@ -58,6 +58,9 @@ export function FilterWidget() {
   const graphColors = useGraphStore((s) => s.userSettings.graphColors);
   const branches = useGraphStore((s) => s.branches);
 
+  // Message filter local state
+  const [messageText, setMessageText] = useState<string>(() => filters.textFilter ?? '');
+
   // Date range local state (Date objects for react-datepicker)
   // Initialize from store so dates set while panel was closed are picked up on mount
   const [fromDate, setFromDate] = useState<Date | null>(() => parseISOToDate(filters.afterDate));
@@ -87,6 +90,32 @@ export function FilterWidget() {
     });
     return unsub;
   }, []);
+
+  // Sync local message text state with store (handles external changes like Reset All)
+  useEffect(() => {
+    const unsub = useGraphStore.subscribe((state, prevState) => {
+      if (state.filters.textFilter !== prevState.filters.textFilter) {
+        setMessageText(state.filters.textFilter ?? '');
+      }
+    });
+    return unsub;
+  }, []);
+
+  // Debounced text filter application
+  useEffect(() => {
+    const textFilter = messageText || undefined;
+
+    // Skip if store already matches (avoids unnecessary re-render loops on mount)
+    const currentFilters = useGraphStore.getState().filters;
+    if (currentFilters.textFilter === textFilter) return;
+
+    const timer = setTimeout(() => {
+      setFilters({ textFilter });
+      recomputeVisibility();
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [messageText, setFilters, recomputeVisibility]);
 
   // Debounced date filter application
   useEffect(() => {
@@ -162,6 +191,7 @@ export function FilterWidget() {
   const handleResetAll = useCallback(() => {
     const filters = useGraphStore.getState().filters;
     const hadStructuralFilters = !!(filters.branches?.length || filters.afterDate || filters.beforeDate);
+    setMessageText('');
     resetAllFilters({ preserveBranches: false });
     recomputeVisibility();
     // Only re-fetch from backend if structural filters were active
@@ -170,7 +200,7 @@ export function FilterWidget() {
     }
   }, [resetAllFilters, recomputeVisibility]);
 
-  const hasAnyFilters = !!(filters.branches?.length || filters.authors?.length || filters.afterDate || filters.beforeDate);
+  const hasAnyFilters = !!(filters.branches?.length || filters.authors?.length || filters.afterDate || filters.beforeDate || filters.textFilter);
 
   // Branch badges: combine local+remote into merged badges
   const branchBadges = useMemo(
@@ -408,6 +438,32 @@ export function FilterWidget() {
             portalId="datepicker-portal"
             className={!toValid ? 'invalid-date' : ''}
           />
+        </div>
+      </div>
+
+      {/* Message filter row */}
+      <div className="flex gap-2">
+        <span className="text-[var(--vscode-descriptionForeground)] w-16 flex-shrink-0 pt-0.5">Message</span>
+        <div className="flex-1 min-w-0 relative">
+          <input
+            type="text"
+            value={messageText}
+            onChange={(e) => setMessageText(e.target.value)}
+            placeholder="Filter by message or hash..."
+            className="w-full px-2 py-1 pr-7 text-sm bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] rounded focus:outline-none focus:border-[var(--vscode-focusBorder)]"
+          />
+          {messageText && (
+            <button
+              onClick={() => setMessageText('')}
+              className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 hover:bg-[var(--vscode-toolbar-hoverBackground)] rounded"
+              title="Clear message filter"
+              aria-label="Clear message filter"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 

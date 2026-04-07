@@ -52,13 +52,24 @@ export function App() {
 
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
       event.preventDefault();
+      const isClosing = activeToggleWidget === 'search';
       setActiveToggleWidget('search');
+      if (isClosing) {
+        rootRef.current?.focus();
+      }
+      return;
+    }
+
+    if (event.key === 'F3') {
+      event.preventDefault();
+      rpcClient.navigateMatch(event.shiftKey ? 'prev' : 'next');
       return;
     }
 
     if (isFormControl) {
       if (event.key === 'Escape' && activeToggleWidget !== null) {
         setActiveToggleWidget(null);
+        rootRef.current?.focus();
       }
       return;
     }
