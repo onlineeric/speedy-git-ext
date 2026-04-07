@@ -52,7 +52,10 @@ class RpcClient {
         this.firePrefetch();
         break;
       case 'commitsAppended': {
-        if (message.payload.generation !== store.fetchGeneration) break;
+        if (message.payload.generation !== store.fetchGeneration) {
+          store.setPrefetching(false);
+          break;
+        }
         store.appendCommits(message.payload.commits, message.payload.totalLoadedWithoutFilter);
         store.setHasMore(message.payload.hasMore);
         store.setPrefetching(false);
