@@ -656,21 +656,35 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   nextMatch: () => set((state) => {
     const { matchIndices, currentMatchIndex } = state.searchState;
     if (matchIndices.length === 0) return {};
+    const newMatchIndex = (currentMatchIndex + 1) % matchIndices.length;
+    const commitIndex = matchIndices[newMatchIndex];
+    const commit = state.mergedCommits[commitIndex];
     return {
       searchState: {
         ...state.searchState,
-        currentMatchIndex: (currentMatchIndex + 1) % matchIndices.length,
+        currentMatchIndex: newMatchIndex,
       },
+      selectedCommit: commit?.hash,
+      selectedCommitIndex: commitIndex,
+      lastClickedHash: commit?.hash,
+      selectedCommits: [],
     };
   }),
   prevMatch: () => set((state) => {
     const { matchIndices, currentMatchIndex } = state.searchState;
     if (matchIndices.length === 0) return {};
+    const newMatchIndex = (currentMatchIndex - 1 + matchIndices.length) % matchIndices.length;
+    const commitIndex = matchIndices[newMatchIndex];
+    const commit = state.mergedCommits[commitIndex];
     return {
       searchState: {
         ...state.searchState,
-        currentMatchIndex: (currentMatchIndex - 1 + matchIndices.length) % matchIndices.length,
+        currentMatchIndex: newMatchIndex,
       },
+      selectedCommit: commit?.hash,
+      selectedCommitIndex: commitIndex,
+      lastClickedHash: commit?.hash,
+      selectedCommits: [],
     };
   }),
   setAuthorList: (authors) => set({ authorList: authors }),

@@ -9,6 +9,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [2.2.0] - 2026-04-07
+
+#### Added
+- Search navigation (Next/Prev buttons and F3/Shift+F3 hotkeys) now selects the matched commit, so closing the search panel leaves the last navigated match selected
+
+#### Fixed
+- Search panel focus: closing the panel via Esc, Ctrl+F, or Close button no longer loses keyboard focus — hotkeys continue to work immediately after closing
+
 ## [2.1.1] - 2026-04-06
 No changes - justs a patch release to publish the pre-release 2.1.0 to the marketplace after testing.
 

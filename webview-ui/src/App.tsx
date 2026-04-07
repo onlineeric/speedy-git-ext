@@ -17,6 +17,9 @@ export function App() {
   const setDetailsPanelOpen = useGraphStore((state) => state.setDetailsPanelOpen);
   const moveSelection = useGraphStore((state) => state.moveSelection);
   const selectCommit = useGraphStore((state) => state.selectCommit);
+  const searchState = useGraphStore((state) => state.searchState);
+  const nextMatch = useGraphStore((state) => state.nextMatch);
+  const prevMatch = useGraphStore((state) => state.prevMatch);
 
   useEffect(() => {
     rpcClient.initialize();
@@ -52,13 +55,34 @@ export function App() {
 
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
       event.preventDefault();
+      const isClosing = activeToggleWidget === 'search';
       setActiveToggleWidget('search');
+      if (isClosing) {
+        rootRef.current?.focus();
+      }
+      return;
+    }
+
+    if (event.key === 'F3') {
+      event.preventDefault();
+      if (searchState.isOpen) {
+        if (event.shiftKey) {
+          prevMatch();
+        } else {
+          nextMatch();
+        }
+        const hash = useGraphStore.getState().selectedCommit;
+        if (hash) {
+          rpcClient.getCommitDetails(hash);
+        }
+      }
       return;
     }
 
     if (isFormControl) {
       if (event.key === 'Escape' && activeToggleWidget !== null) {
         setActiveToggleWidget(null);
+        rootRef.current?.focus();
       }
       return;
     }
