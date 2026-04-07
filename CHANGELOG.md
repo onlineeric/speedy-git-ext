@@ -9,6 +9,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [2.2.1] - 2026-04-08
+
+#### Fixed
+- Text and author filters now automatically prefetch more commits when all cached commits are hidden, instead of showing an empty graph with no way to load more
+- "Load more commits" button replaces the "keep scrolling" message in the gap indicator, providing a clear action when few or no visible commits prevent scrolling
+- Scroll-past-gap handler no longer auto-triggers when content is too short to scroll, preventing runaway fetching that loaded the entire repository
+- Text filter now correctly shows "No commits match the current filters" instead of "No commits found" in the empty state
+- Empty state displays "Loading…" during active prefetch instead of prematurely showing the no-results message
+
 ## [2.2.0] - 2026-04-07
 
 #### Added
