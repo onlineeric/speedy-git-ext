@@ -191,6 +191,7 @@ export function FilterWidget() {
   const handleResetAll = useCallback(() => {
     const filters = useGraphStore.getState().filters;
     const hadStructuralFilters = !!(filters.branches?.length || filters.afterDate || filters.beforeDate);
+    setMessageText('');
     resetAllFilters({ preserveBranches: false });
     recomputeVisibility();
     // Only re-fetch from backend if structural filters were active
