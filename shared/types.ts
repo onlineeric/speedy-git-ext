@@ -122,6 +122,7 @@ export interface GraphFilters {
   authors?: string[];
   afterDate?: string;
   beforeDate?: string;
+  textFilter?: string;
   maxCount: number;
   skip?: number;
 }

@@ -19,7 +19,7 @@
 
 **Purpose**: Add the new filter field to the shared type used by both store and UI
 
-- [ ] T001 Add `textFilter?: string` field to `GraphFilters` interface in `shared/types.ts`
+- [x] T001 Add `textFilter?: string` field to `GraphFilters` interface in `shared/types.ts`
 
 **Checkpoint**: Type compiles — `pnpm typecheck` passes
 
@@ -33,10 +33,10 @@
 
 ### Implementation for User Story 1
 
-- [ ] T002 [US1] Extend `computeHiddenCommitHashes()` in `webview-ui/src/stores/graphStore.ts` to hide commits not matching `filters.textFilter` (case-insensitive `subject` includes OR hash `startsWith` when text ≥4 chars). Combine with author filter in single pass. Skip stash entries (existing pattern).
-- [ ] T003 [US1] Add "Message" text input row to `webview-ui/src/components/FilterWidget.tsx` after the Dates section. Use local `useState` for input text, `useEffect` with 150ms debounce calling `setFilters({ textFilter })` then `recomputeVisibility()`. Follow the same row layout pattern as Authors/Dates rows (`flex gap-2`, `w-16` label, `flex-1` content).
-- [ ] T004 [US1] Update `hasAnyFilters` check in `webview-ui/src/components/FilterWidget.tsx` (line 173) to include `|| !!filters.textFilter` so Reset All button appears when text filter is active.
-- [ ] T005 [US1] Sync local text input state with store in `webview-ui/src/components/FilterWidget.tsx` — add `useEffect` subscriber (same pattern as date sync at lines 73-89) to handle external clears (e.g., Reset All, context menu actions).
+- [x] T002 [US1] Extend `computeHiddenCommitHashes()` in `webview-ui/src/stores/graphStore.ts` to hide commits not matching `filters.textFilter` (case-insensitive `subject` includes OR hash `startsWith` when text ≥4 chars). Combine with author filter in single pass. Skip stash entries (existing pattern).
+- [x] T003 [US1] Add "Message" text input row to `webview-ui/src/components/FilterWidget.tsx` after the Dates section. Use local `useState` for input text, `useEffect` with 150ms debounce calling `setFilters({ textFilter })` then `recomputeVisibility()`. Follow the same row layout pattern as Authors/Dates rows (`flex gap-2`, `w-16` label, `flex-1` content).
+- [x] T004 [US1] Update `hasAnyFilters` check in `webview-ui/src/components/FilterWidget.tsx` (line 173) to include `|| !!filters.textFilter` so Reset All button appears when text filter is active.
+- [x] T005 [US1] Sync local text input state with store in `webview-ui/src/components/FilterWidget.tsx` — add `useEffect` subscriber (same pattern as date sync at lines 73-89) to handle external clears (e.g., Reset All, context menu actions).
 
 **Checkpoint**: User Story 1 fully functional — typing text hides non-matching commits, graph updates with dotted lines, Reset All clears the text filter.
 
@@ -66,7 +66,7 @@ No additional implementation tasks required. The AND combination is inherently h
 
 ### Implementation for User Story 3
 
-- [ ] T006 [US3] Add clear button (x icon) to the Message text input in `webview-ui/src/components/FilterWidget.tsx`. Show only when text is non-empty. On click: clear local state, which triggers debounced `setFilters({ textFilter: undefined })` + `recomputeVisibility()`.
+- [x] T006 [US3] Add clear button (x icon) to the Message text input in `webview-ui/src/components/FilterWidget.tsx`. Show only when text is non-empty. On click: clear local state, which triggers debounced `setFilters({ textFilter: undefined })` + `recomputeVisibility()`.
 
 **Checkpoint**: Clear button appears when text is present, disappears when empty, clears only the text filter.
 
@@ -90,7 +90,7 @@ No additional implementation tasks required. Stash visibility is inherently hand
 
 **Purpose**: Validation and cleanup
 
-- [ ] T007 Run `pnpm typecheck && pnpm lint && pnpm build` to verify all changes compile and pass linting
+- [x] T007 Run `pnpm typecheck && pnpm lint && pnpm build` to verify all changes compile and pass linting
 - [ ] T008 Run quickstart.md smoke test validation via VS Code "Run Extension" launch config
 
 ---
