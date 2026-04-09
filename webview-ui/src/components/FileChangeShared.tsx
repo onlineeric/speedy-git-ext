@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FileChange } from '@shared/types';
+import { UNCOMMITTED_HASH } from '@shared/types';
 import { CopyIcon, CheckIcon, FileIcon, FileCodeIcon } from './icons';
 import { rpcClient } from '../rpc/rpcClient';
 
@@ -80,6 +81,10 @@ export function FileActionIcons({
 
   const handleOpenAtCommit = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (commitHash === UNCOMMITTED_HASH) {
+      rpcClient.openCurrentFile(file.path);
+      return;
+    }
     if (file.status === 'deleted' && parentHash) {
       rpcClient.openFile(parentHash, file.path);
     } else {

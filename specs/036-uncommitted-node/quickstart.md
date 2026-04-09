@@ -45,3 +45,13 @@ Smoke test: Open a repo with uncommitted changes → verify node appears → cli
 - `UNCOMMITTED_HASH = 'UNCOMMITTED'` — identifies the synthetic node in all layers
 - Ref type: `'uncommitted'` — used for context menu routing, filter bypass, visual styling
 - Subject format: `"Uncommitted Changes (3 staged, 2 modified, 1 untracked)"` — dynamic, zero-count categories omitted
+
+## UNCOMMITTED_HASH Guard Rail Pattern
+
+The `UNCOMMITTED` string is not a valid git hash — it fails `validateHash()`. Any component that passes a commit hash to a git backend operation **must** guard against it:
+
+- **Signature fetch**: `CommitSignatureSection` — skip `getSignatureInfo()` for `UNCOMMITTED_HASH`
+- **File open**: `FileChangeShared.handleOpenAtCommit` — use `openCurrentFile()` instead of `openFile(hash, ...)`
+- **Diff**: `openDiffEditor` — resolve HEAD to actual hash for `git-show://` URI; use `untitled:` for untracked empty left side
+- **Author context menu**: `CommitTableRow` — skip `AuthorContextMenu` wrapper for uncommitted rows
+- **General rule**: if you add a new feature that uses `details.hash` or `commit.hash` for a git operation, check for `UNCOMMITTED_HASH` first

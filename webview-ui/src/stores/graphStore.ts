@@ -11,6 +11,7 @@ import type {
   CommitSignatureInfo,
   ContainingBranchesResult,
   DetailsPanelPosition,
+  FileChange,
   FileViewMode,
   GraphFilters,
   PersistedUIState,
@@ -28,9 +29,11 @@ import type {
 import {
   DEFAULT_USER_SETTINGS,
   DEFAULT_PERSISTED_UI_STATE,
+  UNCOMMITTED_HASH,
   cloneCommitTableLayout,
 } from '@shared/types';
 import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
+import { buildUncommittedSubject } from '../utils/uncommittedUtils';
 
 /**
  * Compute the set of commit hashes that should be hidden by active visibility filters.
@@ -48,8 +51,8 @@ function computeHiddenCommitHashes(commits: Commit[], filters: GraphFilters): Se
   const textLower = hasTextFilter ? filters.textFilter!.toLowerCase() : '';
 
   for (const commit of commits) {
-    // Stash entries are never hidden
-    if (commit.refs.some(r => r.type === 'stash')) continue;
+    // Stash and uncommitted entries are never hidden by author/text filters
+    if (commit.refs.some(r => r.type === 'stash' || r.type === 'uncommitted')) continue;
 
     if (includedAuthors && !includedAuthors.has(commit.authorEmail)) {
       hidden.add(commit.hash);
@@ -125,6 +128,9 @@ interface GraphStore {
   authorListLoading: boolean;
   worktreeByHead: Map<string, WorktreeInfo>;
   containingBranchesCache: Map<string, ContainingBranchesResult>;
+  uncommittedFiles: FileChange[];
+  uncommittedCounts: { stagedCount: number; unstagedCount: number; untrackedCount: number };
+  hasUncommittedChanges: boolean;
   hiddenCommitHashes: Set<string>;
   consecutiveEmptyBatches: number;
   filteredOutCount: number;
@@ -190,6 +196,7 @@ interface GraphStore {
   prevMatch: () => void;
   setAuthorList: (authors: Author[]) => void;
   setAuthorListLoading: (loading: boolean) => void;
+  setUncommittedChanges: (payload: { files: FileChange[]; stagedCount: number; unstagedCount: number; untrackedCount: number }) => void;
   recomputeVisibility: () => void;
   resetAllFilters: (options?: { preserveBranches?: boolean }) => void;
   setSubmodules: (submodules: Submodule[], stack?: SubmoduleNavEntry[]) => void;
@@ -256,16 +263,77 @@ function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[], filte
   return merged;
 }
 
-function computeMergedTopology(commits: Commit[], stashes: StashEntry[], filters?: GraphFilters, hiddenHashes?: Set<string>): { mergedCommits: Commit[]; topology: GraphTopology } {
+function mergeUncommittedIntoCommits(
+  commits: Commit[],
+  hasUncommittedChanges: boolean,
+  counts: { stagedCount: number; unstagedCount: number; untrackedCount: number },
+  branches: Branch[],
+  filters?: GraphFilters,
+): Commit[] {
+  if (!hasUncommittedChanges) return commits;
+
+  // Respect branch filter: only inject when HEAD branch is in the filter set (or no filter active)
+  if (filters?.branches && filters.branches.length > 0) {
+    const currentBranch = branches.find(b => b.current);
+    if (currentBranch && !filters.branches.includes(currentBranch.name)) {
+      return commits;
+    }
+  }
+
+  // Find HEAD commit hash (first commit with a 'head' ref, or just the first commit)
+  const headCommitHash = commits.length > 0
+    ? (commits.find(c => c.refs.some(r => r.type === 'head'))?.hash ?? commits[0].hash)
+    : '';
+
+  if (!headCommitHash) return commits;
+
+  const syntheticCommit: Commit = {
+    hash: UNCOMMITTED_HASH,
+    abbreviatedHash: '---',
+    parents: [headCommitHash],
+    author: '---',
+    authorEmail: '',
+    authorDate: Date.now(),
+    subject: buildUncommittedSubject(counts.stagedCount, counts.unstagedCount, counts.untrackedCount),
+    refs: [{ name: 'Uncommitted Changes', type: 'uncommitted' }],
+  };
+
+  return [syntheticCommit, ...commits];
+}
+
+interface UncommittedContext {
+  hasUncommittedChanges: boolean;
+  counts: { stagedCount: number; unstagedCount: number; untrackedCount: number };
+  branches: Branch[];
+}
+
+function getUncommittedContext(state: GraphStore): UncommittedContext {
+  return { hasUncommittedChanges: state.hasUncommittedChanges, counts: state.uncommittedCounts, branches: state.branches };
+}
+
+function computeMergedTopology(
+  commits: Commit[],
+  stashes: StashEntry[],
+  filters?: GraphFilters,
+  hiddenHashes?: Set<string>,
+  uncommitted?: UncommittedContext,
+): { mergedCommits: Commit[]; topology: GraphTopology } {
   // When hidden hashes are provided, filter commits to visible-only before merging stashes,
   // but pass the full commit list to calculateTopology for correct lane assignment.
   const visibleCommits = hiddenHashes && hiddenHashes.size > 0
     ? commits.filter(c => !hiddenHashes.has(c.hash))
     : commits;
-  const mergedCommits = mergeStashesIntoCommits(visibleCommits, stashes, filters);
+  let mergedCommits = mergeStashesIntoCommits(visibleCommits, stashes, filters);
+  // Inject uncommitted node at index 0 after stashes are merged
+  if (uncommitted) {
+    mergedCommits = mergeUncommittedIntoCommits(mergedCommits, uncommitted.hasUncommittedChanges, uncommitted.counts, uncommitted.branches, filters);
+  }
   // Topology needs ALL commits (including hidden) for correct lane reservations.
   // Merge stashes into the full list for topology too, so stash lane assignments work.
-  const allWithStashes = mergeStashesIntoCommits(commits, stashes, filters);
+  let allWithStashes = mergeStashesIntoCommits(commits, stashes, filters);
+  if (uncommitted) {
+    allWithStashes = mergeUncommittedIntoCommits(allWithStashes, uncommitted.hasUncommittedChanges, uncommitted.counts, uncommitted.branches, filters);
+  }
   return { mergedCommits, topology: calculateTopology(allWithStashes, hiddenHashes, mergedCommits) };
 }
 
@@ -328,6 +396,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   worktreeList: [],
   worktreeByHead: new Map(),
   containingBranchesCache: new Map(),
+  uncommittedFiles: [],
+  uncommittedCounts: { stagedCount: 0, unstagedCount: 0, untrackedCount: 0 },
+  hasUncommittedChanges: false,
   hiddenCommitHashes: new Set<string>(),
   consecutiveEmptyBatches: 0,
   filteredOutCount: 0,
@@ -374,7 +445,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setCommits: (commits) => {
     const filters = get().filters;
     const hiddenCommitHashes = computeHiddenCommitHashes(commits, filters);
-    const { mergedCommits, topology } = computeMergedTopology(commits, get().stashes, filters, hiddenCommitHashes);
+    const { mergedCommits, topology } = computeMergedTopology(commits, get().stashes, filters, hiddenCommitHashes, getUncommittedContext(get()));
     const selectedCommit = get().selectedCommit;
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
@@ -414,7 +485,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const { commits, stashes, filters, totalLoadedWithoutFilter: existingTotal, selectedCommit } = get();
     const allCommits = [...commits, ...newCommits];
     const hiddenCommitHashes = computeHiddenCommitHashes(allCommits, filters);
-    const { mergedCommits, topology } = computeMergedTopology(allCommits, stashes, filters, hiddenCommitHashes);
+    const { mergedCommits, topology } = computeMergedTopology(allCommits, stashes, filters, hiddenCommitHashes, getUncommittedContext(get()));
     const hasFilter = !!(filters.branches?.length || filters.afterDate || filters.beforeDate);
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
@@ -526,7 +597,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setFilters: (filters) => set((state) => ({ filters: { ...state.filters, ...filters } })),
   setRemotes: (remotes) => set({ remotes }),
   setStashes: (stashes) => {
-    const { mergedCommits, topology } = computeMergedTopology(get().commits, stashes, get().filters, get().hiddenCommitHashes);
+    const { mergedCommits, topology } = computeMergedTopology(get().commits, stashes, get().filters, get().hiddenCommitHashes, getUncommittedContext(get()));
     const selectedCommit = get().selectedCommit;
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
@@ -689,10 +760,37 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   }),
   setAuthorList: (authors) => set({ authorList: authors }),
   setAuthorListLoading: (authorListLoading) => set({ authorListLoading }),
+  setUncommittedChanges: (payload) => {
+    const hasChanges = payload.stagedCount + payload.unstagedCount + payload.untrackedCount > 0;
+    const counts = { stagedCount: payload.stagedCount, unstagedCount: payload.unstagedCount, untrackedCount: payload.untrackedCount };
+    const { commits, stashes, filters, branches } = get();
+    const hiddenCommitHashes = computeHiddenCommitHashes(commits, filters);
+    const uncommitted: UncommittedContext = { hasUncommittedChanges: hasChanges, counts, branches };
+    const { mergedCommits, topology } = computeMergedTopology(commits, stashes, filters, hiddenCommitHashes, uncommitted);
+    const selectedCommit = get().selectedCommit;
+    const selectedCommitIndex = selectedCommit
+      ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
+      : -1;
+    set({
+      uncommittedFiles: payload.files,
+      uncommittedCounts: counts,
+      hasUncommittedChanges: hasChanges,
+      mergedCommits,
+      topology,
+      hiddenCommitHashes,
+      selectedCommitIndex,
+    });
+    // Auto-refresh details panel when uncommitted node is selected
+    if (selectedCommit === UNCOMMITTED_HASH && get().detailsPanelOpen) {
+      import('../rpc/rpcClient').then(({ rpcClient }) => {
+        rpcClient.getCommitDetails(UNCOMMITTED_HASH);
+      }).catch(() => { /* ignore lazy import error */ });
+    }
+  },
   recomputeVisibility: () => {
     const { commits, stashes, filters } = get();
     const hiddenCommitHashes = computeHiddenCommitHashes(commits, filters);
-    const { mergedCommits, topology } = computeMergedTopology(commits, stashes, filters, hiddenCommitHashes);
+    const { mergedCommits, topology } = computeMergedTopology(commits, stashes, filters, hiddenCommitHashes, getUncommittedContext(get()));
     const selectedCommit = get().selectedCommit;
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)

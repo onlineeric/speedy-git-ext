@@ -1,5 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, CommitParentInfo } from '@shared/types';
+import type { CherryPickOptions, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, CommitParentInfo, FileChangeStatus } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 
 declare const acquireVsCodeApi: () => {
@@ -193,6 +193,9 @@ class RpcClient {
         store.setAuthorList(message.payload.authors);
         store.setAuthorListLoading(false);
         break;
+      case 'uncommittedChanges':
+        store.setUncommittedChanges(message.payload);
+        break;
     }
   }
 
@@ -242,8 +245,8 @@ class RpcClient {
     this.send({ type: 'copyToClipboard', payload: { text } });
   }
 
-  openDiff(hash: string, filePath: string, parentHash?: string) {
-    this.send({ type: 'openDiff', payload: { hash, filePath, parentHash } });
+  openDiff(hash: string, filePath: string, parentHash?: string, status?: FileChangeStatus) {
+    this.send({ type: 'openDiff', payload: { hash, filePath, parentHash, status } });
   }
 
   openFile(hash: string, filePath: string) {

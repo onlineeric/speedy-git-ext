@@ -58,22 +58,24 @@ shared/
 └── messages.ts          # Add getUncommittedChanges/uncommittedChanges message types
 
 src/
-├── WebviewProvider.ts   # Add getUncommittedChanges handler, modify getCommitDetails for UNCOMMITTED hash, modify openDiff for uncommitted files
+├── WebviewProvider.ts   # Add getUncommittedChanges handler, modify getCommitDetails for UNCOMMITTED hash, modify openDiff for uncommitted files (resolve HEAD to real hash for git-show:// URI)
 └── services/
-    └── GitDiffService.ts  # getUncommittedDetails() already exists; add getUncommittedCommitDetails() wrapper
+    └── GitDiffService.ts  # getUncommittedDetails() refactored; added getUncommittedSummary() returning files + separate staged/unstaged/untracked counts
 
 webview-ui/src/
 ├── stores/
-│   └── graphStore.ts    # Add mergeUncommittedIntoCommits(), modify computeHiddenCommitHashes(), modify setCommits flow
+│   └── graphStore.ts    # Add mergeUncommittedIntoCommits(), modify computeHiddenCommitHashes(), modify setCommits flow, auto-refresh details panel
+├── rpc/
+│   └── rpcClient.ts     # Add uncommittedChanges handler, add status param to openDiff()
 ├── components/
-│   ├── CommitRow.tsx        # Add uncommitted node styling (italic + accent color)
-│   ├── CommitTableRow.tsx   # Add uncommitted node styling
-│   ├── GraphCell.tsx        # Add dashed edge rendering for uncommitted node
-│   ├── CommitDetailsPanel.tsx  # Handle UNCOMMITTED hash for details fetch + auto-update
+│   ├── CommitRow.tsx           # Add uncommitted node styling (italic + accent color) + context menu routing
+│   ├── CommitTableRow.tsx      # Add uncommitted node styling + context menu routing + skip AuthorContextMenu for uncommitted
+│   ├── GraphCell.tsx           # Add dashed circle + dashed edge rendering for uncommitted node
+│   ├── CommitDetailsPanel.tsx  # Skip signature fetch for UNCOMMITTED hash, pass file status for uncommitted diffs
+│   ├── FileChangeShared.tsx    # Redirect "open at commit" to openCurrentFile for uncommitted files
 │   └── UncommittedContextMenu.tsx  # New: minimal context menu (Refresh only)
 └── utils/
     ├── graphTopology.ts     # Add uncommitted node skip + post-loop finalization (stash pattern)
-    ├── filterUtils.ts       # Exempt uncommitted from author/text filters; respect branch filter
     └── uncommittedUtils.ts  # New: isUncommitted() helper, buildUncommittedSubject(), UNCOMMITTED_HASH constant re-export
 ```
 
@@ -92,9 +94,11 @@ The stash node implementation is the exact blueprint:
 ### D2: Diff Strategy for Uncommitted Files
 
 The existing `openDiffEditor()` (`WebviewProvider.ts:1504-1517`) uses `git-show://` URI scheme with commit hashes. For uncommitted files:
-- **Staged/unstaged tracked files**: Left side = `HEAD` via `git-show://HEAD/...`, Right side = working directory file URI (`vscode.Uri.file()`). This shows combined changes against HEAD.
-- **Untracked files**: Left side = empty content (file doesn't exist in HEAD), Right side = working directory file URI. This shows "new file" diff.
+- **Staged/unstaged tracked files**: Left side = HEAD (resolved to actual commit hash via `getCommits({maxCount:1})`) via `git-show://HASH/...`, Right side = working directory file URI (`vscode.Uri.file()`). This shows combined changes against HEAD.
+- **Untracked files**: Left side = empty content (`untitled:` scheme), Right side = working directory file URI. This shows "new file" diff.
 - **Detection**: When `openDiff` receives `UNCOMMITTED_HASH`, the handler switches to this strategy instead of the normal commit-to-parent diff.
+
+**Implementation note**: The `git-show://` content provider (`GitShowContentProvider`) validates the authority as a hex commit hash via `validateHash()`. Symbolic refs like `HEAD` are rejected, so the backend must resolve HEAD to its actual hash before constructing the URI. Similarly, the `untitled:` scheme is used for the empty left side of untracked files instead of `git-show://empty` which would also fail validation.
 
 ### D3: Uncommitted Data Fetch Timing
 
@@ -122,6 +126,15 @@ Unlike stashes (which bypass all filters), the uncommitted node respects the bra
 - In `computeHiddenCommitHashes()`: skip hiding for author/text filters (like stashes).
 - Separately, in `mergeUncommittedIntoCommits()`: only inject the node if no branch filter is active OR the HEAD branch is in the active branch filter set.
 - This requires passing the current HEAD branch name and active branch filter to the merge function.
+
+### D7: UNCOMMITTED_HASH Guard Rails
+
+The synthetic `UNCOMMITTED` hash must never reach git commands that validate hashes. Multiple components needed guards:
+- **`CommitDetailsPanel`**: `CommitSignatureSection` auto-fetches signature info for any displayed commit — skip for `UNCOMMITTED_HASH` to prevent `validateHash()` rejection.
+- **`FileChangeShared`**: The "open at commit" action icon passes `commitHash` to `rpcClient.openFile()` — redirect to `openCurrentFile()` for uncommitted files.
+- **`CommitTableRow`**: The author column wraps in `AuthorContextMenu` — skip for uncommitted to prevent "Add Author to filter" adding the placeholder `---` author.
+
+**Principle**: Any frontend component that uses a commit hash for git operations must check for `UNCOMMITTED_HASH` and either skip the operation or provide a working-directory-aware alternative.
 
 ## Risk Assessment
 

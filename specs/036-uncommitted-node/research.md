@@ -72,3 +72,15 @@
 **Rationale**: Confirmed in clarification session. When a user filters to view a specific branch, showing unrelated working tree changes at the top is confusing. The uncommitted node logically belongs to the current branch. Author/date/text filters are bypassed because the node has no real author or date, and hiding it by text search would be unexpected.
 
 **Implementation approach**: Check branch filter in `mergeUncommittedIntoCommits()` before injecting the node, rather than in `computeHiddenCommitHashes()`. This avoids creating and immediately hiding the node.
+
+## R8: UNCOMMITTED_HASH Guard Rails
+
+**Decision**: Any frontend component that uses a commit hash for git operations must check for `UNCOMMITTED_HASH` and either skip the operation or provide a working-directory-aware alternative.
+
+**Rationale**: Discovered during smoke testing. The synthetic `UNCOMMITTED` string fails `validateHash()` (which expects hex-only, 4-40 chars). Multiple components blindly pass the selected commit hash to backend operations:
+- `CommitSignatureSection` auto-fetches `getSignatureInfo(hash)` on render
+- `FileChangeShared.handleOpenAtCommit` calls `openFile(commitHash, path)`
+- `CommitTableRow` wraps the author column in `AuthorContextMenu` (adds `---` to filter)
+- `openDiffEditor` used symbolic `HEAD` in `git-show://` URI (provider validates as hash)
+
+**Mitigation pattern**: Guard with `hash === UNCOMMITTED_HASH` at the call site. For diff, resolve HEAD to actual hash. For file open, redirect to `openCurrentFile()`. For signature/author, skip entirely.

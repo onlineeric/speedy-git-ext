@@ -5,6 +5,7 @@ import { GraphCell } from './GraphCell';
 import { CommitContextMenu } from './CommitContextMenu';
 import { BranchContextMenu } from './BranchContextMenu';
 import { StashContextMenu } from './StashContextMenu';
+import { UncommittedContextMenu } from './UncommittedContextMenu';
 import { OverflowRefsBadge } from './OverflowRefsBadge';
 import { RefLabel } from './RefLabel';
 import { HeadIcon } from './icons';
@@ -53,6 +54,7 @@ export const CommitRow = memo(function CommitRow({
 }: CommitRowProps) {
   const { avatarsEnabled, dateFormat, showRemoteBranches, showTags, graphColors } = userSettings;
   const isStash = commit.refs.some((r) => r.type === 'stash');
+  const isUncommitted = commit.refs.some((r) => r.type === 'uncommitted');
   const stashIndex = isStash ? parseStashIndex(commit.refs) : -1;
 
   const node = topology.nodes.get(commit.hash);
@@ -143,7 +145,7 @@ export const CommitRow = memo(function CommitRow({
       )}
 
       <span
-        className={`flex-1 truncate text-sm ${isStash ? 'italic text-[var(--vscode-descriptionForeground)]' : ''}`}
+        className={`flex-1 truncate text-sm ${isStash ? 'italic text-[var(--vscode-descriptionForeground)]' : isUncommitted ? 'italic text-[#E8A317]' : ''}`}
         title={commit.subject}
       >
         {renderInlineCode(commit.subject)}
@@ -166,6 +168,14 @@ export const CommitRow = memo(function CommitRow({
       </span>
     </div>
   );
+
+  if (isUncommitted) {
+    return (
+      <UncommittedContextMenu>
+        {row}
+      </UncommittedContextMenu>
+    );
+  }
 
   if (isStash) {
     return (

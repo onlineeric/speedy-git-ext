@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, PersistedUIState, Author } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, PersistedUIState, Author, FileChange, FileChangeStatus } from './types.js';
 import type { GitError } from './errors.js';
 
 export type RequestMessage =
@@ -9,7 +9,7 @@ export type RequestMessage =
   | { type: 'checkoutCommit'; payload: { hash: string } }
   | { type: 'fetch'; payload: { remote?: string; prune?: boolean; filters?: Partial<GraphFilters> } }
   | { type: 'copyToClipboard'; payload: { text: string } }
-  | { type: 'openDiff'; payload: { hash: string; filePath: string; parentHash?: string } }
+  | { type: 'openDiff'; payload: { hash: string; filePath: string; parentHash?: string; status?: FileChangeStatus } }
   | { type: 'openFile'; payload: { hash: string; filePath: string } }
   | { type: 'refresh'; payload: { filters?: Partial<GraphFilters> } }
   // Branch ops
@@ -77,7 +77,8 @@ export type RequestMessage =
   // File actions
   | { type: 'openCurrentFile'; payload: { filePath: string } }
   // UI state persistence
-  | { type: 'updatePersistedUIState'; payload: { uiState: Partial<Omit<PersistedUIState, 'version'>> } };
+  | { type: 'updatePersistedUIState'; payload: { uiState: Partial<Omit<PersistedUIState, 'version'>> } }
+  | { type: 'getUncommittedChanges'; payload: Record<string, never> };
 
 export type ResponseMessage =
   | { type: 'commits'; payload: { commits: Commit[]; branches?: Branch[]; hasMore?: boolean; totalLoadedWithoutFilter?: number } }
@@ -110,7 +111,8 @@ export type ResponseMessage =
   | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[] } }
   | { type: 'containingBranches'; payload: { hash: string; branches: string[]; status: 'loaded' | 'error' } }
   | { type: 'persistedUIState'; payload: { uiState: PersistedUIState } }
-  | { type: 'authorList'; payload: { authors: Author[] } };
+  | { type: 'authorList'; payload: { authors: Author[] } }
+  | { type: 'uncommittedChanges'; payload: { files: FileChange[]; stagedCount: number; unstagedCount: number; untrackedCount: number } };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -137,6 +139,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   stashAndCheckout: true, stashAndCheckoutCommit: true,
   getWorktreeList: true, getContainingBranches: true, openExternal: true,
   openCurrentFile: true, updatePersistedUIState: true, getAuthors: true,
+  getUncommittedChanges: true,
 };
 
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
@@ -148,7 +151,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
   pushResult: true, avatarUrls: true, worktreeList: true, containingBranches: true,
-  persistedUIState: true, authorList: true,
+  persistedUIState: true, authorList: true, uncommittedChanges: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {

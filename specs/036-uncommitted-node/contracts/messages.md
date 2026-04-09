@@ -42,15 +42,18 @@
 ### getCommitDetails (existing)
 
 When called with `hash: UNCOMMITTED_HASH`:
-- Backend calls `getUncommittedDetails()` instead of `getCommitDetails()`.
+- Backend calls `getUncommittedSummary()` instead of `getCommitDetails()`.
 - Returns synthetic `CommitDetails` object with file changes and placeholder metadata.
 - Stats field: `{ additions: 0, deletions: 0 }` (line-level stats not available from name-status).
+- Resolves HEAD hash via `getCommits({maxCount:1})` for the `parents` field.
 
 ### openDiff (existing, payload extended)
 
 **Payload change**: Add optional `status?: FileChangeStatus` field to the `openDiff` payload. This allows the diff handler to determine the diff strategy for uncommitted files without re-fetching.
 
 When called with `hash: UNCOMMITTED_HASH`:
-- **Tracked files (staged/unstaged)**: `status` is `'modified'`, `'added'`, `'deleted'`, `'renamed'`, or `'copied'`. Left URI = `git-show://HEAD/...`, Right URI = `vscode.Uri.file(workspacePath/filePath)`.
-- **Untracked files**: `status` is `'untracked'`. Left URI = empty content URI, Right URI = `vscode.Uri.file(workspacePath/filePath)`.
+- **Tracked files (staged/unstaged)**: `status` is `'modified'`, `'added'`, `'deleted'`, `'renamed'`, or `'copied'`. Left URI = `git-show://RESOLVED_HEAD_HASH/...` (HEAD resolved to actual commit hash), Right URI = `vscode.Uri.file(workspacePath/filePath)`.
+- **Untracked files**: `status` is `'untracked'`. Left URI = `untitled:filename` (empty content), Right URI = `vscode.Uri.file(workspacePath/filePath)`.
 - Detection: check `payload.hash === UNCOMMITTED_HASH` and use `payload.status` to route diff strategy.
+
+**Important**: The `git-show://` content provider validates the URI authority as a hex commit hash via `validateHash()`. Symbolic refs like `HEAD` are rejected — always resolve to actual hash first.

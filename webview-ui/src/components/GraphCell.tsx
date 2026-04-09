@@ -52,6 +52,8 @@ export const GraphCell = memo(function GraphCell({
   const nodeY = height / 2;
   const color = getColor(node.colorIndex, palette);
   const hasMerge = commit.parents.length > 1;
+  const isUncommitted = commit.refs.some(r => r.type === 'uncommitted');
+  const uncommittedColor = '#E8A317'; // amber accent distinct from lane colors
 
   // Get lanes that pass through this row
   const passingLanes = getPassingLanes(index, commits, topology);
@@ -128,8 +130,8 @@ export const GraphCell = memo(function GraphCell({
       {node.parentConnections.map((conn, idx) => {
         const fromX = getLaneX(conn.fromLane);
         const toX = getLaneX(conn.toLane);
-        const connColor = getColor(conn.colorIndex, palette);
-        const dottedProps = conn.isDotted ? { strokeDasharray: '4 3', opacity: 0.7 } : {};
+        const connColor = isUncommitted ? uncommittedColor : getColor(conn.colorIndex, palette);
+        const dottedProps = (conn.isDotted || isUncommitted) ? { strokeDasharray: '4 3', opacity: isUncommitted ? 0.9 : 0.7 } : {};
         const tooltip = conn.isDotted && conn.hiddenCount
           ? <title>{conn.hiddenCount} hidden commit{conn.hiddenCount !== 1 ? 's' : ''}</title>
           : null;
@@ -192,9 +194,10 @@ export const GraphCell = memo(function GraphCell({
         cx={nodeX}
         cy={nodeY}
         r={isHeadCommit ? HEAD_NODE_RADIUS : NODE_RADIUS}
-        fill={hasMerge ? 'transparent' : color}
-        stroke={color}
+        fill={isUncommitted ? 'transparent' : hasMerge ? 'transparent' : color}
+        stroke={isUncommitted ? uncommittedColor : color}
         strokeWidth={2}
+        {...(isUncommitted ? { strokeDasharray: '3 2' } : {})}
         className={onNodeMouseEnter ? 'cursor-pointer' : undefined}
         onMouseEnter={onNodeMouseEnter ? (e) => {
           const rect = e.currentTarget.getBoundingClientRect();

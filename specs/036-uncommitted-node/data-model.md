@@ -65,6 +65,8 @@ New constant:
   UNCOMMITTED_HASH = 'UNCOMMITTED'
 ```
 
+**Guard rail**: `'UNCOMMITTED'` is not valid hex and fails `validateHash()`. All code paths that pass a commit hash to git operations must check for `UNCOMMITTED_HASH` and either skip or provide a working-directory alternative. See quickstart.md for the full guard rail pattern.
+
 ### shared/messages.ts
 
 ```

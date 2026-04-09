@@ -134,6 +134,13 @@
 - [x] T030 Run `pnpm build` — clean build of extension and webview
 - [ ] T031 Smoke test per quickstart.md: open repo with changes → verify node → click node → verify details → click file → verify diff → commit all → verify node disappears. Also verify: (a) graph rendering feels equally responsive with the uncommitted node present (SC-005), (b) test in a multi-root workspace if possible to confirm per-repo independence (EC5)
 
+### Smoke-Test Fixes (discovered during T031 manual testing)
+
+- [x] T032 Fix diff for uncommitted tracked files — `git-show://` content provider rejects symbolic refs like `HEAD`. Resolve HEAD to actual commit hash via `getCommits({maxCount:1})` before building URI. Use `untitled:` scheme for empty left side of untracked files. (`src/WebviewProvider.ts`)
+- [x] T033 Fix "open at commit" action for uncommitted files — `FileChangeShared.tsx` `handleOpenAtCommit` passed `UNCOMMITTED` hash to `rpcClient.openFile()`. Redirect to `openCurrentFile()` when `commitHash === UNCOMMITTED_HASH`. (`webview-ui/src/components/FileChangeShared.tsx`)
+- [x] T034 Fix signature fetch error on uncommitted node selection — `CommitSignatureSection` auto-fetches `getSignatureInfo(hash)` for any displayed commit. Skip fetch when `hash === UNCOMMITTED_HASH`. (`webview-ui/src/components/CommitDetailsPanel.tsx`)
+- [x] T035 Fix author context menu on uncommitted row — skip `AuthorContextMenu` wrapper and avatar for uncommitted row to prevent "Add Author to filter" adding placeholder `---` author. (`webview-ui/src/components/CommitTableRow.tsx`)
+
 ---
 
 ## Dependencies & Execution Order
