@@ -1564,25 +1564,41 @@ export class WebviewProvider {
     if (hash === UNCOMMITTED_HASH) {
       const fileName = filePath.split('/').pop() ?? filePath;
       const absolutePath = path.join(this.currentRepoPath, filePath);
-      const rightUri = vscode.Uri.file(absolutePath);
 
       if (status === 'untracked') {
-        // Untracked file: use untitled scheme for empty left side
+        // Untracked file: empty left side, working tree file on right
         const leftUri = vscode.Uri.parse(`untitled:${fileName}`);
+        const rightUri = vscode.Uri.file(absolutePath);
         const title = `${filePath} (Untracked)`;
         try {
           await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
         } catch {
           this.log.warn(`Diff editor failed for untracked file: ${filePath}`);
         }
-      } else {
-        // Tracked file: resolve HEAD to actual hash (git-show:// provider requires a valid hash)
+      } else if (status === 'deleted') {
+        // Deleted file: HEAD version on left, empty right side
         const headHash = await this.getHeadHash();
         if (!headHash) {
           this.log.warn(`Cannot resolve HEAD for diff: ${filePath}`);
           return;
         }
         const leftUri = vscode.Uri.from({ scheme: 'git-show', authority: headHash, path: `/${headHash.slice(0, 8)}: ${fileName}`, query: filePath });
+        const rightUri = vscode.Uri.parse(`untitled:${fileName}`);
+        const title = `${filePath} (Deleted)`;
+        try {
+          await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
+        } catch {
+          this.log.warn(`Diff editor failed for deleted file: ${filePath}`);
+        }
+      } else {
+        // Tracked file (modified, added, renamed, copied): HEAD version on left, working tree on right
+        const headHash = await this.getHeadHash();
+        if (!headHash) {
+          this.log.warn(`Cannot resolve HEAD for diff: ${filePath}`);
+          return;
+        }
+        const leftUri = vscode.Uri.from({ scheme: 'git-show', authority: headHash, path: `/${headHash.slice(0, 8)}: ${fileName}`, query: filePath });
+        const rightUri = vscode.Uri.file(absolutePath);
         const title = `${filePath} (Working Tree)`;
         try {
           await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);

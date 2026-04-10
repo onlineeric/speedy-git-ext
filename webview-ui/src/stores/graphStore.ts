@@ -780,11 +780,29 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       hiddenCommitHashes,
       selectedCommitIndex,
     });
-    // Auto-refresh details panel when uncommitted node is selected
+    // Auto-refresh details panel from the already-received data (avoids a redundant backend round-trip)
     if (selectedCommit === UNCOMMITTED_HASH && get().detailsPanelOpen) {
-      import('../rpc/rpcClient').then(({ rpcClient }) => {
-        rpcClient.getCommitDetails(UNCOMMITTED_HASH);
-      }).catch(() => { /* ignore lazy import error */ });
+      const headCommit = commits.find(c => c.refs.some(r => r.type === 'head'));
+      const headHash = headCommit?.hash ?? (commits.length > 0 ? commits[0].hash : '');
+      const details: CommitDetails = {
+        hash: UNCOMMITTED_HASH,
+        abbreviatedHash: '---',
+        parents: headHash ? [headHash] : [],
+        author: '---',
+        authorEmail: '',
+        authorDate: Date.now(),
+        committer: '---',
+        committerEmail: '',
+        committerDate: Date.now(),
+        subject: buildUncommittedSubject(counts.stagedCount, counts.unstagedCount, counts.untrackedCount),
+        body: '',
+        files: payload.files,
+        stats: payload.files.reduce((acc, f) => ({
+          additions: acc.additions + (f.additions ?? 0),
+          deletions: acc.deletions + (f.deletions ?? 0),
+        }), { additions: 0, deletions: 0 }),
+      };
+      set({ commitDetails: details });
     }
   },
   recomputeVisibility: () => {
