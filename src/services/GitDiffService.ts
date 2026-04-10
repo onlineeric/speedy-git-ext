@@ -138,49 +138,49 @@ export class GitDiffService {
   }
 
   async getUncommittedDetails(): Promise<Result<FileChange[]>> {
-    this.log.info('Getting uncommitted changes');
-    // Staged changes
-    const stagedResult = await this.executor.execute({
-      args: ['diff', '--cached', '--name-status', '-z'],
-      cwd: this.workspacePath,
-    });
+    const summary = await this.getUncommittedSummary();
+    if (!summary.success) return summary;
+    return ok(summary.value.files);
+  }
 
-    // Unstaged changes
-    const unstagedResult = await this.executor.execute({
-      args: ['diff', '--name-status', '-z'],
-      cwd: this.workspacePath,
-    });
+  async getUncommittedSummary(): Promise<Result<{ files: FileChange[]; stagedCount: number; unstagedCount: number; untrackedCount: number }>> {
+    this.log.info('Getting uncommitted changes summary');
+    const [stagedResult, stagedNumstatResult, unstagedResult, unstagedNumstatResult, untrackedResult] = await Promise.all([
+      this.executor.execute({ args: ['diff', '--cached', '--name-status', '-z'], cwd: this.workspacePath }),
+      this.executor.execute({ args: ['diff', '--cached', '--numstat', '-z'], cwd: this.workspacePath }),
+      this.executor.execute({ args: ['diff', '--name-status', '-z'], cwd: this.workspacePath }),
+      this.executor.execute({ args: ['diff', '--numstat', '-z'], cwd: this.workspacePath }),
+      this.executor.execute({ args: ['ls-files', '--others', '--exclude-standard', '-z'], cwd: this.workspacePath }),
+    ]);
 
-    // Untracked files
-    const untrackedResult = await this.executor.execute({
-      args: ['ls-files', '--others', '--exclude-standard', '-z'],
-      cwd: this.workspacePath,
-    });
+    const stagedFiles = stagedResult.success ? parseDiffNameStatus(stagedResult.value.stdout) : [];
+    const unstagedFiles = unstagedResult.success ? parseDiffNameStatus(unstagedResult.value.stdout) : [];
+    const untrackedPaths = untrackedResult.success
+      ? untrackedResult.value.stdout.split(NULL_CHAR).filter(Boolean)
+      : [];
 
-    const files: FileChange[] = [];
-
-    if (stagedResult.success) {
-      files.push(...parseDiffNameStatus(stagedResult.value.stdout));
+    // Apply per-file line counts from numstat
+    if (stagedNumstatResult.success) {
+      applyNumstatToFiles(stagedFiles, stagedNumstatResult.value.stdout);
     }
-    if (unstagedResult.success) {
-      const unstaged = parseDiffNameStatus(unstagedResult.value.stdout);
-      // Unstaged takes precedence over staged (represents current working tree state)
-      const unstagedPaths = new Set(unstaged.map((f) => f.path));
-      const merged = files.filter((f) => !unstagedPaths.has(f.path));
-      merged.push(...unstaged);
-      files.length = 0;
-      files.push(...merged);
-    }
-    if (untrackedResult.success) {
-      const untrackedPaths = untrackedResult.value.stdout
-        .split(NULL_CHAR)
-        .filter(Boolean);
-      for (const path of untrackedPaths) {
-        files.push({ path, status: 'untracked' });
-      }
+    if (unstagedNumstatResult.success) {
+      applyNumstatToFiles(unstagedFiles, unstagedNumstatResult.value.stdout);
     }
 
-    return ok(files);
+    // Merge files: unstaged takes precedence over staged for overlapping paths
+    const unstagedPathSet = new Set(unstagedFiles.map((f) => f.path));
+    const files: FileChange[] = [
+      ...stagedFiles.filter((f) => !unstagedPathSet.has(f.path)),
+      ...unstagedFiles,
+      ...untrackedPaths.map((path): FileChange => ({ path, status: 'untracked' })),
+    ];
+
+    return ok({
+      files,
+      stagedCount: stagedFiles.length,
+      unstagedCount: unstagedFiles.length,
+      untrackedCount: untrackedPaths.length,
+    });
   }
 }
 
@@ -327,4 +327,51 @@ function parseNumstat(
   }
 
   return { additions: totalAdditions, deletions: totalDeletions };
+}
+
+/**
+ * Applies per-file additions/deletions from `git diff --numstat -z` output
+ * to an existing FileChange[] array (mutates in-place).
+ * Format: "adds\tdels\tpath\0" for normal, "adds\tdels\t\0old\0new\0" for renames.
+ */
+function applyNumstatToFiles(files: FileChange[], numstatOutput: string): void {
+  if (!numstatOutput) return;
+
+  const fileMap = new Map<string, FileChange>();
+  for (const f of files) {
+    fileMap.set(f.path, f);
+    if (f.oldPath) fileMap.set(f.oldPath, f);
+  }
+
+  const parts = numstatOutput.split(NULL_CHAR);
+  let i = 0;
+  while (i < parts.length) {
+    const statPart = parts[i];
+    if (!statPart) { i++; continue; }
+
+    const tabParts = statPart.split('\t');
+    if (tabParts.length < 2) { i++; continue; }
+
+    const addStr = tabParts[0];
+    const delStr = tabParts[1];
+    const isBinary = addStr === '-' && delStr === '-';
+    const additions = addStr === '-' ? 0 : parseInt(addStr, 10);
+    const deletions = delStr === '-' ? 0 : parseInt(delStr, 10);
+
+    const thirdField = tabParts[2] ?? '';
+    let filePath: string;
+    if (thirdField === '' && parts[i + 1]) {
+      filePath = parts[i + 1];
+      i += 3;
+    } else {
+      filePath = thirdField;
+      i += 1;
+    }
+
+    const file = fileMap.get(filePath);
+    if (file && !isBinary) {
+      file.additions = additions;
+      file.deletions = deletions;
+    }
+  }
 }

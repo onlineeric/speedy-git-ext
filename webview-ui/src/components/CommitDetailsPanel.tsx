@@ -1,5 +1,6 @@
 import { memo, useCallback, useRef, useEffect, useState } from 'react';
 import type { CommitDetails, FileChange, DetailsPanelPosition, FileViewMode, CommitSignatureInfo } from '@shared/types';
+import { UNCOMMITTED_HASH } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { formatRelativeDate } from '../utils/formatDate';
@@ -348,6 +349,7 @@ function CommitSignatureSection({ hash }: { hash: string }) {
   const loading = useGraphStore((state) => !!state.signatureLoading[hash]);
 
   useEffect(() => {
+    if (hash === UNCOMMITTED_HASH) return;
     const store = useGraphStore.getState();
     if (hash in store.signatureCache || store.signatureLoading[hash]) {
       return;
@@ -423,6 +425,10 @@ function FileChangesList({
   };
 
   const handleFileClick = (file: FileChange) => {
+    if (details.hash === UNCOMMITTED_HASH) {
+      rpcClient.openDiff(details.hash, file.path, undefined, file.status);
+      return;
+    }
     if (file.status === 'deleted') {
       const parentHash = details.parents[0];
       if (parentHash) {

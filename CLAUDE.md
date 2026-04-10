@@ -156,6 +156,7 @@ shared/                           # Shared types between backend & frontend
 ## Active Technologies
 - TypeScript 5.x (strict) + React 18, Zustand, Tailwind CSS (035-text-filter)
 - N/A (in-memory Zustand state only) (035-text-filter)
+- TypeScript 5.x (strict mode) + React 18, Zustand, @tanstack/react-virtual, Radix UI, Tailwind CSS (webview); esbuild (extension host) (036-uncommitted-node)
 
 ## Recent Changes
 - 035-text-filter: Added TypeScript 5.x (strict) + React 18, Zustand, Tailwind CSS

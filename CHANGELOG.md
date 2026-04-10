@@ -9,6 +9,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [2.3.0] - 2026-04-09
+
+### Added
+- Uncommitted changes node at the top of the git graph showing current working tree state (staged, unstaged, and untracked files) as a visually distinct node connected to HEAD
+- Dynamic node label with categorized file count summary — e.g., "Uncommitted Changes (3 staged, 2 modified, 1 untracked)" — zero-count categories omitted automatically
+- Click the uncommitted node to inspect all changed files in the commit details panel with correct status badges, in both list and tree view modes
+- Click any file in the uncommitted node's details panel to open a diff view showing changes against HEAD, or full content for untracked files
+- Uncommitted node auto-refreshes when files are saved, staged, or modified — appears when changes exist, disappears when the working tree is clean
+- Details panel stays open and auto-updates its content when the uncommitted node refreshes, preserving the user's selection
+- Uncommitted node is exempt from author, date, and text filters (always visible when changes exist), but respects branch filters — hidden when the current branch is excluded
+- Right-clicking the uncommitted node shows a minimal context menu instead of the standard commit actions, preventing irrelevant operations
+- Works in all repository states including detached HEAD, during rebase, and during merge conflicts
+
 ## [2.2.1] - 2026-04-08
 
 #### Fixed

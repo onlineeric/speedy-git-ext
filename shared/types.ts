@@ -85,7 +85,23 @@ export interface RefInfo {
   remote?: string;
 }
 
-export type RefType = 'head' | 'branch' | 'remote' | 'tag' | 'stash';
+export type RefType = 'head' | 'branch' | 'remote' | 'tag' | 'stash' | 'uncommitted';
+
+export const UNCOMMITTED_HASH = 'UNCOMMITTED';
+
+export function buildUncommittedSubject(
+  stagedCount: number,
+  unstagedCount: number,
+  untrackedCount: number,
+): string {
+  const parts: string[] = [];
+  if (stagedCount > 0) parts.push(`${stagedCount} staged`);
+  if (unstagedCount > 0) parts.push(`${unstagedCount} modified`);
+  if (untrackedCount > 0) parts.push(`${untrackedCount} untracked`);
+
+  if (parts.length === 0) return 'Uncommitted Changes';
+  return `Uncommitted Changes (${parts.join(', ')})`;
+}
 
 export interface Branch {
   name: string;
