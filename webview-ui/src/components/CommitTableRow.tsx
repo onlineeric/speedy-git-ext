@@ -5,6 +5,7 @@ import { GraphCell } from './GraphCell';
 import { CommitContextMenu } from './CommitContextMenu';
 import { BranchContextMenu } from './BranchContextMenu';
 import { StashContextMenu } from './StashContextMenu';
+import { UncommittedContextMenu } from './UncommittedContextMenu';
 import { OverflowRefsBadge } from './OverflowRefsBadge';
 import { RefLabel } from './RefLabel';
 import { HeadIcon } from './icons';
@@ -56,6 +57,7 @@ export const CommitTableRow = memo(function CommitTableRow({
 }: CommitTableRowProps) {
   const { avatarsEnabled, dateFormat, showRemoteBranches, showTags, graphColors } = userSettings;
   const isStash = commit.refs.some((ref) => ref.type === 'stash');
+  const isUncommitted = commit.refs.some((ref) => ref.type === 'uncommitted');
   const stashIndex = isStash ? parseStashIndex(commit.refs) : -1;
   const graphColumn = layout.columns.find((column) => column.id === 'graph');
 
@@ -129,6 +131,7 @@ export const CommitTableRow = memo(function CommitTableRow({
             laneColor,
             laneColorStyle,
             isStash,
+            isUncommitted,
             stashIndex,
             onNodeMouseEnter,
             onNodeMouseLeave,
@@ -137,6 +140,14 @@ export const CommitTableRow = memo(function CommitTableRow({
       ))}
     </div>
   );
+
+  if (isUncommitted) {
+    return (
+      <UncommittedContextMenu>
+        {row}
+      </UncommittedContextMenu>
+    );
+  }
 
   if (isStash) {
     return (
@@ -169,6 +180,7 @@ function renderColumn({
   laneColor,
   laneColorStyle,
   isStash,
+  isUncommitted,
   stashIndex,
   onNodeMouseEnter,
   onNodeMouseLeave,
@@ -188,6 +200,7 @@ function renderColumn({
   laneColor: string | undefined;
   laneColorStyle: React.CSSProperties | undefined;
   isStash: boolean;
+  isUncommitted: boolean;
   stashIndex: number;
   onNodeMouseEnter?: (hash: string, rect: DOMRect) => void;
   onNodeMouseLeave?: () => void;
@@ -246,26 +259,31 @@ function renderColumn({
             </div>
           )}
           <span
-            className={`truncate text-sm ${isStash ? 'italic text-[var(--vscode-descriptionForeground)]' : ''}`}
+            className={`truncate text-sm ${isStash ? 'italic text-[var(--vscode-descriptionForeground)]' : isUncommitted ? 'italic text-[#E8A317]' : ''}`}
             title={commit.subject}
           >
             {renderInlineCode(commit.subject)}
           </span>
         </div>
       );
-    case 'author':
+    case 'author': {
+      const authorContent = (
+        <div className="flex h-full items-center gap-2 overflow-hidden">
+          {avatarsEnabled && commit.author && !isUncommitted ? (
+            <AuthorAvatar author={commit.author} email={commit.authorEmail} />
+          ) : null}
+          <span className="truncate text-xs text-[var(--vscode-descriptionForeground)]" title={commit.author}>
+            {commit.author}
+          </span>
+        </div>
+      );
+      if (isUncommitted) return authorContent;
       return (
         <AuthorContextMenu authorEmail={commit.authorEmail}>
-          <div className="flex h-full items-center gap-2 overflow-hidden">
-            {avatarsEnabled && commit.author ? (
-              <AuthorAvatar author={commit.author} email={commit.authorEmail} />
-            ) : null}
-            <span className="truncate text-xs text-[var(--vscode-descriptionForeground)]" title={commit.author}>
-              {commit.author}
-            </span>
-          </div>
+          {authorContent}
         </AuthorContextMenu>
       );
+    }
     case 'date':
       return (
         <DateContextMenu authorDate={commit.authorDate}>

@@ -1,5 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, CommitParentInfo } from '@shared/types';
+import type { CherryPickOptions, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, CommitParentInfo, FileChangeStatus } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 
 declare const acquireVsCodeApi: () => {
@@ -16,6 +16,13 @@ class RpcClient {
   private pendingParentLookups = new Map<number, { resolve: (parents: CommitParentInfo[]) => void; reject: (error: Error) => void }>();
   private parentRequestIdByHash = new Map<string, number>();
   private pendingPush: { resolve: (message: string) => void; reject: (error: Error) => void } | null = null;
+  /**
+   * Promise slot for correlating a dialog-initiated git action with its
+   * backend response. Used by FilePickerDialog to lift its `isRunning` busy
+   * state on the actual response (success or error), not on an unrelated
+   * store update. See `awaitNextDialogAction()`.
+   */
+  private pendingDialogAction: { resolve: () => void; reject: (error: string) => void } | null = null;
 
   private messageHandler = (event: MessageEvent) => {
     const message = event.data as ResponseMessage;
@@ -37,6 +44,7 @@ class RpcClient {
     window.removeEventListener('message', this.messageHandler);
     this.initialized = false;
     this.rejectPendingLookups('RPC client disposed');
+    this.clearPendingDialogAction();
   }
 
   private handleMessage(message: ResponseMessage) {
@@ -88,6 +96,11 @@ class RpcClient {
       case 'error':
         store.setError(message.payload.error.message);
         this.rejectPendingLookups(message.payload.error.message);
+        if (this.pendingDialogAction) {
+          const { reject } = this.pendingDialogAction;
+          this.pendingDialogAction = null;
+          reject(message.payload.error.message);
+        }
         break;
       case 'prefetchError':
         store.setError(message.payload.error.message);
@@ -95,6 +108,11 @@ class RpcClient {
         break;
       case 'success':
         store.setSuccessMessage(message.payload.message);
+        if (this.pendingDialogAction) {
+          const { resolve } = this.pendingDialogAction;
+          this.pendingDialogAction = null;
+          resolve();
+        }
         break;
       case 'pushResult':
         if (this.pendingPush) {
@@ -193,6 +211,12 @@ class RpcClient {
         store.setAuthorList(message.payload.authors);
         store.setAuthorListLoading(false);
         break;
+      case 'uncommittedChanges':
+        store.setUncommittedChanges(message.payload);
+        break;
+      case 'conflictState':
+        store.setConflictState(message.payload);
+        break;
     }
   }
 
@@ -242,8 +266,8 @@ class RpcClient {
     this.send({ type: 'copyToClipboard', payload: { text } });
   }
 
-  openDiff(hash: string, filePath: string, parentHash?: string) {
-    this.send({ type: 'openDiff', payload: { hash, filePath, parentHash } });
+  openDiff(hash: string, filePath: string, parentHash?: string, status?: FileChangeStatus) {
+    this.send({ type: 'openDiff', payload: { hash, filePath, parentHash, status } });
   }
 
   openFile(hash: string, filePath: string) {
@@ -502,6 +526,84 @@ class RpcClient {
   // Pagination
   loadMoreCommits(skip: number, generation: number, filters: { branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string }) {
     this.send({ type: 'loadMoreCommits', payload: { skip, generation, filters } });
+  }
+
+  stageFiles(paths: string[]) {
+    this.send({ type: 'stageFiles', payload: { paths } });
+  }
+
+  unstageFiles(paths: string[]) {
+    this.send({ type: 'unstageFiles', payload: { paths } });
+  }
+
+  stageAll() {
+    this.send({ type: 'stageAll', payload: {} });
+  }
+
+  unstageAll() {
+    this.send({ type: 'unstageAll', payload: {} });
+  }
+
+  discardFiles(paths: string[], includeUntracked: boolean) {
+    this.send({ type: 'discardFiles', payload: { paths, includeUntracked } });
+  }
+
+  discardAllUnstaged() {
+    this.send({ type: 'discardAllUnstaged', payload: {} });
+  }
+
+  stashWithMessage(message?: string, paths?: string[]) {
+    this.send({ type: 'stashWithMessage', payload: { message, paths } });
+  }
+
+  stashSelected(message: string, paths: string[], addUntrackedFirst: boolean) {
+    this.send({ type: 'stashSelected', payload: { message, paths, addUntrackedFirst } });
+  }
+
+  /**
+   * Install a one-shot promise that resolves on the next `success` response
+   * or rejects on the next `error` response. Used by dialog flows
+   * (FilePickerDialog) to lift a local busy state on the actual backend
+   * response, not on unrelated store updates from file watchers etc.
+   *
+   * If a previous slot is still installed (e.g., the user rapid-clicked),
+   * the previous one is rejected with `'superseded'` before the new slot is
+   * installed.
+   */
+  awaitNextDialogAction(): Promise<void> {
+    if (this.pendingDialogAction) {
+      const { reject } = this.pendingDialogAction;
+      this.pendingDialogAction = null;
+      reject('superseded');
+    }
+    return new Promise<void>((resolve, reject) => {
+      this.pendingDialogAction = { resolve, reject };
+    });
+  }
+
+  /**
+   * Clear any installed dialog-action promise slot by rejecting it with
+   * `'dialog-closed'`. Called on dialog unmount/close to guarantee we do not
+   * leak a hanging promise.
+   */
+  clearPendingDialogAction() {
+    if (this.pendingDialogAction) {
+      const { reject } = this.pendingDialogAction;
+      this.pendingDialogAction = null;
+      reject('dialog-closed');
+    }
+  }
+
+  getConflictState() {
+    this.send({ type: 'getConflictState', payload: {} });
+  }
+
+  openStagedDiff(filePath: string) {
+    this.send({ type: 'openStagedDiff', payload: { filePath } });
+  }
+
+  getUncommittedChanges() {
+    this.send({ type: 'getUncommittedChanges', payload: {} });
   }
 
   firePrefetch() {

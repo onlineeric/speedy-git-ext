@@ -27,11 +27,18 @@ WHEN scroll position changes (useEffect re-evaluates):
 
   IF client-side filters are active (hiddenCommitHashes.size > 0):
     IF visible rows remaining below viewport < overScan threshold (default 20):
-      IF gap indicator is showing -> DO NOTHING (wait for user to scroll past it)
+      IF gap indicator is showing -> DO NOTHING (wait for user action)
       ELSE                        -> FIRE PREFETCH
   ELSE (no filters):
     IF scroll reached last batch boundary (rangeEnd >= lastBatchStartIndex):
       -> FIRE PREFETCH
+
+WHEN client-side filter hides ALL cached commits (mergedCommits.length = 0):
+  IF no more commits on backend (hasMore = false)    -> DO NOTHING
+  IF already fetching (prefetching = true)           -> DO NOTHING
+  IF no filter active (hiddenCommitHashes.size = 0)  -> DO NOTHING (genuinely 0 commits)
+  IF gap indicator is showing                        -> DO NOTHING (wait for user to click "Load more")
+  ELSE                                               -> FIRE PREFETCH
 ```
 
 ### Fire Prefetch
@@ -83,7 +90,15 @@ WHEN backend responds with commitsAppended:
 ### Gap Indicator & User Resume
 
 ```
-WHEN gap indicator is visible AND user scrolls to absolute bottom:
+WHEN gap indicator is visible AND hasMore = true:
+  IF visible commits exist (mergedCommits.length > 0):
+    -> Show gap indicator bar with "Load more commits" button below commit list
+    -> User can click button OR scroll to absolute bottom to resume
+    -> Scroll-to-bottom auto-check only fires if content overflows the viewport
+  IF no visible commits (mergedCommits.length = 0):
+    -> Show "Load more commits" button in the empty state area
+
+WHEN user clicks "Load more commits" button OR scrolls to absolute bottom:
   -> Reset consecutiveEmptyBatches = 0
   -> Hide gap indicator
   -> Fire prefetch (resume fetching cycle)
@@ -103,6 +118,8 @@ WHEN user changes text filter (after 150ms debounce):
        Hide gap indicator
   -> Scroll trigger useEffect re-evaluates with new state
      (if few visible rows remain, fires new prefetch)
+  -> If ALL cached commits are hidden (mergedCommits.length = 0):
+     Zero-visible-commits trigger fires prefetch automatically
 ```
 
 ### Filter Change (Branch / Date)
@@ -126,11 +143,18 @@ WHEN backend responds with prefetchError:
 ### Loading Indicator Display
 
 ```
-IF prefetching = true  -> Show "Loading..." below commit list
-IF prefetching = false -> Hide "Loading..."
+IF visible commits exist (mergedCommits.length > 0):
+  IF prefetching = true  -> Show "Loading..." below commit list
+  IF prefetching = false -> Hide "Loading..."
 
-IF showGapIndicator = true AND hasMore = true:
-  -> Show "{N} commits filtered out of {total} loaded — keep scrolling down to fetch next batch"
+IF no visible commits (mergedCommits.length = 0, isEmpty = true):
+  IF loading OR prefetching -> Show "Loading..."
+  ELSE IF showGapIndicator AND hasMore -> Show filtered-out count + "Load more commits" button
+  ELSE IF any filter active -> Show "No commits match the current filters"
+  ELSE -> Show "No commits found"
+
+IF showGapIndicator = true AND hasMore = true AND visible commits exist:
+  -> Show "{N} commits filtered out of {total} loaded" with "Load more commits" button
 ```
 
 ---
@@ -203,7 +227,7 @@ After `setCommits`, the immediate `firePrefetch()` call ensures batch 2 is fetch
 
 ### Step 1: Trigger
 
-Prefetch is triggered from three places:
+Prefetch is triggered from four places:
 
 #### A. Immediate prefetch after initial load (rpcClient.ts:52)
 ```typescript
@@ -261,6 +285,21 @@ case 'commitsAppended': {
   }
 }
 ```
+
+#### D. Zero-visible-commits trigger (GraphContainer.tsx:131-138)
+When a client-side filter hides ALL cached commits, the virtualizer has 0 items and `virtualizer.range` is undefined, so the scroll-based trigger (B) cannot fire. A dedicated `useEffect` handles this case:
+
+```typescript
+useEffect(() => {
+  if (commits.length > 0) return;           // scroll trigger handles this case
+  if (!hasMore || prefetching) return;
+  if (hiddenCommitHashes.size === 0) return; // no filter active; genuinely 0 commits loaded
+  if (showGapIndicator) return;              // gap cap reached; "Load more" button handles this
+  rpcClient.firePrefetch();
+}, [commits.length, hasMore, prefetching, hiddenCommitHashes.size, showGapIndicator]);
+```
+
+Note: `commits` here is aliased from `mergedCommits` (visible commits only). After this trigger fires the first prefetch, auto-retry (C) handles subsequent batches up to the cap. When the cap is reached, the "Load more commits" button in the empty state allows the user to resume manually.
 
 ### Step 2: Send Request
 
@@ -391,29 +430,62 @@ Batch N+1 arrives -> 0 visible commits -> consecutiveEmptyBatches = 2
 Batch N+2 arrives -> 0 visible commits -> consecutiveEmptyBatches = 3
   -> showGapIndicator = true
   -> auto-retry does NOT fire (3 is not < 3)
-  -> UI shows: "1500 commits filtered out of 2500 loaded - keep scrolling down to fetch next batch"
+  -> UI shows: "1500 commits filtered out of 2500 loaded" with "Load more commits" button
 ```
 
 At any point, if a batch yields >= 1 visible commit, all counters reset to 0.
 
-### Gap Indicator UI (GraphContainer.tsx:320-326)
+### Gap Indicator UI
+
+Two locations depending on whether visible commits exist:
+
+**Non-empty state** (GraphContainer.tsx:353-364) — shown below the commit list:
 
 ```tsx
 {showGapIndicator && hasMore && (
   <div className="...">
-    {filteredOutCount} commit{filteredOutCount !== 1 ? 's' : ''} filtered out of {allCommitsCount} loaded
-    {' — keep scrolling down to fetch next batch'}
+    <span>{filteredOutCount} commits filtered out of {allCommitsCount} loaded</span>
+    <button onClick={handleLoadMore}>Load more commits</button>
   </div>
 )}
 ```
 
-### Scroll-Past-Gap-Indicator (GraphContainer.tsx:132-155)
+**Empty state** (GraphContainer.tsx:247-264) — shown in the center of the empty area when all commits are hidden:
 
-When the gap indicator is visible, user must scroll to the absolute bottom to resume fetching:
+```tsx
+{isEmpty ? (
+  <div>
+    {loading || prefetching
+      ? 'Loading…'
+      : showGapIndicator && hasMore
+        ? <>{filteredOutCount} commits filtered out ... <button>Load more commits</button></>
+        : hasActiveFilter
+          ? 'No commits match the current filters'
+          : 'No commits found'}
+  </div>
+) : ( ... )}
+```
+
+The `handleLoadMore` callback (GraphContainer.tsx:232-238) resets gap state and fires prefetch:
+
+```typescript
+const handleLoadMore = useCallback(() => {
+  useGraphStore.setState({
+    consecutiveEmptyBatches: 0,
+    showGapIndicator: false,
+  });
+  rpcClient.firePrefetch();
+}, []);
+```
+
+### Scroll-Past-Gap-Indicator (GraphContainer.tsx:140-166)
+
+When the gap indicator is visible and content overflows the viewport, scrolling to the absolute bottom also resumes fetching:
 
 ```typescript
 useEffect(() => {
   if (!showGapIndicator || !hasMore || prefetching) return;
+  if (rangeEnd === undefined) return;
   if (rangeEnd < commits.length - 1) return;
 
   const handleScroll = () => {
@@ -427,14 +499,19 @@ useEffect(() => {
     }
   };
   el.addEventListener('scroll', handleScroll, { passive: true });
-  handleScroll();  // check immediately in case already at bottom
+  // Check immediately only if content overflows (user can actually scroll)
+  if (el.scrollHeight > el.clientHeight) {
+    handleScroll();
+  }
   return () => el.removeEventListener('scroll', handleScroll);
 }, [showGapIndicator, hasMore, prefetching, rangeEnd, commits.length]);
 ```
 
+The overflow check (`el.scrollHeight > el.clientHeight`) prevents auto-triggering when only a few visible commits exist and the content is shorter than the viewport. Without this, the handler would immediately detect "at bottom" and resume fetching in an infinite loop. When content doesn't overflow, the user uses the "Load more commits" button instead.
+
 ---
 
-## Loading Indicator (GraphContainer.tsx:328-332)
+## Loading Indicator (GraphContainer.tsx:366-369)
 
 ```tsx
 {prefetching && (
@@ -442,7 +519,7 @@ useEffect(() => {
 )}
 ```
 
-Displayed whenever `prefetching === true`. Shows below the commit list. Disappears when `setPrefetching(false)` is called (either on successful response, generation mismatch, or prefetch error).
+Displayed whenever `prefetching === true`. Shows below the commit list in the non-empty state. In the empty state, `loading || prefetching` shows "Loading..." in the center area. Disappears when `setPrefetching(false)` is called (either on successful response, generation mismatch, or prefetch error).
 
 ---
 
@@ -575,7 +652,7 @@ Backend errors (WebviewProvider.ts:693-710) also offer a "Retry" dialog. If the 
 
 ## Full Lifecycle Example
 
-### Scenario: Text filter on a 20k-commit repo
+### Scenario A: Text filter with some visible commits
 
 ```
 T0: Initial load
@@ -617,12 +694,41 @@ T6: Batch 5 arrives (gen=2, matches)
     0 visible -> consecutiveEmptyBatches = 3
     showGapIndicator = true
     Auto-retry does NOT fire (3 is not < 3)
-    UI shows: "1500 commits filtered out of 3500 loaded — keep scrolling down to fetch next batch"
+    UI shows: "1500 commits filtered out of 3500 loaded" with "Load more commits" button
 
-T7: User scrolls to bottom
-    Scroll-past-gap handler fires
-    Resets consecutiveEmptyBatches = 0, showGapIndicator = false
+T7: User clicks "Load more commits" button (or scrolls to bottom if content overflows)
+    handleLoadMore resets consecutiveEmptyBatches = 0, showGapIndicator = false
     firePrefetch() -> cycle continues from T4 pattern
+```
+
+### Scenario B: Text filter hides ALL cached commits
+
+```
+T0: Initial load -> 1000 commits cached (2 batches)
+
+T1: User types a very specific text filter
+    recomputeVisibility() -> mergedCommits = [] (all 1000 hidden)
+    fetchGeneration incremented, gap state reset
+
+T2: Zero-visible-commits trigger fires (commits.length = 0, hiddenCommitHashes.size > 0)
+    -> firePrefetch()
+    Empty state shows "Loading..."
+
+T3-T5: 3 batches arrive, all 0 visible
+    Auto-retry handles batches 2 & 3
+    After batch 3: consecutiveEmptyBatches = 3, showGapIndicator = true
+
+T6: Zero-visible-commits trigger suppressed (showGapIndicator guard)
+    Empty state shows: "1500 commits filtered out of 2500 loaded" + "Load more commits" button
+
+T7: User clicks "Load more commits"
+    Resets gap state -> firePrefetch() -> cycle repeats from T3
+
+T8: Eventually a batch yields visible commits
+    -> mergedCommits grows > 0 -> isEmpty = false
+    -> Normal scroll-based trigger takes over
+
+OR: hasMore = false -> "No commits match the current filters"
 ```
 
 ### Scenario: Filter applied while prefetch in-flight
@@ -648,6 +754,10 @@ T4: Scroll-based trigger re-evaluates (prefetching changed)
 | `!hasMore \|\| prefetching` | `firePrefetch()` (rpcClient.ts:500) | Fetching when all commits loaded, or duplicate concurrent requests |
 | `!hasMore \|\| prefetching` | Scroll trigger (GraphContainer.tsx:110) | Same, at the trigger level |
 | `!showGapIndicator` | Scroll trigger (GraphContainer.tsx:119) | Auto-fetching past the 3-batch cap |
+| `commits.length > 0` | Zero-visible trigger (GraphContainer.tsx:132) | Firing when scroll trigger can handle it |
+| `hiddenCommitHashes.size === 0` | Zero-visible trigger (GraphContainer.tsx:135) | Firing when genuinely 0 commits loaded (no filter active) |
+| `showGapIndicator` | Zero-visible trigger (GraphContainer.tsx:136) | Auto-fetching past the 3-batch cap (defers to "Load more" button) |
+| `el.scrollHeight > el.clientHeight` | Scroll-past-gap (GraphContainer.tsx:162) | Auto-triggering when content doesn't overflow viewport |
 | `generation mismatch` | Response handler (rpcClient.ts:55) | Stale batch data from prior filter/reload state |
 | `consecutiveEmptyBatches < 3` | Auto-retry (rpcClient.ts:63) | Runaway fetching when filter is very selective |
 
@@ -667,9 +777,12 @@ T4: Scroll-based trigger re-evaluates (prefetching changed)
 | `rpcClient.ts` | 92-95 | `prefetchError` handler |
 | `rpcClient.ts` | 498-505 | `firePrefetch` - guard, lock, send request |
 | `GraphContainer.tsx` | 109-129 | Scroll-based prefetch trigger (with/without filters) |
-| `GraphContainer.tsx` | 132-155 | Scroll-past-gap-indicator handler |
-| `GraphContainer.tsx` | 320-326 | Gap indicator UI |
-| `GraphContainer.tsx` | 328-332 | Loading indicator UI |
+| `GraphContainer.tsx` | 131-138 | Zero-visible-commits prefetch trigger |
+| `GraphContainer.tsx` | 140-166 | Scroll-past-gap-indicator handler (with overflow check) |
+| `GraphContainer.tsx` | 232-238 | `handleLoadMore` callback (reset gap state + prefetch) |
+| `GraphContainer.tsx` | 247-264 | Empty state UI (loading, "Load more" button, no-match message) |
+| `GraphContainer.tsx` | 353-364 | Gap indicator UI with "Load more commits" button |
+| `GraphContainer.tsx` | 366-369 | Loading indicator UI |
 | `FilterWidget.tsx` | 104-118 | Text filter debounce + recomputeVisibility call |
 | `WebviewProvider.ts` | 657-676 | Backend `getCommits` handler |
 | `WebviewProvider.ts` | 678-710 | Backend `loadMoreCommits` handler |

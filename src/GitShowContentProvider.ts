@@ -21,6 +21,19 @@ export class GitShowContentProvider implements vscode.TextDocumentContentProvide
       throw new Error(`Invalid git-show URI: missing ${!hash ? 'hash' : 'file path'} (uri: ${uri.toString()})`);
     }
 
+    // Staged (index) version — authority is the sentinel "staged" instead of a commit hash.
+    // Uses `git show :<path>` to retrieve the exact content that would be committed.
+    if (hash === 'staged') {
+      const stagedResult = await this.gitDiffService.getStagedFileContent(filePath);
+      if (!stagedResult.success) {
+        if (stagedResult.error.code === 'COMMAND_FAILED') {
+          return '';
+        }
+        throw new Error(`Failed to read staged ${filePath}: ${stagedResult.error.message}`);
+      }
+      return stagedResult.value;
+    }
+
     const result = await this.gitDiffService.getCommitFile(hash, filePath);
     if (!result.success) {
       // Return empty for "file not found at revision" — expected in diff views

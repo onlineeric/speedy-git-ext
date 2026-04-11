@@ -9,6 +9,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [2.3.0] - 2026-04-11
+
+### Added
+- Uncommitted changes node at the top of the git graph showing current working tree state (staged, unstaged, and untracked files) as a visually distinct node connected to HEAD
+- Dynamic node label with categorized file count summary — e.g., "Uncommitted Changes (3 staged, 2 modified, 1 untracked)" — zero-count categories omitted automatically
+- Click the uncommitted node to inspect all changed files in the commit details panel with correct status badges, in both list and tree view modes
+- Click any file in the uncommitted node's details panel to open a diff view showing changes against HEAD, or full content for untracked files
+- Uncommitted node auto-refreshes when files are saved, staged, or modified — appears when changes exist, disappears when the working tree is clean
+- Details panel stays open and auto-updates its content when the uncommitted node refreshes, preserving the user's selection
+- Uncommitted node is exempt from author, date, and text filters (always visible when changes exist), but respects branch filters — hidden when the current branch is excluded
+- Right-clicking the uncommitted node shows a minimal context menu instead of the standard commit actions, preventing irrelevant operations
+- Works in all repository states including detached HEAD, during rebase, and during merge conflicts
+- Staged and unstaged file changes displayed in separate "Staged Changes" and "Unstaged Changes" sections in the details panel, each with an accurate file count — see at a glance what will be committed vs. what won't
+- Stage or unstage individual files via action buttons next to each file in the details panel, with instant section updates; on uncommitted-node file rows the stage/unstage arrow is always visible (no hover required) for one-click access, while Copy path, Open file, and Open current version icons remain hover-only
+- "Stage All" and "Unstage All" bulk action buttons on section headers for batch operations across all files in a section
+- Discard individual unstaged file changes with a confirmation dialog warning about permanent data loss; untracked files are deleted from disk upon confirmation
+- Uncommitted node right-click context menu with operations: Stash Everything… (opens a confirmation dialog with optional message input before any stash is created), Stage All Changes, Unstage All Changes, Discard All Unstaged Changes, and Open Source Control Panel — the "Stash Everything…" label with trailing ellipsis prevents visual confusion with "Stage All Changes" and gives users a safe exit on misclick
+- Context menu items conditionally shown or hidden based on current state (e.g., "Stage All" hidden when no unstaged changes exist)
+- Multi-select file picker dialog ("Select files for...") from the context menu with a single action radio group (Stage, Unstage, Discard, Stash with message) so users pick a subset of files and choose one unambiguous action
+- Live git command preview on every radio row in the file picker dialog (greyed out on disabled rows), with a copy-to-clipboard button shown only on the currently selected row
+- Single contextual action button in the file picker dialog whose label and affected-file count update with the selected radio (e.g., `Stage (2)`, `Unstage (3)`, `Discard (2)`, `Stash (5)`); the button is hidden entirely when no files are selected, leaving only Close
+- Smart default radio selection on each selection change: Stage when enabled, Unstage when only staged files are selected, none pre-selected when no files are picked
+- Stash-with-message row in the file picker dialog includes an inline message input that auto-selects the Stash radio when clicked; empty messages are auto-replaced with `Stash of <N> files from <branch>` so every stash stays identifiable
+- Selective stashes that include untracked files automatically run `git add && git stash push` so untracked files end up inside the stash entry instead of being silently dropped; the command preview shows both steps joined with `&&` to match exactly what executes
+- Selective stashes always include every renamed-file pair (even when not explicitly selected) to prevent broken half-rename stash entries; the Stash row shows a persistent inline note when renamed files are present
+- Per-file Discard confirmation dialog with a scoped title ("Discard Selected Changes"), file count in the description, count-aware action button (`Discard (N)`), and an extra warning when the discard includes untracked files that will be permanently deleted
+- After a successful action in the file picker dialog, the dialog stays open, refreshes the file list, preserves the user's prior selection (silently pruning paths that no longer exist), and re-evaluates the radio group — the default radio flips intelligently (e.g., Stage → Unstage) so the next click can immediately undo or chain another action on the same set
+- Busy state on the file picker action button while a git command is executing: the action button, file checkboxes, and radio group are all disabled, while Close stays enabled and dismisses the dialog without attempting to cancel the running command
+- Inline error banner at the top of the file picker dialog when an action fails, showing the git error message while preserving the file selection and radio choice; failed add-then-stash flows explicitly identify which step failed (`git add` vs `git stash push`) and describe the resulting working-tree state
+- "Open file at this commit" icon removed from uncommitted-node file rows (it was redundant — identical to "Open current version" for the working tree); the icon remains present and functional on every regular commit
+- Clicking the disabled stash-message text input in the "Select files for…" dialog auto-selects the Stash radio and focuses the field, so the click is never a dead-end interaction
+- Disabled action rows in the "Select files for…" dialog still render their command preview in a greyed-out style, so users can see what each action *would* do before changing their selection
+- Command preview rows in the "Select files for…" dialog omit the redundant "Command preview:" lead-in label when the radio name already identifies the command, keeping each row visually compact
+- Dual-state files (a single path with both staged content and additional working-tree edits) are correctly counted on both the staged and unstaged side of the file picker dialog, and a single such file selected alone qualifies as a "mixed" selection that enables all four action radios
+- Merge conflict state display: a "Merge Conflicts" section appears above staged and unstaged sections during merge, rebase, or cherry-pick conflicts, listing conflicted files with an "open file" button for resolution via VS Code's native merge editor
+- Staged file content viewing shows the git index version rather than the working tree version, so users can verify exactly what will be committed
+- All destructive operation dialogs (discard, stash) include a git command preview, consistent with existing extension dialog patterns
+- Partially staged files appear in both Staged and Unstaged sections simultaneously, reflecting git's per-hunk staging model
+- Single list/tree view toggle in the top section header applies to all sections (staged, unstaged, conflicts) simultaneously
+
 ## [2.2.1] - 2026-04-08
 
 #### Fixed

@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, PersistedUIState, Author } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary } from './types.js';
 import type { GitError } from './errors.js';
 
 export type RequestMessage =
@@ -9,7 +9,7 @@ export type RequestMessage =
   | { type: 'checkoutCommit'; payload: { hash: string } }
   | { type: 'fetch'; payload: { remote?: string; prune?: boolean; filters?: Partial<GraphFilters> } }
   | { type: 'copyToClipboard'; payload: { text: string } }
-  | { type: 'openDiff'; payload: { hash: string; filePath: string; parentHash?: string } }
+  | { type: 'openDiff'; payload: { hash: string; filePath: string; parentHash?: string; status?: FileChangeStatus } }
   | { type: 'openFile'; payload: { hash: string; filePath: string } }
   | { type: 'refresh'; payload: { filters?: Partial<GraphFilters> } }
   // Branch ops
@@ -77,7 +77,19 @@ export type RequestMessage =
   // File actions
   | { type: 'openCurrentFile'; payload: { filePath: string } }
   // UI state persistence
-  | { type: 'updatePersistedUIState'; payload: { uiState: Partial<Omit<PersistedUIState, 'version'>> } };
+  | { type: 'updatePersistedUIState'; payload: { uiState: Partial<Omit<PersistedUIState, 'version'>> } }
+  | { type: 'getUncommittedChanges'; payload: Record<string, never> }
+  // Staging ops
+  | { type: 'stageFiles'; payload: { paths: string[] } }
+  | { type: 'unstageFiles'; payload: { paths: string[] } }
+  | { type: 'stageAll'; payload: Record<string, never> }
+  | { type: 'unstageAll'; payload: Record<string, never> }
+  | { type: 'discardFiles'; payload: { paths: string[]; includeUntracked: boolean } }
+  | { type: 'discardAllUnstaged'; payload: Record<string, never> }
+  | { type: 'stashWithMessage'; payload: { message?: string; paths?: string[] } }
+  | { type: 'stashSelected'; payload: { message: string; paths: string[]; addUntrackedFirst: boolean } }
+  | { type: 'getConflictState'; payload: Record<string, never> }
+  | { type: 'openStagedDiff'; payload: { filePath: string } };
 
 export type ResponseMessage =
   | { type: 'commits'; payload: { commits: Commit[]; branches?: Branch[]; hasMore?: boolean; totalLoadedWithoutFilter?: number } }
@@ -110,7 +122,9 @@ export type ResponseMessage =
   | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[] } }
   | { type: 'containingBranches'; payload: { hash: string; branches: string[]; status: 'loaded' | 'error' } }
   | { type: 'persistedUIState'; payload: { uiState: PersistedUIState } }
-  | { type: 'authorList'; payload: { authors: Author[] } };
+  | { type: 'authorList'; payload: { authors: Author[] } }
+  | { type: 'uncommittedChanges'; payload: UncommittedSummary }
+  | { type: 'conflictState'; payload: ConflictState };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -137,6 +151,10 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   stashAndCheckout: true, stashAndCheckoutCommit: true,
   getWorktreeList: true, getContainingBranches: true, openExternal: true,
   openCurrentFile: true, updatePersistedUIState: true, getAuthors: true,
+  getUncommittedChanges: true,
+  stageFiles: true, unstageFiles: true, stageAll: true, unstageAll: true,
+  discardFiles: true, discardAllUnstaged: true, stashWithMessage: true, stashSelected: true,
+  getConflictState: true, openStagedDiff: true,
 };
 
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
@@ -148,7 +166,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
   pushResult: true, avatarUrls: true, worktreeList: true, containingBranches: true,
-  persistedUIState: true, authorList: true,
+  persistedUIState: true, authorList: true, uncommittedChanges: true, conflictState: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {

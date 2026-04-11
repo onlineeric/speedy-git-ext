@@ -1,7 +1,7 @@
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
-import type { CommitDetails, FileChange, FileChangeStatus } from '../../shared/types.js';
+import type { CommitDetails, ConflictType, FileChange, FileChangeStatus, FileStageState, UncommittedSummary } from '../../shared/types.js';
 import { validateHash, validateFilePath } from '../utils/gitValidation.js';
 
 const NULL_CHAR = '\x00';
@@ -115,6 +115,23 @@ export class GitDiffService {
     return ok(result.value.stdout);
   }
 
+  /** Returns the staged (index) version of a file, equivalent to `git show :<path>`. */
+  async getStagedFileContent(filePath: string): Promise<Result<string>> {
+    const pathCheck = validateFilePath(filePath);
+    if (!pathCheck.success) return pathCheck;
+
+    const result = await this.executor.execute({
+      args: ['show', `:${filePath}`],
+      cwd: this.workspacePath,
+    });
+
+    if (!result.success) {
+      return result;
+    }
+
+    return ok(result.value.stdout);
+  }
+
   async openExternalDirDiff(hash: string, parentHash?: string): Promise<Result<string>> {
     const hashCheck = validateHash(hash);
     if (!hashCheck.success) return hashCheck;
@@ -138,49 +155,100 @@ export class GitDiffService {
   }
 
   async getUncommittedDetails(): Promise<Result<FileChange[]>> {
-    this.log.info('Getting uncommitted changes');
-    // Staged changes
-    const stagedResult = await this.executor.execute({
-      args: ['diff', '--cached', '--name-status', '-z'],
+    const summary = await this.getUncommittedSummary();
+    if (!summary.success) return summary;
+    return ok([...summary.value.stagedFiles, ...summary.value.unstagedFiles, ...summary.value.conflictFiles]);
+  }
+
+  async getUncommittedSummary(): Promise<Result<UncommittedSummary>> {
+    this.log.info('Getting uncommitted changes summary');
+    const [stagedResult, stagedNumstatResult, unstagedResult, unstagedNumstatResult, untrackedResult] = await Promise.all([
+      this.executor.execute({ args: ['diff', '--cached', '--name-status', '-z'], cwd: this.workspacePath }),
+      this.executor.execute({ args: ['diff', '--cached', '--numstat', '-z'], cwd: this.workspacePath }),
+      this.executor.execute({ args: ['diff', '--name-status', '-z'], cwd: this.workspacePath }),
+      this.executor.execute({ args: ['diff', '--numstat', '-z'], cwd: this.workspacePath }),
+      this.executor.execute({ args: ['ls-files', '--others', '--exclude-standard', '-z'], cwd: this.workspacePath }),
+    ]);
+
+    const stagedFiles = stagedResult.success ? parseDiffNameStatus(stagedResult.value.stdout) : [];
+    const unstagedFiles = unstagedResult.success ? parseDiffNameStatus(unstagedResult.value.stdout) : [];
+    const untrackedPaths = untrackedResult.success
+      ? untrackedResult.value.stdout.split(NULL_CHAR).filter(Boolean)
+      : [];
+
+    // Apply per-file line counts from numstat
+    if (stagedNumstatResult.success) {
+      applyNumstatToFiles(stagedFiles, stagedNumstatResult.value.stdout);
+    }
+    if (unstagedNumstatResult.success) {
+      applyNumstatToFiles(unstagedFiles, unstagedNumstatResult.value.stdout);
+    }
+
+    const tagStageState = (files: FileChange[], state: FileStageState): FileChange[] =>
+      files.map(f => ({ ...f, stageState: state }));
+
+    const taggedStaged = tagStageState(stagedFiles, 'staged');
+    const taggedUnstaged = tagStageState(unstagedFiles, 'unstaged');
+    const taggedUntracked: FileChange[] = untrackedPaths.map((path): FileChange => ({
+      path, status: 'untracked', stageState: 'unstaged',
+    }));
+
+    const conflictState = await this.detectConflictState();
+    const conflictPathSet = new Set(conflictState.conflictFiles);
+
+    const conflictFiles: FileChange[] = conflictState.conflictFiles.map((path): FileChange => ({
+      path, status: 'modified', stageState: 'conflicted',
+    }));
+
+    const filteredStaged = conflictPathSet.size > 0
+      ? taggedStaged.filter(f => !conflictPathSet.has(f.path))
+      : taggedStaged;
+    const filteredUnstaged = conflictPathSet.size > 0
+      ? taggedUnstaged.filter(f => !conflictPathSet.has(f.path))
+      : taggedUnstaged;
+
+    return ok({
+      stagedFiles: filteredStaged,
+      unstagedFiles: [...filteredUnstaged, ...taggedUntracked],
+      conflictFiles,
+      conflictType: conflictState.conflictType,
+      stagedCount: filteredStaged.length,
+      unstagedCount: filteredUnstaged.length,
+      untrackedCount: untrackedPaths.length,
+    });
+  }
+
+  private async detectConflictState(): Promise<{ conflictType?: ConflictType; conflictFiles: string[] }> {
+    // --verify --quiet exits non-zero when the ref doesn't exist, so .success is a reliable signal
+    const [mergeHead, rebaseHead, cherryPickHead] = await Promise.all([
+      this.executor.execute({ args: ['rev-parse', '--verify', '--quiet', 'MERGE_HEAD'], cwd: this.workspacePath }),
+      this.executor.execute({ args: ['rev-parse', '--verify', '--quiet', 'REBASE_HEAD'], cwd: this.workspacePath }),
+      this.executor.execute({ args: ['rev-parse', '--verify', '--quiet', 'CHERRY_PICK_HEAD'], cwd: this.workspacePath }),
+    ]);
+
+    let conflictType: ConflictType | undefined;
+    if (mergeHead.success) {
+      conflictType = 'merge';
+    } else if (rebaseHead.success) {
+      conflictType = 'rebase';
+    } else if (cherryPickHead.success) {
+      conflictType = 'cherry-pick';
+    }
+
+    if (!conflictType) {
+      return { conflictFiles: [] };
+    }
+
+    const conflictResult = await this.executor.execute({
+      args: ['diff', '--name-only', '--diff-filter=U'],
       cwd: this.workspacePath,
     });
 
-    // Unstaged changes
-    const unstagedResult = await this.executor.execute({
-      args: ['diff', '--name-status', '-z'],
-      cwd: this.workspacePath,
-    });
+    const conflictFiles = conflictResult.success
+      ? conflictResult.value.stdout.trim().split('\n').filter(Boolean)
+      : [];
 
-    // Untracked files
-    const untrackedResult = await this.executor.execute({
-      args: ['ls-files', '--others', '--exclude-standard', '-z'],
-      cwd: this.workspacePath,
-    });
-
-    const files: FileChange[] = [];
-
-    if (stagedResult.success) {
-      files.push(...parseDiffNameStatus(stagedResult.value.stdout));
-    }
-    if (unstagedResult.success) {
-      const unstaged = parseDiffNameStatus(unstagedResult.value.stdout);
-      // Unstaged takes precedence over staged (represents current working tree state)
-      const unstagedPaths = new Set(unstaged.map((f) => f.path));
-      const merged = files.filter((f) => !unstagedPaths.has(f.path));
-      merged.push(...unstaged);
-      files.length = 0;
-      files.push(...merged);
-    }
-    if (untrackedResult.success) {
-      const untrackedPaths = untrackedResult.value.stdout
-        .split(NULL_CHAR)
-        .filter(Boolean);
-      for (const path of untrackedPaths) {
-        files.push({ path, status: 'untracked' });
-      }
-    }
-
-    return ok(files);
+    return { conflictType, conflictFiles };
   }
 }
 
@@ -327,4 +395,51 @@ function parseNumstat(
   }
 
   return { additions: totalAdditions, deletions: totalDeletions };
+}
+
+/**
+ * Applies per-file additions/deletions from `git diff --numstat -z` output
+ * to an existing FileChange[] array (mutates in-place).
+ * Format: "adds\tdels\tpath\0" for normal, "adds\tdels\t\0old\0new\0" for renames.
+ */
+function applyNumstatToFiles(files: FileChange[], numstatOutput: string): void {
+  if (!numstatOutput) return;
+
+  const fileMap = new Map<string, FileChange>();
+  for (const f of files) {
+    fileMap.set(f.path, f);
+    if (f.oldPath) fileMap.set(f.oldPath, f);
+  }
+
+  const parts = numstatOutput.split(NULL_CHAR);
+  let i = 0;
+  while (i < parts.length) {
+    const statPart = parts[i];
+    if (!statPart) { i++; continue; }
+
+    const tabParts = statPart.split('\t');
+    if (tabParts.length < 2) { i++; continue; }
+
+    const addStr = tabParts[0];
+    const delStr = tabParts[1];
+    const isBinary = addStr === '-' && delStr === '-';
+    const additions = addStr === '-' ? 0 : parseInt(addStr, 10);
+    const deletions = delStr === '-' ? 0 : parseInt(delStr, 10);
+
+    const thirdField = tabParts[2] ?? '';
+    let filePath: string;
+    if (thirdField === '' && parts[i + 1]) {
+      filePath = parts[i + 1];
+      i += 3;
+    } else {
+      filePath = thirdField;
+      i += 1;
+    }
+
+    const file = fileMap.get(filePath);
+    if (file && !isBinary) {
+      file.additions = additions;
+      file.deletions = deletions;
+    }
+  }
 }

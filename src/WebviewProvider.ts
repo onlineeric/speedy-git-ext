@@ -7,6 +7,7 @@ import type {
   CommitListMode,
   CommitTableColumnId,
   CommitTableLayout,
+  FileChangeStatus,
   GraphFilters,
   PersistedUIState,
   RepoInfo,
@@ -16,6 +17,8 @@ import type {
 import {
   COMMIT_TABLE_COLUMN_IDS,
   DEFAULT_PERSISTED_UI_STATE,
+  UNCOMMITTED_HASH,
+  buildUncommittedSubject,
   cloneCommitTableLayout,
 } from '../shared/types.js';
 import type { GitLogService } from './services/GitLogService.js';
@@ -32,8 +35,9 @@ import type { GitRebaseService } from './services/GitRebaseService.js';
 import type { GitSignatureService } from './services/GitSignatureService.js';
 import type { GitSubmoduleService } from './services/GitSubmoduleService.js';
 import type { GitWorktreeService } from './services/GitWorktreeService.js';
+import type { GitIndexService } from './services/GitIndexService.js';
 import type { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
-import { GitError } from '../shared/errors.js';
+import { GitError, type Result } from '../shared/errors.js';
 import { GitExecutor } from './services/GitExecutor.js';
 import { GitHubAvatarService } from './services/GitHubAvatarService.js';
 
@@ -176,6 +180,7 @@ export class WebviewProvider {
     private gitSignatureService: GitSignatureService,
     private gitSubmoduleService: GitSubmoduleService,
     private gitWorktreeService: GitWorktreeService,
+    private gitIndexService: GitIndexService,
     private readonly log: vscode.LogOutputChannel,
     private readonly gitRepoDiscoveryService?: GitRepoDiscoveryService,
     currentRepoPath?: string
@@ -218,6 +223,7 @@ export class WebviewProvider {
     gitSignatureService: GitSignatureService,
     gitSubmoduleService: GitSubmoduleService,
     gitWorktreeService: GitWorktreeService,
+    gitIndexService: GitIndexService,
     currentRepoPath: string
   ) {
     this.gitLogService = gitLogService;
@@ -233,6 +239,7 @@ export class WebviewProvider {
     this.gitSignatureService = gitSignatureService;
     this.gitSubmoduleService = gitSubmoduleService;
     this.gitWorktreeService = gitWorktreeService;
+    this.gitIndexService = gitIndexService;
     this.currentRepoPath = currentRepoPath;
     // Invalidate UI state cache so per-repo column layout is reloaded for the new repo
     this.uiStateCache = undefined;
@@ -561,6 +568,7 @@ export class WebviewProvider {
       await this.handleMessage({ type: 'getRemotes', payload: {} });
       await this.handleMessage({ type: 'getSubmodules', payload: {} });
       await this.handleMessage({ type: 'getWorktreeList', payload: {} });
+      await this.handleMessage({ type: 'getUncommittedChanges', payload: {} });
       if (includeStashes) {
         await this.handleMessage({ type: 'getStashes', payload: {} });
       }
@@ -736,6 +744,39 @@ export class WebviewProvider {
         break;
       }
       case 'getCommitDetails': {
+        if (message.payload.hash === UNCOMMITTED_HASH) {
+          const [summaryResult, headHash] = await Promise.all([
+            this.gitDiffService.getUncommittedSummary(),
+            this.getHeadHash(),
+          ]);
+          if (summaryResult.success) {
+            const { stagedFiles, unstagedFiles, conflictFiles, stagedCount, unstagedCount, untrackedCount } = summaryResult.value;
+            const files = [...stagedFiles, ...unstagedFiles, ...conflictFiles];
+            const details = {
+              hash: UNCOMMITTED_HASH,
+              abbreviatedHash: '---',
+              parents: headHash ? [headHash] : [],
+              author: '---',
+              authorEmail: '',
+              authorDate: Date.now(),
+              committer: '---',
+              committerEmail: '',
+              committerDate: Date.now(),
+              subject: buildUncommittedSubject(stagedCount, unstagedCount, untrackedCount),
+              body: '',
+              files,
+              stats: files.reduce((acc, f) => ({
+                additions: acc.additions + (f.additions ?? 0),
+                deletions: acc.deletions + (f.deletions ?? 0),
+              }), { additions: 0, deletions: 0 }),
+            };
+            this.postMessage({ type: 'commitDetails', payload: { details } });
+            this.postMessage({ type: 'uncommittedChanges', payload: summaryResult.value });
+          } else {
+            this.postMessage({ type: 'error', payload: { error: summaryResult.error } });
+          }
+          break;
+        }
         const result = await this.gitDiffService.getCommitDetails(message.payload.hash);
         if (result.success) {
           this.postMessage({ type: 'commitDetails', payload: { details: result.value } });
@@ -841,7 +882,7 @@ export class WebviewProvider {
         break;
       }
       case 'openDiff': {
-        await this.openDiffEditor(message.payload.hash, message.payload.filePath, message.payload.parentHash);
+        await this.openDiffEditor(message.payload.hash, message.payload.filePath, message.payload.parentHash, message.payload.status);
         break;
       }
       case 'openFile': {
@@ -1498,10 +1539,157 @@ export class WebviewProvider {
         await this.sendInitialData(undefined, true);
         break;
       }
+      case 'getUncommittedChanges': {
+        const result = await this.gitDiffService.getUncommittedSummary();
+        if (result.success) {
+          this.postMessage({ type: 'uncommittedChanges', payload: result.value });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'stageFiles': {
+        await this.handleIndexMutation(this.gitIndexService.stageFiles(message.payload.paths));
+        break;
+      }
+      case 'unstageFiles': {
+        await this.handleIndexMutation(this.gitIndexService.unstageFiles(message.payload.paths));
+        break;
+      }
+      case 'stageAll': {
+        await this.handleIndexMutation(this.gitIndexService.stageAll());
+        break;
+      }
+      case 'unstageAll': {
+        await this.handleIndexMutation(this.gitIndexService.unstageAll());
+        break;
+      }
+      case 'discardFiles': {
+        await this.handleIndexMutation(this.gitIndexService.discardFiles(message.payload.paths, message.payload.includeUntracked));
+        break;
+      }
+      case 'discardAllUnstaged': {
+        await this.handleIndexMutation(this.gitIndexService.discardAllUnstaged());
+        break;
+      }
+      case 'stashWithMessage': {
+        const result = await this.gitStashService.stashWithMessage(
+          message.payload.message,
+          message.payload.paths
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData(undefined, true);
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'stashSelected': {
+        const result = await this.gitStashService.stashSelected(
+          message.payload.message,
+          message.payload.paths,
+          message.payload.addUntrackedFirst
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData(undefined, true);
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'getConflictState': {
+        const result = await this.gitDiffService.getUncommittedSummary();
+        if (result.success) {
+          const { conflictFiles, conflictType } = result.value;
+          this.postMessage({
+            type: 'conflictState',
+            payload: {
+              inConflict: conflictFiles.length > 0,
+              conflictType,
+              conflictFiles: conflictFiles.map(f => f.path),
+            },
+          });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'openStagedDiff': {
+        await this.openStagedDiffEditor(message.payload.filePath);
+        break;
+      }
     }
   }
 
-  private async openDiffEditor(hash: string, filePath: string, parentHash?: string) {
+  private async getHeadHash(): Promise<string> {
+    const result = await this.gitLogService.getCommits({ maxCount: 1 });
+    return result.success && result.value.commits.length > 0
+      ? result.value.commits[0].hash
+      : '';
+  }
+
+  /** Handle an index mutation (stage/unstage/discard) — only refreshes uncommitted data, not the full graph. */
+  private async handleIndexMutation(resultPromise: Promise<Result<string, GitError>>): Promise<void> {
+    const result = await resultPromise;
+    if (result.success) {
+      this.postMessage({ type: 'success', payload: { message: result.value } });
+      await this.handleMessage({ type: 'getUncommittedChanges', payload: {} });
+    } else {
+      this.postMessage({ type: 'error', payload: { error: result.error } });
+    }
+  }
+
+  private async openDiffEditor(hash: string, filePath: string, parentHash?: string, status?: FileChangeStatus) {
+    if (hash === UNCOMMITTED_HASH) {
+      const fileName = filePath.split('/').pop() ?? filePath;
+      const absolutePath = path.join(this.currentRepoPath, filePath);
+
+      if (status === 'untracked') {
+        // Untracked file: empty left side, working tree file on right
+        const leftUri = vscode.Uri.parse(`untitled:${fileName}`);
+        const rightUri = vscode.Uri.file(absolutePath);
+        const title = `${filePath} (Untracked)`;
+        try {
+          await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
+        } catch {
+          this.log.warn(`Diff editor failed for untracked file: ${filePath}`);
+        }
+      } else if (status === 'deleted') {
+        // Deleted file: HEAD version on left, empty right side
+        const headHash = await this.getHeadHash();
+        if (!headHash) {
+          this.log.warn(`Cannot resolve HEAD for diff: ${filePath}`);
+          return;
+        }
+        const leftUri = vscode.Uri.from({ scheme: 'git-show', authority: headHash, path: `/${headHash.slice(0, 8)}: ${fileName}`, query: filePath });
+        const rightUri = vscode.Uri.parse(`untitled:${fileName}`);
+        const title = `${filePath} (Deleted)`;
+        try {
+          await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
+        } catch {
+          this.log.warn(`Diff editor failed for deleted file: ${filePath}`);
+        }
+      } else {
+        // Tracked file (modified, added, renamed, copied): HEAD version on left, working tree on right
+        const headHash = await this.getHeadHash();
+        if (!headHash) {
+          this.log.warn(`Cannot resolve HEAD for diff: ${filePath}`);
+          return;
+        }
+        const leftUri = vscode.Uri.from({ scheme: 'git-show', authority: headHash, path: `/${headHash.slice(0, 8)}: ${fileName}`, query: filePath });
+        const rightUri = vscode.Uri.file(absolutePath);
+        const title = `${filePath} (Working Tree)`;
+        try {
+          await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
+        } catch {
+          this.log.warn(`Diff editor failed for uncommitted file: ${filePath}`);
+        }
+      }
+      return;
+    }
+
     const parent = parentHash ?? `${hash}~1`;
     const fileName = filePath.split('/').pop() ?? filePath;
     const leftUri = vscode.Uri.from({ scheme: 'git-show', authority: parent, path: `/${parent.slice(0, 8)}: ${fileName}`, query: filePath });
@@ -1514,6 +1702,36 @@ export class WebviewProvider {
     } catch {
       this.log.warn(`Diff editor failed, falling back to file view: ${filePath}`);
       await this.openFileAtRevision(hash, filePath);
+    }
+  }
+
+  private async openStagedDiffEditor(filePath: string) {
+    const fileName = filePath.split('/').pop() ?? filePath;
+    const headHash = await this.getHeadHash();
+    if (!headHash) {
+      this.log.warn(`Cannot resolve HEAD for staged diff: ${filePath}`);
+      return;
+    }
+    // Left: HEAD version, Right: staged (index) version.
+    // The right-side URI uses the sentinel authority "staged" which the content
+    // provider resolves via `git show :<path>` to return the index content.
+    const leftUri = vscode.Uri.from({
+      scheme: 'git-show',
+      authority: headHash,
+      path: `/${headHash.slice(0, 8)}: ${fileName}`,
+      query: filePath,
+    });
+    const rightUri = vscode.Uri.from({
+      scheme: 'git-show',
+      authority: 'staged',
+      path: `/Staged: ${fileName}`,
+      query: filePath,
+    });
+    const title = `${filePath} (Staged)`;
+    try {
+      await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
+    } catch {
+      this.log.warn(`Staged diff editor failed: ${filePath}`);
     }
   }
 

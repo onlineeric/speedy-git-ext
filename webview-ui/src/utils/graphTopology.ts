@@ -91,9 +91,10 @@ export function calculateTopology(commits: Commit[], hiddenHashes?: Set<string>,
   // Track lanes with active connection lines passing through (freed in activeLanes but visually occupied)
   const busyLanes = new Map<number, number>();
 
-  // Collect stash commit indices during the main loop so the post-loop
-  // resolution can iterate only stashes instead of scanning all commits.
+  // Collect stash and uncommitted commit indices during the main loop so the post-loop
+  // resolution can iterate only these instead of scanning all commits.
   const stashIndices: number[] = [];
+  const uncommittedIndices: number[] = [];
 
   for (let i = 0; i < commits.length; i++) {
     const commit = commits[i];
@@ -133,15 +134,17 @@ export function calculateTopology(commits: Commit[], hiddenHashes?: Set<string>,
     const parentConnections: CommitNode['parentConnections'] = [];
     const parents = commit.parents;
 
-    // Stash commits are dead-end leaf nodes — skip parent processing so they
-    // don't pull their parent onto the stash lane. Connections are resolved post-loop.
+    // Stash and uncommitted commits are dead-end leaf nodes — skip parent processing so they
+    // don't pull their parent onto their lane. Connections are resolved post-loop.
     const isStash = commit.refs.some(r => r.type === 'stash');
+    const isUncommitted = commit.refs.some(r => r.type === 'uncommitted');
 
-    if (isStash) {
-      // No parent processing — stash connections resolved after the main loop.
-      // Mark the stash lane as busy until the parent row so the connection line
+    if (isStash || isUncommitted) {
+      // No parent processing — connections resolved after the main loop.
+      // Mark the lane as busy until the parent row so the connection line
       // prevents other commits from landing on this lane.
-      stashIndices.push(i);
+      if (isStash) stashIndices.push(i);
+      if (isUncommitted) uncommittedIndices.push(i);
       if (parents.length > 0) {
         const parentRow = fullIndexByHash.get(parents[0]);
         if (parentRow !== undefined) markBusyLane(busyLanes, assignedLane, parentRow);
@@ -309,6 +312,22 @@ export function calculateTopology(commits: Commit[], hiddenHashes?: Set<string>,
         fromLane: stashNode.lane,
         toLane: parentNode.lane,
         colorIndex: stashNode.colorIndex,
+      });
+    }
+  }
+
+  // Resolve uncommitted connections (same pattern as stash finalization above).
+  for (const idx of uncommittedIndices) {
+    const commit = commits[idx];
+    if (commit.parents.length === 0) continue;
+    const uncommittedNode = nodes.get(commit.hash);
+    const parentNode = nodes.get(commit.parents[0]);
+    if (uncommittedNode && parentNode) {
+      uncommittedNode.parentConnections.push({
+        parentHash: commit.parents[0],
+        fromLane: uncommittedNode.lane,
+        toLane: parentNode.lane,
+        colorIndex: uncommittedNode.colorIndex,
       });
     }
   }
