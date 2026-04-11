@@ -143,12 +143,33 @@ export interface GraphFilters {
   skip?: number;
 }
 
+export type FileStageState = 'staged' | 'unstaged' | 'conflicted';
+
+export type ConflictType = 'merge' | 'rebase' | 'cherry-pick';
+
+export interface ConflictState {
+  inConflict: boolean;
+  conflictType?: ConflictType;
+  conflictFiles: string[];
+}
+
+export interface UncommittedSummary {
+  stagedFiles: FileChange[];
+  unstagedFiles: FileChange[];
+  conflictFiles: FileChange[];
+  conflictType?: ConflictType;
+  stagedCount: number;
+  unstagedCount: number;
+  untrackedCount: number;
+}
+
 export interface FileChange {
   path: string;
   oldPath?: string;
   status: FileChangeStatus;
   additions?: number;
   deletions?: number;
+  stageState?: FileStageState;
 }
 
 export type FileChangeStatus =

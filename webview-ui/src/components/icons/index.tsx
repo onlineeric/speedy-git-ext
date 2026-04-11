@@ -286,6 +286,55 @@ export function ColumnsIcon({ className }: IconProps) {
   );
 }
 
+/** Up arrow (stage) — 12×12, inherits text color via currentColor */
+export function StageIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path d="M 6 2 L 6 10" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" />
+      <path d="M 3 5 L 6 2 L 9 5" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Down arrow (unstage) — 12×12, inherits text color via currentColor */
+export function UnstageIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path d="M 6 2 L 6 10" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" />
+      <path d="M 3 7 L 6 10 L 9 7" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Trash/discard icon — 12×12, inherits text color via currentColor */
+export function DiscardIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path d="M 3 3.5 L 3.5 10.5 H 8.5 L 9 3.5" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" />
+      <line x1={2} y1={3.5} x2={10} y2={3.5} stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" />
+      <path d="M 4.5 3.5 V 2 H 7.5 V 3.5" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Chevron down — 12×12, inherits text color via currentColor */
+export function ChevronDownIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path d="M 3 4.5 L 6 7.5 L 9 4.5" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Chevron right — 12×12, inherits text color via currentColor */
+export function ChevronRightIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path d="M 4.5 3 L 7.5 6 L 4.5 9" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** Filled target/bullseye for HEAD indicator — 12×12, inherits text color via currentColor */
 export function HeadIcon({ className, style }: IconProps) {
   return (

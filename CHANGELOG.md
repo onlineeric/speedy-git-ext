@@ -21,6 +21,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Uncommitted node is exempt from author, date, and text filters (always visible when changes exist), but respects branch filters — hidden when the current branch is excluded
 - Right-clicking the uncommitted node shows a minimal context menu instead of the standard commit actions, preventing irrelevant operations
 - Works in all repository states including detached HEAD, during rebase, and during merge conflicts
+- Staged and unstaged file changes displayed in separate "Staged Changes" and "Unstaged Changes" sections in the details panel, each with an accurate file count — see at a glance what will be committed vs. what won't
+- Stage or unstage individual files via action buttons next to each file in the details panel, with instant section updates
+- "Stage All" and "Unstage All" bulk action buttons on section headers for batch operations across all files in a section
+- Discard individual unstaged file changes with a confirmation dialog warning about permanent data loss; untracked files are deleted from disk upon confirmation
+- Uncommitted node right-click context menu with operations: Stash All Changes (with optional message input), Stage All Changes, Unstage All Changes, Discard All Unstaged Changes, and Open Source Control Panel
+- Context menu items conditionally shown or hidden based on current state (e.g., "Stage All" hidden when no unstaged changes exist)
+- Multi-select file picker dialog ("Select files for...") from the context menu for targeted batch stage, unstage, stash, or discard operations on a chosen subset of files
+- Merge conflict state display: a "Merge Conflicts" section appears above staged and unstaged sections during merge, rebase, or cherry-pick conflicts, listing conflicted files with an "open file" button for resolution via VS Code's native merge editor
+- Staged file content viewing shows the git index version rather than the working tree version, so users can verify exactly what will be committed
+- All destructive operation dialogs (discard, stash) include a git command preview, consistent with existing extension dialog patterns
+- Partially staged files appear in both Staged and Unstaged sections simultaneously, reflecting git's per-hunk staging model
+- Single list/tree view toggle in the top section header applies to all sections (staged, unstaged, conflicts) simultaneously
 
 ## [2.2.1] - 2026-04-08
 

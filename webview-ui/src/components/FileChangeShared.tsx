@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FileChange } from '@shared/types';
 import { UNCOMMITTED_HASH } from '@shared/types';
-import { CopyIcon, CheckIcon, FileIcon, FileCodeIcon } from './icons';
+import { CopyIcon, CheckIcon, FileIcon, FileCodeIcon, StageIcon, UnstageIcon, DiscardIcon } from './icons';
 import { rpcClient } from '../rpc/rpcClient';
 
 export function shouldShowChangeCounts(file: FileChange): boolean {
@@ -65,10 +65,12 @@ export function FileActionIcons({
   file,
   commitHash,
   parentHash,
+  onDiscardClick,
 }: {
   file: FileChange;
   commitHash: string;
   parentHash?: string;
+  onDiscardClick?: (file: FileChange) => void;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -97,8 +99,55 @@ export function FileActionIcons({
     rpcClient.openCurrentFile(file.path);
   };
 
+  const handleStage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    rpcClient.stageFiles([file.path]);
+  };
+
+  const handleUnstage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    rpcClient.unstageFiles([file.path]);
+  };
+
+  const handleDiscard = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDiscardClick?.(file);
+  };
+
+  const isUncommitted = commitHash === UNCOMMITTED_HASH;
+  const isConflicted = file.stageState === 'conflicted';
+
   return (
     <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      {isUncommitted && !isConflicted && file.stageState === 'unstaged' && (
+        <>
+          <button
+            className="rounded p-0.5 text-green-400 hover:text-green-300 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+            onClick={handleStage}
+            title="Stage file"
+          >
+            <StageIcon />
+          </button>
+          {onDiscardClick && (
+            <button
+              className="rounded p-0.5 text-red-400 hover:text-red-300 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+              onClick={handleDiscard}
+              title="Discard changes"
+            >
+              <DiscardIcon />
+            </button>
+          )}
+        </>
+      )}
+      {isUncommitted && !isConflicted && file.stageState === 'staged' && (
+        <button
+          className="rounded p-0.5 text-yellow-400 hover:text-yellow-300 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+          onClick={handleUnstage}
+          title="Unstage file"
+        >
+          <UnstageIcon />
+        </button>
+      )}
       <button
         className="rounded p-0.5 text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)]"
         onClick={handleCopyPath}
