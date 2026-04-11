@@ -50,7 +50,7 @@ export function UncommittedContextMenu({ children }: UncommittedContextMenuProps
           <ContextMenu.Content className="min-w-[200px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
             {hasAnyChanges && (
               <ContextMenu.Item className={menuItemClass} onSelect={() => setStashDialogOpen(true)}>
-                Stash All Changes
+                Stash Everything…
               </ContextMenu.Item>
             )}
             {hasUnstagedChanges && (
@@ -87,6 +87,7 @@ export function UncommittedContextMenu({ children }: UncommittedContextMenuProps
         open={stashDialogOpen}
         onOpenChange={setStashDialogOpen}
         onConfirm={handleStashConfirm}
+        title="Stash Everything"
       />
       <DiscardAllDialog
         open={discardAllDialogOpen}

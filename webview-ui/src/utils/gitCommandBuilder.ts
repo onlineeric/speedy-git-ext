@@ -185,10 +185,14 @@ export function buildRenameBranchCommand(options: RenameBranchCommandOptions): s
   return `git branch -m ${options.oldName} ${options.newName}`;
 }
 
+function quoteMessage(message: string): string {
+  return `"${message.replace(/"/g, '\\"')}"`;
+}
+
 export function buildTagCommand(options: TagCommandOptions): string {
   const parts = ['git tag'];
   if (options.message) {
-    parts.push('-a', options.name, '-m', `"${options.message.replace(/"/g, '\\"')}"`, options.hash);
+    parts.push('-a', options.name, '-m', quoteMessage(options.message), options.hash);
   } else {
     parts.push(options.name, options.hash);
   }
@@ -210,7 +214,70 @@ export interface StashWithMessageCommandOptions {
 export function buildStashWithMessageCommand(options: StashWithMessageCommandOptions): string {
   const parts = ['git stash push --include-untracked'];
   if (options.message) {
-    parts.push('-m', `"${options.message.replace(/"/g, '\\"')}"`);
+    parts.push('-m', quoteMessage(options.message));
   }
   return parts.join(' ');
+}
+
+/**
+ * Wraps a path in double quotes when it contains whitespace or shell-significant
+ * characters; returns it as-is otherwise so simple paths stay readable.
+ */
+function quotePath(path: string): string {
+  if (/[\s"'$`\\]/.test(path)) {
+    return `"${path.replace(/"/g, '\\"')}"`;
+  }
+  return path;
+}
+
+function joinPaths(paths: string[]): string {
+  return paths.map(quotePath).join(' ');
+}
+
+export function buildSelectiveStageCommand(paths: string[]): string {
+  return `git add -- ${joinPaths(paths)}`;
+}
+
+export function buildSelectiveUnstageCommand(paths: string[]): string {
+  return `git reset HEAD -- ${joinPaths(paths)}`;
+}
+
+export interface SelectiveDiscardCommandOptions {
+  trackedPaths: string[];
+  untrackedPaths: string[];
+}
+
+/**
+ * Mirrors the backend GitIndexService.discardFiles behavior:
+ *   - tracked-only          → `git checkout -- <paths>`
+ *   - tracked + untracked   → `git checkout -- <tracked> && git clean -fd -- <untracked>`
+ *   - untracked-only        → `git clean -fd -- <paths>`
+ */
+export function buildSelectiveDiscardCommand(options: SelectiveDiscardCommandOptions): string {
+  const { trackedPaths, untrackedPaths } = options;
+  const hasTracked = trackedPaths.length > 0;
+  const hasUntracked = untrackedPaths.length > 0;
+
+  const checkoutCmd = hasTracked ? `git checkout -- ${joinPaths(trackedPaths)}` : '';
+  const cleanCmd = hasUntracked ? `git clean -fd -- ${joinPaths(untrackedPaths)}` : '';
+
+  if (hasTracked && hasUntracked) return `${checkoutCmd} && ${cleanCmd}`;
+  if (hasTracked) return checkoutCmd;
+  return cleanCmd;
+}
+
+export interface SelectiveStashCommandOptions {
+  paths: string[];
+  message: string;
+  hasUntracked: boolean;
+}
+
+export function buildSelectiveStashCommand(options: SelectiveStashCommandOptions): string {
+  const { paths, message, hasUntracked } = options;
+  const pathsStr = joinPaths(paths);
+  const stashCmd = `git stash push -m ${quoteMessage(message)} -- ${pathsStr}`;
+  if (hasUntracked) {
+    return `git add -- ${pathsStr} && ${stashCmd}`;
+  }
+  return stashCmd;
 }

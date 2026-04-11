@@ -87,6 +87,7 @@ export type RequestMessage =
   | { type: 'discardFiles'; payload: { paths: string[]; includeUntracked: boolean } }
   | { type: 'discardAllUnstaged'; payload: Record<string, never> }
   | { type: 'stashWithMessage'; payload: { message?: string; paths?: string[] } }
+  | { type: 'stashSelected'; payload: { message: string; paths: string[]; addUntrackedFirst: boolean } }
   | { type: 'getConflictState'; payload: Record<string, never> }
   | { type: 'openStagedDiff'; payload: { filePath: string } };
 
@@ -152,7 +153,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   openCurrentFile: true, updatePersistedUIState: true, getAuthors: true,
   getUncommittedChanges: true,
   stageFiles: true, unstageFiles: true, stageAll: true, unstageAll: true,
-  discardFiles: true, discardAllUnstaged: true, stashWithMessage: true,
+  discardFiles: true, discardAllUnstaged: true, stashWithMessage: true, stashSelected: true,
   getConflictState: true, openStagedDiff: true,
 };
 
