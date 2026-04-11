@@ -194,3 +194,23 @@ export function buildTagCommand(options: TagCommandOptions): string {
   }
   return parts.join(' ');
 }
+
+export function buildDiscardFilesCommand(paths: string[]): string {
+  return `git checkout -- ${paths.join(' ')}`;
+}
+
+export function buildDiscardAllUnstagedCommand(): string {
+  return 'git checkout -- . && git clean -fd';
+}
+
+export interface StashWithMessageCommandOptions {
+  message?: string;
+}
+
+export function buildStashWithMessageCommand(options: StashWithMessageCommandOptions): string {
+  const parts = ['git stash push --include-untracked'];
+  if (options.message) {
+    parts.push('-m', `"${options.message.replace(/"/g, '\\"')}"`);
+  }
+  return parts.join(' ');
+}

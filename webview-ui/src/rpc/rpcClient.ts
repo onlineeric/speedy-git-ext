@@ -196,6 +196,9 @@ class RpcClient {
       case 'uncommittedChanges':
         store.setUncommittedChanges(message.payload);
         break;
+      case 'conflictState':
+        store.setConflictState(message.payload);
+        break;
     }
   }
 
@@ -505,6 +508,46 @@ class RpcClient {
   // Pagination
   loadMoreCommits(skip: number, generation: number, filters: { branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string }) {
     this.send({ type: 'loadMoreCommits', payload: { skip, generation, filters } });
+  }
+
+  stageFiles(paths: string[]) {
+    this.send({ type: 'stageFiles', payload: { paths } });
+  }
+
+  unstageFiles(paths: string[]) {
+    this.send({ type: 'unstageFiles', payload: { paths } });
+  }
+
+  stageAll() {
+    this.send({ type: 'stageAll', payload: {} });
+  }
+
+  unstageAll() {
+    this.send({ type: 'unstageAll', payload: {} });
+  }
+
+  discardFiles(paths: string[], includeUntracked: boolean) {
+    this.send({ type: 'discardFiles', payload: { paths, includeUntracked } });
+  }
+
+  discardAllUnstaged() {
+    this.send({ type: 'discardAllUnstaged', payload: {} });
+  }
+
+  stashWithMessage(message?: string) {
+    this.send({ type: 'stashWithMessage', payload: { message } });
+  }
+
+  getConflictState() {
+    this.send({ type: 'getConflictState', payload: {} });
+  }
+
+  openStagedDiff(filePath: string) {
+    this.send({ type: 'openStagedDiff', payload: { filePath } });
+  }
+
+  getUncommittedChanges() {
+    this.send({ type: 'getUncommittedChanges', payload: {} });
   }
 
   firePrefetch() {

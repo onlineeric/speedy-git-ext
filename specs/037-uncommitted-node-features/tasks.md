@@ -17,16 +17,16 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T001 Add FileStageState type ('staged' | 'unstaged' | 'conflicted'), ConflictState interface, and extend FileChange with optional stageState field in shared/types.ts
-- [ ] T002 Add new RequestMessage types (stageFiles, unstageFiles, stageAll, unstageAll, discardFiles, discardAllUnstaged, stashWithMessage, getConflictState, openStagedDiff) and modify uncommittedChanges ResponseMessage payload to use separated stagedFiles/unstagedFiles/conflictFiles arrays in shared/messages.ts
-- [ ] T003 [P] Create GitIndexService with stageFiles, unstageFiles, stageAll, unstageAll, discardFiles, and discardAllUnstaged methods using GitExecutor, all returning Result<string, GitError> in src/services/GitIndexService.ts
-- [ ] T004 [P] Add stashWithMessage(message?: string) method to GitStashService that runs git stash push --include-untracked with optional -m flag, returning Result<string, GitError> in src/services/GitStashService.ts
-- [ ] T005 [P] Modify GitDiffService.getUncommittedSummary() to return separated stagedFiles and unstagedFiles arrays (each with stageState set) instead of merged files array, keeping existing counts in src/services/GitDiffService.ts
-- [ ] T006 Add getConflictState() method to GitDiffService that checks for .git/MERGE_HEAD, .git/REBASE_HEAD, .git/CHERRY_PICK_HEAD and lists conflicted files via git diff --name-only --diff-filter=U in src/services/GitDiffService.ts
-- [ ] T007 Add RPC handlers for stageFiles, unstageFiles, stageAll, unstageAll, discardFiles, discardAllUnstaged, stashWithMessage, getConflictState, and update getUncommittedChanges and getCommitDetails handlers for new payload shape, all following mutation+sendInitialData pattern in src/WebviewProvider.ts
-- [ ] T008 [P] Add rpcClient methods: stageFiles, unstageFiles, stageAll, unstageAll, discardFiles, discardAllUnstaged, stashWithMessage, getConflictState, openStagedDiff, and update uncommittedChanges response handler for new payload in webview-ui/src/rpc/rpcClient.ts
-- [ ] T009 [P] Add command preview builder functions for stage, unstage, discard, discard-all, and stash operations in webview-ui/src/utils/gitCommandBuilder.ts
-- [ ] T010 [P] Update graphStore.setUncommittedChanges to store separated uncommittedStagedFiles, uncommittedUnstagedFiles, uncommittedConflictFiles, and conflictType, and update auto-refresh logic for the new payload shape in webview-ui/src/stores/graphStore.ts
+- [x] T001 Add FileStageState type ('staged' | 'unstaged' | 'conflicted'), ConflictState interface, and extend FileChange with optional stageState field in shared/types.ts
+- [x] T002 Add new RequestMessage types (stageFiles, unstageFiles, stageAll, unstageAll, discardFiles, discardAllUnstaged, stashWithMessage, getConflictState, openStagedDiff) and modify uncommittedChanges ResponseMessage payload to use separated stagedFiles/unstagedFiles/conflictFiles arrays in shared/messages.ts
+- [x] T003 [P] Create GitIndexService with stageFiles, unstageFiles, stageAll, unstageAll, discardFiles, and discardAllUnstaged methods using GitExecutor, all returning Result<string, GitError> in src/services/GitIndexService.ts
+- [x] T004 [P] Add stashWithMessage(message?: string) method to GitStashService that runs git stash push --include-untracked with optional -m flag, returning Result<string, GitError> in src/services/GitStashService.ts
+- [x] T005 [P] Modify GitDiffService.getUncommittedSummary() to return separated stagedFiles and unstagedFiles arrays (each with stageState set) instead of merged files array, keeping existing counts in src/services/GitDiffService.ts
+- [x] T006 Add getConflictState() method to GitDiffService that checks for .git/MERGE_HEAD, .git/REBASE_HEAD, .git/CHERRY_PICK_HEAD and lists conflicted files via git diff --name-only --diff-filter=U in src/services/GitDiffService.ts
+- [x] T007 Add RPC handlers for stageFiles, unstageFiles, stageAll, unstageAll, discardFiles, discardAllUnstaged, stashWithMessage, getConflictState, and update getUncommittedChanges and getCommitDetails handlers for new payload shape, all following mutation+sendInitialData pattern in src/WebviewProvider.ts
+- [x] T008 [P] Add rpcClient methods: stageFiles, unstageFiles, stageAll, unstageAll, discardFiles, discardAllUnstaged, stashWithMessage, getConflictState, openStagedDiff, and update uncommittedChanges response handler for new payload in webview-ui/src/rpc/rpcClient.ts
+- [x] T009 [P] Add command preview builder functions for stage, unstage, discard, discard-all, and stash operations in webview-ui/src/utils/gitCommandBuilder.ts
+- [x] T010 [P] Update graphStore.setUncommittedChanges to store separated uncommittedStagedFiles, uncommittedUnstagedFiles, uncommittedConflictFiles, and conflictType, and update auto-refresh logic for the new payload shape in webview-ui/src/stores/graphStore.ts
 
 **Checkpoint**: Backend services, RPC handlers, and frontend data layer are complete. All message types defined. Ready for UI implementation.
 
@@ -40,8 +40,8 @@
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Refactor CommitDetailsPanel to render separate "Staged Changes (X files)" and "Unstaged Changes (X files)" collapsible sections for UNCOMMITTED_HASH, reading from graphStore's separated arrays, with a single list/tree view toggle in the top section header controlling all sections in webview-ui/src/components/CommitDetailsPanel.tsx
-- [ ] T012 [US1] Hide empty sections — only show "Staged Changes" section when stagedFiles is non-empty, only show "Unstaged Changes" section when unstagedFiles is non-empty in webview-ui/src/components/CommitDetailsPanel.tsx
+- [x] T011 [US1] Refactor CommitDetailsPanel to render separate "Staged Changes (X files)" and "Unstaged Changes (X files)" collapsible sections for UNCOMMITTED_HASH, reading from graphStore's separated arrays, with a single list/tree view toggle in the top section header controlling all sections in webview-ui/src/components/CommitDetailsPanel.tsx
+- [x] T012 [US1] Hide empty sections — only show "Staged Changes" section when stagedFiles is non-empty, only show "Unstaged Changes" section when unstagedFiles is non-empty in webview-ui/src/components/CommitDetailsPanel.tsx
 
 **Checkpoint**: Selecting the uncommitted node shows separated staged/unstaged sections. MVP deliverable.
 
@@ -57,7 +57,7 @@
 
 ### Implementation for User Story 2
 
-- [ ] T013 [US2] Add stage button (up arrow icon) to unstaged files and unstage button (down arrow icon) to staged files in FileActionIcons component, conditionally rendered based on stageState, with onClick calling rpcClient.stageFiles/unstageFiles in webview-ui/src/components/FileChangeShared.tsx
+- [x] T013 [US2] Add stage button (up arrow icon) to unstaged files and unstage button (down arrow icon) to staged files in FileActionIcons component, conditionally rendered based on stageState, with onClick calling rpcClient.stageFiles/unstageFiles in webview-ui/src/components/FileChangeShared.tsx
 
 **Checkpoint**: Per-file stage/unstage works from the details panel. Combined with US1, this is a fully functional staging workflow.
 
@@ -73,7 +73,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T014 [US3] Add "Stage All" button to the Unstaged Changes section header and "Unstage All" button to the Staged Changes section header, calling rpcClient.stageAll/unstageAll on click in webview-ui/src/components/CommitDetailsPanel.tsx
+- [x] T014 [US3] Add "Stage All" button to the Unstaged Changes section header and "Unstage All" button to the Staged Changes section header, calling rpcClient.stageAll/unstageAll on click in webview-ui/src/components/CommitDetailsPanel.tsx
 
 **Checkpoint**: Bulk stage/unstage from section headers works.
 
@@ -89,8 +89,8 @@
 
 ### Implementation for User Story 4
 
-- [ ] T015 [P] [US4] Create DiscardDialog component with destructive warning, CommandPreview showing the git command, confirm/cancel buttons, using Radix AlertDialog and danger variant styling in webview-ui/src/components/DiscardDialog.tsx
-- [ ] T016 [US4] Add discard button (trash/revert icon) to unstaged files only in FileActionIcons, with onClick opening DiscardDialog, and on confirm calling rpcClient.discardFiles in webview-ui/src/components/FileChangeShared.tsx
+- [x] T015 [P] [US4] Create DiscardDialog component with destructive warning, CommandPreview showing the git command, confirm/cancel buttons, using Radix AlertDialog and danger variant styling in webview-ui/src/components/DiscardDialog.tsx
+- [x] T016 [US4] Add discard button (trash/revert icon) to unstaged files only in FileActionIcons, with onClick opening DiscardDialog, and on confirm calling rpcClient.discardFiles in webview-ui/src/components/FileChangeShared.tsx
 
 **Checkpoint**: Per-file discard with confirmation works for unstaged files.
 
@@ -106,9 +106,9 @@
 
 ### Implementation for User Story 5
 
-- [ ] T017 [P] [US5] Create StashDialog component with message text input, CommandPreview showing git stash command, confirm/cancel buttons, using Radix AlertDialog in webview-ui/src/components/StashDialog.tsx
-- [ ] T018 [P] [US5] Create DiscardAllDialog component with destructive warning for discarding all unstaged changes, CommandPreview, confirm/cancel buttons, using Radix AlertDialog with danger variant in webview-ui/src/components/DiscardAllDialog.tsx
-- [ ] T019 [US5] Expand UncommittedContextMenu with menu items for Stash All Changes, Stage All Changes, Unstage All Changes, Discard All Unstaged Changes, Select files for..., Open Source Control Panel, with conditional visibility based on uncommittedCounts from graphStore, separator groups, and dialog state management for StashDialog and DiscardAllDialog in webview-ui/src/components/UncommittedContextMenu.tsx
+- [x] T017 [P] [US5] Create StashDialog component with message text input, CommandPreview showing git stash command, confirm/cancel buttons, using Radix AlertDialog in webview-ui/src/components/StashDialog.tsx
+- [x] T018 [P] [US5] Create DiscardAllDialog component with destructive warning for discarding all unstaged changes, CommandPreview, confirm/cancel buttons, using Radix AlertDialog with danger variant in webview-ui/src/components/DiscardAllDialog.tsx
+- [x] T019 [US5] Expand UncommittedContextMenu with menu items for Stash All Changes, Stage All Changes, Unstage All Changes, Discard All Unstaged Changes, Select files for..., Open Source Control Panel, with conditional visibility based on uncommittedCounts from graphStore, separator groups, and dialog state management for StashDialog and DiscardAllDialog in webview-ui/src/components/UncommittedContextMenu.tsx
 
 **Checkpoint**: Full context menu with all operations works from the graph node.
 
@@ -124,8 +124,8 @@
 
 ### Implementation for User Story 6
 
-- [ ] T020 [US6] Create FilePickerDialog component with grouped checkboxes (staged/unstaged sections with headers), select-all per section, action buttons (Stage, Unstage, Stash, Discard) disabled when no files selected, Discard showing sub-confirmation, using Radix Dialog in webview-ui/src/components/FilePickerDialog.tsx
-- [ ] T021 [US6] Wire FilePickerDialog to UncommittedContextMenu "Select files for..." menu item, passing current uncommitted files from graphStore and handling action callbacks in webview-ui/src/components/UncommittedContextMenu.tsx
+- [x] T020 [US6] Create FilePickerDialog component with grouped checkboxes (staged/unstaged sections with headers), select-all per section, action buttons (Stage, Unstage, Stash, Discard) disabled when no files selected, Discard showing sub-confirmation, using Radix Dialog in webview-ui/src/components/FilePickerDialog.tsx
+- [x] T021 [US6] Wire FilePickerDialog to UncommittedContextMenu "Select files for..." menu item, passing current uncommitted files from graphStore and handling action callbacks in webview-ui/src/components/UncommittedContextMenu.tsx
 
 **Checkpoint**: File picker with grouped selection and batch operations works.
 
@@ -141,8 +141,8 @@
 
 ### Implementation for User Story 7
 
-- [ ] T022 [US7] Add "Merge Conflicts (X files)" section above Staged/Unstaged sections in CommitDetailsPanel, rendered when conflictFiles is non-empty, reading conflictType from graphStore for the section label in webview-ui/src/components/CommitDetailsPanel.tsx
-- [ ] T023 [US7] Ensure FileActionIcons shows only "open file" button (no stage/unstage/discard) when file stageState is 'conflicted' in webview-ui/src/components/FileChangeShared.tsx
+- [x] T022 [US7] Add "Merge Conflicts (X files)" section above Staged/Unstaged sections in CommitDetailsPanel, rendered when conflictFiles is non-empty, reading conflictType from graphStore for the section label in webview-ui/src/components/CommitDetailsPanel.tsx
+- [x] T023 [US7] Ensure FileActionIcons shows only "open file" button (no stage/unstage/discard) when file stageState is 'conflicted' in webview-ui/src/components/FileChangeShared.tsx
 
 **Checkpoint**: Conflict state is displayed correctly; conflict files have open-only actions.
 
@@ -158,8 +158,8 @@
 
 ### Implementation for User Story 8
 
-- [ ] T024 [US8] Add staged file content support to openDiff and openFile RPC handlers — when a 'staged' flag is passed, use git show :<path> (index version) instead of working tree, handling the openStagedDiff request type (defined in T002) in src/WebviewProvider.ts
-- [ ] T025 [US8] Update FileActionIcons to pass stageState context when opening file content, so staged files call rpcClient.openStagedDiff (defined in T008) and unstaged files use the existing openDiff path in webview-ui/src/components/FileChangeShared.tsx
+- [x] T024 [US8] Add staged file content support to openDiff and openFile RPC handlers — when a 'staged' flag is passed, use git show :<path> (index version) instead of working tree, handling the openStagedDiff request type (defined in T002) in src/WebviewProvider.ts
+- [x] T025 [US8] Update FileActionIcons to pass stageState context when opening file content, so staged files call rpcClient.openStagedDiff (defined in T008) and unstaged files use the existing openDiff path in webview-ui/src/components/FileChangeShared.tsx
 
 **Checkpoint**: Staged files show correct content from git index. Unstaged files show working tree content.
 
@@ -169,11 +169,11 @@
 
 **Purpose**: Final validation and cleanup across all stories.
 
-- [ ] T026 Run pnpm typecheck and fix any TypeScript errors across all modified files
-- [ ] T027 Run pnpm lint and fix any ESLint violations across all modified files
-- [ ] T028 Run pnpm build and verify clean production build
-- [ ] T029 Run pnpm test and fix any failing unit tests
-- [ ] T030 Run quickstart.md smoke test validation — perform full manual test sequence
+- [x] T026 Run pnpm typecheck and fix any TypeScript errors across all modified files
+- [x] T027 Run pnpm lint and fix any ESLint violations across all modified files
+- [x] T028 Run pnpm build and verify clean production build
+- [x] T029 Run pnpm test and fix any failing unit tests
+- [x] T030 Run quickstart.md smoke test validation — perform full manual test sequence
 
 ---
 

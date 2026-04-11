@@ -85,6 +85,20 @@ export class GitStashService {
     return ok('Stashed changes');
   }
 
+  async stashWithMessage(message?: string): Promise<Result<string>> {
+    this.log.info(`Stash with message: ${message ?? '(none)'}`);
+    const args = ['stash', 'push', '--include-untracked'];
+    if (message) {
+      args.push('-m', message);
+    }
+    const result = await this.executor.execute({
+      args,
+      cwd: this.workspacePath,
+    });
+    if (!result.success) return result;
+    return ok(message ? `Stashed changes: ${message}` : 'Stashed changes');
+  }
+
   async dropStash(index: number): Promise<Result<string>> {
     this.log.info(`Drop stash@{${index}}`);
     if (index < 0 || !Number.isInteger(index)) {

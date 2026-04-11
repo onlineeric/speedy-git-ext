@@ -1,7 +1,7 @@
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
-import type { CommitDetails, FileChange, FileChangeStatus } from '../../shared/types.js';
+import type { CommitDetails, ConflictType, FileChange, FileChangeStatus, FileStageState, UncommittedSummary } from '../../shared/types.js';
 import { validateHash, validateFilePath } from '../utils/gitValidation.js';
 
 const NULL_CHAR = '\x00';
@@ -140,10 +140,10 @@ export class GitDiffService {
   async getUncommittedDetails(): Promise<Result<FileChange[]>> {
     const summary = await this.getUncommittedSummary();
     if (!summary.success) return summary;
-    return ok(summary.value.files);
+    return ok([...summary.value.stagedFiles, ...summary.value.unstagedFiles, ...summary.value.conflictFiles]);
   }
 
-  async getUncommittedSummary(): Promise<Result<{ files: FileChange[]; stagedCount: number; unstagedCount: number; untrackedCount: number }>> {
+  async getUncommittedSummary(): Promise<Result<UncommittedSummary>> {
     this.log.info('Getting uncommitted changes summary');
     const [stagedResult, stagedNumstatResult, unstagedResult, unstagedNumstatResult, untrackedResult] = await Promise.all([
       this.executor.execute({ args: ['diff', '--cached', '--name-status', '-z'], cwd: this.workspacePath }),
@@ -167,20 +167,71 @@ export class GitDiffService {
       applyNumstatToFiles(unstagedFiles, unstagedNumstatResult.value.stdout);
     }
 
-    // Merge files: unstaged takes precedence over staged for overlapping paths
-    const unstagedPathSet = new Set(unstagedFiles.map((f) => f.path));
-    const files: FileChange[] = [
-      ...stagedFiles.filter((f) => !unstagedPathSet.has(f.path)),
-      ...unstagedFiles,
-      ...untrackedPaths.map((path): FileChange => ({ path, status: 'untracked' })),
-    ];
+    const tagStageState = (files: FileChange[], state: FileStageState): FileChange[] =>
+      files.map(f => ({ ...f, stageState: state }));
+
+    const taggedStaged = tagStageState(stagedFiles, 'staged');
+    const taggedUnstaged = tagStageState(unstagedFiles, 'unstaged');
+    const taggedUntracked: FileChange[] = untrackedPaths.map((path): FileChange => ({
+      path, status: 'untracked', stageState: 'unstaged',
+    }));
+
+    const conflictState = await this.detectConflictState();
+    const conflictPathSet = new Set(conflictState.conflictFiles);
+
+    const conflictFiles: FileChange[] = conflictState.conflictFiles.map((path): FileChange => ({
+      path, status: 'modified', stageState: 'conflicted',
+    }));
+
+    const filteredStaged = conflictPathSet.size > 0
+      ? taggedStaged.filter(f => !conflictPathSet.has(f.path))
+      : taggedStaged;
+    const filteredUnstaged = conflictPathSet.size > 0
+      ? taggedUnstaged.filter(f => !conflictPathSet.has(f.path))
+      : taggedUnstaged;
 
     return ok({
-      files,
+      stagedFiles: filteredStaged,
+      unstagedFiles: [...filteredUnstaged, ...taggedUntracked],
+      conflictFiles,
+      conflictType: conflictState.conflictType,
       stagedCount: stagedFiles.length,
       unstagedCount: unstagedFiles.length,
       untrackedCount: untrackedPaths.length,
     });
+  }
+
+  private async detectConflictState(): Promise<{ conflictType?: ConflictType; conflictFiles: string[] }> {
+    // --verify --quiet exits non-zero when the ref doesn't exist, so .success is a reliable signal
+    const [mergeHead, rebaseHead, cherryPickHead] = await Promise.all([
+      this.executor.execute({ args: ['rev-parse', '--verify', '--quiet', 'MERGE_HEAD'], cwd: this.workspacePath }),
+      this.executor.execute({ args: ['rev-parse', '--verify', '--quiet', 'REBASE_HEAD'], cwd: this.workspacePath }),
+      this.executor.execute({ args: ['rev-parse', '--verify', '--quiet', 'CHERRY_PICK_HEAD'], cwd: this.workspacePath }),
+    ]);
+
+    let conflictType: ConflictType | undefined;
+    if (mergeHead.success) {
+      conflictType = 'merge';
+    } else if (rebaseHead.success) {
+      conflictType = 'rebase';
+    } else if (cherryPickHead.success) {
+      conflictType = 'cherry-pick';
+    }
+
+    if (!conflictType) {
+      return { conflictFiles: [] };
+    }
+
+    const conflictResult = await this.executor.execute({
+      args: ['diff', '--name-only', '--diff-filter=U'],
+      cwd: this.workspacePath,
+    });
+
+    const conflictFiles = conflictResult.success
+      ? conflictResult.value.stdout.trim().split('\n').filter(Boolean)
+      : [];
+
+    return { conflictType, conflictFiles };
   }
 }
 

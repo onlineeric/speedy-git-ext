@@ -14,6 +14,7 @@ import { GitRebaseService } from './services/GitRebaseService.js';
 import { GitSignatureService } from './services/GitSignatureService.js';
 import { GitSubmoduleService } from './services/GitSubmoduleService.js';
 import { GitWorktreeService } from './services/GitWorktreeService.js';
+import { GitIndexService } from './services/GitIndexService.js';
 import { GitShowContentProvider } from './GitShowContentProvider.js';
 import { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
 import { GitWatcherService } from './services/GitWatcherService.js';
@@ -34,6 +35,7 @@ export class ExtensionController {
   private gitSignatureService: GitSignatureService | undefined;
   private gitSubmoduleService: GitSubmoduleService | undefined;
   private gitWorktreeService: GitWorktreeService | undefined;
+  private gitIndexService: GitIndexService | undefined;
   private contentProviderRegistration: vscode.Disposable | undefined;
   private gitWatcherService: GitWatcherService | undefined;
   private gitRepoDiscoveryService: GitRepoDiscoveryService | undefined;
@@ -119,6 +121,7 @@ export class ExtensionController {
     this.gitSignatureService = new GitSignatureService(workspacePath, this.log);
     this.gitSubmoduleService = new GitSubmoduleService(workspacePath, this.log);
     this.gitWorktreeService = new GitWorktreeService(workspacePath, this.log);
+    this.gitIndexService = new GitIndexService(workspacePath, this.log);
 
     this.gitWatcherService?.setRepoPath(workspacePath);
 
@@ -137,6 +140,7 @@ export class ExtensionController {
         this.gitSignatureService,
         this.gitSubmoduleService,
         this.gitWorktreeService!,
+        this.gitIndexService!,
         workspacePath
       );
     }
@@ -201,6 +205,7 @@ export class ExtensionController {
         this.gitSignatureService!,
         this.gitSubmoduleService!,
         this.gitWorktreeService!,
+        this.gitIndexService!,
         this.log,
         this.gitRepoDiscoveryService,
         workspacePath

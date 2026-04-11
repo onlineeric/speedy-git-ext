@@ -9,6 +9,8 @@ import type {
   CommitListMode,
   CommitTableLayout,
   CommitSignatureInfo,
+  ConflictState,
+  ConflictType,
   ContainingBranchesResult,
   DetailsPanelPosition,
   FileChange,
@@ -24,6 +26,7 @@ import type {
   Submodule,
   SubmoduleNavEntry,
   UserSettings,
+  UncommittedSummary,
   WorktreeInfo,
 } from '@shared/types';
 import {
@@ -128,7 +131,10 @@ interface GraphStore {
   authorListLoading: boolean;
   worktreeByHead: Map<string, WorktreeInfo>;
   containingBranchesCache: Map<string, ContainingBranchesResult>;
-  uncommittedFiles: FileChange[];
+  uncommittedStagedFiles: FileChange[];
+  uncommittedUnstagedFiles: FileChange[];
+  uncommittedConflictFiles: FileChange[];
+  conflictType?: ConflictType;
   uncommittedCounts: { stagedCount: number; unstagedCount: number; untrackedCount: number };
   hasUncommittedChanges: boolean;
   hiddenCommitHashes: Set<string>;
@@ -196,7 +202,8 @@ interface GraphStore {
   prevMatch: () => void;
   setAuthorList: (authors: Author[]) => void;
   setAuthorListLoading: (loading: boolean) => void;
-  setUncommittedChanges: (payload: { files: FileChange[]; stagedCount: number; unstagedCount: number; untrackedCount: number }) => void;
+  setUncommittedChanges: (payload: UncommittedSummary) => void;
+  setConflictState: (state: ConflictState) => void;
   recomputeVisibility: () => void;
   resetAllFilters: (options?: { preserveBranches?: boolean }) => void;
   setSubmodules: (submodules: Submodule[], stack?: SubmoduleNavEntry[]) => void;
@@ -396,7 +403,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   worktreeList: [],
   worktreeByHead: new Map(),
   containingBranchesCache: new Map(),
-  uncommittedFiles: [],
+  uncommittedStagedFiles: [],
+  uncommittedUnstagedFiles: [],
+  uncommittedConflictFiles: [],
+  conflictType: undefined,
   uncommittedCounts: { stagedCount: 0, unstagedCount: 0, untrackedCount: 0 },
   hasUncommittedChanges: false,
   hiddenCommitHashes: new Set<string>(),
@@ -763,6 +773,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setUncommittedChanges: (payload) => {
     const hasChanges = payload.stagedCount + payload.unstagedCount + payload.untrackedCount > 0;
     const counts = { stagedCount: payload.stagedCount, unstagedCount: payload.unstagedCount, untrackedCount: payload.untrackedCount };
+    const allFiles = [...payload.stagedFiles, ...payload.unstagedFiles, ...payload.conflictFiles];
     const { commits, stashes, filters, branches } = get();
     const hiddenCommitHashes = computeHiddenCommitHashes(commits, filters);
     const uncommitted: UncommittedContext = { hasUncommittedChanges: hasChanges, counts, branches };
@@ -772,7 +783,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
       : -1;
     set({
-      uncommittedFiles: payload.files,
+      uncommittedStagedFiles: payload.stagedFiles,
+      uncommittedUnstagedFiles: payload.unstagedFiles,
+      uncommittedConflictFiles: payload.conflictFiles,
+      conflictType: payload.conflictType,
       uncommittedCounts: counts,
       hasUncommittedChanges: hasChanges,
       mergedCommits,
@@ -796,14 +810,18 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         committerDate: Date.now(),
         subject: buildUncommittedSubject(counts.stagedCount, counts.unstagedCount, counts.untrackedCount),
         body: '',
-        files: payload.files,
-        stats: payload.files.reduce((acc, f) => ({
+        files: allFiles,
+        stats: allFiles.reduce((acc, f) => ({
           additions: acc.additions + (f.additions ?? 0),
           deletions: acc.deletions + (f.deletions ?? 0),
         }), { additions: 0, deletions: 0 }),
       };
       set({ commitDetails: details });
     }
+  },
+  setConflictState: (_state) => {
+    // Conflict state is primarily delivered via uncommittedChanges payload;
+    // this handler is available for standalone conflict state queries
   },
   recomputeVisibility: () => {
     const { commits, stashes, filters } = get();

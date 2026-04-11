@@ -42,14 +42,14 @@ function createProvider(
     warn: vi.fn(),
     error: vi.fn(),
     debug: vi.fn(),
-  } as unknown as ConstructorParameters<typeof WebviewProvider>[14];
+  } as unknown as ConstructorParameters<typeof WebviewProvider>[15];
   const repoDiscovery = {
     getRepos: () => [
       { path: '/repo-a', name: 'repo-a', displayName: 'repo-a' },
       { path: '/repo-b', name: 'repo-b', displayName: 'repo-b' },
     ],
     getActiveRepoPath: () => currentRepoPath,
-  } as unknown as ConstructorParameters<typeof WebviewProvider>[15];
+  } as unknown as ConstructorParameters<typeof WebviewProvider>[16];
 
   const provider = new WebviewProvider(
     extensionContext,
@@ -66,6 +66,7 @@ function createProvider(
     emptyDependency as ConstructorParameters<typeof WebviewProvider>[11],
     emptyDependency as ConstructorParameters<typeof WebviewProvider>[12],
     emptyDependency as ConstructorParameters<typeof WebviewProvider>[13],
+    emptyDependency as ConstructorParameters<typeof WebviewProvider>[14],
     log,
     repoDiscovery,
     currentRepoPath,

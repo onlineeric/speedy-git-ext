@@ -5,10 +5,11 @@ import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { formatRelativeDate } from '../utils/formatDate';
 import { renderInlineCode } from '../utils/inlineCodeRenderer';
-import { ListViewIcon, TreeViewIcon, CloseIcon, MoveRightIcon, MoveBottomIcon } from './icons';
+import { ListViewIcon, TreeViewIcon, CloseIcon, MoveRightIcon, MoveBottomIcon, ChevronDownIcon, ChevronRightIcon } from './icons';
 import { FileChangesTreeView } from './FileChangesTreeView';
 import { FileStatusBadge, FileChangeIndicators, FileActionIcons } from './FileChangeShared';
 import { AuthorBadge } from './AuthorBadge';
+import { DiscardDialog } from './DiscardDialog';
 
 const MIN_SIZE = 120;
 const MIN_GRAPH_WIDTH = 200;
@@ -418,6 +419,10 @@ function FileChangesList({
 }) {
   const fileViewMode = useGraphStore((state) => state.fileViewMode);
   const setFileViewMode = useGraphStore((state) => state.setFileViewMode);
+  const stagedFiles = useGraphStore((state) => state.uncommittedStagedFiles);
+  const unstagedFiles = useGraphStore((state) => state.uncommittedUnstagedFiles);
+  const conflictFiles = useGraphStore((state) => state.uncommittedConflictFiles);
+  const conflictType = useGraphStore((state) => state.conflictType);
 
   const handleSetFileViewMode = (mode: FileViewMode) => {
     setFileViewMode(mode);
@@ -426,7 +431,11 @@ function FileChangesList({
 
   const handleFileClick = (file: FileChange) => {
     if (details.hash === UNCOMMITTED_HASH) {
-      rpcClient.openDiff(details.hash, file.path, undefined, file.status);
+      if (file.stageState === 'staged') {
+        rpcClient.openStagedDiff(file.path);
+      } else {
+        rpcClient.openDiff(details.hash, file.path, undefined, file.status);
+      }
       return;
     }
     if (file.status === 'deleted') {
@@ -439,28 +448,101 @@ function FileChangesList({
     }
   };
 
+  const [discardFile, setDiscardFile] = useState<FileChange | null>(null);
+
+  const handleDiscardConfirm = () => {
+    if (discardFile) {
+      const includeUntracked = discardFile.status === 'untracked';
+      rpcClient.discardFiles([discardFile.path], includeUntracked);
+      setDiscardFile(null);
+    }
+  };
+
+  const isUncommitted = details.hash === UNCOMMITTED_HASH;
+
+  const viewToggle = (
+    <span className="flex items-center gap-0.5">
+      <button
+        className={`rounded p-0.5 ${fileViewMode === 'list' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
+        onClick={() => handleSetFileViewMode('list')}
+        title="List view"
+      >
+        <ListViewIcon size={16} />
+      </button>
+      <button
+        className={`rounded p-0.5 ${fileViewMode === 'tree' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
+        onClick={() => handleSetFileViewMode('tree')}
+        title="Tree view"
+      >
+        <TreeViewIcon size={16} />
+      </button>
+    </span>
+  );
+
+  if (isUncommitted) {
+    return (
+      <div className={`px-3 py-2 ${splitLayout ? 'h-full' : ''}`}>
+        <div className="mb-1 flex items-center gap-2">
+          <span className="text-xs text-[var(--vscode-descriptionForeground)]">
+            {details.files.length} file{details.files.length !== 1 ? 's' : ''} changed
+          </span>
+          {viewToggle}
+        </div>
+        {conflictFiles.length > 0 && (
+          <UncommittedFileSection
+            title={`${conflictType === 'rebase' ? 'Rebase' : conflictType === 'cherry-pick' ? 'Cherry-pick' : 'Merge'} Conflicts`}
+            files={conflictFiles}
+            commitHash={details.hash}
+            parentHash={details.parents[0]}
+            onFileClick={handleFileClick}
+            fileViewMode={fileViewMode}
+            variant="conflict"
+          />
+        )}
+        {stagedFiles.length > 0 && (
+          <UncommittedFileSection
+            title="Staged Changes"
+            files={stagedFiles}
+            commitHash={details.hash}
+            parentHash={details.parents[0]}
+            onFileClick={handleFileClick}
+            fileViewMode={fileViewMode}
+            variant="staged"
+            onBulkAction={() => rpcClient.unstageAll()}
+            bulkActionLabel="Unstage All"
+          />
+        )}
+        {unstagedFiles.length > 0 && (
+          <UncommittedFileSection
+            title="Unstaged Changes"
+            files={unstagedFiles}
+            commitHash={details.hash}
+            parentHash={details.parents[0]}
+            onFileClick={handleFileClick}
+            fileViewMode={fileViewMode}
+            variant="unstaged"
+            onBulkAction={() => rpcClient.stageAll()}
+            bulkActionLabel="Stage All"
+            onDiscardClick={setDiscardFile}
+          />
+        )}
+        <DiscardDialog
+          open={discardFile !== null}
+          onOpenChange={(open) => { if (!open) setDiscardFile(null); }}
+          file={discardFile}
+          onConfirm={handleDiscardConfirm}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={`px-3 py-2 ${splitLayout ? 'h-full' : ''}`}>
       <div className="mb-1 flex items-center gap-2">
         <span className="text-xs text-[var(--vscode-descriptionForeground)]">
           {details.files.length} file{details.files.length !== 1 ? 's' : ''} changed
         </span>
-        <span className="flex items-center gap-0.5">
-          <button
-            className={`rounded p-0.5 ${fileViewMode === 'list' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
-            onClick={() => handleSetFileViewMode('list')}
-            title="List view"
-          >
-            <ListViewIcon size={16} />
-          </button>
-          <button
-            className={`rounded p-0.5 ${fileViewMode === 'tree' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
-            onClick={() => handleSetFileViewMode('tree')}
-            title="Tree view"
-          >
-            <TreeViewIcon size={16} />
-          </button>
-        </span>
+        {viewToggle}
       </div>
       {fileViewMode === 'list' ? (
         <div className="space-y-0.5">
@@ -486,16 +568,98 @@ function FileChangesList({
   );
 }
 
+function UncommittedFileSection({
+  title,
+  files,
+  commitHash,
+  parentHash,
+  onFileClick,
+  fileViewMode,
+  variant,
+  onBulkAction,
+  bulkActionLabel,
+  onDiscardClick,
+}: {
+  title: string;
+  files: FileChange[];
+  commitHash: string;
+  parentHash?: string;
+  onFileClick: (file: FileChange) => void;
+  fileViewMode: FileViewMode;
+  variant: 'staged' | 'unstaged' | 'conflict';
+  onBulkAction?: () => void;
+  bulkActionLabel?: string;
+  onDiscardClick?: (file: FileChange) => void;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  const variantColor =
+    variant === 'conflict'
+      ? 'text-red-400'
+      : variant === 'staged'
+        ? 'text-green-400'
+        : 'text-[var(--vscode-descriptionForeground)]';
+
+  return (
+    <div className="mb-2">
+      <div className="flex items-center gap-1 py-1">
+        <button
+          className="flex items-center gap-1 text-xs font-medium hover:text-[var(--vscode-foreground)]"
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          {collapsed ? <ChevronRightIcon /> : <ChevronDownIcon />}
+          <span className={variantColor}>{title}</span>
+          <span className="text-[var(--vscode-descriptionForeground)]">({files.length})</span>
+        </button>
+        {onBulkAction && bulkActionLabel && (
+          <button
+            className="ml-auto text-[10px] rounded px-1.5 py-0.5 text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)]"
+            onClick={onBulkAction}
+            title={bulkActionLabel}
+          >
+            {bulkActionLabel}
+          </button>
+        )}
+      </div>
+      {!collapsed && (
+        fileViewMode === 'list' ? (
+          <div className="space-y-0.5">
+            {files.map((file) => (
+              <FileChangeRow
+                key={`${variant}-${file.path}`}
+                file={file}
+                onFileNameClick={() => onFileClick(file)}
+                commitHash={commitHash}
+                parentHash={parentHash}
+                onDiscardClick={onDiscardClick}
+              />
+            ))}
+          </div>
+        ) : (
+          <FileChangesTreeView
+            files={files}
+            commitHash={commitHash}
+            parentHash={parentHash}
+            onFileNameClick={onFileClick}
+          />
+        )
+      )}
+    </div>
+  );
+}
+
 function FileChangeRow({
   file,
   onFileNameClick,
   commitHash,
   parentHash,
+  onDiscardClick,
 }: {
   file: FileChange;
   onFileNameClick: () => void;
   commitHash: string;
   parentHash?: string;
+  onDiscardClick?: (file: FileChange) => void;
 }) {
   const fileTitle = file.oldPath
     ? `${file.path} ← ${file.oldPath}`
@@ -523,6 +687,7 @@ function FileChangeRow({
         file={file}
         commitHash={commitHash}
         parentHash={parentHash}
+        onDiscardClick={onDiscardClick}
       />
     </div>
   );
