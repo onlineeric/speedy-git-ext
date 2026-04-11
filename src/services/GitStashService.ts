@@ -103,6 +103,53 @@ export class GitStashService {
     return ok(message ? `Stashed changes: ${message}` : 'Stashed changes');
   }
 
+  /**
+   * Stash a user-selected subset of uncommitted files. When
+   * `addUntrackedFirst` is true, first runs `git add --` on the paths because
+   * `git stash push -- <paths>` does not include untracked files via `-u`.
+   * If the stash push fails after a successful add, returns an augmented
+   * error that names both steps so the dialog can show the tree state.
+   */
+  async stashSelected(
+    message: string,
+    paths: string[],
+    addUntrackedFirst: boolean,
+  ): Promise<Result<string>> {
+    this.log.info(
+      `Stash selected: ${paths.length} file(s), addUntrackedFirst=${addUntrackedFirst}, message="${message}"`,
+    );
+
+    if (paths.length === 0) {
+      return err(new GitError('stashSelected: no paths provided', 'VALIDATION_ERROR'));
+    }
+
+    if (addUntrackedFirst) {
+      const addResult = await this.executor.execute({
+        args: ['add', '--', ...paths],
+        cwd: this.workspacePath,
+      });
+      if (!addResult.success) return addResult;
+    }
+
+    const stashResult = await this.executor.execute({
+      args: ['stash', 'push', '-m', message, '--', ...paths],
+      cwd: this.workspacePath,
+    });
+
+    if (!stashResult.success) {
+      if (addUntrackedFirst) {
+        const augmented = new GitError(
+          `git add succeeded; git stash push failed with: ${stashResult.error.message}. Selected untracked files are now staged.`,
+          stashResult.error.code,
+        );
+        return err(augmented);
+      }
+      return stashResult;
+    }
+
+    return ok(`Stashed changes: ${message}`);
+  }
+
   async dropStash(index: number): Promise<Result<string>> {
     this.log.info(`Drop stash@{${index}}`);
     if (index < 0 || !Number.isInteger(index)) {

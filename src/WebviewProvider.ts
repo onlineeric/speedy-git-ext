@@ -1585,6 +1585,20 @@ export class WebviewProvider {
         }
         break;
       }
+      case 'stashSelected': {
+        const result = await this.gitStashService.stashSelected(
+          message.payload.message,
+          message.payload.paths,
+          message.payload.addUntrackedFirst
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData(undefined, true);
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
       case 'getConflictState': {
         const result = await this.gitDiffService.getUncommittedSummary();
         if (result.success) {
