@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
-## [2.3.0] - 2026-04-11
+## [2.3.0] - pre-release - 2026-04-11
 
 ### Added
 - Uncommitted changes node at the top of the git graph showing current working tree state (staged, unstaged, and untracked files) as a visually distinct node connected to HEAD
