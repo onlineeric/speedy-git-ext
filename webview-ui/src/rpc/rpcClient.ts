@@ -534,8 +534,8 @@ class RpcClient {
     this.send({ type: 'discardAllUnstaged', payload: {} });
   }
 
-  stashWithMessage(message?: string) {
-    this.send({ type: 'stashWithMessage', payload: { message } });
+  stashWithMessage(message?: string, paths?: string[]) {
+    this.send({ type: 'stashWithMessage', payload: { message, paths } });
   }
 
   getConflictState() {

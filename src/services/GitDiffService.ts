@@ -115,6 +115,23 @@ export class GitDiffService {
     return ok(result.value.stdout);
   }
 
+  /** Returns the staged (index) version of a file, equivalent to `git show :<path>`. */
+  async getStagedFileContent(filePath: string): Promise<Result<string>> {
+    const pathCheck = validateFilePath(filePath);
+    if (!pathCheck.success) return pathCheck;
+
+    const result = await this.executor.execute({
+      args: ['show', `:${filePath}`],
+      cwd: this.workspacePath,
+    });
+
+    if (!result.success) {
+      return result;
+    }
+
+    return ok(result.value.stdout);
+  }
+
   async openExternalDirDiff(hash: string, parentHash?: string): Promise<Result<string>> {
     const hashCheck = validateHash(hash);
     if (!hashCheck.success) return hashCheck;
@@ -195,8 +212,8 @@ export class GitDiffService {
       unstagedFiles: [...filteredUnstaged, ...taggedUntracked],
       conflictFiles,
       conflictType: conflictState.conflictType,
-      stagedCount: stagedFiles.length,
-      unstagedCount: unstagedFiles.length,
+      stagedCount: filteredStaged.length,
+      unstagedCount: filteredUnstaged.length,
       untrackedCount: untrackedPaths.length,
     });
   }

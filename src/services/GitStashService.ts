@@ -85,11 +85,15 @@ export class GitStashService {
     return ok('Stashed changes');
   }
 
-  async stashWithMessage(message?: string): Promise<Result<string>> {
-    this.log.info(`Stash with message: ${message ?? '(none)'}`);
+  async stashWithMessage(message?: string, paths?: string[]): Promise<Result<string>> {
+    const scopeLabel = paths && paths.length > 0 ? `${paths.length} file(s)` : 'all';
+    this.log.info(`Stash with message: ${message ?? '(none)'}, scope: ${scopeLabel}`);
     const args = ['stash', 'push', '--include-untracked'];
     if (message) {
       args.push('-m', message);
+    }
+    if (paths && paths.length > 0) {
+      args.push('--', ...paths);
     }
     const result = await this.executor.execute({
       args,

@@ -1573,7 +1573,10 @@ export class WebviewProvider {
         break;
       }
       case 'stashWithMessage': {
-        const result = await this.gitStashService.stashWithMessage(message.payload.message);
+        const result = await this.gitStashService.stashWithMessage(
+          message.payload.message,
+          message.payload.paths
+        );
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
           await this.sendInitialData(undefined, true);
@@ -1695,18 +1698,18 @@ export class WebviewProvider {
       this.log.warn(`Cannot resolve HEAD for staged diff: ${filePath}`);
       return;
     }
-    // Left: HEAD version, Right: staged (index) version using :0: prefix
+    // Left: HEAD version, Right: staged (index) version.
+    // The right-side URI uses the sentinel authority "staged" which the content
+    // provider resolves via `git show :<path>` to return the index content.
     const leftUri = vscode.Uri.from({
       scheme: 'git-show',
       authority: headHash,
       path: `/${headHash.slice(0, 8)}: ${fileName}`,
       query: filePath,
     });
-    // For the staged version, we use the special `:0:` syntax to get the index version
-    const stagedAuthority = `:0:${filePath}`;
     const rightUri = vscode.Uri.from({
       scheme: 'git-show',
-      authority: stagedAuthority,
+      authority: 'staged',
       path: `/Staged: ${fileName}`,
       query: filePath,
     });

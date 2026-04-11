@@ -86,7 +86,7 @@ export type RequestMessage =
   | { type: 'unstageAll'; payload: Record<string, never> }
   | { type: 'discardFiles'; payload: { paths: string[]; includeUntracked: boolean } }
   | { type: 'discardAllUnstaged'; payload: Record<string, never> }
-  | { type: 'stashWithMessage'; payload: { message?: string } }
+  | { type: 'stashWithMessage'; payload: { message?: string; paths?: string[] } }
   | { type: 'getConflictState'; payload: Record<string, never> }
   | { type: 'openStagedDiff'; payload: { filePath: string } };
 

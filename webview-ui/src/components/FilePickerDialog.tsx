@@ -67,8 +67,10 @@ export function FilePickerDialog({
   };
 
   const handleStash = () => {
-    // Stash operates on all changes, not selected files
-    rpcClient.stashWithMessage();
+    if (selectedPaths.size === 0) return;
+    // Stash only the selected files (both staged and unstaged selections).
+    const paths = [...selectedStaged, ...selectedUnstaged].map(f => f.path);
+    rpcClient.stashWithMessage(undefined, paths);
   };
 
   const handleDiscard = () => {
@@ -141,7 +143,7 @@ export function FilePickerDialog({
                 onClick={handleStash}
                 className="rounded bg-[var(--vscode-button-secondaryBackground)] px-3 py-1.5 text-sm text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Stash
+                Stash ({selectedPaths.size})
               </button>
               <button
                 disabled={selectedUnstaged.length === 0}
