@@ -154,13 +154,9 @@ shared/                           # Shared types between backend & frontend
 - **Git**: NEVER commit or merge; only readonly operations (`git log`, `git status`, `git diff`) and create PR, create branch only if I ask you to do so, or if speckit workflow requires it.
 
 ## Active Technologies
-- TypeScript 5.x (strict) + React 18, Zustand, Tailwind CSS (035-text-filter)
-- N/A (in-memory Zustand state only) (035-text-filter)
-- TypeScript 5.x (strict mode) + React 18, Zustand, @tanstack/react-virtual, Radix UI, Tailwind CSS (webview); esbuild (extension host) (036-uncommitted-node)
-- TypeScript 5.x (strict) + React 18, Zustand, Radix UI, @tanstack/react-virtual, esbuild (backend), Vite (frontend) (037-uncommitted-node-features)
-- N/A (transient Zustand state + VS Code globalState for UI preferences) (037-uncommitted-node-features)
-- TypeScript 5.x (strict) + React 18, Zustand, Radix UI (`@radix-ui/react-dialog`, `@radix-ui/react-radio-group`), Tailwind CSS (webview); esbuild (extension host); existing `GitExecutor`/`GitStashService` (backend) (038-uncommitted-node-ux)
-- N/A — transient Zustand state + dialog-local React state only. No new persisted UI state; no new `globalState` keys. (038-uncommitted-node-ux)
+- TypeScript 5.x (strict) + React 18, Zustand, Radix UI, Tailwind CSS (webview); esbuild (extension host), Vite (frontend)
 
 ## Recent Changes
-- 035-text-filter: Added TypeScript 5.x (strict) + React 18, Zustand, Tailwind CSS
+- 039-uncommitted-node-ux2: File picker dialog enhancements
+- 038-uncommitted-node-ux: Dialog and stashing UX polish
+- 037-uncommitted-node-features: Uncommitted node feature expansion

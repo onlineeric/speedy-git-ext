@@ -5,9 +5,9 @@ import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { formatRelativeDate } from '../utils/formatDate';
 import { renderInlineCode } from '../utils/inlineCodeRenderer';
-import { ListViewIcon, TreeViewIcon, CloseIcon, MoveRightIcon, MoveBottomIcon, ChevronDownIcon, ChevronRightIcon } from './icons';
+import { CloseIcon, MoveRightIcon, MoveBottomIcon, ChevronDownIcon, ChevronRightIcon } from './icons';
 import { FileChangesTreeView } from './FileChangesTreeView';
-import { FileStatusBadge, FileChangeIndicators, FileActionIcons } from './FileChangeShared';
+import { FileChangeRow, ViewModeToggle } from './FileChangeShared';
 import { AuthorBadge } from './AuthorBadge';
 import { DiscardDialog } from './DiscardDialog';
 
@@ -418,16 +418,10 @@ function FileChangesList({
   splitLayout?: boolean;
 }) {
   const fileViewMode = useGraphStore((state) => state.fileViewMode);
-  const setFileViewMode = useGraphStore((state) => state.setFileViewMode);
   const stagedFiles = useGraphStore((state) => state.uncommittedStagedFiles);
   const unstagedFiles = useGraphStore((state) => state.uncommittedUnstagedFiles);
   const conflictFiles = useGraphStore((state) => state.uncommittedConflictFiles);
   const conflictType = useGraphStore((state) => state.conflictType);
-
-  const handleSetFileViewMode = (mode: FileViewMode) => {
-    setFileViewMode(mode);
-    rpcClient.persistUIState({ fileViewMode: mode });
-  };
 
   const handleFileClick = (file: FileChange) => {
     if (details.hash === UNCOMMITTED_HASH) {
@@ -460,25 +454,6 @@ function FileChangesList({
 
   const isUncommitted = details.hash === UNCOMMITTED_HASH;
 
-  const viewToggle = (
-    <span className="flex items-center gap-0.5">
-      <button
-        className={`rounded p-0.5 ${fileViewMode === 'list' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
-        onClick={() => handleSetFileViewMode('list')}
-        title="List view"
-      >
-        <ListViewIcon size={16} />
-      </button>
-      <button
-        className={`rounded p-0.5 ${fileViewMode === 'tree' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
-        onClick={() => handleSetFileViewMode('tree')}
-        title="Tree view"
-      >
-        <TreeViewIcon size={16} />
-      </button>
-    </span>
-  );
-
   if (isUncommitted) {
     return (
       <div className={`px-3 py-2 ${splitLayout ? 'h-full' : ''}`}>
@@ -486,7 +461,7 @@ function FileChangesList({
           <span className="text-xs text-[var(--vscode-descriptionForeground)]">
             {details.files.length} file{details.files.length !== 1 ? 's' : ''} changed
           </span>
-          {viewToggle}
+          <ViewModeToggle />
         </div>
         {conflictFiles.length > 0 && (
           <UncommittedFileSection
@@ -542,7 +517,7 @@ function FileChangesList({
         <span className="text-xs text-[var(--vscode-descriptionForeground)]">
           {details.files.length} file{details.files.length !== 1 ? 's' : ''} changed
         </span>
-        {viewToggle}
+        <ViewModeToggle />
       </div>
       {fileViewMode === 'list' ? (
         <div className="space-y-0.5">
@@ -648,47 +623,3 @@ function UncommittedFileSection({
   );
 }
 
-function FileChangeRow({
-  file,
-  onFileNameClick,
-  commitHash,
-  parentHash,
-  onDiscardClick,
-}: {
-  file: FileChange;
-  onFileNameClick: () => void;
-  commitHash: string;
-  parentHash?: string;
-  onDiscardClick?: (file: FileChange) => void;
-}) {
-  const fileTitle = file.oldPath
-    ? `${file.path} ← ${file.oldPath}`
-    : file.path;
-
-  return (
-    <div
-      className="group flex items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-[var(--vscode-list-hoverBackground)]"
-      title={fileTitle}
-    >
-      <FileStatusBadge status={file.status} />
-      <span
-        className="cursor-pointer truncate font-mono hover:text-[var(--vscode-textLink-foreground)] hover:underline"
-        onClick={onFileNameClick}
-      >
-        {file.path}
-        {file.oldPath && (
-          <span className="text-[var(--vscode-descriptionForeground)]">
-            {' ← '}{file.oldPath}
-          </span>
-        )}
-      </span>
-      <FileChangeIndicators file={file} />
-      <FileActionIcons
-        file={file}
-        commitHash={commitHash}
-        parentHash={parentHash}
-        onDiscardClick={onDiscardClick}
-      />
-    </div>
-  );
-}

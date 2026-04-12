@@ -65,6 +65,7 @@ The file picker dialog supports both the flat list view and the directory tree v
 - **FR-010**: The dialog MUST preserve the existing visual separation between the staged and unstaged sections (including their section headers and any collapse/expand behavior) while delegating the rendering of the file entries inside each section to the shared component.
 - **FR-011**: When only one of the two sections (staged or unstaged) has entries to show, that section's title bar MUST still display the view-mode toggle and it MUST still govern the section and update the shared view mode state.
 - **FR-012**: In tree view, clicking a folder checkbox MUST toggle the selection of all descendant files within that folder. Folder checkboxes MUST display a tri-state indicator: unchecked when no descendants are selected, fully checked when all descendants are selected, and partially checked when some but not all descendants are selected.
+- **FR-013**: Clicking anywhere on a file row (not only the checkbox) MUST toggle the file's selection state in both list and tree views. This includes clicking the file name, the status badge, or the line-count indicators. Only the checkbox itself is exempt from the row-level click handler to prevent double-toggling.
 
 ### Key Entities
 
@@ -89,6 +90,7 @@ The file picker dialog supports both the flat list view and the directory tree v
 - Q: In tree view, when a user clicks a folder checkbox, should it cascade select/deselect all descendants? → A: Yes — clicking a folder toggles all descendant file checkboxes; folder shows tri-state indicator (empty / partial / full) based on children's selection state.
 - Q: Should file action icons (open diff, open file) from the commit details panel be shown in the dialog rows? → A: No — hide action icons in the dialog; show only the status badge, file path, and +/- line counts.
 - Q: Where should the view-mode toggle appear when only one section exists? → A: Toggle buttons appear on both the staged and unstaged section title bars. Both control the same shared view mode state, affecting all sections in the dialog and the commit details panel.
+- Q: Should clicking on the file row (not just the checkbox) toggle selection? → A: Yes — in both list and tree views, clicking anywhere on a file row toggles its selection. In list view this is achieved via a wrapping `<label>`; in tree view the row div has an onClick handler that calls `onTogglePath`, with `stopPropagation` on the checkbox to prevent double-toggling.
 
 ## Assumptions
 

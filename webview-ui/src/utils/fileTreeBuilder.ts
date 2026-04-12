@@ -9,6 +9,18 @@ export interface FileTreeNode {
   fileChange?: FileChange;
 }
 
+export function getDescendantFilePaths(node: FileTreeNode): string[] {
+  const paths: string[] = [];
+  const collect = (n: FileTreeNode) => {
+    if (!n.isFolder && n.fileChange) {
+      paths.push(n.fileChange.path);
+    }
+    n.children?.forEach(collect);
+  };
+  collect(node);
+  return paths;
+}
+
 /**
  * Builds a hierarchical file tree from a flat array of FileChange objects.
  * Applies folder compaction: single-child intermediate folders are merged
