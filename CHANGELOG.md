@@ -9,6 +9,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [2.3.1] - pre-release - 2026-04-12
+
+### Added
+- File picker dialog now renders file rows with the same layout, status badges, and per-file added/deleted line counts (+N −N) as the commit details panel, providing a consistent file browsing experience across the extension
+- List and tree view toggle on each section title bar (staged / unstaged) in the file picker dialog — both toggles control a single shared view mode that stays in sync with the commit details panel
+- View mode preference shared between the file picker dialog and the commit details panel; changing it in either place is immediately reflected in the other with no extra steps
+- Tree view folder checkboxes with cascading select/deselect and tri-state indicators (unchecked / partially checked / fully checked) based on descendant selection state
+- Click anywhere on a file row (file name, status badge, or line counts) to toggle its selection in both list and tree views, not just the checkbox
+- View mode preference persists across dialog open/close cycles and editor reloads using the existing persistence mechanism
+- File selection state preserved when toggling between list and tree views — switching view mode never clears checked files
+- File action icons (open diff, open file) hidden in the dialog context since the dialog serves a selection purpose
+
 ## [2.3.0] - pre-release - 2026-04-11
 
 ### Added
