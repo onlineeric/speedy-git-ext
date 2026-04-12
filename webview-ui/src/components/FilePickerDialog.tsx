@@ -5,6 +5,8 @@ import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { DiscardAllDialog } from './DiscardAllDialog';
 import { CommandPreview } from './CommandPreview';
+import { FileChangeRow, ViewModeToggle } from './FileChangeShared';
+import { FileChangesTreeView } from './FileChangesTreeView';
 import {
   computeRadioAvailability,
   applyDefaultRadioRule,
@@ -201,6 +203,18 @@ function FilePickerDialogInner({
     });
   }, []);
 
+  const toggleFolderPaths = useCallback((paths: string[], checked: boolean) => {
+    setSelectedPaths((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        paths.forEach((p) => next.add(p));
+      } else {
+        paths.forEach((p) => next.delete(p));
+      }
+      return next;
+    });
+  }, []);
+
   const resolvedStashMessage = useMemo(() => {
     const trimmed = stashMessage.trim();
     if (trimmed) return trimmed;
@@ -380,23 +394,25 @@ function FilePickerDialogInner({
 
             <div className="mt-4 flex-1 overflow-auto min-h-0 space-y-3">
               {stagedFiles.length > 0 && (
-                <FileGroup
+                <SelectableFileSection
                   title="Staged"
                   files={stagedFiles}
                   selectedPaths={selectedPaths}
                   disabled={isRunning}
                   onToggleFile={toggleFile}
                   onToggleAll={() => toggleAllInSection(stagedFiles)}
+                  onToggleFolderPaths={toggleFolderPaths}
                 />
               )}
               {unstagedFiles.length > 0 && (
-                <FileGroup
+                <SelectableFileSection
                   title="Unstaged"
                   files={unstagedFiles}
                   selectedPaths={selectedPaths}
                   disabled={isRunning}
                   onToggleFile={toggleFile}
                   onToggleAll={() => toggleAllInSection(unstagedFiles)}
+                  onToggleFolderPaths={toggleFolderPaths}
                 />
               )}
               {allFiles.length === 0 && (
@@ -534,13 +550,14 @@ function RadioRow({ kind, enabled, selected, preview, onSelect, messageInputSlot
   );
 }
 
-function FileGroup({
+function SelectableFileSection({
   title,
   files,
   selectedPaths,
   disabled,
   onToggleFile,
   onToggleAll,
+  onToggleFolderPaths,
 }: {
   title: string;
   files: FileChange[];
@@ -548,7 +565,9 @@ function FileGroup({
   disabled: boolean;
   onToggleFile: (path: string) => void;
   onToggleAll: () => void;
+  onToggleFolderPaths: (paths: string[], checked: boolean) => void;
 }) {
+  const fileViewMode = useGraphStore((state) => state.fileViewMode);
   const allSelected = files.every((f) => selectedPaths.has(f.path));
   const someSelected = files.some((f) => selectedPaths.has(f.path));
 
@@ -568,29 +587,43 @@ function FileGroup({
           />
           {title} ({files.length})
         </label>
+        <ViewModeToggle />
       </div>
-      <div className="space-y-0.5 pl-2">
-        {files.map((file) => (
-          <label
-            key={file.path}
-            className={`flex items-center gap-1.5 rounded px-1 py-0.5 text-xs hover:bg-[var(--vscode-list-hoverBackground)] ${
-              disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={selectedPaths.has(file.path)}
-              disabled={disabled}
-              onChange={() => onToggleFile(file.path)}
-              className="accent-[var(--vscode-focusBorder)]"
-            />
-            <span className="truncate font-mono">{file.path}</span>
-            <span className="ml-auto text-[var(--vscode-descriptionForeground)]">
-              {file.status}
-            </span>
-          </label>
-        ))}
-      </div>
+      {fileViewMode === 'list' ? (
+        <div className="space-y-0.5 pl-2">
+          {files.map((file) => (
+            <label
+              key={file.path}
+              className={`flex items-center gap-1.5 ${
+                disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={selectedPaths.has(file.path)}
+                disabled={disabled}
+                onChange={() => onToggleFile(file.path)}
+                className="accent-[var(--vscode-focusBorder)]"
+              />
+              <FileChangeRow
+                file={file}
+                hideActions
+              />
+            </label>
+          ))}
+        </div>
+      ) : (
+        <div className="pl-2">
+          <FileChangesTreeView
+            files={files}
+            selectedPaths={selectedPaths}
+            onTogglePath={onToggleFile}
+            onToggleFolderPaths={onToggleFolderPaths}
+            hideActions
+            disabled={disabled}
+          />
+        </div>
+      )}
     </div>
   );
 }

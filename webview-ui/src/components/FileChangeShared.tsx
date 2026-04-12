@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import type { FileChange } from '@shared/types';
+import type { FileChange, FileViewMode } from '@shared/types';
 import { UNCOMMITTED_HASH } from '@shared/types';
-import { CopyIcon, CheckIcon, FileIcon, FileCodeIcon, StageIcon, UnstageIcon, DiscardIcon } from './icons';
+import { CopyIcon, CheckIcon, FileIcon, FileCodeIcon, StageIcon, UnstageIcon, DiscardIcon, ListViewIcon, TreeViewIcon } from './icons';
 import { rpcClient } from '../rpc/rpcClient';
+import { useGraphStore } from '../stores/graphStore';
 
 export function shouldShowChangeCounts(file: FileChange): boolean {
   if (file.status === 'added' || file.status === 'deleted') return false;
@@ -58,6 +59,84 @@ export function FileChangeIndicators({ file }: { file: FileChange }) {
         <span className="text-red-400">-{file.deletions}</span>
       )}
     </>
+  );
+}
+
+export function ViewModeToggle() {
+  const fileViewMode = useGraphStore((state) => state.fileViewMode);
+  const setFileViewMode = useGraphStore((state) => state.setFileViewMode);
+
+  const handleSetFileViewMode = (mode: FileViewMode) => {
+    setFileViewMode(mode);
+    rpcClient.persistUIState({ fileViewMode: mode });
+  };
+
+  return (
+    <span className="flex items-center gap-0.5">
+      <button
+        className={`rounded p-0.5 ${fileViewMode === 'list' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
+        onClick={() => handleSetFileViewMode('list')}
+        title="List view"
+      >
+        <ListViewIcon size={16} />
+      </button>
+      <button
+        className={`rounded p-0.5 ${fileViewMode === 'tree' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
+        onClick={() => handleSetFileViewMode('tree')}
+        title="Tree view"
+      >
+        <TreeViewIcon size={16} />
+      </button>
+    </span>
+  );
+}
+
+export function FileChangeRow({
+  file,
+  onFileNameClick,
+  commitHash = '',
+  parentHash,
+  onDiscardClick,
+  hideActions,
+}: {
+  file: FileChange;
+  onFileNameClick?: () => void;
+  commitHash?: string;
+  parentHash?: string;
+  onDiscardClick?: (file: FileChange) => void;
+  hideActions?: boolean;
+}) {
+  const fileTitle = file.oldPath
+    ? `${file.path} ← ${file.oldPath}`
+    : file.path;
+
+  return (
+    <div
+      className="group flex items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-[var(--vscode-list-hoverBackground)]"
+      title={fileTitle}
+    >
+      <FileStatusBadge status={file.status} />
+      <span
+        className={`truncate font-mono ${onFileNameClick ? 'cursor-pointer hover:text-[var(--vscode-textLink-foreground)] hover:underline' : ''}`}
+        onClick={onFileNameClick}
+      >
+        {file.path}
+        {file.oldPath && (
+          <span className="text-[var(--vscode-descriptionForeground)]">
+            {' ← '}{file.oldPath}
+          </span>
+        )}
+      </span>
+      <FileChangeIndicators file={file} />
+      {!hideActions && (
+        <FileActionIcons
+          file={file}
+          commitHash={commitHash}
+          parentHash={parentHash}
+          onDiscardClick={onDiscardClick}
+        />
+      )}
+    </div>
   );
 }
 
