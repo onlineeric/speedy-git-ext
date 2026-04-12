@@ -13,6 +13,7 @@ interface FileChangesTreeViewProps {
   onTogglePath?: (path: string) => void;
   onToggleFolderPaths?: (paths: string[], checked: boolean) => void;
   hideActions?: boolean;
+  disabled?: boolean;
 }
 
 export function FileChangesTreeView({
@@ -24,6 +25,7 @@ export function FileChangesTreeView({
   onTogglePath,
   onToggleFolderPaths,
   hideActions,
+  disabled,
 }: FileChangesTreeViewProps) {
   const tree = useMemo(() => buildFileTree(files), [files]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -63,6 +65,7 @@ export function FileChangesTreeView({
           onTogglePath={onTogglePath}
           onToggleFolderPaths={onToggleFolderPaths}
           hideActions={hideActions}
+          disabled={disabled}
         />
       ))}
     </div>
@@ -80,6 +83,7 @@ function TreeNode({
   onTogglePath,
   onToggleFolderPaths,
   hideActions,
+  disabled,
 }: {
   node: FileTreeNode;
   collapsed: Set<string>;
@@ -91,6 +95,7 @@ function TreeNode({
   onTogglePath?: (path: string) => void;
   onToggleFolderPaths?: (paths: string[], checked: boolean) => void;
   hideActions?: boolean;
+  disabled?: boolean;
 }) {
   if (node.isFolder) {
     return (
@@ -105,6 +110,7 @@ function TreeNode({
         onToggleFolderPaths={onToggleFolderPaths}
         onTogglePath={onTogglePath}
         hideActions={hideActions}
+        disabled={disabled}
       />
     );
   }
@@ -118,6 +124,7 @@ function TreeNode({
       selectedPaths={selectedPaths}
       onTogglePath={onTogglePath}
       hideActions={hideActions}
+      disabled={disabled}
     />
   );
 }
@@ -133,6 +140,7 @@ function FolderNode({
   onToggleFolderPaths,
   onTogglePath,
   hideActions,
+  disabled,
 }: {
   node: FileTreeNode;
   collapsed: Set<string>;
@@ -144,6 +152,7 @@ function FolderNode({
   onToggleFolderPaths?: (paths: string[], checked: boolean) => void;
   onTogglePath?: (path: string) => void;
   hideActions?: boolean;
+  disabled?: boolean;
 }) {
   const isCollapsed = collapsed.has(node.id);
   const indent = node.depth * 16;
@@ -174,6 +183,7 @@ function FolderNode({
             ref={(el) => {
               if (el) el.indeterminate = someSelected;
             }}
+            disabled={disabled}
             onClick={handleFolderCheckbox}
             onChange={() => {}}
             className="accent-[var(--vscode-focusBorder)] cursor-pointer"
@@ -199,6 +209,7 @@ function FolderNode({
           onTogglePath={onTogglePath}
           onToggleFolderPaths={onToggleFolderPaths}
           hideActions={hideActions}
+          disabled={disabled}
         />
       ))}
     </>
@@ -213,6 +224,7 @@ function FileNode({
   selectedPaths,
   onTogglePath,
   hideActions,
+  disabled,
 }: {
   node: FileTreeNode;
   commitHash?: string;
@@ -221,21 +233,24 @@ function FileNode({
   selectedPaths?: Set<string>;
   onTogglePath?: (path: string) => void;
   hideActions?: boolean;
+  disabled?: boolean;
 }) {
   const file = node.fileChange!;
   const indent = node.depth * 16;
+  const selectable = selectedPaths && onTogglePath && !disabled;
 
   return (
     <div
-      className={`group flex items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-[var(--vscode-list-hoverBackground)]${selectedPaths && onTogglePath ? ' cursor-pointer' : ''}`}
+      className={`group flex items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-[var(--vscode-list-hoverBackground)]${selectable ? ' cursor-pointer' : ''}${disabled ? ' opacity-60' : ''}`}
       style={{ paddingLeft: indent + 4 + 16 }}
       title={file.path}
-      onClick={selectedPaths && onTogglePath ? () => onTogglePath(file.path) : undefined}
+      onClick={selectable ? () => onTogglePath(file.path) : undefined}
     >
       {selectedPaths && onTogglePath && (
         <input
           type="checkbox"
           checked={selectedPaths.has(file.path)}
+          disabled={disabled}
           onChange={() => onTogglePath(file.path)}
           onClick={(e) => e.stopPropagation()}
           className="accent-[var(--vscode-focusBorder)] cursor-pointer"

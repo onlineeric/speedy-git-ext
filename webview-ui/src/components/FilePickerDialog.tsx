@@ -620,6 +620,7 @@ function SelectableFileSection({
             onTogglePath={onToggleFile}
             onToggleFolderPaths={onToggleFolderPaths}
             hideActions
+            disabled={disabled}
           />
         </div>
       )}
