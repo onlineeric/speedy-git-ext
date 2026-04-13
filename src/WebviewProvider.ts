@@ -537,6 +537,10 @@ export class WebviewProvider {
         this.postMessage({ type: 'loading', payload: { loading: true } });
       }
       const batchSize = this.getBatchSize();
+
+      // Start uncommitted changes fetch early — runs in parallel with getCommits
+      const uncommittedPromise = this.gitDiffService.getUncommittedSummary();
+
       const commitsResult = await this.gitLogService.getCommits({ ...effectiveFilters, maxCount: batchSize });
       let fetchedCommits: Commit[] = [];
       if (commitsResult.success) {
@@ -563,15 +567,27 @@ export class WebviewProvider {
         this.postMessage({ type: 'loading', payload: { loading: false } });
       }
 
-      await this.handleMessage({ type: 'getBranches', payload: {} });
-      await this.handleMessage({ type: 'getAuthors', payload: {} });
-      await this.handleMessage({ type: 'getRemotes', payload: {} });
-      await this.handleMessage({ type: 'getSubmodules', payload: {} });
-      await this.handleMessage({ type: 'getWorktreeList', payload: {} });
-      await this.handleMessage({ type: 'getUncommittedChanges', payload: {} });
-      if (includeStashes) {
-        await this.handleMessage({ type: 'getStashes', payload: {} });
+      // Send uncommitted changes — data was fetched in parallel with getCommits,
+      // but must arrive after commits so the frontend can merge the node correctly
+      const uncommittedResult = await uncommittedPromise;
+      if (uncommittedResult.success) {
+        this.postMessage({ type: 'uncommittedChanges', payload: uncommittedResult.value });
+      } else {
+        this.postMessage({ type: 'error', payload: { error: uncommittedResult.error } });
       }
+
+      // Fetch remaining metadata in parallel
+      const metadataPromises: Promise<void>[] = [
+        this.handleMessage({ type: 'getBranches', payload: {} }),
+        this.handleMessage({ type: 'getAuthors', payload: {} }),
+        this.handleMessage({ type: 'getRemotes', payload: {} }),
+        this.handleMessage({ type: 'getSubmodules', payload: {} }),
+        this.handleMessage({ type: 'getWorktreeList', payload: {} }),
+      ];
+      if (includeStashes) {
+        metadataPromises.push(this.handleMessage({ type: 'getStashes', payload: {} }));
+      }
+      await Promise.all(metadataPromises);
       const cherryPickStateResult = this.gitCherryPickService.getCherryPickState();
       if (cherryPickStateResult.success) {
         this.postMessage({ type: 'cherryPickState', payload: { state: cherryPickStateResult.value } });
