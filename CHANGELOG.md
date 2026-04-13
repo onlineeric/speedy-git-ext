@@ -9,6 +9,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [2.3.2] - pre-release - 2026-04-13
+
+### Fixed
+- Uncommitted node now appears nearly instantly after the git graph loads, instead of taking 8–10 seconds on large repos — uncommitted data is fetched in parallel with the commit log rather than sequentially after it
+- Replaced 5 sequential git commands for uncommitted status with a single `git status --porcelain=v2` plus 2 numstat commands running in parallel, cutting process spawns and redundant working-tree scans
+- Conflict detection now runs in parallel with file status commands instead of waiting for them to finish
+- All post-commit metadata fetches (branches, authors, remotes, submodules, worktrees) now run in parallel instead of one-by-one, reducing total load time on initial load and every post-operation refresh (checkout, stash, tag, fetch, etc.)
+- Commit details panel loads faster — file list and line-count stats now fetched in parallel instead of sequentially
+- Revert state check now runs in parallel with metadata fetches instead of waiting for them to complete
+- Removed redundant duplicate submodule data fetch in submodule init/update operations
+
 ## [2.3.1] - pre-release - 2026-04-12
 
 ### Added

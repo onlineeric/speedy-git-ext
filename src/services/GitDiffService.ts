@@ -1,7 +1,7 @@
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
-import type { CommitDetails, ConflictType, FileChange, FileChangeStatus, FileStageState, UncommittedSummary } from '../../shared/types.js';
+import type { CommitDetails, ConflictType, FileChange, FileChangeStatus, UncommittedSummary } from '../../shared/types.js';
 import { validateHash, validateFilePath } from '../utils/gitValidation.js';
 
 const NULL_CHAR = '\x00';
@@ -42,22 +42,18 @@ export class GitDiffService {
 
     const isMerge = meta.parents.length > 1;
 
-    // Get file changes with stats
-    const filesResult = await this.getDiffNameStatus(hash, isMerge);
-    if (!filesResult.success) {
-      return filesResult;
-    }
-
-    // Get stats (additions/deletions) — use -z for correct rename path parsing
-    // For merge commits, diff against first parent explicitly
-    // --no-commit-id prevents the commit hash from being prepended to the output
+    // File changes and numstat are independent — run in parallel
     const numstatArgs = isMerge
       ? ['diff-tree', '--no-commit-id', '--numstat', '-r', '-z', `${hash}^1`, hash]
       : ['diff-tree', '--no-commit-id', '--numstat', '-r', '--root', '-z', hash];
-    const statsResult = await this.executor.execute({
-      args: numstatArgs,
-      cwd: this.workspacePath,
-    });
+    const [filesResult, statsResult] = await Promise.all([
+      this.getDiffNameStatus(hash, isMerge),
+      this.executor.execute({ args: numstatArgs, cwd: this.workspacePath }),
+    ]);
+
+    if (!filesResult.success) {
+      return filesResult;
+    }
 
     if (!statsResult.success) {
       this.log.warn(`Numstat command failed for ${hash.slice(0, 7)}: ${statsResult.error.message}`);
@@ -162,21 +158,20 @@ export class GitDiffService {
 
   async getUncommittedSummary(): Promise<Result<UncommittedSummary>> {
     this.log.info('Getting uncommitted changes summary');
-    const [stagedResult, stagedNumstatResult, unstagedResult, unstagedNumstatResult, untrackedResult] = await Promise.all([
-      this.executor.execute({ args: ['diff', '--cached', '--name-status', '-z'], cwd: this.workspacePath }),
+
+    // Perf: single `git status --porcelain=v2` replaces 3 separate diff/ls-files commands,
+    // numstat commands kept for per-file line counts, conflict detection runs in parallel
+    const [statusResult, stagedNumstatResult, unstagedNumstatResult, conflictState] = await Promise.all([
+      this.executor.execute({ args: ['status', '--porcelain=v2', '-z'], cwd: this.workspacePath }),
       this.executor.execute({ args: ['diff', '--cached', '--numstat', '-z'], cwd: this.workspacePath }),
-      this.executor.execute({ args: ['diff', '--name-status', '-z'], cwd: this.workspacePath }),
       this.executor.execute({ args: ['diff', '--numstat', '-z'], cwd: this.workspacePath }),
-      this.executor.execute({ args: ['ls-files', '--others', '--exclude-standard', '-z'], cwd: this.workspacePath }),
+      this.detectConflictState(),
     ]);
 
-    const stagedFiles = stagedResult.success ? parseDiffNameStatus(stagedResult.value.stdout) : [];
-    const unstagedFiles = unstagedResult.success ? parseDiffNameStatus(unstagedResult.value.stdout) : [];
-    const untrackedPaths = untrackedResult.success
-      ? untrackedResult.value.stdout.split(NULL_CHAR).filter(Boolean)
-      : [];
+    const { stagedFiles, unstagedFiles, untrackedPaths } = statusResult.success
+      ? parseStatusPorcelainV2(statusResult.value.stdout)
+      : { stagedFiles: [] as FileChange[], unstagedFiles: [] as FileChange[], untrackedPaths: [] as string[] };
 
-    // Apply per-file line counts from numstat
     if (stagedNumstatResult.success) {
       applyNumstatToFiles(stagedFiles, stagedNumstatResult.value.stdout);
     }
@@ -184,28 +179,21 @@ export class GitDiffService {
       applyNumstatToFiles(unstagedFiles, unstagedNumstatResult.value.stdout);
     }
 
-    const tagStageState = (files: FileChange[], state: FileStageState): FileChange[] =>
-      files.map(f => ({ ...f, stageState: state }));
-
-    const taggedStaged = tagStageState(stagedFiles, 'staged');
-    const taggedUnstaged = tagStageState(unstagedFiles, 'unstaged');
     const taggedUntracked: FileChange[] = untrackedPaths.map((path): FileChange => ({
       path, status: 'untracked', stageState: 'unstaged',
     }));
 
-    const conflictState = await this.detectConflictState();
     const conflictPathSet = new Set(conflictState.conflictFiles);
-
     const conflictFiles: FileChange[] = conflictState.conflictFiles.map((path): FileChange => ({
       path, status: 'modified', stageState: 'conflicted',
     }));
 
     const filteredStaged = conflictPathSet.size > 0
-      ? taggedStaged.filter(f => !conflictPathSet.has(f.path))
-      : taggedStaged;
+      ? stagedFiles.filter(f => !conflictPathSet.has(f.path))
+      : stagedFiles;
     const filteredUnstaged = conflictPathSet.size > 0
-      ? taggedUnstaged.filter(f => !conflictPathSet.has(f.path))
-      : taggedUnstaged;
+      ? unstagedFiles.filter(f => !conflictPathSet.has(f.path))
+      : unstagedFiles;
 
     return ok({
       stagedFiles: filteredStaged,
@@ -442,4 +430,90 @@ function applyNumstatToFiles(files: FileChange[], numstatOutput: string): void {
       file.deletions = deletions;
     }
   }
+}
+
+/** Find the position right after the Nth space in a string. Returns -1 if not enough spaces. */
+function afterNthSpace(str: string, n: number): number {
+  let count = 0;
+  for (let i = 0; i < str.length; i++) {
+    if (str[i] === ' ') {
+      count++;
+      if (count === n) return i + 1;
+    }
+  }
+  return -1;
+}
+
+function statusLetterToFileStatus(code: string): FileChangeStatus {
+  switch (code) {
+    case 'A': return 'added';
+    case 'M': return 'modified';
+    case 'T': return 'modified'; // type change (e.g. file → symlink)
+    case 'D': return 'deleted';
+    case 'R': return 'renamed';
+    case 'C': return 'copied';
+    default: return 'unknown';
+  }
+}
+
+/**
+ * Parses `git status --porcelain=v2 -z` output into staged, unstaged, and untracked files.
+ *
+ * Entry formats (NUL-terminated paths):
+ *   1 XY sub mH mI mW hH hI <path>\0
+ *   2 XY sub mH mI mW hH hI X<score> <path>\0<origPath>\0
+ *   u XY sub m1 m2 m3 mW h1 h2 h3 <path>\0
+ *   ? <path>\0
+ */
+function parseStatusPorcelainV2(output: string): {
+  stagedFiles: FileChange[];
+  unstagedFiles: FileChange[];
+  untrackedPaths: string[];
+} {
+  const stagedFiles: FileChange[] = [];
+  const unstagedFiles: FileChange[] = [];
+  const untrackedPaths: string[] = [];
+
+  if (!output.trim()) {
+    return { stagedFiles, unstagedFiles, untrackedPaths };
+  }
+
+  const tokens = output.split(NULL_CHAR).filter(Boolean);
+  let i = 0;
+
+  while (i < tokens.length) {
+    const token = tokens[i];
+
+    if (token.startsWith('1 ')) {
+      // Ordinary changed entry — 8 header fields before path
+      const xy = token.substring(2, 4);
+      const path = token.substring(afterNthSpace(token, 8));
+      if (xy[0] !== '.') {
+        stagedFiles.push({ path, status: statusLetterToFileStatus(xy[0]), stageState: 'staged' });
+      }
+      if (xy[1] !== '.') {
+        unstagedFiles.push({ path, status: statusLetterToFileStatus(xy[1]), stageState: 'unstaged' });
+      }
+    } else if (token.startsWith('2 ')) {
+      // Rename/copy entry — 9 header fields before path, next token is origPath
+      const xy = token.substring(2, 4);
+      const path = token.substring(afterNthSpace(token, 9));
+      const origPath = tokens[i + 1] ?? '';
+      i++; // consume origPath token
+      if (xy[0] !== '.') {
+        stagedFiles.push({ path, oldPath: origPath, status: xy[0] === 'R' ? 'renamed' : 'copied', stageState: 'staged' });
+      }
+      if (xy[1] !== '.') {
+        unstagedFiles.push({ path, oldPath: origPath, status: statusLetterToFileStatus(xy[1]), stageState: 'unstaged' });
+      }
+    } else if (token.startsWith('u ')) {
+      // Unmerged entries are handled separately via detectConflictState — skip here
+    } else if (token.startsWith('? ')) {
+      untrackedPaths.push(token.substring(2));
+    }
+
+    i++;
+  }
+
+  return { stagedFiles, unstagedFiles, untrackedPaths };
 }
