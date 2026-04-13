@@ -120,6 +120,7 @@ export class GitWatcherService implements vscode.Disposable {
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = undefined;
       this.lastRefreshTime = Date.now();
+      this.log.info(`[TRACE] GitWatcherService: firing change event (delay was ${delay}ms)`);
       this._onDidDetectChange.fire();
     }, delay);
   }
