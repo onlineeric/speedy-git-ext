@@ -9,6 +9,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [2.3.3] - pre-release - 2026-04-13
+
+### Changed
+- Initial graph load now delivers all data (commits, branches, stashes, uncommitted changes, and metadata) in a single coordinated update — the graph appears fully settled in one visual step after the loading indicator, with no flicker or progressive element appearance
+- Graph refresh keeps the current graph visible and interactive with a subtle toolbar spinner while fetching new data, then updates in-place in a single visual transition — no more blank screen or intermediate partial states during refresh
+- Graph topology (lane assignments, connections, colors) now computed exactly once per load or refresh cycle instead of three times, reducing CPU usage especially on large repositories
+
+### Fixed
+- Partial data source failures during load no longer cause a blank screen — the graph renders with all successfully fetched data and shows a non-blocking notification listing which data source(s) failed
+
 ## [2.3.2] - pre-release - 2026-04-13
 
 ### Fixed

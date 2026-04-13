@@ -2,7 +2,7 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "publisher": "onlineeric",
   "license": "MIT",
   "repository": {
@@ -128,7 +128,8 @@
     "ext:package": "npx @vscode/vsce package --no-dependencies",
     "ext:publish": "pnpm run ext:publish:vscode && pnpm run ext:publish:cursor",
     "ext:publish:vscode": "npx @vscode/vsce publish --no-dependencies",
-    "ext:publish:cursor": "npx ovsx publish --no-dependencies"
+    "ext:publish:cursor": "npx ovsx publish --no-dependencies",
+    "ext:publish:pre-release": "npx @vscode/vsce publish --no-dependencies --pre-release && npx ovsx publish --no-dependencies --pre-release"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

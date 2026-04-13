@@ -1,4 +1,36 @@
 import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary } from './types.js';
+
+/** Payload for the batched initial data message */
+export interface InitialDataPayload {
+  /** Commit list; null when fingerprint unchanged (auto-refresh optimization) */
+  commits: Commit[] | null;
+  /** Total commits loaded before client-side filtering */
+  totalLoadedWithoutFilter: number;
+  /** Whether more commits are available for pagination */
+  hasMore: boolean;
+  /** Branch list */
+  branches: Branch[];
+  /** Stash entries */
+  stashes: StashEntry[];
+  /** Uncommitted changes summary */
+  uncommittedChanges: UncommittedSummary;
+  /** Remote repository info */
+  remotes: RemoteInfo[];
+  /** Commit authors for filter dropdown */
+  authors: Author[];
+  /** Worktree list */
+  worktrees: WorktreeInfo[];
+  /** Submodule list and navigation stack */
+  submodules: Submodule[];
+  submoduleStack: SubmoduleNavEntry[];
+  /** Operation states */
+  cherryPickState: CherryPickState;
+  rebaseState: RebaseState;
+  rebaseConflictInfo: RebaseConflictInfo | null;
+  revertState: RevertState;
+  /** Data source errors (empty if all succeeded) */
+  errors: string[];
+}
 import type { GitError } from './errors.js';
 
 export type RequestMessage =
@@ -124,7 +156,8 @@ export type ResponseMessage =
   | { type: 'persistedUIState'; payload: { uiState: PersistedUIState } }
   | { type: 'authorList'; payload: { authors: Author[] } }
   | { type: 'uncommittedChanges'; payload: UncommittedSummary }
-  | { type: 'conflictState'; payload: ConflictState };
+  | { type: 'conflictState'; payload: ConflictState }
+  | { type: 'initialData'; payload: InitialDataPayload };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -167,6 +200,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
   pushResult: true, avatarUrls: true, worktreeList: true, containingBranches: true,
   persistedUIState: true, authorList: true, uncommittedChanges: true, conflictState: true,
+  initialData: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {
