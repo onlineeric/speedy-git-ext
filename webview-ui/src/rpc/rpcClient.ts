@@ -217,6 +217,16 @@ class RpcClient {
       case 'conflictState':
         store.setConflictState(message.payload);
         break;
+      case 'initialData':
+        store.setInitialData(message.payload);
+        store.setIsLoadingRepo(false);
+        if (message.payload.errors.length > 0) {
+          store.setError(`Some data sources failed: ${message.payload.errors.join('; ')}`);
+        }
+        if (message.payload.commits !== null) {
+          this.firePrefetch();
+        }
+        break;
     }
   }
 

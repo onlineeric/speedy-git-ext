@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import * as path from 'path';
-import type { RequestMessage, ResponseMessage } from '../shared/messages.js';
+import type { RequestMessage, ResponseMessage, InitialDataPayload } from '../shared/messages.js';
 import type {
   Commit,
   CommitListMode,
@@ -12,6 +12,7 @@ import type {
   PersistedUIState,
   RepoInfo,
   SubmoduleNavEntry,
+  UncommittedSummary,
   UserSettings,
 } from '../shared/types.js';
 import {
@@ -152,6 +153,8 @@ export class WebviewProvider {
   private pendingRefresh = false;
   private isPanelVisible = false;
   private deferredRefresh = false;
+  /** Tracks whether the initial load has been sent — subsequent loads are "refreshes" and should not show loading overlay */
+  private initialLoadSent = false;
   /** Fingerprint of the last commit data sent to webview, used to skip no-op auto-refreshes */
   private lastCommitFingerprint = '';
   /** In-memory cache of persisted UI state to avoid stale reads in rapid sequential saves */
@@ -246,6 +249,7 @@ export class WebviewProvider {
     this.gitHubAvatarService = null;
     this.gitHubAvatarInitialized = false;
     this.lastCommitFingerprint = '';
+    this.initialLoadSent = false;
   }
 
   /** Returns true if the webview panel is currently open */
@@ -255,7 +259,7 @@ export class WebviewProvider {
 
   /** Reload all data for the current active repo (use after a repo switch when panel is already open) */
   async reload() {
-    await this.sendInitialData(undefined, true);
+    await this.sendInitialData();
   }
 
   /** Trigger a non-disruptive auto-refresh. Drops if already refreshing, defers if panel hidden. */
@@ -268,7 +272,7 @@ export class WebviewProvider {
       this.pendingRefresh = true;
       return;
     }
-    await this.sendInitialData(undefined, false, true);
+    await this.sendInitialData(undefined, true);
   }
 
   /** Push an updated repo list to the webview */
@@ -468,7 +472,7 @@ export class WebviewProvider {
       );
     }
 
-    await this.sendInitialData(undefined, true);
+    await this.sendInitialData();
   }
 
   private computeCommitFingerprint(commits: Commit[]): string {
@@ -495,7 +499,7 @@ export class WebviewProvider {
     }
   }
 
-  private async sendInitialData(filters?: Partial<GraphFilters>, includeStashes = false, isAutoRefresh = false) {
+  private async sendInitialData(filters?: Partial<GraphFilters>, isAutoRefresh = false) {
     // Notify VS Code's Source Control panel to refresh after extension-initiated git operations.
     // Skip during auto-refreshes since those are already triggered by VS Code detecting git changes.
     if (!isAutoRefresh) {
@@ -528,94 +532,205 @@ export class WebviewProvider {
         }
       }
 
-      // Fetch commits directly so we can reuse them for avatar fetching
       if (effectiveFilters) {
         this.currentFilters = { ...this.currentFilters, ...effectiveFilters };
       }
-      // Only show loading indicator for manual refresh / initial load (not auto-refresh)
-      if (!isAutoRefresh) {
+
+      // Only show loading indicator for initial load (not refresh / auto-refresh).
+      // During refresh, the current graph stays visible — the toolbar spinner provides feedback.
+      const isInitialLoad = !this.initialLoadSent;
+      if (isInitialLoad) {
         this.postMessage({ type: 'loading', payload: { loading: true } });
       }
+
       const batchSize = this.getBatchSize();
+      const errors: string[] = [];
 
-      // Start uncommitted changes fetch early — runs in parallel with getCommits
-      const uncommittedPromise = this.gitDiffService.getUncommittedSummary();
+      // Fetch all data sources in parallel using Promise.allSettled for partial failure resilience
+      const [
+        commitsSettled,
+        uncommittedSettled,
+        branchesSettled,
+        authorsSettled,
+        remotesSettled,
+        submodulesSettled,
+        worktreesSettled,
+        stashesSettled,
+        revertStateSettled,
+      ] = await Promise.allSettled([
+        this.gitLogService.getCommits({ ...effectiveFilters, maxCount: batchSize }),
+        this.gitDiffService.getUncommittedSummary(),
+        this.gitLogService.getBranches(),
+        this.gitLogService.getAuthors(),
+        this.gitRemoteService.getRemotes(),
+        this.gitSubmoduleService.getSubmodules(),
+        this.gitWorktreeService.listWorktrees(),
+        this.gitStashService.getStashes(),
+        this.gitRevertService.getRevertState(),
+      ]);
 
-      const commitsResult = await this.gitLogService.getCommits({ ...effectiveFilters, maxCount: batchSize });
+      // Extract commits with fingerprint optimization
       let fetchedCommits: Commit[] = [];
-      if (commitsResult.success) {
-        fetchedCommits = commitsResult.value.commits;
+      let commitsForPayload: Commit[] | null = [];
+      let totalLoadedWithoutFilter = 0;
+      let hasMore = true;
+      if (commitsSettled.status === 'fulfilled' && commitsSettled.value.success) {
+        fetchedCommits = commitsSettled.value.value.commits;
+        totalLoadedWithoutFilter = commitsSettled.value.value.totalLoadedWithoutFilter ?? 0;
+        hasMore = fetchedCommits.length >= batchSize;
 
-        // Skip sending commits if nothing changed during auto-refresh
         const fingerprint = this.computeCommitFingerprint(fetchedCommits);
         const commitsUnchanged = isAutoRefresh && fingerprint === this.lastCommitFingerprint;
         this.lastCommitFingerprint = fingerprint;
 
-        if (!commitsUnchanged) {
-          this.postMessage({
-            type: 'commits',
-            payload: {
-              commits: fetchedCommits,
-              totalLoadedWithoutFilter: commitsResult.value.totalLoadedWithoutFilter,
-            },
-          });
+        commitsForPayload = commitsUnchanged ? null : fetchedCommits;
+      } else {
+        const reason = commitsSettled.status === 'rejected'
+          ? String(commitsSettled.reason)
+          : commitsSettled.value.success ? '' : commitsSettled.value.error.message;
+        if (reason) errors.push(`commits: ${reason}`);
+        commitsForPayload = [];
+      }
+
+      // Extract uncommitted changes
+      const defaultUncommitted: UncommittedSummary = {
+        stagedFiles: [], unstagedFiles: [], conflictFiles: [],
+        stagedCount: 0, unstagedCount: 0, untrackedCount: 0,
+      };
+      let uncommittedChanges = defaultUncommitted;
+      if (uncommittedSettled.status === 'fulfilled' && uncommittedSettled.value.success) {
+        uncommittedChanges = uncommittedSettled.value.value;
+      } else {
+        const reason = uncommittedSettled.status === 'rejected'
+          ? String(uncommittedSettled.reason)
+          : uncommittedSettled.value.success ? '' : uncommittedSettled.value.error.message;
+        if (reason) errors.push(`uncommittedChanges: ${reason}`);
+      }
+
+      // Extract branches
+      let branches: import('../shared/types.js').Branch[] = [];
+      if (branchesSettled.status === 'fulfilled' && branchesSettled.value.success) {
+        branches = branchesSettled.value.value;
+      } else {
+        const reason = branchesSettled.status === 'rejected'
+          ? String(branchesSettled.reason)
+          : branchesSettled.value.success ? '' : branchesSettled.value.error.message;
+        if (reason) errors.push(`branches: ${reason}`);
+      }
+
+      // Extract authors
+      let authors: import('../shared/types.js').Author[] = [];
+      if (authorsSettled.status === 'fulfilled' && authorsSettled.value.success) {
+        authors = authorsSettled.value.value;
+      } else {
+        const reason = authorsSettled.status === 'rejected'
+          ? String(authorsSettled.reason)
+          : authorsSettled.value.success ? '' : authorsSettled.value.error.message;
+        if (reason) errors.push(`authors: ${reason}`);
+      }
+
+      // Extract remotes
+      let remotes: import('../shared/types.js').RemoteInfo[] = [];
+      if (remotesSettled.status === 'fulfilled' && remotesSettled.value.success) {
+        remotes = remotesSettled.value.value;
+      } else {
+        const reason = remotesSettled.status === 'rejected'
+          ? String(remotesSettled.reason)
+          : remotesSettled.value.success ? '' : remotesSettled.value.error.message;
+        if (reason) errors.push(`remotes: ${reason}`);
+      }
+
+      // Extract submodules
+      let submodules: import('../shared/types.js').Submodule[] = [];
+      if (submodulesSettled.status === 'fulfilled' && submodulesSettled.value.success) {
+        submodules = submodulesSettled.value.value;
+      } else {
+        const reason = submodulesSettled.status === 'rejected'
+          ? String(submodulesSettled.reason)
+          : submodulesSettled.value.success ? '' : submodulesSettled.value.error.message;
+        if (reason) errors.push(`submodules: ${reason}`);
+      }
+
+      // Extract worktrees
+      let worktrees: import('../shared/types.js').WorktreeInfo[] = [];
+      if (worktreesSettled.status === 'fulfilled' && worktreesSettled.value.success) {
+        worktrees = worktreesSettled.value.value;
+      } else {
+        const reason = worktreesSettled.status === 'rejected'
+          ? String(worktreesSettled.reason)
+          : worktreesSettled.value.success ? '' : worktreesSettled.value.error.message;
+        if (reason) errors.push(`worktrees: ${reason}`);
+      }
+
+      // Extract stashes
+      let stashes: import('../shared/types.js').StashEntry[] = [];
+      if (stashesSettled.status === 'fulfilled') {
+        const val = stashesSettled.value;
+        if ('success' in val && val.success) {
+          stashes = val.value;
+        } else if ('success' in val && !val.success) {
+          errors.push(`stashes: ${val.error.message}`);
         }
       } else {
-        this.postMessage({ type: 'error', payload: { error: commitsResult.error } });
-      }
-      if (!isAutoRefresh) {
-        this.postMessage({ type: 'loading', payload: { loading: false } });
+        errors.push(`stashes: ${String(stashesSettled.reason)}`);
       }
 
-      // Send uncommitted changes — data was fetched in parallel with getCommits,
-      // but must arrive after commits so the frontend can merge the node correctly
-      const uncommittedResult = await uncommittedPromise;
-      if (uncommittedResult.success) {
-        this.postMessage({ type: 'uncommittedChanges', payload: uncommittedResult.value });
+      // Extract revert state
+      let revertState: import('../shared/types.js').RevertState = 'idle';
+      if (revertStateSettled.status === 'fulfilled' && revertStateSettled.value.success) {
+        revertState = revertStateSettled.value.value;
       } else {
-        this.postMessage({ type: 'error', payload: { error: uncommittedResult.error } });
+        const reason = revertStateSettled.status === 'rejected'
+          ? String(revertStateSettled.reason)
+          : revertStateSettled.value.success ? '' : revertStateSettled.value.error.message;
+        if (reason) errors.push(`revertState: ${reason}`);
       }
-
-      // Fetch remaining metadata and revert state in parallel
-      const revertStatePromise = this.gitRevertService.getRevertState();
-      const metadataPromises: Promise<void>[] = [
-        this.handleMessage({ type: 'getBranches', payload: {} }),
-        this.handleMessage({ type: 'getAuthors', payload: {} }),
-        this.handleMessage({ type: 'getRemotes', payload: {} }),
-        this.handleMessage({ type: 'getSubmodules', payload: {} }),
-        this.handleMessage({ type: 'getWorktreeList', payload: {} }),
-      ];
-      if (includeStashes) {
-        metadataPromises.push(this.handleMessage({ type: 'getStashes', payload: {} }));
-      }
-      await Promise.all(metadataPromises);
 
       // Cherry-pick and rebase state checks are synchronous (fs.existsSync)
+      let cherryPickState: import('../shared/types.js').CherryPickState = 'idle';
       const cherryPickStateResult = this.gitCherryPickService.getCherryPickState();
       if (cherryPickStateResult.success) {
-        this.postMessage({ type: 'cherryPickState', payload: { state: cherryPickStateResult.value } });
+        cherryPickState = cherryPickStateResult.value;
       }
 
+      let rebaseState: import('../shared/types.js').RebaseState = 'idle';
+      let rebaseConflictInfo: import('../shared/types.js').RebaseConflictInfo | null = null;
       const rebaseStateResult = this.gitRebaseService.getRebaseState();
       if (rebaseStateResult.success) {
-        if (rebaseStateResult.value.state === 'in-progress') {
+        rebaseState = rebaseStateResult.value.state;
+        if (rebaseState === 'in-progress') {
           const conflictResult = await this.gitRebaseService.getConflictInfo();
-          this.postMessage({
-            type: 'rebaseState',
-            payload: {
-              state: 'in-progress',
-              conflictInfo: conflictResult.success ? conflictResult.value : rebaseStateResult.value.conflictInfo,
-            },
-          });
-        } else {
-          this.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
+          rebaseConflictInfo = conflictResult.success
+            ? conflictResult.value
+            : rebaseStateResult.value.conflictInfo ?? null;
         }
       }
 
-      // Revert state was started in parallel with metadata — await it now
-      const revertStateResult = await revertStatePromise;
-      if (revertStateResult.success) {
-        this.postMessage({ type: 'revertState', payload: { state: revertStateResult.value } });
+      // Build and send the batched payload
+      const payload: InitialDataPayload = {
+        commits: commitsForPayload,
+        totalLoadedWithoutFilter,
+        hasMore,
+        branches,
+        stashes,
+        uncommittedChanges,
+        remotes,
+        authors,
+        worktrees,
+        submodules,
+        submoduleStack: this.submoduleHandlers?.getStack() ?? [],
+        cherryPickState,
+        rebaseState,
+        rebaseConflictInfo,
+        revertState,
+        errors,
+      };
+
+      this.postMessage({ type: 'initialData', payload });
+
+      if (isInitialLoad) {
+        this.postMessage({ type: 'loading', payload: { loading: false } });
+        this.initialLoadSent = true;
       }
 
       // Fetch GitHub avatars in background (non-blocking), skip if avatars disabled
@@ -957,7 +1072,7 @@ export class WebviewProvider {
         if (message.payload.filters) {
           this.currentFilters = { maxCount: this.currentFilters.maxCount, ...message.payload.filters };
         }
-        await this.sendInitialData(message.payload.filters, true);
+        await this.sendInitialData(message.payload.filters);
         break;
       }
       // Branch ops
@@ -1168,7 +1283,7 @@ export class WebviewProvider {
         const result = await this.gitStashService.applyStash(message.payload.index);
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
-          await this.sendInitialData(undefined, true);
+          await this.sendInitialData();
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }
@@ -1178,7 +1293,7 @@ export class WebviewProvider {
         const result = await this.gitStashService.popStash(message.payload.index);
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
-          await this.sendInitialData(undefined, true);
+          await this.sendInitialData();
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }
@@ -1188,7 +1303,7 @@ export class WebviewProvider {
         const result = await this.gitStashService.dropStash(message.payload.index);
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
-          await this.sendInitialData(undefined, true);
+          await this.sendInitialData();
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }
@@ -1488,14 +1603,14 @@ export class WebviewProvider {
       case 'openSubmodule': {
         if (this.submoduleHandlers) {
           await this.submoduleHandlers.openSubmodule(message.payload.submodulePath);
-          await this.sendInitialData(undefined, true);
+          await this.sendInitialData();
         }
         break;
       }
       case 'backToParentRepo': {
         if (this.submoduleHandlers) {
           await this.submoduleHandlers.backToParentRepo();
-          await this.sendInitialData(undefined, true);
+          await this.sendInitialData();
         }
         break;
       }
@@ -1503,7 +1618,7 @@ export class WebviewProvider {
         const result = await this.gitSubmoduleService.updateSubmodule(message.payload.submodulePath);
         if (result.success) {
           this.postMessage({ type: 'submoduleOperationResult', payload: { success: true } });
-          await this.sendInitialData(undefined, true);
+          await this.sendInitialData();
         } else {
           this.postMessage({
             type: 'submoduleOperationResult',
@@ -1517,7 +1632,7 @@ export class WebviewProvider {
         const result = await this.gitSubmoduleService.initSubmodule(message.payload.submodulePath);
         if (result.success) {
           this.postMessage({ type: 'submoduleOperationResult', payload: { success: true } });
-          await this.sendInitialData(undefined, true);
+          await this.sendInitialData();
         } else {
           this.postMessage({
             type: 'submoduleOperationResult',
@@ -1554,7 +1669,7 @@ export class WebviewProvider {
         if (currentGeneration !== this.fetchGeneration) {
           break;
         }
-        await this.sendInitialData(undefined, true);
+        await this.sendInitialData();
         break;
       }
       case 'getUncommittedChanges': {
@@ -1597,7 +1712,7 @@ export class WebviewProvider {
         );
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
-          await this.sendInitialData(undefined, true);
+          await this.sendInitialData();
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }
@@ -1611,7 +1726,7 @@ export class WebviewProvider {
         );
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
-          await this.sendInitialData(undefined, true);
+          await this.sendInitialData();
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }

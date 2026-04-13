@@ -35,6 +35,7 @@ import {
   UNCOMMITTED_HASH,
   cloneCommitTableLayout,
 } from '@shared/types';
+import type { InitialDataPayload } from '@shared/messages';
 import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
 import { buildUncommittedSubject } from '../utils/uncommittedUtils';
 
@@ -138,6 +139,7 @@ interface GraphStore {
   uncommittedCounts: { stagedCount: number; unstagedCount: number; untrackedCount: number };
   hasUncommittedChanges: boolean;
   hiddenCommitHashes: Set<string>;
+  isRefreshing: boolean;
   consecutiveEmptyBatches: number;
   filteredOutCount: number;
   showGapIndicator: boolean;
@@ -206,6 +208,8 @@ interface GraphStore {
   setConflictState: (state: ConflictState) => void;
   recomputeVisibility: () => void;
   resetAllFilters: (options?: { preserveBranches?: boolean }) => void;
+  setIsRefreshing: (value: boolean) => void;
+  setInitialData: (payload: InitialDataPayload) => void;
   setSubmodules: (submodules: Submodule[], stack?: SubmoduleNavEntry[]) => void;
   pushSubmodule: (entry: SubmoduleNavEntry) => void;
   popSubmodule: () => void;
@@ -409,6 +413,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   conflictType: undefined,
   uncommittedCounts: { stagedCount: 0, unstagedCount: 0, untrackedCount: 0 },
   hasUncommittedChanges: false,
+  isRefreshing: false,
   hiddenCommitHashes: new Set<string>(),
   consecutiveEmptyBatches: 0,
   filteredOutCount: 0,
@@ -852,6 +857,89 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       totalLoadedWithoutFilter: null,
     };
   }),
+  setIsRefreshing: (isRefreshing) => set({ isRefreshing }),
+  setInitialData: (payload) => {
+    const state = get();
+    // Use new commits if provided, else reuse existing (fingerprint-unchanged refresh)
+    const commits = payload.commits ?? state.commits;
+    const stashes = payload.stashes;
+    const filters = state.filters;
+
+    // Extract uncommitted changes
+    const hasChanges = payload.uncommittedChanges.stagedCount + payload.uncommittedChanges.unstagedCount + payload.uncommittedChanges.untrackedCount > 0;
+    const counts = {
+      stagedCount: payload.uncommittedChanges.stagedCount,
+      unstagedCount: payload.uncommittedChanges.unstagedCount,
+      untrackedCount: payload.uncommittedChanges.untrackedCount,
+    };
+
+    // Compute hidden hashes, merged commits, and topology in one pass
+    const hiddenCommitHashes = computeHiddenCommitHashes(commits, filters);
+    const uncommitted: UncommittedContext = { hasUncommittedChanges: hasChanges, counts, branches: payload.branches };
+    const { mergedCommits, topology } = computeMergedTopology(commits, stashes, filters, hiddenCommitHashes, uncommitted);
+
+    // Preserve selection for hashes that still exist
+    const newHashSet = new Set(mergedCommits.map((c) => c.hash));
+    const selectedCommit = state.selectedCommit;
+    const selectedCommitIndex = selectedCommit
+      ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
+      : -1;
+
+    // Build worktree lookup map
+    const worktreeByHead = new Map<string, WorktreeInfo>();
+    for (const wt of payload.worktrees) {
+      worktreeByHead.set(wt.head, wt);
+    }
+
+    set({
+      commits,
+      branches: payload.branches,
+      stashes,
+      uncommittedStagedFiles: payload.uncommittedChanges.stagedFiles,
+      uncommittedUnstagedFiles: payload.uncommittedChanges.unstagedFiles,
+      uncommittedConflictFiles: payload.uncommittedChanges.conflictFiles,
+      conflictType: payload.uncommittedChanges.conflictType,
+      uncommittedCounts: counts,
+      hasUncommittedChanges: hasChanges,
+      remotes: payload.remotes,
+      authorList: payload.authors,
+      worktreeList: payload.worktrees,
+      worktreeByHead,
+      submodules: payload.submodules,
+      submoduleStack: payload.submoduleStack,
+      cherryPickInProgress: payload.cherryPickState === 'in-progress',
+      rebaseInProgress: payload.rebaseState === 'in-progress',
+      rebaseConflictInfo: payload.rebaseConflictInfo ?? undefined,
+      revertInProgress: payload.revertState === 'in-progress',
+      mergedCommits,
+      topology,
+      hiddenCommitHashes,
+      hasMore: payload.hasMore,
+      isRefreshing: false,
+      // Reset pagination state when new commits arrive
+      ...(payload.commits !== null ? {
+        prefetching: false,
+        fetchGeneration: state.fetchGeneration + 1,
+        lastBatchStartIndex: 0,
+        totalLoadedWithoutFilter: payload.totalLoadedWithoutFilter || null,
+        pendingCommitCheckout: null,
+        signatureCache: {},
+        signatureLoading: {},
+        containingBranchesCache: new Map(),
+        hoveredCommitHash: null,
+        tooltipAnchorRect: null,
+        consecutiveEmptyBatches: 0,
+        filteredOutCount: 0,
+        showGapIndicator: false,
+      } : {
+        totalLoadedWithoutFilter: payload.totalLoadedWithoutFilter || state.totalLoadedWithoutFilter,
+      }),
+      selectedCommit: selectedCommitIndex >= 0 ? selectedCommit : undefined,
+      selectedCommitIndex,
+      selectedCommits: state.selectedCommits.filter((h) => newHashSet.has(h)),
+      lastClickedHash: state.lastClickedHash && newHashSet.has(state.lastClickedHash) ? state.lastClickedHash : undefined,
+    });
+  },
   setSubmodules: (submodules, stack) => set((state) => ({
     submodules,
     submoduleStack: stack ?? state.submoduleStack,
