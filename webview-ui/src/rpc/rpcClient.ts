@@ -95,6 +95,7 @@ class RpcClient {
         break;
       case 'error':
         store.setError(message.payload.error.message);
+        store.setIsRefreshing(false);
         this.rejectPendingLookups(message.payload.error.message);
         if (this.pendingDialogAction) {
           const { reject } = this.pendingDialogAction;

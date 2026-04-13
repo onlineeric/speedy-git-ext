@@ -590,6 +590,7 @@ export class WebviewProvider {
           : commitsSettled.value.success ? '' : commitsSettled.value.error.message;
         if (reason) errors.push(`commits: ${reason}`);
         commitsForPayload = [];
+        hasMore = false;
       }
 
       // Extract uncommitted changes
