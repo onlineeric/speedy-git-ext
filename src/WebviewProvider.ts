@@ -264,12 +264,14 @@ export class WebviewProvider {
 
   /** Trigger a non-disruptive auto-refresh. Drops if already refreshing, defers if panel hidden. */
   async triggerAutoRefresh(): Promise<void> {
+    this.log.info(`[TRACE] triggerAutoRefresh called (visible=${this.isPanelVisible}, refreshing=${this.isRefreshing})`);
     if (!this.isPanelVisible) {
       this.deferredRefresh = true;
       return;
     }
     if (this.isRefreshing) {
       this.pendingRefresh = true;
+      this.log.info('[TRACE] triggerAutoRefresh: queued as pending (already refreshing)');
       return;
     }
     await this.sendInitialData(undefined, true);
@@ -410,11 +412,13 @@ export class WebviewProvider {
   }
 
   async show() {
+    this.log.info('[TRACE] WebviewProvider.show() called');
     if (this.panel) {
       this.panel.reveal();
       return;
     }
 
+    const tShow = performance.now();
     this.panel = vscode.window.createWebviewPanel(
       'speedyGit',
       'Speedy Git',
@@ -464,6 +468,8 @@ export class WebviewProvider {
       this.isPanelVisible = false;
     });
 
+    this.log.info(`[TRACE] webview panel created: ${(performance.now() - tShow).toFixed(0)}ms`);
+
     // Send repo list first so the dropdown is populated before commits arrive
     if (this.gitRepoDiscoveryService) {
       this.sendRepoList(
@@ -500,6 +506,8 @@ export class WebviewProvider {
   }
 
   private async sendInitialData(filters?: Partial<GraphFilters>, isAutoRefresh = false) {
+    const t0 = performance.now();
+    this.log.info(`[TRACE] sendInitialData START (isAutoRefresh=${isAutoRefresh})`);
     // Notify VS Code's Source Control panel to refresh after extension-initiated git operations.
     // Skip during auto-refreshes since those are already triggered by VS Code detecting git changes.
     if (!isAutoRefresh) {
@@ -519,7 +527,9 @@ export class WebviewProvider {
 
       // Check if the filtered branches still exist before fetching commits
       if (effectiveFilters.branches && effectiveFilters.branches.length > 0) {
+        const tBranch = performance.now();
         const branchResult = await this.gitLogService.getBranches();
+        this.log.info(`[TRACE] branch validation: ${(performance.now() - tBranch).toFixed(0)}ms`);
         if (branchResult.success) {
           const branchNames = new Set(
             branchResult.value.flatMap((b) => [b.name, ...(b.remote ? [`${b.remote}/${b.name}`] : [])])
@@ -546,6 +556,16 @@ export class WebviewProvider {
       const batchSize = this.getBatchSize();
       const errors: string[] = [];
 
+      // [TRACE] Wrap each fetch with timing
+      const tFetch = performance.now();
+      const traced = <T>(label: string, promise: Promise<T>): Promise<T> => {
+        const s = performance.now();
+        return promise.then(
+          (v) => { this.log.info(`[TRACE] ${label}: ${(performance.now() - s).toFixed(0)}ms`); return v; },
+          (e) => { this.log.info(`[TRACE] ${label} FAILED: ${(performance.now() - s).toFixed(0)}ms`); throw e; },
+        );
+      };
+
       // Fetch all data sources in parallel using Promise.allSettled for partial failure resilience
       const [
         commitsSettled,
@@ -558,16 +578,17 @@ export class WebviewProvider {
         stashesSettled,
         revertStateSettled,
       ] = await Promise.allSettled([
-        this.gitLogService.getCommits({ ...effectiveFilters, maxCount: batchSize }),
-        this.gitDiffService.getUncommittedSummary(),
-        this.gitLogService.getBranches(),
-        this.gitLogService.getAuthors(),
-        this.gitRemoteService.getRemotes(),
-        this.gitSubmoduleService.getSubmodules(),
-        this.gitWorktreeService.listWorktrees(),
-        this.gitStashService.getStashes(),
-        this.gitRevertService.getRevertState(),
+        traced('getCommits', this.gitLogService.getCommits({ ...effectiveFilters, maxCount: batchSize })),
+        traced('getUncommittedSummary', this.gitDiffService.getUncommittedSummary()),
+        traced('getBranches', this.gitLogService.getBranches()),
+        traced('getAuthors', this.gitLogService.getAuthors()),
+        traced('getRemotes', this.gitRemoteService.getRemotes()),
+        traced('getSubmodules', this.gitSubmoduleService.getSubmodules()),
+        traced('listWorktrees', this.gitWorktreeService.listWorktrees()),
+        traced('getStashes', this.gitStashService.getStashes()),
+        traced('getRevertState', this.gitRevertService.getRevertState()),
       ]);
+      this.log.info(`[TRACE] all parallel fetches done: ${(performance.now() - tFetch).toFixed(0)}ms`);
 
       // Extract commits with fingerprint optimization
       let fetchedCommits: Commit[] = [];
@@ -727,7 +748,9 @@ export class WebviewProvider {
         errors,
       };
 
+      this.log.info(`[TRACE] payload built, commits=${commitsForPayload?.length ?? 'null'}, branches=${branches.length}, authors=${authors.length}`);
       this.postMessage({ type: 'initialData', payload });
+      this.log.info(`[TRACE] initialData posted: ${(performance.now() - t0).toFixed(0)}ms total`);
 
       if (isInitialLoad) {
         this.postMessage({ type: 'loading', payload: { loading: false } });
@@ -787,6 +810,7 @@ export class WebviewProvider {
   }
 
   private async handleMessage(message: RequestMessage) {
+    this.log.info(`[TRACE] handleMessage: ${message.type}`);
     this.log.debug(`Received message: ${message.type}`);
     switch (message.type) {
       case 'getAuthors': {

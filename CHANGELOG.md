@@ -9,6 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [2.3.4] - pre-release - 2026-04-14
+
+### Changed
+Performance tracing version
+
 ## [2.3.3] - pre-release - 2026-04-13
 
 ### Changed
