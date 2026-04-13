@@ -504,7 +504,7 @@ function parseStatusPorcelainV2(output: string): {
         stagedFiles.push({ path, oldPath: origPath, status: xy[0] === 'R' ? 'renamed' : 'copied', stageState: 'staged' });
       }
       if (xy[1] !== '.') {
-        unstagedFiles.push({ path, oldPath: origPath, status: xy[1] === 'R' ? 'renamed' : 'copied', stageState: 'unstaged' });
+        unstagedFiles.push({ path, oldPath: origPath, status: statusLetterToFileStatus(xy[1]), stageState: 'unstaged' });
       }
     } else if (token.startsWith('u ')) {
       // Unmerged entries are handled separately via detectConflictState — skip here
