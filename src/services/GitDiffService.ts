@@ -42,22 +42,18 @@ export class GitDiffService {
 
     const isMerge = meta.parents.length > 1;
 
-    // Get file changes with stats
-    const filesResult = await this.getDiffNameStatus(hash, isMerge);
-    if (!filesResult.success) {
-      return filesResult;
-    }
-
-    // Get stats (additions/deletions) — use -z for correct rename path parsing
-    // For merge commits, diff against first parent explicitly
-    // --no-commit-id prevents the commit hash from being prepended to the output
+    // File changes and numstat are independent — run in parallel
     const numstatArgs = isMerge
       ? ['diff-tree', '--no-commit-id', '--numstat', '-r', '-z', `${hash}^1`, hash]
       : ['diff-tree', '--no-commit-id', '--numstat', '-r', '--root', '-z', hash];
-    const statsResult = await this.executor.execute({
-      args: numstatArgs,
-      cwd: this.workspacePath,
-    });
+    const [filesResult, statsResult] = await Promise.all([
+      this.getDiffNameStatus(hash, isMerge),
+      this.executor.execute({ args: numstatArgs, cwd: this.workspacePath }),
+    ]);
+
+    if (!filesResult.success) {
+      return filesResult;
+    }
 
     if (!statsResult.success) {
       this.log.warn(`Numstat command failed for ${hash.slice(0, 7)}: ${statsResult.error.message}`);

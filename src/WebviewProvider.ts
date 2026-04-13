@@ -576,7 +576,8 @@ export class WebviewProvider {
         this.postMessage({ type: 'error', payload: { error: uncommittedResult.error } });
       }
 
-      // Fetch remaining metadata in parallel
+      // Fetch remaining metadata and revert state in parallel
+      const revertStatePromise = this.gitRevertService.getRevertState();
       const metadataPromises: Promise<void>[] = [
         this.handleMessage({ type: 'getBranches', payload: {} }),
         this.handleMessage({ type: 'getAuthors', payload: {} }),
@@ -588,6 +589,8 @@ export class WebviewProvider {
         metadataPromises.push(this.handleMessage({ type: 'getStashes', payload: {} }));
       }
       await Promise.all(metadataPromises);
+
+      // Cherry-pick and rebase state checks are synchronous (fs.existsSync)
       const cherryPickStateResult = this.gitCherryPickService.getCherryPickState();
       if (cherryPickStateResult.success) {
         this.postMessage({ type: 'cherryPickState', payload: { state: cherryPickStateResult.value } });
@@ -609,7 +612,8 @@ export class WebviewProvider {
         }
       }
 
-      const revertStateResult = await this.gitRevertService.getRevertState();
+      // Revert state was started in parallel with metadata — await it now
+      const revertStateResult = await revertStatePromise;
       if (revertStateResult.success) {
         this.postMessage({ type: 'revertState', payload: { state: revertStateResult.value } });
       }
@@ -1499,7 +1503,6 @@ export class WebviewProvider {
         const result = await this.gitSubmoduleService.updateSubmodule(message.payload.submodulePath);
         if (result.success) {
           this.postMessage({ type: 'submoduleOperationResult', payload: { success: true } });
-          await this.sendSubmodulesData();
           await this.sendInitialData(undefined, true);
         } else {
           this.postMessage({
@@ -1514,7 +1517,6 @@ export class WebviewProvider {
         const result = await this.gitSubmoduleService.initSubmodule(message.payload.submodulePath);
         if (result.success) {
           this.postMessage({ type: 'submoduleOperationResult', payload: { success: true } });
-          await this.sendSubmodulesData();
           await this.sendInitialData(undefined, true);
         } else {
           this.postMessage({
