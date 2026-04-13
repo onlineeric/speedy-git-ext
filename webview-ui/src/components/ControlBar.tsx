@@ -24,7 +24,7 @@ const TOGGLE_BUTTON_COLORS = {
 } as const;
 
 export function ControlBar() {
-  const { branches, filters, setFilters, mergedCommits, loading, totalLoadedWithoutFilter, setActiveToggleWidget, activeToggleWidget } = useGraphStore();
+  const { branches, filters, setFilters, mergedCommits, loading, totalLoadedWithoutFilter, setActiveToggleWidget, activeToggleWidget, isRefreshing } = useGraphStore();
   const graphFilters = useGraphStore((state) => state.filters);
   const [remoteDialogOpen, setRemoteDialogOpen] = useState(false);
 
@@ -60,20 +60,9 @@ export function ControlBar() {
     rpcClient.getCommits({ ...filters, branches: undefined });
   };
 
-  const [refreshing, setRefreshing] = useState(false);
-
   const handleRefresh = () => {
-    setRefreshing(true);
+    useGraphStore.getState().setIsRefreshing(true);
     rpcClient.refresh(filters);
-
-    const timeout = setTimeout(() => setRefreshing(false), 30_000);
-    const unsub = useGraphStore.subscribe((state) => {
-      if (!state.loading) {
-        setRefreshing(false);
-        clearTimeout(timeout);
-        unsub();
-      }
-    });
   };
 
   const [fetching, setFetching] = useState(false);
@@ -146,10 +135,10 @@ export function ControlBar() {
 
       <button
         onClick={handleRefresh}
-        className={`${iconButtonClass} ${refreshing ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}`}
+        className={`${iconButtonClass} ${isRefreshing ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}`}
         title="Refresh"
       >
-        <RefreshIcon className={iconClass} />
+        <RefreshIcon className={`${iconClass}${isRefreshing ? ' animate-spin' : ''}`} />
       </button>
 
       <button
