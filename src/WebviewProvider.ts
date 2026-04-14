@@ -556,7 +556,7 @@ export class WebviewProvider {
       // Fetch all data sources in parallel using Promise.allSettled for partial failure resilience.
       // NOTE: getSubmodules is intentionally NOT included here — it can be slow (`git submodule status`
       // spawns one process per submodule and suffers under process contention). It runs separately
-      // via fetchAndSendSubmodules() after the initial payload is posted, so the graph renders fast.
+      // via sendSubmodulesData() after the initial payload is posted, so the graph renders fast.
       const [
         commitsSettled,
         uncommittedSettled,
@@ -731,7 +731,7 @@ export class WebviewProvider {
 
       // Fetch submodules in the background (non-blocking) — decoupled from the initial
       // payload so `git submodule status` can't block graph render on slow machines.
-      void this.fetchAndSendSubmodules();
+      void this.sendSubmodulesData();
 
       // Fetch GitHub avatars in background (non-blocking), skip if avatars disabled
       if (settings?.avatarsEnabled !== false && fetchedCommits.length > 0) {
@@ -770,8 +770,24 @@ export class WebviewProvider {
     }
   }
 
+  /** Fetch submodules and send to the webview.
+   *
+   * Used by both the initial-load background path (fired after `initialData` is posted
+   * so `git submodule status` cannot block graph render on slow machines) and the
+   * on-demand `getSubmodules` RPC path.
+   *
+   * Captures `fetchGeneration` at entry and drops the result if the generation changed
+   * while the git call was in flight — this prevents a stale in-flight fetch bound to
+   * the previous repo's `GitSubmoduleService` from overwriting the current repo's
+   * submodule panel after a rapid repo switch. */
   private async sendSubmodulesData() {
+    const generation = this.fetchGeneration;
     const result = await this.gitSubmoduleService.getSubmodules();
+    if (generation !== this.fetchGeneration) {
+      // Repo switched while the fetch was in flight; the result belongs to a previous
+      // repo and must not be posted.
+      return;
+    }
     if (result.success) {
       this.postMessage({
         type: 'submodulesData',
@@ -783,22 +799,6 @@ export class WebviewProvider {
     } else {
       this.postMessage({ type: 'error', payload: { error: result.error } });
     }
-  }
-
-  /** Fetch submodules and send to webview as a non-blocking background operation.
-   * Used after the initial data payload is posted to avoid blocking graph render. */
-  private async fetchAndSendSubmodules() {
-    const result = await this.gitSubmoduleService.getSubmodules();
-    if (result.success) {
-      this.postMessage({
-        type: 'submodulesData',
-        payload: {
-          submodules: result.value,
-          stack: this.submoduleHandlers?.getStack() ?? [],
-        },
-      });
-    }
-    // Silently ignore errors — submodule data is non-critical for graph display.
   }
 
   private async handleMessage(message: RequestMessage) {
