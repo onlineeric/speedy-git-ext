@@ -14,6 +14,7 @@ export class GitWorktreeService {
   }
 
   async listWorktrees(): Promise<Result<WorktreeInfo[]>> {
+    this.log.info('List worktrees');
     const result = await this.executor.execute({
       args: ['worktree', 'list', '--porcelain'],
       cwd: this.workspacePath,

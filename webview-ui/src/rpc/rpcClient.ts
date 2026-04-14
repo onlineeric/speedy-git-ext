@@ -219,7 +219,6 @@ class RpcClient {
         store.setConflictState(message.payload);
         break;
       case 'initialData':
-        console.log('[TRACE] initialData message received by rpcClient');
         store.setInitialData(message.payload);
         store.setIsLoadingRepo(false);
         if (message.payload.errors.length > 0) {
