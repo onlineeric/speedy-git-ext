@@ -19,9 +19,9 @@ export function App() {
   const selectCommit = useGraphStore((state) => state.selectCommit);
 
   useEffect(() => {
+    // Settings are sent synchronously by sendInitialData() and submodules arrive
+    // via the decoupled `submodulesData` message — no explicit RPC needed here.
     rpcClient.initialize();
-    rpcClient.getSettings();
-    rpcClient.getSubmodules();
     rootRef.current?.focus();
   }, []);
 

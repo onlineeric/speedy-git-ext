@@ -859,13 +859,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   }),
   setIsRefreshing: (isRefreshing) => set({ isRefreshing }),
   setInitialData: (payload) => {
-    const t0 = performance.now();
-    console.log('[TRACE] setInitialData START', {
-      commits: payload.commits?.length ?? 'null(reuse)',
-      branches: payload.branches.length,
-      stashes: payload.stashes.length,
-      authors: payload.authors.length,
-    });
     const state = get();
     // Use new commits if provided, else reuse existing (fingerprint-unchanged refresh)
     const commits = payload.commits ?? state.commits;
@@ -881,11 +874,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     };
 
     // Compute hidden hashes, merged commits, and topology in one pass
-    const tTopo = performance.now();
     const hiddenCommitHashes = computeHiddenCommitHashes(commits, filters);
     const uncommitted: UncommittedContext = { hasUncommittedChanges: hasChanges, counts, branches: payload.branches };
     const { mergedCommits, topology } = computeMergedTopology(commits, stashes, filters, hiddenCommitHashes, uncommitted);
-    console.log(`[TRACE] topology computation: ${(performance.now() - tTopo).toFixed(0)}ms (${mergedCommits.length} merged commits)`);
 
     // Preserve selection for hashes that still exist
     const newHashSet = new Set(mergedCommits.map((c) => c.hash));
@@ -914,8 +905,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       authorList: payload.authors,
       worktreeList: payload.worktrees,
       worktreeByHead,
-      submodules: payload.submodules,
-      submoduleStack: payload.submoduleStack,
       cherryPickInProgress: payload.cherryPickState === 'in-progress',
       rebaseInProgress: payload.rebaseState === 'in-progress',
       rebaseConflictInfo: payload.rebaseConflictInfo ?? undefined,
@@ -948,7 +937,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedCommits: state.selectedCommits.filter((h) => newHashSet.has(h)),
       lastClickedHash: state.lastClickedHash && newHashSet.has(state.lastClickedHash) ? state.lastClickedHash : undefined,
     });
-    console.log(`[TRACE] setInitialData DONE: ${(performance.now() - t0).toFixed(0)}ms total`);
   },
   setSubmodules: (submodules, stack) => set((state) => ({
     submodules,

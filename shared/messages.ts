@@ -20,9 +20,6 @@ export interface InitialDataPayload {
   authors: Author[];
   /** Worktree list */
   worktrees: WorktreeInfo[];
-  /** Submodule list and navigation stack */
-  submodules: Submodule[];
-  submoduleStack: SubmoduleNavEntry[];
   /** Operation states */
   cherryPickState: CherryPickState;
   rebaseState: RebaseState;

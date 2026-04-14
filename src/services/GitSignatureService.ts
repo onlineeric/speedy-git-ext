@@ -18,7 +18,7 @@ export class GitSignatureService {
 
   constructor(
     private readonly workspacePath: string,
-    log: LogOutputChannel
+    private readonly log: LogOutputChannel
   ) {
     this.executor = new GitExecutor(log);
   }
@@ -27,6 +27,7 @@ export class GitSignatureService {
     const hashCheck = validateHash(hash);
     if (!hashCheck.success) return hashCheck;
 
+    this.log.info(`Get signature info for ${hash.slice(0, 7)}`);
     const result = await this.executor.execute({
       args: ['log', '-1', '--format=%G?%x00%GS%x00%GK%x00%GP%x00%GG', hash],
       cwd: this.workspacePath,

@@ -264,16 +264,17 @@ export class WebviewProvider {
 
   /** Trigger a non-disruptive auto-refresh. Drops if already refreshing, defers if panel hidden. */
   async triggerAutoRefresh(): Promise<void> {
-    this.log.info(`[TRACE] triggerAutoRefresh called (visible=${this.isPanelVisible}, refreshing=${this.isRefreshing})`);
     if (!this.isPanelVisible) {
+      this.log.info('Auto-refresh deferred (panel hidden)');
       this.deferredRefresh = true;
       return;
     }
     if (this.isRefreshing) {
+      this.log.info('Auto-refresh queued (already refreshing)');
       this.pendingRefresh = true;
-      this.log.info('[TRACE] triggerAutoRefresh: queued as pending (already refreshing)');
       return;
     }
+    this.log.info('Auto-refresh triggered');
     await this.sendInitialData(undefined, true);
   }
 
@@ -412,13 +413,11 @@ export class WebviewProvider {
   }
 
   async show() {
-    this.log.info('[TRACE] WebviewProvider.show() called');
     if (this.panel) {
       this.panel.reveal();
       return;
     }
 
-    const tShow = performance.now();
     this.panel = vscode.window.createWebviewPanel(
       'speedyGit',
       'Speedy Git',
@@ -468,8 +467,6 @@ export class WebviewProvider {
       this.isPanelVisible = false;
     });
 
-    this.log.info(`[TRACE] webview panel created: ${(performance.now() - tShow).toFixed(0)}ms`);
-
     // Send repo list first so the dropdown is populated before commits arrive
     if (this.gitRepoDiscoveryService) {
       this.sendRepoList(
@@ -506,11 +503,13 @@ export class WebviewProvider {
   }
 
   private async sendInitialData(filters?: Partial<GraphFilters>, isAutoRefresh = false) {
-    const t0 = performance.now();
-    this.log.info(`[TRACE] sendInitialData START (isAutoRefresh=${isAutoRefresh})`);
+    const loadLabel = isAutoRefresh ? 'auto-refresh' : this.initialLoadSent ? 'refresh' : 'initial';
+    this.log.info(`Loading repo data (${loadLabel})`);
     // Notify VS Code's Source Control panel to refresh after extension-initiated git operations.
     // Skip during auto-refreshes since those are already triggered by VS Code detecting git changes.
-    if (!isAutoRefresh) {
+    // Also skip on the very first load — no git operations have happened yet, and triggering
+    // `repo.status()` here causes a file-watcher cascade that fires a redundant auto-refresh.
+    if (!isAutoRefresh && this.initialLoadSent) {
       this.refreshVSCodeSourceControl();
     }
     this.isRefreshing = true;
@@ -527,9 +526,7 @@ export class WebviewProvider {
 
       // Check if the filtered branches still exist before fetching commits
       if (effectiveFilters.branches && effectiveFilters.branches.length > 0) {
-        const tBranch = performance.now();
         const branchResult = await this.gitLogService.getBranches();
-        this.log.info(`[TRACE] branch validation: ${(performance.now() - tBranch).toFixed(0)}ms`);
         if (branchResult.success) {
           const branchNames = new Set(
             branchResult.value.flatMap((b) => [b.name, ...(b.remote ? [`${b.remote}/${b.name}`] : [])])
@@ -556,39 +553,29 @@ export class WebviewProvider {
       const batchSize = this.getBatchSize();
       const errors: string[] = [];
 
-      // [TRACE] Wrap each fetch with timing
-      const tFetch = performance.now();
-      const traced = <T>(label: string, promise: Promise<T>): Promise<T> => {
-        const s = performance.now();
-        return promise.then(
-          (v) => { this.log.info(`[TRACE] ${label}: ${(performance.now() - s).toFixed(0)}ms`); return v; },
-          (e) => { this.log.info(`[TRACE] ${label} FAILED: ${(performance.now() - s).toFixed(0)}ms`); throw e; },
-        );
-      };
-
-      // Fetch all data sources in parallel using Promise.allSettled for partial failure resilience
+      // Fetch all data sources in parallel using Promise.allSettled for partial failure resilience.
+      // NOTE: getSubmodules is intentionally NOT included here — it can be slow (`git submodule status`
+      // spawns one process per submodule and suffers under process contention). It runs separately
+      // via sendSubmodulesData() after the initial payload is posted, so the graph renders fast.
       const [
         commitsSettled,
         uncommittedSettled,
         branchesSettled,
         authorsSettled,
         remotesSettled,
-        submodulesSettled,
         worktreesSettled,
         stashesSettled,
         revertStateSettled,
       ] = await Promise.allSettled([
-        traced('getCommits', this.gitLogService.getCommits({ ...effectiveFilters, maxCount: batchSize })),
-        traced('getUncommittedSummary', this.gitDiffService.getUncommittedSummary()),
-        traced('getBranches', this.gitLogService.getBranches()),
-        traced('getAuthors', this.gitLogService.getAuthors()),
-        traced('getRemotes', this.gitRemoteService.getRemotes()),
-        traced('getSubmodules', this.gitSubmoduleService.getSubmodules()),
-        traced('listWorktrees', this.gitWorktreeService.listWorktrees()),
-        traced('getStashes', this.gitStashService.getStashes()),
-        traced('getRevertState', this.gitRevertService.getRevertState()),
+        this.gitLogService.getCommits({ ...effectiveFilters, maxCount: batchSize }),
+        this.gitDiffService.getUncommittedSummary(),
+        this.gitLogService.getBranches(),
+        this.gitLogService.getAuthors(),
+        this.gitRemoteService.getRemotes(),
+        this.gitWorktreeService.listWorktrees(),
+        this.gitStashService.getStashes(),
+        this.gitRevertService.getRevertState(),
       ]);
-      this.log.info(`[TRACE] all parallel fetches done: ${(performance.now() - tFetch).toFixed(0)}ms`);
 
       // Extract commits with fingerprint optimization
       let fetchedCommits: Commit[] = [];
@@ -662,17 +649,6 @@ export class WebviewProvider {
         if (reason) errors.push(`remotes: ${reason}`);
       }
 
-      // Extract submodules
-      let submodules: import('../shared/types.js').Submodule[] = [];
-      if (submodulesSettled.status === 'fulfilled' && submodulesSettled.value.success) {
-        submodules = submodulesSettled.value.value;
-      } else {
-        const reason = submodulesSettled.status === 'rejected'
-          ? String(submodulesSettled.reason)
-          : submodulesSettled.value.success ? '' : submodulesSettled.value.error.message;
-        if (reason) errors.push(`submodules: ${reason}`);
-      }
-
       // Extract worktrees
       let worktrees: import('../shared/types.js').WorktreeInfo[] = [];
       if (worktreesSettled.status === 'fulfilled' && worktreesSettled.value.success) {
@@ -739,8 +715,6 @@ export class WebviewProvider {
         remotes,
         authors,
         worktrees,
-        submodules,
-        submoduleStack: this.submoduleHandlers?.getStack() ?? [],
         cherryPickState,
         rebaseState,
         rebaseConflictInfo,
@@ -748,14 +722,16 @@ export class WebviewProvider {
         errors,
       };
 
-      this.log.info(`[TRACE] payload built, commits=${commitsForPayload?.length ?? 'null'}, branches=${branches.length}, authors=${authors.length}`);
       this.postMessage({ type: 'initialData', payload });
-      this.log.info(`[TRACE] initialData posted: ${(performance.now() - t0).toFixed(0)}ms total`);
 
       if (isInitialLoad) {
         this.postMessage({ type: 'loading', payload: { loading: false } });
         this.initialLoadSent = true;
       }
+
+      // Fetch submodules in the background (non-blocking) — decoupled from the initial
+      // payload so `git submodule status` can't block graph render on slow machines.
+      void this.sendSubmodulesData();
 
       // Fetch GitHub avatars in background (non-blocking), skip if avatars disabled
       if (settings?.avatarsEnabled !== false && fetchedCommits.length > 0) {
@@ -794,8 +770,24 @@ export class WebviewProvider {
     }
   }
 
+  /** Fetch submodules and send to the webview.
+   *
+   * Used by both the initial-load background path (fired after `initialData` is posted
+   * so `git submodule status` cannot block graph render on slow machines) and the
+   * on-demand `getSubmodules` RPC path.
+   *
+   * Captures `fetchGeneration` at entry and drops the result if the generation changed
+   * while the git call was in flight — this prevents a stale in-flight fetch bound to
+   * the previous repo's `GitSubmoduleService` from overwriting the current repo's
+   * submodule panel after a rapid repo switch. */
   private async sendSubmodulesData() {
+    const generation = this.fetchGeneration;
     const result = await this.gitSubmoduleService.getSubmodules();
+    if (generation !== this.fetchGeneration) {
+      // Repo switched while the fetch was in flight; the result belongs to a previous
+      // repo and must not be posted.
+      return;
+    }
     if (result.success) {
       this.postMessage({
         type: 'submodulesData',
@@ -810,7 +802,6 @@ export class WebviewProvider {
   }
 
   private async handleMessage(message: RequestMessage) {
-    this.log.info(`[TRACE] handleMessage: ${message.type}`);
     this.log.debug(`Received message: ${message.type}`);
     switch (message.type) {
       case 'getAuthors': {

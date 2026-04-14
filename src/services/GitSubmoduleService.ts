@@ -1,4 +1,6 @@
 import type { LogOutputChannel } from 'vscode';
+import * as path from 'path';
+import { existsSync } from 'fs';
 import { GitExecutor } from './GitExecutor.js';
 import { type Result, ok } from '../../shared/errors.js';
 import type { Submodule, SubmoduleStatus } from '../../shared/types.js';
@@ -12,12 +14,22 @@ export class GitSubmoduleService {
 
   constructor(
     private readonly workspacePath: string,
-    log: LogOutputChannel
+    private readonly log: LogOutputChannel
   ) {
     this.executor = new GitExecutor(log);
   }
 
   async getSubmodules(): Promise<Result<Submodule[]>> {
+    // Fast-path: skip all git commands if no .gitmodules file exists.
+    // `git submodule status` is very slow on some systems (2s+), so avoid
+    // spawning it in the common case where the repo has no submodules.
+    const gitmodulesPath = path.join(this.workspacePath, '.gitmodules');
+    if (!existsSync(gitmodulesPath)) {
+      this.log.info('Get submodules (skipped: no .gitmodules)');
+      return ok([]);
+    }
+
+    this.log.info('Get submodules');
     const [statusResult, pathMap, urlMap] = await Promise.all([
       this.executor.execute({
         args: ['submodule', 'status'],
@@ -48,6 +60,7 @@ export class GitSubmoduleService {
   }
 
   async updateSubmodule(submodulePath: string): Promise<Result<string>> {
+    this.log.info(`Update submodule: ${submodulePath}`);
     const result = await this.executor.execute({
       args: ['submodule', 'update', '--init', '--', submodulePath],
       cwd: this.workspacePath,
@@ -61,6 +74,7 @@ export class GitSubmoduleService {
   }
 
   async initSubmodule(submodulePath: string): Promise<Result<string>> {
+    this.log.info(`Init submodule: ${submodulePath}`);
     const result = await this.executor.execute({
       args: ['submodule', 'update', '--init', '--', submodulePath],
       cwd: this.workspacePath,

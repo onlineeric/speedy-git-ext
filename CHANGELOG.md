@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [3.0.0] - 2026-04-14
+- Included everything in v2.3.x - Uncommitted Node feature, which only published as pre-release
+- Performance tuning to start the extension fast, removed unnecessary and redundant data fetching.
+
 ## [2.3.4] - pre-release - 2026-04-14
 
 ### Changed

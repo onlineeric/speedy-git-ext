@@ -238,7 +238,6 @@ export class ExtensionController {
     }
 
     if (!this.gitWatcherService) {
-      const tWatcher = performance.now();
       this.gitWatcherService = new GitWatcherService(this.log);
       this.context.subscriptions.push(this.gitWatcherService);
       this.gitWatcherService.onDidDetectChange(() => {
@@ -247,7 +246,6 @@ export class ExtensionController {
         });
       });
       await this.gitWatcherService.initialize(workspacePath);
-      this.log.info(`[TRACE] GitWatcherService initialized: ${(performance.now() - tWatcher).toFixed(0)}ms`);
     }
 
     await this.webviewProvider.show();
