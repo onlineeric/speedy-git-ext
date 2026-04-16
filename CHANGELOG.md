@@ -9,6 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [3.0.1] - 2026-04-16
+
+### Fixed
+- Interactive rebase no longer fails on Windows with "command not found" — temp script paths passed to Git's shell (GIT_SEQUENCE_EDITOR, GIT_EDITOR) are now normalized to forward slashes, preventing Git Bash from stripping backslashes
+
 ## [3.0.0] - 2026-04-14
 - Included everything in v2.3.x - Uncommitted Node feature, which only published as pre-release
 - Performance tuning to start the extension fast, removed unnecessary and redundant data fetching.
