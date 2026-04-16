@@ -10,6 +10,11 @@ import { validateHash, validateRefName } from '../utils/gitValidation.js';
 import { isDirtyWorkingTree } from '../utils/gitQueries.js';
 import { isConflictStderr } from '../utils/gitParsers.js';
 
+/** Convert Windows backslash paths to forward slashes for Git shell compatibility */
+function toShellPath(p: string): string {
+  return p.replace(/\\/g, '/');
+}
+
 export class GitRebaseService {
   private executor: GitExecutor;
   private readonly rebaseMergeDir: string;
@@ -115,10 +120,10 @@ export class GitRebaseService {
 
     this.writeTempScripts(tmpDir, config);
 
-    const sequenceEditor = path.join(tmpDir, 'sequence-editor.sh');
-    const messageEditor = path.join(tmpDir, 'editor.sh');
-    const todoPath = path.join(tmpDir, 'todo.txt');
-    const counterPath = path.join(tmpDir, 'counter.txt');
+    const sequenceEditor = toShellPath(path.join(tmpDir, 'sequence-editor.sh'));
+    const messageEditor = toShellPath(path.join(tmpDir, 'editor.sh'));
+    const todoPath = toShellPath(path.join(tmpDir, 'todo.txt'));
+    const counterPath = toShellPath(path.join(tmpDir, 'counter.txt'));
 
     this.log.info(`Interactive rebase from: ${config.baseHash}`);
     const result = await this.executor.execute({
@@ -128,7 +133,7 @@ export class GitRebaseService {
         GIT_SEQUENCE_EDITOR: sequenceEditor,
         GIT_EDITOR: messageEditor,
         SPEEDY_TODO_FILE: todoPath,
-        SPEEDY_REBASE_DIR: tmpDir,
+        SPEEDY_REBASE_DIR: toShellPath(tmpDir),
         SPEEDY_COUNTER_FILE: counterPath,
       },
     });
@@ -164,7 +169,7 @@ export class GitRebaseService {
   async continueRebase(): Promise<Result<string>> {
     this.log.info('Continue rebase');
     const editorEnv = this.activeTmpDir
-      ? { GIT_EDITOR: path.join(this.activeTmpDir, 'editor.sh') }
+      ? { GIT_EDITOR: toShellPath(path.join(this.activeTmpDir, 'editor.sh')) }
       : { GIT_EDITOR: 'true' };
     const result = await this.executor.execute({
       args: ['rebase', '--continue'],
