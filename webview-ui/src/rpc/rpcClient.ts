@@ -503,14 +503,6 @@ class RpcClient {
     this.send({ type: 'getSubmodules', payload: {} });
   }
 
-  openSubmodule(submodulePath: string) {
-    this.send({ type: 'openSubmodule', payload: { submodulePath } });
-  }
-
-  backToParentRepo() {
-    this.send({ type: 'backToParentRepo', payload: {} });
-  }
-
   updateSubmodule(submodulePath: string) {
     this.send({ type: 'updateSubmodule', payload: { submodulePath } });
   }

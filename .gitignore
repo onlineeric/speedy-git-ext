@@ -4,6 +4,7 @@ build/
 *.vsix
 .vscode-test/
 test-repo/
+test-repo-submodules/
 *.log
 .env*
 .DS_Store

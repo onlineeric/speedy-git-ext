@@ -211,16 +211,17 @@ export class ExtensionController {
         workspacePath
       );
       this.webviewProvider.setSwitchRepoHandler((repoPath) => this.switchActiveRepo(repoPath));
+      this.webviewProvider.setDisplayRepoHandler((repoPath) => this.reinitServices(repoPath));
       this.webviewProvider.setSettingsProvider(() => this.readUserSettings());
       this.webviewProvider.setSubmoduleNavigationHandlers({
         getStack: () => [...this.submoduleStack],
+        // Selector-driven submodule navigation uses `switchRepo` directly; this
+        // legacy handler no longer mutates `submoduleStack`. Kept wired only
+        // because the RequestMessage variant is still in `shared/messages.ts`
+        // (deprecated; removed in a follow-up — see tasks T045).
         openSubmodule: async (submodulePath) => {
           const repoPath = this.getCurrentRepoPath();
           if (!repoPath) return;
-          this.submoduleStack = [
-            ...this.submoduleStack,
-            { repoPath, repoName: path.basename(repoPath) },
-          ];
           this.reinitServices(path.resolve(repoPath, submodulePath));
         },
         backToParentRepo: async () => {

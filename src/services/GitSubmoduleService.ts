@@ -128,6 +128,9 @@ export class GitSubmoduleService {
     const [, prefix, hash, submodulePath, describe = ''] = match;
     const status = this.getStatus(prefix);
     const url = this.findUrlForPath(submodulePath, pathMap, urlMap);
+    const initialized =
+      status !== 'uninitialized' &&
+      existsSync(path.join(this.workspacePath, submodulePath, '.git'));
 
     return {
       path: submodulePath,
@@ -135,6 +138,7 @@ export class GitSubmoduleService {
       status,
       describe,
       url,
+      initialized,
     };
   }
 
