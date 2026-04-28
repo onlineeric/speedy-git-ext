@@ -124,6 +124,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "generate-test-repo": "tsx scripts/main.ts",
+    "generate-submodule-repos": "tsx scripts/generate-submodule-repos.ts",
     "test": "vitest run",
     "ext:package": "npx @vscode/vsce package --no-dependencies",
     "ext:publish": "pnpm run ext:publish:vscode && pnpm run ext:publish:cursor",
