@@ -151,6 +151,17 @@ export class WebviewProvider {
   private gitHubAvatarInitialized = false;
   private isRefreshing = false;
   private pendingRefresh = false;
+  /**
+   * Whether the currently displayed repo is a submodule navigated via the
+   * submodule selector (`displayRepo`) rather than the workspace's active
+   * parent repo. While `true`, every `sendInitialData()` skips the submodules
+   * background fetch — the webview's `submodules` state is keyed to the
+   * parent and must not be overwritten with the submodule's own (typically
+   * empty) submodule list, which would hide the submodule selector. Cleared
+   * on `switchRepo` and on a `displayRepo` whose path equals the workspace
+   * active parent (i.e. the submodule selector's parent option).
+   */
+  private isDisplayingSubmodule = false;
   private isPanelVisible = false;
   private deferredRefresh = false;
   /** Tracks whether the initial load has been sent — subsequent loads are "refreshes" and should not show loading overlay */
@@ -197,6 +208,18 @@ export class WebviewProvider {
   /** Register the callback that reinitializes services for a new repo path */
   setSwitchRepoHandler(handler: (repoPath: string) => void) {
     this.onSwitchRepo = handler;
+  }
+
+  /**
+   * Callback invoked when the user navigates within a parent's submodule context
+   * (parent ↔ submodule, sub ↔ sub) WITHOUT changing the workspace's active repo.
+   * Rebinds services to the new path; does NOT touch GitRepoDiscoveryService state.
+   */
+  private onDisplayRepo: ((repoPath: string) => void) | undefined;
+
+  /** Register the callback that rebinds services for submodule selector navigation */
+  setDisplayRepoHandler(handler: (repoPath: string) => void) {
+    this.onDisplayRepo = handler;
   }
 
   setSettingsProvider(handler: () => UserSettings) {
@@ -465,6 +488,19 @@ export class WebviewProvider {
     this.panel.onDidDispose(() => {
       this.panel = undefined;
       this.isPanelVisible = false;
+      // Submodule selection is not persisted across panel reloads (FR-008a),
+      // so on dispose, drop any submodule-display context and rebind services
+      // to the workspace's active parent. Without this, a panel reopen after
+      // viewing a submodule would leave the backend bound to the submodule
+      // while the webview resets to the parent option, producing a graph view
+      // that disagrees with the repo selector.
+      if (this.isDisplayingSubmodule) {
+        this.isDisplayingSubmodule = false;
+        const parentPath = this.gitRepoDiscoveryService?.getActiveRepoPath();
+        if (parentPath) {
+          this.onDisplayRepo?.(parentPath);
+        }
+      }
     });
 
     // Send repo list first so the dropdown is populated before commits arrive
@@ -731,7 +767,12 @@ export class WebviewProvider {
 
       // Fetch submodules in the background (non-blocking) — decoupled from the initial
       // payload so `git submodule status` can't block graph render on slow machines.
-      void this.sendSubmodulesData();
+      // Skipped while a submodule is the displayed repo (FR-017): the webview's
+      // submodules state is keyed to the parent, and the displayed submodule's own
+      // submodules are not relevant to the parent's selector.
+      if (!this.isDisplayingSubmodule) {
+        void this.sendSubmodulesData();
+      }
 
       // Fetch GitHub avatars in background (non-blocking), skip if avatars disabled
       if (settings?.avatarsEnabled !== false && fetchedCommits.length > 0) {
@@ -1676,12 +1717,46 @@ export class WebviewProvider {
         // backend's remembered filters before reloading commits.
         this.currentFilters = { maxCount: this.currentFilters.maxCount };
 
+        // Workspace active repo changed: clear the submodule-display flag so
+        // subsequent refreshes fetch submodules for the new active parent.
+        this.isDisplayingSubmodule = false;
+
         // Reinitialize services and clear submodule stack for the new repo
         // (switchActiveRepo also calls discovery.setActiveRepo internally)
         this.onSwitchRepo?.(repoPath);
 
         // Send updated repo list immediately so the dropdown reflects the switch
         this.sendRepoList(discovery.getRepos(), discovery.getActiveRepoPath());
+        if (currentGeneration !== this.fetchGeneration) {
+          break;
+        }
+        await this.sendInitialData();
+        break;
+      }
+      case 'displayRepo': {
+        // Submodule selector navigation: change the displayed repo (rebind services)
+        // WITHOUT touching the workspace's active repo. The repo selector remains
+        // visibly fixed on the parent (FR-017). No path validation against the
+        // workspace `repos` list — submodule paths typically aren't in it.
+        const { repoPath } = message.payload;
+        const discovery = this.gitRepoDiscoveryService;
+        if (!discovery) break;
+
+        this.fetchGeneration++;
+        const currentGeneration = this.fetchGeneration;
+
+        // Reset remembered filters so the new context starts clean.
+        this.currentFilters = { maxCount: this.currentFilters.maxCount };
+
+        // Track whether the displayed repo is a submodule (path differs from
+        // the workspace active parent) or the parent itself (parent option in
+        // the submodule selector). Subsequent refreshes consult this flag to
+        // decide whether to refetch submodules.
+        const activeParent = discovery.getActiveRepoPath();
+        this.isDisplayingSubmodule = repoPath !== activeParent;
+
+        this.onDisplayRepo?.(repoPath);
+
         if (currentGeneration !== this.fetchGeneration) {
           break;
         }

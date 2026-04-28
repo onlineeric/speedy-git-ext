@@ -9,6 +9,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [3.1.0] - 2026-04-28
+
+### Added
+- Submodule selector control next to the repo selector for parent repos that have at least one initialized submodule — defaults to the parent option and lists direct submodules alphabetically by name (case-insensitive)
+- Switch directly between two submodules of the same parent in a single selection via the submodule selector, without returning to the parent first
+- Repo selector is now a filterable combo box with a text-filter input at the top of the dropdown — type a partial substring to narrow the list using case-insensitive matching, matching the existing branches filter style
+- Submodule selector is also a filterable combo box with identical layout, filter behavior, and keyboard/focus contract as the repo selector and branches filter
+- Left-to-right reset chain across the top menu — changing the repo selector resets the submodule selector to the parent option (or hides it) and clears the filter/search group's content; changing the submodule selector clears only the filter/search group's content
+- Filter and search panels keep their open/closed toggle state across these resets — only the panel content is cleared, never the user's panel-layout choice
+
+### Changed
+- A submodule reached via a parent's submodule selector now produces a graph view identical to the same submodule reached as an auto-discovered sub-repo in the repo selector — same commits, same controls, same git operation behavior, with no special header or modal "submodule mode"
+- Submodule selector always starts at the parent option on panel reload and VS Code restart; previously-selected submodules are not persisted across sessions or repo selector changes
+
+### Removed
+- Removed the submodule header row that previously appeared above the graph for parent repos with submodules
+- Removed the "Back to parent" button — navigate via the submodule selector instead
+- Removed the legacy `<repo> / Current` title formatting that accompanied the header row
+- Removed specially-added submodule entries from the repo selector (e.g., `<parent>-submodules/<submodule>`); only auto-discovered sub-repo entries remain, eliminating duplicate listings for the same submodule
+
 ## [3.0.1] - 2026-04-16
 
 ### Fixed

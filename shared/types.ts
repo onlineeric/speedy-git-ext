@@ -38,8 +38,20 @@ export interface Submodule {
   status: SubmoduleStatus;
   describe: string;
   url?: string;
+  /**
+   * True iff status !== 'uninitialized' AND <parent>/<path>/.git exists on disk.
+   * The submodule selector includes only entries with `initialized === true`.
+   * Computed by `GitSubmoduleService.parseSubmoduleLine` (FR-006, R5).
+   */
+  initialized: boolean;
 }
 
+/**
+ * @deprecated since 041-submodule-selector — submodule navigation is now driven by
+ * the submodule selector in the toolbar, which uses `switchRepo` directly. This
+ * type is retained as a transitional empty array on `submodulesData` payloads to
+ * avoid touching every consumer in this PR. A follow-up will remove it.
+ */
 export interface SubmoduleNavEntry {
   repoPath: string;
   repoName: string;
