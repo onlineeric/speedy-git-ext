@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { Submodule } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { CommitRow } from './CommitRow';
@@ -10,7 +8,6 @@ import { CommitTableRow } from './CommitTableRow';
 import { CherryPickConflictBanner } from './CherryPickConflictBanner';
 import { RebaseConflictBanner } from './RebaseConflictBanner';
 import { TogglePanel } from './TogglePanel';
-import { SubmoduleBreadcrumb } from './SubmoduleBreadcrumb';
 import { CommitTooltip } from './CommitTooltip';
 import { useTooltipHover } from '../hooks/useTooltipHover';
 import { resolveCommitTableLayout } from '../utils/commitTableLayout';
@@ -31,7 +28,7 @@ function computeMaxVisibleRefs(width: number): number {
 }
 
 export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContainerProps) {
-  const { mergedCommits: commits, topology, maxVisibleRefs, setMaxVisibleRefs, submodules } = useGraphStore();
+  const { mergedCommits: commits, topology, maxVisibleRefs, setMaxVisibleRefs } = useGraphStore();
   const prefetching = useGraphStore((state) => state.prefetching);
   const hasMore = useGraphStore((state) => state.hasMore);
   const lastBatchStartIndex = useGraphStore((state) => state.lastBatchStartIndex);
@@ -241,9 +238,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
     <div className="flex h-full flex-col overflow-hidden">
       <CherryPickConflictBanner />
       <RebaseConflictBanner />
-      <SubmoduleBreadcrumb />
       <TogglePanel />
-      <SubmoduleSection submodules={submodules} />
       {isEmpty ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 text-[var(--vscode-descriptionForeground)]">
           {loading || prefetching
@@ -374,83 +369,3 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
   );
 }
 
-function SubmoduleSection({ submodules }: { submodules: Submodule[] }) {
-  if (submodules.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="border-b border-[var(--vscode-panel-border)] px-4 py-2">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--vscode-descriptionForeground)]">
-        Submodules
-      </div>
-
-      <div className="space-y-1">
-        {submodules.map((submodule) => (
-          <SubmoduleRow key={submodule.path} submodule={submodule} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SubmoduleRow({ submodule }: { submodule: Submodule }) {
-  const statusColor = getSubmoduleStatusColor(submodule.status);
-
-  return (
-    <ContextMenu.Root>
-      <ContextMenu.Trigger asChild>
-        <button
-          type="button"
-          onClick={() => rpcClient.openSubmodule(submodule.path)}
-          className="flex w-full items-center gap-3 rounded px-2 py-1 text-left text-sm hover:bg-[var(--vscode-list-hoverBackground)]"
-        >
-          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: statusColor }} />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate">{submodule.path}</span>
-            <span className="block truncate text-xs text-[var(--vscode-descriptionForeground)]">
-              {submodule.hash.slice(0, 7)}
-              {submodule.describe ? ` · ${submodule.describe}` : ''}
-            </span>
-          </span>
-          <span className="text-xs uppercase text-[var(--vscode-descriptionForeground)]">
-            {submodule.status}
-          </span>
-        </button>
-      </ContextMenu.Trigger>
-      <ContextMenu.Portal>
-        <ContextMenu.Content className="min-w-[190px] rounded border border-[var(--vscode-menu-border)] bg-[var(--vscode-menu-background)] py-1 shadow-lg">
-          <ContextMenu.Item
-            className="cursor-pointer px-3 py-1.5 text-sm text-[var(--vscode-menu-foreground)] outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]"
-            onSelect={() => rpcClient.openSubmodule(submodule.path)}
-          >
-            Open Submodule
-          </ContextMenu.Item>
-          <ContextMenu.Item
-            className="cursor-pointer px-3 py-1.5 text-sm text-[var(--vscode-menu-foreground)] outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]"
-            onSelect={() => rpcClient.updateSubmodule(submodule.path)}
-          >
-            Update Submodule
-          </ContextMenu.Item>
-          <ContextMenu.Item
-            className="cursor-pointer px-3 py-1.5 text-sm text-[var(--vscode-menu-foreground)] outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]"
-            onSelect={() => rpcClient.initSubmodule(submodule.path)}
-          >
-            Initialize Submodule
-          </ContextMenu.Item>
-        </ContextMenu.Content>
-      </ContextMenu.Portal>
-    </ContextMenu.Root>
-  );
-}
-
-function getSubmoduleStatusColor(status: Submodule['status']): string {
-  switch (status) {
-    case 'clean':
-      return 'var(--vscode-testing-iconPassed)';
-    case 'dirty':
-      return 'var(--vscode-testing-iconErrored)';
-    case 'uninitialized':
-      return 'var(--vscode-testing-iconQueued)';
-  }
-}

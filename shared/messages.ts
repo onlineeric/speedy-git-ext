@@ -88,9 +88,21 @@ export type RequestMessage =
   | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string } } }
   | { type: 'openSettings'; payload: Record<string, never> }
   | { type: 'switchRepo'; payload: { repoPath: string } }
+  /**
+   * Show a different repository in the graph WITHOUT changing the workspace's
+   * active repo. Used by the submodule selector: navigates among the parent's
+   * submodules (or back to the parent) while leaving the repo selector visibly
+   * fixed on the parent (FR-017).
+   *
+   * `repoPath` is an absolute filesystem path. It is NOT validated against the
+   * workspace `repos` list — submodule paths typically aren't in that list.
+   */
+  | { type: 'displayRepo'; payload: { repoPath: string } }
   | { type: 'getSettings'; payload: Record<string, never> }
   | { type: 'getSubmodules'; payload: Record<string, never> }
+  /** @deprecated since 041-submodule-selector — selector navigation uses switchRepo. Handler kept for legacy compatibility; will be removed in a follow-up. */
   | { type: 'openSubmodule'; payload: { submodulePath: string } }
+  /** @deprecated since 041-submodule-selector — selector navigation uses switchRepo. Handler kept for legacy compatibility; will be removed in a follow-up. */
   | { type: 'backToParentRepo'; payload: Record<string, never> }
   | { type: 'updateSubmodule'; payload: { submodulePath: string } }
   | { type: 'initSubmodule'; payload: { submodulePath: string } }
@@ -175,7 +187,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   rebase: true, interactiveRebase: true, getRebaseCommits: true,
   abortRebase: true, continueRebase: true,
   getSignatureInfo: true, dropCommit: true, isCommitPushed: true, getCommitParents: true,
-  loadMoreCommits: true, openSettings: true, switchRepo: true,
+  loadMoreCommits: true, openSettings: true, switchRepo: true, displayRepo: true,
   getSettings: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
   updateSubmodule: true, initSubmodule: true,
   stashAndCheckout: true, stashAndCheckoutCommit: true,

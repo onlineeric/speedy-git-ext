@@ -110,7 +110,24 @@ interface GraphStore {
   pendingCommitCheckout: { hash: string } | null;
   pendingForceDeleteBranch: { name: string; deleteRemote?: { remote: string; name: string } } | null;
   repos: RepoInfo[];
-  activeRepoPath: string;
+  /**
+   * Path the user has selected in the repo selector. Equals the parent path
+   * when a submodule is being viewed via the submodule selector (the repo
+   * selector visibly stays on the parent — FR-017).
+   */
+  activeParentRepoPath: string;
+  /**
+   * Path whose commits are currently rendered in the graph. Equals
+   * `activeParentRepoPath` unless a submodule is selected, in which case it
+   * equals the submodule's resolved absolute path.
+   */
+  displayedRepoPath: string;
+  /**
+   * Submodule selector's current value. 'parent' means the parent option is
+   * selected; otherwise equals one of the parent's initialized submodule paths
+   * (matching `submodule.path` exactly).
+   */
+  submoduleSelection: 'parent' | string;
   isLoadingRepo: boolean;
   userSettings: UserSettings;
   pendingUserSettings: UserSettings | undefined;
@@ -193,6 +210,8 @@ interface GraphStore {
   setPendingForceDeleteBranch: (pending: { name: string; deleteRemote?: { remote: string; name: string } } | null) => void;
   setRepos: (repos: RepoInfo[], activeRepoPath: string) => void;
   setActiveRepo: (repoPath: string) => void;
+  setSubmoduleSelection: (value: 'parent' | string) => void;
+  resetTopMenuGroup: () => void;
   setIsLoadingRepo: (v: boolean) => void;
   setUserSettings: (settings: UserSettings) => void;
   openSearch: () => void;
@@ -348,6 +367,15 @@ function computeMergedTopology(
   return { mergedCommits, topology: calculateTopology(allWithStashes, hiddenHashes, mergedCommits) };
 }
 
+/**
+ * Join a parent repo absolute path with a submodule's relative path using forward
+ * slashes. The webview is a sandboxed browser bundle and cannot import Node's
+ * `path` module, so we normalize manually and collapse duplicate slashes.
+ */
+function joinRepoPath(parent: string, sub: string): string {
+  return `${parent.replace(/\/$/, '')}/${sub.replace(/^\/+/, '')}`.replace(/\/+/g, '/');
+}
+
 export const useGraphStore = create<GraphStore>((set, get) => ({
   commits: [],
   branches: [],
@@ -386,7 +414,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   pendingCommitCheckout: null,
   pendingForceDeleteBranch: null,
   repos: [],
-  activeRepoPath: '',
+  activeParentRepoPath: '',
+  displayedRepoPath: '',
+  submoduleSelection: 'parent',
   isLoadingRepo: false,
   userSettings: { ...DEFAULT_USER_SETTINGS },
   pendingUserSettings: undefined,
@@ -671,19 +701,36 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setPendingCommitCheckout: (pendingCommitCheckout) => set({ pendingCommitCheckout }),
   setPendingForceDeleteBranch: (pending) => set({ pendingForceDeleteBranch: pending }),
   setRepos: (repos, activeRepoPath) => {
-    const { activeRepoPath: prevPath } = get();
-    const repoChanged = prevPath !== '' && prevPath !== activeRepoPath;
-    if (repoChanged) {
+    const { activeParentRepoPath: prevPath } = get();
+    const isInitialLoad = prevPath === '';
+    const parentChanged = !isInitialLoad && prevPath !== activeRepoPath;
+    if (parentChanged) {
       get().resetAllFilters({ preserveBranches: false });
     }
+    // Preserve `submoduleSelection` and `displayedRepoPath` when the workspace
+    // active repo did not change (e.g., the backend re-emitted `repoList` after
+    // a submodule selector navigation). FR-017: the repo selector stays on the
+    // parent while a submodule is being viewed.
     set({
       repos,
-      activeRepoPath,
-      ...(repoChanged ? { pendingCommitCheckout: null } : {}),
+      activeParentRepoPath: activeRepoPath,
+      ...(parentChanged || isInitialLoad
+        ? {
+            submoduleSelection: 'parent' as const,
+            displayedRepoPath: activeRepoPath,
+            ...(parentChanged ? { pendingCommitCheckout: null } : {}),
+          }
+        : {}),
     });
   },
   setActiveRepo: (repoPath) => {
+    // Repo selector change resets the entire top-menu group (FR-022) and the
+    // submodule selector to 'parent' (FR-008).
+    get().resetTopMenuGroup();
     set({
+      activeParentRepoPath: repoPath,
+      submoduleSelection: 'parent',
+      displayedRepoPath: repoPath,
       isLoadingRepo: true,
       pendingCommitCheckout: null,
       selectedCommit: undefined,
@@ -698,6 +745,52 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     }).catch(() => {
       set({ isLoadingRepo: false });
     });
+  },
+  setSubmoduleSelection: (value) => {
+    const { activeParentRepoPath } = get();
+    const displayedRepoPath =
+      value === 'parent' ? activeParentRepoPath : joinRepoPath(activeParentRepoPath, value);
+    // Submodule selector change resets the filter/search group (FR-023) but
+    // does NOT touch activeToggleWidget (FR-024) and does NOT change the repo
+    // selector value (FR-017).
+    get().resetTopMenuGroup();
+    set({
+      submoduleSelection: value,
+      displayedRepoPath,
+      isLoadingRepo: true,
+      pendingCommitCheckout: null,
+      selectedCommit: undefined,
+      selectedCommitIndex: -1,
+      selectedCommits: [],
+      lastClickedHash: undefined,
+      commitDetails: undefined,
+      detailsPanelOpen: false,
+    });
+    import('../rpc/rpcClient').then(({ rpcClient }) => {
+      // Submodule selector navigation: change the displayed repo without
+      // touching the workspace's active repo (FR-017). The repo selector
+      // stays visibly fixed on the parent.
+      rpcClient.send({ type: 'displayRepo', payload: { repoPath: displayedRepoPath } });
+    }).catch(() => {
+      set({ isLoadingRepo: false });
+    });
+  },
+  /**
+   * Centralized left→right reset entry point invoked when the repo or
+   * submodule selector changes. Clears filter and search payload but
+   * intentionally does NOT touch `activeToggleWidget` (FR-024) so the
+   * open/closed state of the filter/search panels is preserved across resets.
+   *
+   * FR-024 invariant: do NOT read or write `activeToggleWidget` in this action.
+   */
+  resetTopMenuGroup: () => {
+    get().resetAllFilters({ preserveBranches: false });
+    set((state) => ({
+      searchState: {
+        ...defaultSearchState,
+        isOpen: state.searchState.isOpen,
+      },
+    }));
   },
   setIsLoadingRepo: (isLoadingRepo) => set({ isLoadingRepo }),
   setUserSettings: (settings) => set((state) => (

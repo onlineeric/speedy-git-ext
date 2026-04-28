@@ -3,6 +3,7 @@ import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { RemoteManagementDialog } from './RemoteManagementDialog';
 import { RepoSelector } from './RepoSelector';
+import { SubmoduleSelector } from './SubmoduleSelector';
 import { MultiBranchDropdown } from './MultiBranchDropdown';
 import { CommitListSettingsPopover } from './CommitListSettingsPopover';
 import {
@@ -107,6 +108,7 @@ export function ControlBar() {
   return (
     <div className="flex items-center gap-1 px-2 py-1.5 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)]">
       <RepoSelector />
+      <SubmoduleSelector />
 
       <MultiBranchDropdown
         branches={branches}
