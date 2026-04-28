@@ -488,6 +488,19 @@ export class WebviewProvider {
     this.panel.onDidDispose(() => {
       this.panel = undefined;
       this.isPanelVisible = false;
+      // Submodule selection is not persisted across panel reloads (FR-008a),
+      // so on dispose, drop any submodule-display context and rebind services
+      // to the workspace's active parent. Without this, a panel reopen after
+      // viewing a submodule would leave the backend bound to the submodule
+      // while the webview resets to the parent option, producing a graph view
+      // that disagrees with the repo selector.
+      if (this.isDisplayingSubmodule) {
+        this.isDisplayingSubmodule = false;
+        const parentPath = this.gitRepoDiscoveryService?.getActiveRepoPath();
+        if (parentPath) {
+          this.onDisplayRepo?.(parentPath);
+        }
+      }
     });
 
     // Send repo list first so the dropdown is populated before commits arrive
@@ -1727,6 +1740,7 @@ export class WebviewProvider {
         // workspace `repos` list — submodule paths typically aren't in it.
         const { repoPath } = message.payload;
         const discovery = this.gitRepoDiscoveryService;
+        if (!discovery) break;
 
         this.fetchGeneration++;
         const currentGeneration = this.fetchGeneration;
@@ -1738,7 +1752,7 @@ export class WebviewProvider {
         // the workspace active parent) or the parent itself (parent option in
         // the submodule selector). Subsequent refreshes consult this flag to
         // decide whether to refetch submodules.
-        const activeParent = discovery?.getActiveRepoPath() ?? '';
+        const activeParent = discovery.getActiveRepoPath();
         this.isDisplayingSubmodule = repoPath !== activeParent;
 
         this.onDisplayRepo?.(repoPath);

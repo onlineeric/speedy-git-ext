@@ -368,12 +368,20 @@ function computeMergedTopology(
 }
 
 /**
- * Join a parent repo absolute path with a submodule's relative path using forward
- * slashes. The webview is a sandboxed browser bundle and cannot import Node's
- * `path` module, so we normalize manually and collapse duplicate slashes.
+ * Join a parent repo absolute path with a submodule's relative path. The
+ * webview is a sandboxed browser bundle and cannot import Node's `path` module,
+ * so we detect the parent's native separator (backslash on Windows, forward on
+ * Unix) and use it consistently — git always emits forward-slash relative
+ * paths for submodules, so the relative segment is converted to match.
  */
 function joinRepoPath(parent: string, sub: string): string {
-  return `${parent.replace(/\/$/, '')}/${sub.replace(/^\/+/, '')}`.replace(/\/+/g, '/');
+  const useBackslash = parent.includes('\\') && !parent.includes('/');
+  const sep = useBackslash ? '\\' : '/';
+  const cleanParent = parent.replace(/[\\/]+$/, '');
+  const cleanSub = sub
+    .replace(/^[\\/]+/, '')
+    .replace(/[\\/]+/g, sep);
+  return `${cleanParent}${sep}${cleanSub}`;
 }
 
 export const useGraphStore = create<GraphStore>((set, get) => ({
@@ -710,7 +718,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     // Preserve `submoduleSelection` and `displayedRepoPath` when the workspace
     // active repo did not change (e.g., the backend re-emitted `repoList` after
     // a submodule selector navigation). FR-017: the repo selector stays on the
-    // parent while a submodule is being viewed.
+    // parent while a submodule is being viewed. On parent change, clear the
+    // stale submodule list so the selector hides until backend confirms which
+    // submodules the new repo has (data-model §4.3).
     set({
       repos,
       activeParentRepoPath: activeRepoPath,
@@ -718,19 +728,27 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         ? {
             submoduleSelection: 'parent' as const,
             displayedRepoPath: activeRepoPath,
+            submodules: [],
             ...(parentChanged ? { pendingCommitCheckout: null } : {}),
           }
         : {}),
     });
   },
   setActiveRepo: (repoPath) => {
+    // No-op when the user re-selects the current repo: avoid clearing
+    // filter/search content and dispatching a wasted RPC (FR-022 conditions
+    // the reset on the value *changing*).
+    if (repoPath === get().activeParentRepoPath) return;
     // Repo selector change resets the entire top-menu group (FR-022) and the
-    // submodule selector to 'parent' (FR-008).
+    // submodule selector to 'parent' (FR-008). Clear the stale submodule list
+    // so the selector hides until backend confirms the new repo's submodules
+    // (data-model §4.3).
     get().resetTopMenuGroup();
     set({
       activeParentRepoPath: repoPath,
       submoduleSelection: 'parent',
       displayedRepoPath: repoPath,
+      submodules: [],
       isLoadingRepo: true,
       pendingCommitCheckout: null,
       selectedCommit: undefined,
@@ -747,6 +765,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     });
   },
   setSubmoduleSelection: (value) => {
+    // No-op when the user re-selects the current option: avoid clearing
+    // filter/search content and dispatching a wasted RPC (FR-023 conditions
+    // the reset on the value *changing*).
+    if (value === get().submoduleSelection) return;
     const { activeParentRepoPath } = get();
     const displayedRepoPath =
       value === 'parent' ? activeParentRepoPath : joinRepoPath(activeParentRepoPath, value);
