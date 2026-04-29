@@ -158,12 +158,15 @@ export class GitRepoDiscoveryService implements vscode.Disposable {
       let displayName = name;
 
       if ((nameCounts.get(name) ?? 0) > 1) {
-        // Use relative path from the closest workspace folder
+        // Use relative path from the closest workspace folder. When the repo
+        // *is* the workspace folder (e.g. parent that shares a basename with
+        // one of its submodules), `path.relative` returns '' — fall back to
+        // the basename so the selector trigger isn't blank.
         const workspaceFolder = workspaceFolders.find((f) =>
           repoPath.startsWith(f.uri.fsPath)
         );
         if (workspaceFolder) {
-          displayName = path.relative(workspaceFolder.uri.fsPath, repoPath);
+          displayName = path.relative(workspaceFolder.uri.fsPath, repoPath) || name;
         }
       }
 
