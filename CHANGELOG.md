@@ -9,6 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [3.1.1] - 2026-04-29
+
+### Fixed
+- Repo selector trigger no longer renders blank when a submodule shares its basename with the parent repo and the parent is itself the workspace folder — the parent now falls back to its basename instead of an empty disambiguated path
+
 ## [3.1.0] - 2026-04-28
 
 ### Added
