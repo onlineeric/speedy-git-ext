@@ -97,7 +97,8 @@ describe('WebviewProvider switchRepo', () => {
     });
 
     expect(testableProvider.currentFilters).toEqual({ maxCount: 250 });
-    expect(testableProvider.sendInitialData).toHaveBeenCalledWith(undefined, true);
+    expect(testableProvider.sendInitialData).toHaveBeenCalledTimes(1);
+    expect(testableProvider.sendInitialData).toHaveBeenCalledWith();
   });
 });
 
