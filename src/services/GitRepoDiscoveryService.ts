@@ -20,17 +20,14 @@ export class GitRepoDiscoveryService implements vscode.Disposable {
     const gitApi = await this.getVscodeGitApi();
     if (gitApi) {
       this.log.info('GitRepoDiscoveryService: using vscode.git API');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this._repos = this.buildRepoList(gitApi.repositories.map((r: any) => r.rootUri.fsPath));
+      this._repos = this.buildRepoList(this.collectRepoPaths(gitApi));
       this._activeRepoPath = this._repos[0]?.path ?? '';
 
       this._disposables.push(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         gitApi.onDidOpenRepository((repo: any) => {
           this.log.info(`GitRepoDiscoveryService: repo opened: ${repo.rootUri.fsPath}`);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const paths = gitApi.repositories.map((r: any) => r.rootUri.fsPath);
-          this._repos = this.buildRepoList(paths);
+          this._repos = this.buildRepoList(this.collectRepoPaths(gitApi));
           if (!this._repos.find((r) => r.path === this._activeRepoPath)) {
             this._activeRepoPath = this._repos[0]?.path ?? '';
           }
@@ -39,9 +36,7 @@ export class GitRepoDiscoveryService implements vscode.Disposable {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         gitApi.onDidCloseRepository((repo: any) => {
           this.log.info(`GitRepoDiscoveryService: repo closed: ${repo.rootUri.fsPath}`);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const paths = gitApi.repositories.map((r: any) => r.rootUri.fsPath);
-          this._repos = this.buildRepoList(paths);
+          this._repos = this.buildRepoList(this.collectRepoPaths(gitApi));
           if (!this._repos.find((r) => r.path === this._activeRepoPath)) {
             const removedName = path.basename(this._activeRepoPath);
             this._activeRepoPath = this._repos[0]?.path ?? '';
@@ -57,11 +52,35 @@ export class GitRepoDiscoveryService implements vscode.Disposable {
     } else {
       this.log.warn('GitRepoDiscoveryService: vscode.git unavailable, falling back to workspace scan');
       const paths = await this.scanWorkspaceFolders();
-      this._repos = this.buildRepoList(paths);
+      this._repos = this.buildRepoList(dedupeExactPaths(paths));
       this._activeRepoPath = this._repos[0]?.path ?? '';
     }
 
     this.log.info(`GitRepoDiscoveryService: initialized with ${this._repos.length} repo(s); active: ${this._activeRepoPath}`);
+  }
+
+  /**
+   * Read repository paths from VS Code's git API and drop entries whose path
+   * string matches an earlier entry exactly. Identical-string duplicates have
+   * no legitimate source — they only appear when something upstream lists the
+   * same repository twice — so collapsing them is safe. Paths that point to
+   * the same repo through different strings (symlinks, junctions, sync-mount
+   * mirrors) are intentionally left alone, since VS Code itself treats those
+   * as separate workspace folders and we don't want to diverge from its UI.
+   * The raw list is logged when any dedup happens so we can diagnose what the
+   * git API was reporting.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private collectRepoPaths(gitApi: any): string[] {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawPaths: string[] = gitApi.repositories.map((r: any) => r.rootUri.fsPath);
+    const deduped = dedupeExactPaths(rawPaths);
+    if (deduped.length !== rawPaths.length) {
+      this.log.info(
+        `GitRepoDiscoveryService: dropped ${rawPaths.length - deduped.length} duplicate repo path(s); raw=${JSON.stringify(rawPaths)}`
+      );
+    }
+    return deduped;
   }
 
   getRepos(): RepoInfo[] {
@@ -173,4 +192,15 @@ export class GitRepoDiscoveryService implements vscode.Disposable {
       return { path: repoPath, name, displayName };
     });
   }
+}
+
+/**
+ * Drop entries whose path string matches an earlier entry exactly, preserving
+ * original ordering. Conservative on purpose: paths that differ in any way
+ * (symlinks, junctions, case, trailing separators) are kept as distinct, so
+ * we don't second-guess VS Code's own treatment of them as separate workspace
+ * folders.
+ */
+export function dedupeExactPaths(paths: string[]): string[] {
+  return Array.from(new Set(paths));
 }

@@ -1,0 +1,9 @@
+{
+  "folders": [
+    { "path": "/home/onlineeric/repos/speedy-git-ext/test-repo" },
+    { "path": "/tmp/alt-mount/test-repo" }
+  ],
+  "settings": {
+    "git.detectSubmodules": false
+  }
+}
