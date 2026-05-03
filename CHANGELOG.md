@@ -9,6 +9,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [3.1.2] - 2026-04-30
+
+### Fixed
+- Repo selector no longer lists the same repository twice when VS Code's git API reports an identical path string more than once — paths reachable through different strings (symlinks, junctions, sync-mount mirrors) are still treated as separate entries to match VS Code's own workspace behavior
+
+### Internal
+- `GitRepoDiscoveryService` now logs the raw repository paths from VS Code's git API whenever duplicate path strings are detected, to aid diagnosing repo-selector duplicate reports
+
 ## [3.1.1] - 2026-04-29
 
 ### Fixed
