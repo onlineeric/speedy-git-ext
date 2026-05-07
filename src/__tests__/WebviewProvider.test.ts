@@ -1,5 +1,6 @@
 import * as crypto from 'crypto';
 import { describe, expect, it, vi } from 'vitest';
+import type { Commit } from '../../shared/types.js';
 import { createDefaultCommitTableLayout, DEFAULT_PERSISTED_UI_STATE } from '../../shared/types.js';
 import { WebviewProvider } from '../WebviewProvider.js';
 
@@ -224,5 +225,104 @@ describe('WebviewProvider per-repo column layout', () => {
 
     const state = testable.loadPersistedUIState();
     expect(state.commitListMode).toBe('table');
+  });
+});
+
+describe('WebviewProvider computeCommitFingerprint', () => {
+  function makeCommit(hash: string, refs: Commit['refs'] = []): Commit {
+    return {
+      hash,
+      abbreviatedHash: hash.slice(0, 7),
+      parents: [],
+      author: 'Test',
+      authorEmail: 'test@example.com',
+      authorDate: 0,
+      subject: `commit ${hash}`,
+      refs,
+    };
+  }
+
+  function fingerprint(commits: Commit[]): string {
+    const { provider } = createProvider();
+    const testable = provider as unknown as {
+      computeCommitFingerprint: (commits: Commit[]) => string;
+    };
+    return testable.computeCommitFingerprint(commits);
+  }
+
+  it('returns empty string for empty commit list', () => {
+    expect(fingerprint([])).toBe('');
+  });
+
+  it('produces identical fingerprint for identical commits with identical refs', () => {
+    const refs: Commit['refs'] = [{ name: 'main', type: 'branch' }];
+    const a = [makeCommit('aaa', refs), makeCommit('bbb')];
+    const b = [makeCommit('aaa', [{ name: 'main', type: 'branch' }]), makeCommit('bbb')];
+    expect(fingerprint(a)).toBe(fingerprint(b));
+  });
+
+  it('changes fingerprint when commit hashes change', () => {
+    const a = [makeCommit('aaa'), makeCommit('bbb')];
+    const b = [makeCommit('aaa'), makeCommit('ccc')];
+    expect(fingerprint(a)).not.toBe(fingerprint(b));
+  });
+
+  // Regression: creating a new branch (or any ref-only change) must bust the
+  // fingerprint so the webview receives fresh commits with up-to-date `refs`.
+  // Without this, the auto-refresh sends `commits=null` and the new branch
+  // label never appears in the graph until a manual refresh.
+  it('changes fingerprint when a branch ref is added to a commit (no hash change)', () => {
+    const before = [
+      makeCommit('aaa', [{ name: 'main', type: 'branch' }]),
+      makeCommit('bbb'),
+    ];
+    const after = [
+      makeCommit('aaa', [
+        { name: 'main', type: 'branch' },
+        { name: 'feature/new', type: 'branch' },
+      ]),
+      makeCommit('bbb'),
+    ];
+    expect(fingerprint(before)).not.toBe(fingerprint(after));
+  });
+
+  it('changes fingerprint when a branch ref is removed from a commit', () => {
+    const before = [
+      makeCommit('aaa', [
+        { name: 'main', type: 'branch' },
+        { name: 'old-branch', type: 'branch' },
+      ]),
+    ];
+    const after = [makeCommit('aaa', [{ name: 'main', type: 'branch' }])];
+    expect(fingerprint(before)).not.toBe(fingerprint(after));
+  });
+
+  it('changes fingerprint when HEAD moves to a different commit (no hash change)', () => {
+    const before = [
+      makeCommit('aaa', [{ name: 'HEAD', type: 'head' }, { name: 'main', type: 'branch' }]),
+      makeCommit('bbb', [{ name: 'feature', type: 'branch' }]),
+    ];
+    const after = [
+      makeCommit('aaa', [{ name: 'main', type: 'branch' }]),
+      makeCommit('bbb', [{ name: 'HEAD', type: 'head' }, { name: 'feature', type: 'branch' }]),
+    ];
+    expect(fingerprint(before)).not.toBe(fingerprint(after));
+  });
+
+  it('changes fingerprint when a tag is added to a commit', () => {
+    const before = [makeCommit('aaa', [{ name: 'main', type: 'branch' }])];
+    const after = [
+      makeCommit('aaa', [
+        { name: 'main', type: 'branch' },
+        { name: 'v1.0.0', type: 'tag' },
+      ]),
+    ];
+    expect(fingerprint(before)).not.toBe(fingerprint(after));
+  });
+
+  it('distinguishes refs with the same name but different remotes', () => {
+    const a = [makeCommit('aaa', [{ name: 'main', type: 'remote', remote: 'origin' }])];
+    const b = [makeCommit('aaa', [{ name: 'main', type: 'remote', remote: 'upstream' }])];
+    expect(fingerprint(a)).not.toBe(fingerprint(b));
   });
 });

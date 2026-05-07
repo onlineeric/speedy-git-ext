@@ -516,7 +516,11 @@ export class WebviewProvider {
 
   private computeCommitFingerprint(commits: Commit[]): string {
     if (commits.length === 0) return '';
-    return commits.map((c) => c.hash).join(',');
+    // Include refs so ref-only changes (branch create/delete/rename, HEAD move)
+    // also bust the fingerprint and trigger a full commit-list refresh.
+    return commits
+      .map((c) => `${c.hash}|${c.refs.map((r) => `${r.type}:${r.remote ?? ''}/${r.name}`).join(',')}`)
+      .join(';');
   }
 
   /** Refresh the VS Code Source Control panel for the current repo without prompting the user.

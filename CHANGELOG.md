@@ -9,6 +9,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [3.1.3] - 2026-05-07
+
+### Fixed
+- Auto-refresh now updates the graph after IDE-initiated git operations that change refs without changing commits — e.g., creating, renaming, or deleting a branch from VS Code's Source Control panel, or HEAD moving via an external checkout. Previously the new branch label only appeared after a manual refresh because the commit-fingerprint optimization compared commit hashes only, missing ref-only changes and sending `commits=null` to the webview, which kept stale `refs` on each commit.
+- Commit fingerprint now incorporates each commit's refs (type, remote, name) so any branch/tag/HEAD change on an unchanged commit list correctly invalidates the cache and triggers a full refresh.
+
+### Internal
+- Added regression tests in `WebviewProvider.test.ts` covering the fingerprint behavior for ref-only changes (branch add/remove, HEAD move, tag add, remote disambiguation), preventing future regressions to the auto-refresh path.
+
 ## [3.1.2] - 2026-04-30
 
 ### Fixed
