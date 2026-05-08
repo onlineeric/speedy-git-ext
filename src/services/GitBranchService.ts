@@ -107,6 +107,27 @@ export class GitBranchService {
     return ok('Fetch completed');
   }
 
+  async fastForwardFromRemote(remote: string, branch: string): Promise<Result<string>> {
+    this.log.info(`Fast-forward local branch: ${remote}/${branch}`);
+
+    const remoteCheck = validateRefName(remote);
+    if (!remoteCheck.success) return remoteCheck;
+    const branchCheck = validateRefName(branch);
+    if (!branchCheck.success) return branchCheck;
+
+    const result = await this.executor.execute({
+      args: ['fetch', remote, `${branch}:${branch}`],
+      cwd: this.workspacePath,
+      timeout: 60000,
+    });
+
+    if (!result.success) {
+      return result;
+    }
+
+    return ok('Fast-forward completed');
+  }
+
   async createBranch(name: string, startPoint?: string): Promise<Result<string>> {
     this.log.info(`Create branch: ${name}${startPoint ? ` from ${startPoint}` : ''}`);
     const nameCheck = validateRefName(name);

@@ -273,6 +273,10 @@ class RpcClient {
     this.send({ type: 'fetch', payload: { remote, prune, filters } });
   }
 
+  fastForwardLocalBranch(remote: string, branch: string) {
+    this.send({ type: 'fastForwardLocalBranch', payload: { remote, branch } });
+  }
+
   copyToClipboard(text: string) {
     this.send({ type: 'copyToClipboard', payload: { text } });
   }
