@@ -45,6 +45,11 @@ export interface CheckoutCommandOptions {
   pull: boolean;
 }
 
+export interface FastForwardLocalBranchCommandOptions {
+  remote: string;
+  branch: string;
+}
+
 export interface TagCommandOptions {
   name: string;
   hash: string;
@@ -59,6 +64,10 @@ export function buildPushCommand(options: PushCommandOptions): string {
   parts.push(options.remote);
   parts.push(options.branch);
   return parts.join(' ');
+}
+
+export function buildFastForwardLocalBranchCommand(options: FastForwardLocalBranchCommandOptions): string {
+  return `git fetch ${options.remote} ${options.branch}:${options.branch}`;
 }
 
 export function buildMergeCommand(options: MergeCommandOptions): string {

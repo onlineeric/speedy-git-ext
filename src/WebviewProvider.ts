@@ -1072,6 +1072,19 @@ export class WebviewProvider {
         }
         break;
       }
+      case 'fastForwardLocalBranch': {
+        const result = await this.gitBranchService.fastForwardFromRemote(
+          message.payload.remote,
+          message.payload.branch
+        );
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: result.value } });
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
       case 'copyToClipboard': {
         await vscode.env.clipboard.writeText(message.payload.text);
         this.postMessage({ type: 'success', payload: { message: 'Copied to clipboard' } });

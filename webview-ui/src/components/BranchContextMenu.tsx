@@ -6,9 +6,11 @@ import { useGraphStore } from '../stores/graphStore';
 import {
   buildDeleteRemoteBranchCommand,
   buildDeleteTagCommand,
+  buildFastForwardLocalBranchCommand,
   buildRenameBranchCommand,
   buildStashAndCheckoutCommand,
 } from '../utils/gitCommandBuilder';
+import { resolveDefaultRemote } from '../utils/resolveDefaultRemote';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DeleteBranchDialog } from './DeleteBranchDialog';
 import { InputDialog } from './InputDialog';
@@ -53,6 +55,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
   const [pushDialogOpen, setPushDialogOpen] = useState(false);
   const [checkoutWithPullOpen, setCheckoutWithPullOpen] = useState(false);
   const [rebaseConfirmOpen, setRebaseConfirmOpen] = useState(false);
+  const [fastForwardOpen, setFastForwardOpen] = useState(false);
   const loading = useGraphStore((s) => s.loading);
   const branches = useGraphStore((s) => s.branches);
 
@@ -122,6 +125,12 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
     return buildStashAndCheckoutCommand({ branch: pendingCheckout.name, pull: pendingCheckout.pull ?? false });
   }, [pendingCheckout]);
 
+  const fastForwardRemote = useMemo(() => resolveDefaultRemote(branches), [branches]);
+  const fastForwardPreview = useMemo(
+    () => buildFastForwardLocalBranchCommand({ remote: fastForwardRemote, branch: refInfo.name }),
+    [fastForwardRemote, refInfo.name],
+  );
+
   const handleRebaseConfirm = (ignoreDate: boolean) => {
     setRebaseConfirmOpen(false);
     useGraphStore.getState().setLoading(true);
@@ -175,6 +184,15 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                 <ContextMenu.Item className={menuItemClass} onSelect={() => setPushDialogOpen(true)}>
                   Push Branch
                 </ContextMenu.Item>
+                {!isCurrentBranch && (
+                  <ContextMenu.Item
+                    className={menuItemClass}
+                    onSelect={() => setFastForwardOpen(true)}
+                    disabled={loading || rebaseInProgress}
+                  >
+                    Fast-forward Local Branch from Remote
+                  </ContextMenu.Item>
+                )}
                 {isCurrentBranch && (
                   <ContextMenu.Item
                     className={menuItemClass}
@@ -329,6 +347,21 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
           rpcClient.checkoutBranchWithPull(refInfo.name, pull);
         }}
         onCancel={() => setCheckoutWithPullOpen(false)}
+      />
+
+      {/* Fast-forward local branch from remote (no checkout) */}
+      <ConfirmDialog
+        open={fastForwardOpen}
+        onConfirm={() => {
+          setFastForwardOpen(false);
+          rpcClient.fastForwardLocalBranch(fastForwardRemote, refInfo.name);
+        }}
+        onCancel={() => setFastForwardOpen(false)}
+        title="Fast-forward Local Branch from Remote"
+        description={`Update local branch '${refInfo.name}' to match remote branch without checkout. Your current branch and working tree are not affected.`}
+        confirmLabel="Fast-forward"
+        variant="warning"
+        commandPreview={fastForwardPreview}
       />
 
       {/* Stash-and-checkout dialog (triggered by checkoutNeedsStash response) */}

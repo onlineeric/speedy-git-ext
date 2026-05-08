@@ -15,6 +15,7 @@ import {
   buildDropStashCommand,
   buildStashAndCheckoutCommand,
   buildRenameBranchCommand,
+  buildFastForwardLocalBranchCommand,
 } from '../gitCommandBuilder';
 
 describe('buildPushCommand', () => {
@@ -234,5 +235,22 @@ describe('buildRenameBranchCommand', () => {
   it('builds rename branch command', () => {
     expect(buildRenameBranchCommand({ oldName: 'old-branch', newName: 'new-branch' }))
       .toBe('git branch -m old-branch new-branch');
+  });
+});
+
+describe('buildFastForwardLocalBranchCommand', () => {
+  it('builds the refspec form against origin', () => {
+    expect(buildFastForwardLocalBranchCommand({ remote: 'origin', branch: 'dev' }))
+      .toBe('git fetch origin dev:dev');
+  });
+
+  it('preserves slashes in branch names', () => {
+    expect(buildFastForwardLocalBranchCommand({ remote: 'origin', branch: 'release/1.2.x' }))
+      .toBe('git fetch origin release/1.2.x:release/1.2.x');
+  });
+
+  it('uses a non-default remote when provided', () => {
+    expect(buildFastForwardLocalBranchCommand({ remote: 'upstream', branch: 'main' }))
+      .toBe('git fetch upstream main:main');
   });
 });

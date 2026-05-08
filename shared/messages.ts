@@ -50,6 +50,7 @@ export type RequestMessage =
   // Remote ops
   | { type: 'push'; payload: { remote: string; branch: string; setUpstream?: boolean; forceMode?: PushForceMode } }
   | { type: 'pull'; payload: { remote?: string; branch?: string; rebase?: boolean } }
+  | { type: 'fastForwardLocalBranch'; payload: { remote: string; branch: string } }
   | { type: 'getRemotes'; payload: Record<string, never> }
   | { type: 'addRemote'; payload: { name: string; url: string } }
   | { type: 'removeRemote'; payload: { name: string } }
@@ -177,7 +178,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   openDiff: true, openFile: true, refresh: true,
   createBranch: true, renameBranch: true, deleteBranch: true,
   deleteRemoteBranch: true, mergeBranch: true,
-  push: true, pull: true, getRemotes: true, addRemote: true,
+  push: true, pull: true, fastForwardLocalBranch: true, getRemotes: true, addRemote: true,
   removeRemote: true, editRemote: true,
   createTag: true, deleteTag: true, pushTag: true,
   getStashes: true, applyStash: true, popStash: true, dropStash: true,
