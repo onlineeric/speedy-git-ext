@@ -160,3 +160,8 @@ shared/                           # Shared types between backend & frontend
 - 041-submodule-selector: Replace submodule mode with submodule selector + filterable repo/submodule combo boxes + left→right top-menu reset chain
 - 039-uncommitted-node-ux2: File picker dialog enhancements
 - 038-uncommitted-node-ux: Dialog and stashing UX polish
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
