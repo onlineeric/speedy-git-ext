@@ -9,6 +9,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### future planned features
 - Compare branches, commits, HEAD, etc.
 
+## [3.2.0] - 2026-05-08
+
+### Added
+- Right-click any non-current local branch badge to "Fast-forward Local Branch from Remote" — updates the local branch to its remote tip without checkout, leaving your current branch and working tree untouched and creating no stash.
+- The fast-forward dialog auto-picks the remote (prefers `origin`, falls back to the first remote alphabetically) and shows a live `git fetch <remote> <branch>:<branch>` preview before you confirm.
+- Diverged-branch and missing-remote-ref failures surface git's error message verbatim through the standard error toast; the local branch is left unchanged. No force-update option is offered.
+
 ## [3.1.3] - 2026-05-07
 
 ### Fixed

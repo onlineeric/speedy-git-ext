@@ -157,9 +157,9 @@ shared/                           # Shared types between backend & frontend
 - TypeScript 5.x (strict) + React 18, Zustand, Radix UI, Tailwind CSS (webview); esbuild (extension host), Vite (frontend)
 
 ## Recent Changes
+- 043-fast-forward-branch: Fast-forward a non-checked-out local branch from its remote without checkout
 - 041-submodule-selector: Replace submodule mode with submodule selector + filterable repo/submodule combo boxes + left→right top-menu reset chain
 - 039-uncommitted-node-ux2: File picker dialog enhancements
-- 038-uncommitted-node-ux: Dialog and stashing UX polish
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,

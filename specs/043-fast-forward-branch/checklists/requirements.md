@@ -36,3 +36,4 @@
   2. Multi-remote selection — deterministic auto-pick (`origin` → first alphabetical); no picker UI.
   3. Diverged-branch handling — surface git's error verbatim; no force option; no pre-detection.
 - Spec is ready for `/speckit-plan`.
+- Implementation completed on 2026-05-08; automated gates pass (typecheck, lint, 379 tests, build). Manual smoke tests (T013, T015, T017, T018, T020 — see `quickstart.md`) pending user execution via VS Code "Run Extension" launch.

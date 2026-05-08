@@ -34,7 +34,7 @@ In additonal to branch filter, we have a new advanced filter panel with
 We have a new table-style commit list view with resizable columns, column reordering, and column visibility controls.
 ![Speedy Git Table View Commit List screenshot](./resources/speedy-git-screenshot-table-view.png)
 
-### Upcoming features in v3
+### Upcoming features in v4
 - Compare branches, commits, HEAD, etc.
 
 ### Git Graph & Commit History
