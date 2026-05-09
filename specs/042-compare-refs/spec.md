@@ -23,10 +23,10 @@ A developer is reviewing recent history on the graph. They right-click a commit 
 
 **Acceptance Scenarios**:
 
-1. **Given** a graph with at least two commits visible, **When** the user right-clicks commit X → "Set as Base" then right-clicks commit Y → "Compare with Base," **Then** the Commit Details panel shows the consolidated A=X, B=Y diff with a header that names both ends.
+1. **Given** a graph with at least two commits visible, **When** the user right-clicks commit X → "Set as Compare Base" then right-clicks commit Y → "Compare with Base," **Then** the Commit Details panel shows the consolidated A=X, B=Y diff with a header that names both ends.
 2. **Given** commit X has been selected for compare, **When** the user right-clicks commit X again, **Then** the "Compare with Base" item is disabled (cannot compare a commit with itself).
-3. **Given** commit X has been selected for compare, **When** the user right-clicks a different commit Z, **Then** "Compare with Base" appears enabled and uses Z as B; "Set as Base" also still appears so the user can override A.
-4. **Given** no prior selection, **When** the user right-clicks a commit, **Then** only "Set as Base" appears (no "Compare with Base" until A is set).
+3. **Given** commit X has been selected for compare, **When** the user right-clicks a different commit Z, **Then** "Compare with Base" appears enabled and uses Z as B; "Set as Compare Base" also still appears so the user can override A.
+4. **Given** no prior selection, **When** the user right-clicks a commit, **Then** only "Set as Compare Base" appears (no "Compare with Base" until A is set).
 5. **Given** an active comparison is showing in the Commit Details panel, **When** the user clicks a single commit row, **Then** the panel returns to single-commit detail view for that commit (compare result is dismissed by normal commit selection, just like any other detail view).
 
 ---
@@ -81,7 +81,7 @@ A developer wants to see what a specific feature work spanning N commits introdu
 **Acceptance Scenarios**:
 
 1. **Given** the user has multi-selected ≥2 commits in the graph, **When** they right-click and choose "Compare these commits," **Then** slot A is filled with `<oldest>^` (parent of the oldest selected commit) and slot B with `<newest>`, and the comparison runs immediately.
-2. **Given** the user has multi-selected exactly 1 commit, **When** the right-click menu opens, **Then** "Compare these commits" is hidden (single-commit selection has no range; "Set as Base" is still offered).
+2. **Given** the user has multi-selected exactly 1 commit, **When** the right-click menu opens, **Then** "Compare these commits" is hidden (single-commit selection has no range; "Set as Compare Base" is still offered).
 3. **Given** the multi-selection includes non-contiguous commits, **When** the user runs "Compare these commits," **Then** the system collapses the selection to its endpoints (oldest → newest) — non-contiguous selection does not produce a separate model; the user is shown the resulting endpoint pair in slots A and B.
 4. **Given** the oldest selected commit is a root commit (no parent), **When** "Compare these commits" runs, **Then** A is set to the empty-tree sentinel so the diff shows "everything in B" (matches `git diff` against the empty tree).
 
@@ -123,7 +123,7 @@ The following edge cases must be handled. Where a default is listed, the default
 
 - Right-click on a commit row whose hash is identical to slot A's resolved hash (e.g., A is `main` which points to the right-clicked commit): "Compare with Base" is disabled.
 - Right-click on a branch label: same flow as right-clicking the commit it points to, but the slot stores the branch *name*, not the hash, so future ref movement is reflected.
-- Right-click on the "Uncommitted" / working-tree pseudo-row at the top of the graph: "Set as Base" and "Compare with Base" appear and use the `Working Tree` sentinel; the three-dot disable rule applies if this sentinel ends up in either slot.
+- Right-click on the "Uncommitted" / working-tree pseudo-row at the top of the graph: "Set as Compare Base" and "Compare with Base" appear and use the `Working Tree` sentinel; the three-dot disable rule applies if this sentinel ends up in either slot.
 - Right-click on a stash entry: compare entries are NOT offered (out of scope for v1; see Out of Scope).
 - Multi-select in the graph then right-click on a row that is not part of the selection: VS Code conventions apply — the context menu reflects either the right-clicked row only or the full multi-selection per platform behavior; "Compare these commits" appears only when the operative selection is ≥2 commits.
 
@@ -193,12 +193,12 @@ The following edge cases must be handled. Where a default is listed, the default
 
 #### Right-click entry points
 
-- **FR-013**: Commit row, branch label, and tag label context menus MUST include "Set as Base" whenever the right-clicked target is a single commit-ish.
+- **FR-013**: Commit row, branch label, and tag label context menus MUST include "Set as Compare Base" whenever the right-clicked target is a single commit-ish.
 - **FR-014**: Those same context menus MUST include "Compare with Base" whenever slot A is set, disabled when the right-clicked target resolves to the same commit-ish as slot A.
 - **FR-015**: When the user right-clicks a multi-selection of ≥2 commits, the menu MUST include "Compare these commits," which fills slot A with `<oldest>^` and slot B with `<newest>` and runs the comparison immediately. For non-contiguous multi-selections the system MUST collapse to oldest/newest endpoints.
 - **FR-016**: When the oldest selected commit is a root commit (no parent), the system MUST use the empty-tree sentinel for slot A so the diff shows the full content of B.
 - **FR-017**: Stash row context menus MUST NOT include any compare entries (out of scope for v1).
-- **FR-018**: The "Uncommitted" / working-tree pseudo-row context menu MUST include "Set as Base" and "Compare with Base" using the `Working Tree` sentinel.
+- **FR-018**: The "Uncommitted" / working-tree pseudo-row context menu MUST include "Set as Compare Base" and "Compare with Base" using the `Working Tree` sentinel.
 
 #### Auto-trigger & explicit-trigger rules
 
@@ -251,7 +251,7 @@ The following edge cases must be handled. Where a default is listed, the default
 
 - Q: Should the staged-index area (`git diff --staged` semantics) be a selectable sentinel in v1? → A: Defer; no `Index` sentinel in v1. Only `Working Tree` and `HEAD` are sentinels.
 - Q: Should stash entries appear in the compare flow in v1? → A: Skip entirely; stashes do not appear in slot combobox and stash row context menus contain no compare items.
-- Q: What user-facing wording labels the two slots? → A: "Base / Target". Slot A is labeled **Base**; slot B is labeled **Target**. The right-click menu items become **Set as Base** (formerly "Select for compare") and **Compare with Base** (formerly "Compare with selected"). Multi-select item remains **Compare these commits**.
+- Q: What user-facing wording labels the two slots? → A: "Base / Target". Slot A is labeled **Base**; slot B is labeled **Target**. The right-click menu items become **Set as Compare Base** (formerly "Select for compare") and **Compare with Base** (formerly "Compare with selected"). Multi-select item remains **Compare these commits**.
 - Q: What does the user see while a comparison is being computed? → A: Reuse the existing Commit Details panel loading indicator (same spinner/skeleton already shown when single-commit details are loading). No new compare-specific loading UI.
 - Q: When does a slot's value resolve to a commit hash — at slot fill or at Compare click? → A: Lazy resolve at Compare click for branches, tags, and typed expressions (e.g., `HEAD~3`). Only raw commit hashes are stored as their resolved hash. The slot's user intent ("compare against `main` as it currently is") is preserved across panel close/open and across graph refreshes.
 - Q: How are very large compare results handled — hard cap, soft cap with confirmation, or unbounded? → A: No hard cap; the loading indicator exposes a **Cancel** affordance that aborts the in-flight git process and clears the loading state. Virtualization handles render-side performance for any size that completes.
@@ -275,7 +275,7 @@ The following assumptions were made while drafting this spec; flag any that are 
 
 - The compare result reuses the existing Commit Details panel. A separate dedicated panel may be considered later if compare-specific affordances accumulate, but is not required for v1.
 - The slot combobox uses the same UI conventions already in use elsewhere in Speedy Git for similar pickers, so the choice of underlying combobox primitive is an implementation detail and not specified here.
-- "Compare these commits" is offered as a separate menu item rather than overloading "Set as Base" for multi-selection (idea spec preference, clearer intent).
+- "Compare these commits" is offered as a separate menu item rather than overloading "Set as Compare Base" for multi-selection (idea spec preference, clearer intent).
 - Recently-used items in slot comboboxes are tracked per session and cleared on repo switch / session end (matches slot persistence rules).
 - Right-click on Speedy Git's "Uncommitted" pseudo-row uses the `Working Tree` sentinel; the implementation must be careful to only show compare items where they make sense (no compare items on stash rows).
 - All comparisons are scoped to the currently active repository — there is no cross-repo or cross-submodule compare.

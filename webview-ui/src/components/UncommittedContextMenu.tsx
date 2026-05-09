@@ -66,7 +66,7 @@ export function UncommittedContextMenu({ children }: UncommittedContextMenuProps
           <ContextMenu.Content className="min-w-[200px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
             {/* Compare-refs (042-compare-refs) — Working Tree sentinel */}
             <ContextMenu.Item className={menuItemClass} onSelect={handleSetWorkingTreeAsBase}>
-              Set as Base
+              Set as Compare Base
             </ContextMenu.Item>
             {aSetForCompare && (
               <ContextMenu.Item

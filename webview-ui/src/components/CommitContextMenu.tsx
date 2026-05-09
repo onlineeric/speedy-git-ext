@@ -239,7 +239,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
             ) : (
               <>
                 <ContextMenu.Item className={menuItemClass} onSelect={handleSetAsBase}>
-                  Set as Base
+                  Set as Compare Base
                 </ContextMenu.Item>
                 {aSet && (
                   <ContextMenu.Item

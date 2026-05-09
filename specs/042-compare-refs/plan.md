@@ -105,9 +105,9 @@ webview-ui/src/                 # Frontend (React + Zustand)
 │   │                           #  +file-row click dispatches openCompareDiff
 │   ├── ControlBar.tsx          # Remove `style={{ display: 'none' }}` on Compare button;
 │   │                           #  add three-state color (idle / open / pending)
-│   ├── CommitContextMenu.tsx   # +Set as Base, +Compare with Base, +Compare these commits
-│   ├── BranchContextMenu.tsx   # +Set as Base, +Compare with Base
-│   ├── UncommittedContextMenu.tsx # +Set as Base, +Compare with Base (using Working Tree)
+│   ├── CommitContextMenu.tsx   # +Set as Compare Base, +Compare with Base, +Compare these commits
+│   ├── BranchContextMenu.tsx   # +Set as Compare Base, +Compare with Base
+│   ├── UncommittedContextMenu.tsx # +Set as Compare Base, +Compare with Base (using Working Tree)
 │   ├── CommitRow.tsx           # +A/B graph row badges
 │   └── CommitTableRow.tsx      # +A/B graph row badges
 ├── stores/

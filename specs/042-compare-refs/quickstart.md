@@ -22,12 +22,12 @@ Open the test repo (or any local repo with ≥2 commits and at least one feature
 ## Scenario 1 — Right-click compare two visible commits (Story 1, P1)
 
 1. Open the Speedy Git graph.
-2. Right-click any commit X. Verify the menu shows **Set as Base** (and only Set as Base — no
+2. Right-click any commit X. Verify the menu shows **Set as Compare Base** (and only Set as Compare Base — no
    "Compare with Base" yet because A is unset). [AC1#4]
-3. Click **Set as Base**.
+3. Click **Set as Compare Base**.
 4. Right-click X again. Verify **Compare with Base** is *disabled* (cannot compare with itself).
    [AC1#2]
-5. Right-click a different commit Y. Verify **Compare with Base** is enabled and **Set as Base**
+5. Right-click a different commit Y. Verify **Compare with Base** is enabled and **Set as Compare Base**
    is also still present. [AC1#3]
 6. Click **Compare with Base**.
 7. Verify the Commit Details panel shows: a header naming both ends, a file list, and the
@@ -158,7 +158,7 @@ the backend with a 5s `setTimeout` for testing).
 
 1. Stash some changes (`git stash`).
 2. In the graph, right-click the stash row.
-3. Verify the menu does NOT contain **Set as Base** or **Compare with Base** or
+3. Verify the menu does NOT contain **Set as Compare Base** or **Compare with Base** or
    **Compare these commits**.
 
 ---

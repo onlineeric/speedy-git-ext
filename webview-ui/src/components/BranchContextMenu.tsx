@@ -184,7 +184,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
             {compareItemsAvailable && (
               <>
                 <ContextMenu.Item className={menuItemClass} onSelect={handleSetAsBaseRef}>
-                  Set as Base
+                  Set as Compare Base
                 </ContextMenu.Item>
                 {aSetForCompare && (
                   <ContextMenu.Item

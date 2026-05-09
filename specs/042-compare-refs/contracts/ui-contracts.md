@@ -118,7 +118,7 @@ Add two menu items above the existing items:
 
 | Item | Visible when | Disabled when | Action |
 |---|---|---|---|
-| **Set as Base** | Always | Never | `setSlotA({ kind: 'commit', hash })` |
+| **Set as Compare Base** | Always | Never | `setSlotA({ kind: 'commit', hash })` |
 | **Compare with Base** | `compareSelection.a !== null` | `compareSelection.aResolvedHash === hash` (or structural same-hash) | `setSlotB({ kind: 'commit', hash })` + dispatch `compareRefs` immediately (FR-019) |
 
 **Multi-selection** (≥2 commits): replace the two single-commit items with:
