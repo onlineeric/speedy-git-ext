@@ -16,6 +16,11 @@ const menuItemClass =
 const dangerItemClass =
   'px-3 py-1.5 text-sm text-[var(--vscode-errorForeground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
 
+// FR-017 (042-compare-refs): stash compare is intentionally out of scope for v1.
+// Do NOT add "Set as Base" / "Compare with Base" / "Compare these commits" items here.
+// Stashes are not selectable in compare slot dropdowns either; this exclusion is enforced
+// across all compare entry points.
+
 export function StashContextMenu({ commit, stashIndex, children }: StashContextMenuProps) {
   const [dropConfirmOpen, setDropConfirmOpen] = useState(false);
   const isValidIndex = stashIndex >= 0;

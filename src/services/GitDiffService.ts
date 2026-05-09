@@ -1,7 +1,8 @@
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
-import type { CommitDetails, ConflictType, FileChange, FileChangeStatus, UncommittedSummary } from '../../shared/types.js';
+import type { CommitDetails, CompareMode, CompareResult, ConflictType, FileChange, FileChangeStatus, SlotValue, UncommittedSummary } from '../../shared/types.js';
+import { EMPTY_TREE_HASH } from '../../shared/types.js';
 import { validateHash, validateFilePath } from '../utils/gitValidation.js';
 
 const NULL_CHAR = '\x00';
@@ -206,6 +207,132 @@ export class GitDiffService {
     });
   }
 
+  /**
+   * Compare two refs (042-compare-refs). Each slot is mapped to a commit-ish
+   * string by `resolveSlotValue`; branches/tags/expressions are passed verbatim
+   * to git for native resolution (FR-007a — lazy resolve). Working-tree side is
+   * encoded as `null` and produces the `git diff <refA>` form.
+   *
+   * For three-dot mode, runs `git merge-base` first; if no common ancestor
+   * exists, falls back to two-dot and sets `fellBackToTwoDot: true` (FR-012).
+   *
+   * `abortSignal` is plumbed into every spawned `git` process so a single
+   * cancel aborts all parallel sub-commands (FR-025b).
+   */
+  async compareRefs(
+    a: SlotValue,
+    b: SlotValue,
+    mode: CompareMode,
+    abortSignal?: AbortSignal,
+  ): Promise<Result<CompareResult, GitError>> {
+    const refA = resolveSlotValue(a);
+    const refB = resolveSlotValue(b);
+
+    // Working-tree on slot A is not supported via plain `git diff` form (the
+    // command would compare working tree to refB which inverts user intent).
+    // The UI prevents this; returning a clear error makes backend defense-in-depth explicit.
+    if (refA === null && refB === null) {
+      return err(new GitError('Both slots are Working Tree; nothing to compare', 'VALIDATION_ERROR'));
+    }
+    if (refA === null) {
+      return err(new GitError('Working Tree must be slot B (Target), not slot A (Base)', 'VALIDATION_ERROR'));
+    }
+    if (mode === 'three-dot' && refB === null) {
+      return err(new GitError('three-dot is not supported with Working Tree', 'COMMAND_FAILED'));
+    }
+
+    let effectiveMode: CompareMode = mode;
+    let fellBackToTwoDot = false;
+
+    if (mode === 'three-dot' && refB !== null) {
+      const mergeBase = await this.executor.execute({
+        args: ['merge-base', refA, refB],
+        cwd: this.workspacePath,
+        abortSignal,
+      });
+      if (!mergeBase.success) {
+        if (mergeBase.error.code === 'CANCELLED') return mergeBase;
+        // No common ancestor — fall back to two-dot per FR-012
+        effectiveMode = 'two-dot';
+        fellBackToTwoDot = true;
+      }
+    }
+
+    const buildArgs = (extra: string[]): string[] => {
+      const base = ['diff', ...extra, '-z'];
+      if (refB === null) {
+        return [...base, refA];
+      }
+      if (effectiveMode === 'three-dot') {
+        return [...base, `${refA}...${refB}`];
+      }
+      return [...base, refA, refB];
+    };
+
+    const [namesResult, statsResult] = await Promise.all([
+      this.executor.execute({ args: buildArgs(['--name-status']), cwd: this.workspacePath, abortSignal }),
+      this.executor.execute({ args: buildArgs(['--numstat']), cwd: this.workspacePath, abortSignal }),
+    ]);
+
+    if (!namesResult.success) {
+      return err(this.translateCompareError(namesResult.error, a, b));
+    }
+    if (!statsResult.success) {
+      this.log.warn(`numstat failed for compare; continuing without per-file counts: ${statsResult.error.message}`);
+    }
+
+    const files = parseDiffNameStatus(namesResult.value.stdout);
+    let totalAdditions = 0;
+    let totalDeletions = 0;
+    if (statsResult.success) {
+      const stats = applyNumstatToFilesWithTotals(files, statsResult.value.stdout);
+      totalAdditions = stats.additions;
+      totalDeletions = stats.deletions;
+    }
+
+    // Resolve the final hashes for the FR-026 graph markers. Working-tree side → null,
+    // emptyTree → EMPTY_TREE_HASH directly. Other kinds resolved via rev-parse.
+    const aResolvedHash = await this.resolveHashForMarker(a, abortSignal);
+    const bResolvedHash = b.kind === 'workingTree' ? null : await this.resolveHashForMarker(b, abortSignal);
+
+    return ok({
+      a, b, mode: effectiveMode, fellBackToTwoDot,
+      aResolvedHash, bResolvedHash,
+      files,
+      stats: { additions: totalAdditions, deletions: totalDeletions },
+    });
+  }
+
+  private async resolveHashForMarker(slot: SlotValue, abortSignal?: AbortSignal): Promise<string | null> {
+    if (slot.kind === 'workingTree') return null;
+    if (slot.kind === 'commit') return slot.hash;
+    if (slot.kind === 'emptyTree') return EMPTY_TREE_HASH;
+
+    const ref = resolveSlotValue(slot);
+    if (ref === null) return null;
+
+    const result = await this.executor.execute({
+      args: ['rev-parse', ref],
+      cwd: this.workspacePath,
+      abortSignal,
+    });
+    if (!result.success) return null;
+    return result.value.stdout.trim() || null;
+  }
+
+  private translateCompareError(error: GitError, a: SlotValue, b: SlotValue): GitError {
+    if (error.code === 'CANCELLED') return error;
+    const stderr = error.stderr ?? error.message;
+    if (/unknown revision|ambiguous argument|bad revision/i.test(stderr)) {
+      // Identify which side failed when possible — git typically names the ref in stderr.
+      const aLabel = slotLabelForError(a);
+      const bLabel = slotLabelForError(b);
+      const failedLabel = stderr.includes(aLabel) ? aLabel : stderr.includes(bLabel) ? bLabel : `${aLabel} or ${bLabel}`;
+      return new GitError(`Unknown ref: ${failedLabel}`, 'COMMAND_FAILED', error.command, stderr);
+    }
+    return error;
+  }
+
   private async detectConflictState(): Promise<{ conflictType?: ConflictType; conflictFiles: string[] }> {
     // --verify --quiet exits non-zero when the ref doesn't exist, so .success is a reliable signal
     const [mergeHead, rebaseHead, cherryPickHead] = await Promise.all([
@@ -383,6 +510,92 @@ function parseNumstat(
   }
 
   return { additions: totalAdditions, deletions: totalDeletions };
+}
+
+/**
+ * Map a `SlotValue` to a commit-ish string suitable for `git diff` arguments.
+ * Branches/tags/expressions are passed verbatim — git resolves them natively
+ * (FR-007a, lazy resolve). Working-tree returns `null` (handled by caller).
+ *
+ * 042-compare-refs.
+ */
+function resolveSlotValue(slot: SlotValue): string | null {
+  switch (slot.kind) {
+    case 'workingTree': return null;
+    case 'head': return 'HEAD';
+    case 'branch': return slot.remote ? `${slot.remote}/${slot.name}` : slot.name;
+    case 'tag': return slot.name;
+    case 'commit': return slot.hash;
+    case 'expression': return slot.text;
+    case 'emptyTree': return EMPTY_TREE_HASH;
+  }
+}
+
+/** Human-readable label used in compare error messages. Must match webview's
+ *  `slotLabel` so the user-visible identifier is consistent across surfaces. */
+function slotLabelForError(slot: SlotValue): string {
+  switch (slot.kind) {
+    case 'workingTree': return 'Working Tree';
+    case 'head': return 'HEAD';
+    case 'branch': return slot.remote ? `${slot.remote}/${slot.name}` : slot.name;
+    case 'tag': return slot.name;
+    case 'commit': return slot.hash.slice(0, 7);
+    case 'expression': return slot.text;
+    case 'emptyTree': return 'Empty Tree';
+  }
+}
+
+/** Variant of `applyNumstatToFiles` that also returns aggregate totals.
+ *  Used by `compareRefs` so the result's `stats` field is populated. */
+function applyNumstatToFilesWithTotals(files: FileChange[], numstatOutput: string): { additions: number; deletions: number } {
+  let additions = 0;
+  let deletions = 0;
+  if (!numstatOutput) return { additions, deletions };
+
+  const fileMap = new Map<string, FileChange>();
+  for (const f of files) {
+    fileMap.set(f.path, f);
+    if (f.oldPath) fileMap.set(f.oldPath, f);
+  }
+
+  const parts = numstatOutput.split(NULL_CHAR);
+  let i = 0;
+  while (i < parts.length) {
+    const statPart = parts[i];
+    if (!statPart) { i++; continue; }
+
+    const tabParts = statPart.split('\t');
+    if (tabParts.length < 2) { i++; continue; }
+
+    const addStr = tabParts[0];
+    const delStr = tabParts[1];
+    const isBinary = addStr === '-' && delStr === '-';
+    const fileAdditions = addStr === '-' ? 0 : parseInt(addStr, 10);
+    const fileDeletions = delStr === '-' ? 0 : parseInt(delStr, 10);
+
+    const thirdField = tabParts[2] ?? '';
+    let filePath: string;
+    if (thirdField === '' && parts[i + 1]) {
+      filePath = parts[i + 1];
+      i += 3;
+    } else {
+      filePath = thirdField;
+      i += 1;
+    }
+
+    if (!isBinary) {
+      additions += fileAdditions;
+      deletions += fileDeletions;
+    }
+
+    const file = fileMap.get(filePath);
+    if (file && !isBinary) {
+      file.additions = fileAdditions;
+      file.deletions = fileDeletions;
+    }
+  }
+
+  return { additions, deletions };
 }
 
 /**

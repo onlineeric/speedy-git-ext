@@ -7,10 +7,12 @@ import type {
   CommitListMode,
   CommitTableColumnId,
   CommitTableLayout,
+  CompareMode,
   FileChangeStatus,
   GraphFilters,
   PersistedUIState,
   RepoInfo,
+  SlotValue,
   SubmoduleNavEntry,
   UncommittedSummary,
   UserSettings,
@@ -170,6 +172,9 @@ export class WebviewProvider {
   private lastCommitFingerprint = '';
   /** In-memory cache of persisted UI state to avoid stale reads in rapid sequential saves */
   private uiStateCache: PersistedUIState | undefined;
+
+  /** Active compare request — at most one runs at a time (latest-wins). */
+  private activeCompareController: { requestId: string; controller: AbortController } | null = null;
   private getSettingsHandler: (() => UserSettings) | undefined;
   private submoduleHandlers:
     | {
@@ -1861,6 +1866,85 @@ export class WebviewProvider {
         await this.openStagedDiffEditor(message.payload.filePath);
         break;
       }
+      // Compare refs (042-compare-refs)
+      case 'compareRefs': {
+        await this.handleCompareRefs(message.payload);
+        break;
+      }
+      case 'cancelCompare': {
+        const active = this.activeCompareController;
+        if (active && active.requestId === message.payload.requestId) {
+          active.controller.abort();
+        }
+        break;
+      }
+      case 'openCompareDiff': {
+        await this.openCompareDiffEditor(message.payload);
+        break;
+      }
+    }
+  }
+
+  /** Run a compare-refs RPC. Latest-wins: a new request aborts any in-flight compare. */
+  private async handleCompareRefs(payload: { a: SlotValue; b: SlotValue; mode: CompareMode; requestId: string }): Promise<void> {
+    // Latest-wins: if a previous compare is in flight, abort it before starting the new one.
+    if (this.activeCompareController) {
+      this.activeCompareController.controller.abort();
+    }
+    const controller = new AbortController();
+    this.activeCompareController = { requestId: payload.requestId, controller };
+
+    const result = await this.gitDiffService.compareRefs(payload.a, payload.b, payload.mode, controller.signal);
+
+    // If we were superseded by a newer request, the new request will already have replaced
+    // `activeCompareController`; only clear it if our requestId still owns the slot.
+    if (this.activeCompareController?.requestId === payload.requestId) {
+      this.activeCompareController = null;
+    }
+
+    if (result.success) {
+      this.postMessage({
+        type: 'compareResult',
+        payload: { requestId: payload.requestId, result: result.value },
+      });
+    } else {
+      // CANCELLED is a non-toast outcome (FR-025b); the webview suppresses it.
+      this.postMessage({
+        type: 'error',
+        payload: { error: result.error },
+      });
+    }
+  }
+
+  /** Open VS Code's diff editor with two compare-side URIs. */
+  private async openCompareDiffEditor(payload: {
+    filePath: string;
+    aHash: string | null;
+    bHash: string | null;
+    status: FileChangeStatus;
+    title: string;
+  }): Promise<void> {
+    const fileName = payload.filePath.split('/').pop() ?? payload.filePath;
+
+    const buildUri = (hash: string | null): vscode.Uri => {
+      if (hash === null) {
+        return vscode.Uri.file(path.join(this.currentRepoPath, payload.filePath));
+      }
+      return vscode.Uri.from({
+        scheme: 'git-show',
+        authority: hash,
+        path: `/${hash.slice(0, 8)}: ${fileName}`,
+        query: payload.filePath,
+      });
+    };
+
+    const leftUri = buildUri(payload.aHash);
+    const rightUri = buildUri(payload.bHash);
+
+    try {
+      await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, payload.title);
+    } catch {
+      this.log.warn(`Compare diff editor failed for: ${payload.filePath}`);
     }
   }
 

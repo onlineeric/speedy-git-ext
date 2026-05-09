@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import type { SlotValue } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { StashDialog } from './StashDialog';
 import { DiscardAllDialog } from './DiscardAllDialog';
 import { FilePickerDialog } from './FilePickerDialog';
+import { setSlotsAndCompare } from '../utils/compareDispatch';
+import { slotsEqual } from '../utils/compareSlot';
 
 interface UncommittedContextMenuProps {
   children: React.ReactNode;
@@ -42,12 +45,41 @@ export function UncommittedContextMenu({ children }: UncommittedContextMenuProps
     setDiscardAllDialogOpen(false);
   };
 
+  // Compare-refs (042-compare-refs): the uncommitted pseudo-row uses the workingTree sentinel.
+  const compareSelection = useGraphStore((state) => state.compareSelection);
+  const setSlotA = useGraphStore((state) => state.setSlotA);
+  const wtSlot: SlotValue = { kind: 'workingTree' };
+  const aSetForCompare = compareSelection.a !== null;
+  const sameAsACompare = aSetForCompare && slotsEqual(compareSelection.a, wtSlot);
+
+  const handleSetWorkingTreeAsBase = () => setSlotA(wtSlot);
+  const handleCompareWorkingTreeWithBase = () => {
+    if (!compareSelection.a || sameAsACompare) return;
+    setSlotsAndCompare(compareSelection.a, wtSlot);
+  };
+
   return (
     <>
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
         <ContextMenu.Portal>
           <ContextMenu.Content className="min-w-[200px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+            {/* Compare-refs (042-compare-refs) — Working Tree sentinel */}
+            <ContextMenu.Item className={menuItemClass} onSelect={handleSetWorkingTreeAsBase}>
+              Set as Base
+            </ContextMenu.Item>
+            {aSetForCompare && (
+              <ContextMenu.Item
+                className={sameAsACompare
+                  ? 'px-3 py-1.5 text-sm text-[var(--vscode-disabledForeground)] cursor-not-allowed outline-none'
+                  : menuItemClass}
+                disabled={sameAsACompare}
+                onSelect={handleCompareWorkingTreeWithBase}
+              >
+                Compare with Base
+              </ContextMenu.Item>
+            )}
+            <ContextMenu.Separator className={separatorClass} />
             {hasAnyChanges && (
               <ContextMenu.Item className={menuItemClass} onSelect={() => setStashDialogOpen(true)}>
                 Stash Everything…

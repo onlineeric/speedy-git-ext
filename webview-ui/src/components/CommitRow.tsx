@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react';
 import type { Commit, UserSettings } from '@shared/types';
 import type { GraphTopology } from '../utils/graphTopology';
+import { useGraphStore } from '../stores/graphStore';
 import { GraphCell } from './GraphCell';
 import { CommitContextMenu } from './CommitContextMenu';
 import { BranchContextMenu } from './BranchContextMenu';
@@ -14,6 +15,37 @@ import { mergeRefs, displayRefToRefInfo, displayRefKey } from '../utils/mergeRef
 import { formatAbsoluteDateTime, formatRelativeDate } from '../utils/formatDate';
 import { AuthorAvatar } from './AuthorAvatar';
 import { getColor, getLaneColorStyle, DEFAULT_GRAPH_PALETTE } from '../utils/colorUtils';
+
+/** Compare-refs A/B markers (042-compare-refs FR-026/027/028). Working Tree
+ *  never gets a marker — the slot chip in the panel is the only indicator there. */
+function CompareABMarker({ commitHash, isUncommitted }: { commitHash: string; isUncommitted: boolean }) {
+  const aHash = useGraphStore((s) => s.compareSelection.aResolvedHash);
+  const bHash = useGraphStore((s) => s.compareSelection.bResolvedHash);
+  if (isUncommitted) return null;
+  const isA = aHash !== null && aHash === commitHash;
+  const isB = bHash !== null && bHash === commitHash;
+  if (!isA && !isB) return null;
+  return (
+    <span className="flex flex-shrink-0 items-center gap-0.5">
+      {isA && (
+        <span
+          className="rounded bg-sky-500 px-1 py-0 text-[10px] font-bold text-white"
+          title="Compare: Base"
+        >
+          A
+        </span>
+      )}
+      {isB && (
+        <span
+          className="rounded bg-emerald-500 px-1 py-0 text-[10px] font-bold text-white"
+          title="Compare: Target"
+        >
+          B
+        </span>
+      )}
+    </span>
+  );
+}
 
 interface CommitRowProps {
   commit: Commit;
@@ -120,6 +152,8 @@ export const CommitRow = memo(function CommitRow({
       >
         {commit.abbreviatedHash}
       </span>
+
+      <CompareABMarker commitHash={commit.hash} isUncommitted={isUncommitted} />
 
       {(isHead || displayRefs.length > 0) && (
         <div className="flex items-center gap-1 flex-shrink-0">

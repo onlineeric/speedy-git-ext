@@ -23,7 +23,7 @@ A developer is reviewing recent history on the graph. They right-click a commit 
 
 **Acceptance Scenarios**:
 
-1. **Given** a graph with at least two commits visible, **When** the user right-clicks commit X → "Set as Base" then right-clicks commit Y → "Compare with selected," **Then** the Commit Details panel shows the consolidated A=X, B=Y diff with a header that names both ends.
+1. **Given** a graph with at least two commits visible, **When** the user right-clicks commit X → "Set as Base" then right-clicks commit Y → "Compare with Base," **Then** the Commit Details panel shows the consolidated A=X, B=Y diff with a header that names both ends.
 2. **Given** commit X has been selected for compare, **When** the user right-clicks commit X again, **Then** the "Compare with Base" item is disabled (cannot compare a commit with itself).
 3. **Given** commit X has been selected for compare, **When** the user right-clicks a different commit Z, **Then** "Compare with Base" appears enabled and uses Z as B; "Set as Base" also still appears so the user can override A.
 4. **Given** no prior selection, **When** the user right-clicks a commit, **Then** only "Set as Base" appears (no "Compare with Base" until A is set).

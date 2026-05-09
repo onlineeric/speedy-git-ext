@@ -121,7 +121,7 @@ this scenario can be exercised via a synthetic delay (e.g., temporarily wrap `co
 the backend with a 5s `setTimeout` for testing).
 
 1. With both slots filled, click Compare.
-2. While the loading spinner is showing, click the **Cancel** button in the panel.
+2. While the loading spinner is showing, click the **Cancel** button rendered next to the spinner in the Commit Details panel.
 3. Verify:
    - The spinner disappears.
    - Slots A and B are unchanged (FR-025b).

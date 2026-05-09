@@ -1,5 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, CommitParentInfo, FileChangeStatus } from '@shared/types';
+import type { CherryPickOptions, CompareMode, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, SlotValue, CommitParentInfo, FileChangeStatus } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 
 declare const acquireVsCodeApi: () => {
@@ -57,6 +57,8 @@ class RpcClient {
           store.setTotalLoadedWithoutFilter(message.payload.totalLoadedWithoutFilter);
         }
         store.setIsLoadingRepo(false);
+        // T034: re-run any active working-tree compare when the graph refreshes (FR-032)
+        store.maybeRerunCompareForWorkingTree();
         this.firePrefetch();
         break;
       case 'commitsAppended': {
@@ -93,16 +95,29 @@ class RpcClient {
       case 'loading':
         store.setLoading(message.payload.loading);
         break;
-      case 'error':
-        store.setError(message.payload.error.message);
+      case 'error': {
+        const errorMessage = message.payload.error.message;
+        const errorCode = (message.payload.error as { code?: string }).code;
+        // Compare-related errors route through the inline panel error path, not the global toast.
+        // Cancellations are silent (FR-025b); other errors populate `comparePanelUI.inlineError`.
+        if (store.comparePanelUI.loading) {
+          if (errorCode === 'CANCELLED') {
+            store.endCompareCancelled();
+          } else {
+            store.endCompareError(errorMessage);
+          }
+          break;
+        }
+        store.setError(errorMessage);
         store.setIsRefreshing(false);
-        this.rejectPendingLookups(message.payload.error.message);
+        this.rejectPendingLookups(errorMessage);
         if (this.pendingDialogAction) {
           const { reject } = this.pendingDialogAction;
           this.pendingDialogAction = null;
-          reject(message.payload.error.message);
+          reject(errorMessage);
         }
         break;
+      }
       case 'prefetchError':
         store.setError(message.payload.error.message);
         store.setPrefetching(false);
@@ -224,10 +239,18 @@ class RpcClient {
         if (message.payload.errors.length > 0) {
           store.setError(`Some data sources failed: ${message.payload.errors.join('; ')}`);
         }
+        // Re-run any active working-tree compare on initial data refresh (FR-032)
+        store.maybeRerunCompareForWorkingTree();
         if (message.payload.commits !== null) {
           this.firePrefetch();
         }
         break;
+      case 'compareResult': {
+        // Latest-wins: ignore stale responses whose requestId no longer matches the active one.
+        if (store.comparePanelUI.activeRequestId !== message.payload.requestId) break;
+        store.endCompareSuccess(message.payload.result);
+        break;
+      }
     }
   }
 
@@ -283,6 +306,23 @@ class RpcClient {
 
   openDiff(hash: string, filePath: string, parentHash?: string, status?: FileChangeStatus) {
     this.send({ type: 'openDiff', payload: { hash, filePath, parentHash, status } });
+  }
+
+  /**
+   * Dispatch a compare-refs RPC. The store's `beginCompare` MUST already have
+   * been called with this `requestId` so the upcoming `compareResult` /
+   * `error` response can be matched by id.
+   */
+  compareRefs(payload: { a: SlotValue; b: SlotValue; mode: CompareMode; requestId: string }) {
+    this.send({ type: 'compareRefs', payload });
+  }
+
+  cancelCompare(requestId: string) {
+    this.send({ type: 'cancelCompare', payload: { requestId } });
+  }
+
+  openCompareDiff(payload: { filePath: string; aHash: string | null; bHash: string | null; status: FileChangeStatus; title: string }) {
+    this.send({ type: 'openCompareDiff', payload });
   }
 
   openFile(hash: string, filePath: string) {

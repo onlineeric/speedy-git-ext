@@ -102,8 +102,15 @@ export function ControlBar() {
         : TOGGLE_BUTTON_COLORS.inactive;
   const searchColor =
     activeToggleWidget === 'search' ? TOGGLE_BUTTON_COLORS.active : TOGGLE_BUTTON_COLORS.inactive;
+  // FR-002 (042-compare-refs): three-state Compare toolbar color (idle / open / pending).
+  const compareSelection = useGraphStore((state) => state.compareSelection);
+  const anyCompareSlotFilled = compareSelection.a !== null || compareSelection.b !== null;
   const compareColor =
-    activeToggleWidget === 'compare' ? TOGGLE_BUTTON_COLORS.active : TOGGLE_BUTTON_COLORS.inactive;
+    activeToggleWidget === 'compare'
+      ? TOGGLE_BUTTON_COLORS.active
+      : anyCompareSlotFilled
+        ? TOGGLE_BUTTON_COLORS.filtered
+        : TOGGLE_BUTTON_COLORS.inactive;
 
   return (
     <div className="flex items-center gap-1 px-2 py-1.5 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)]">
@@ -155,8 +162,7 @@ export function ControlBar() {
       <button
         onClick={() => setActiveToggleWidget('compare')}
         className={`${iconButtonClass} ${compareColor}`}
-        title="Compare"
-        style={{ display: 'none' }} // TODO: remove this once the compare button is wired to the toggle panel
+        title="Compare refs (Base vs Target)"
       >
         <CompareIcon className={iconClass} />
       </button>

@@ -7,6 +7,11 @@ export interface GitExecOptions {
   cwd: string;
   timeout?: number;
   env?: Record<string, string>;
+  /** Optional cancellation signal. When aborted, the spawned process is killed
+   *  and the executor resolves with a `'CANCELLED'` GitError. If the signal is
+   *  already aborted at call time, the executor short-circuits without spawning.
+   *  Added for 042-compare-refs (FR-025b). */
+  abortSignal?: AbortSignal;
 }
 
 export interface GitExecResult {
@@ -18,8 +23,14 @@ export class GitExecutor {
   constructor(private readonly log: LogOutputChannel) {}
 
   async execute(options: GitExecOptions): Promise<Result<GitExecResult>> {
-    const { args, cwd, timeout = 30000, env } = options;
+    const { args, cwd, timeout = 30000, env, abortSignal } = options;
     const cmdString = `git ${args.join(' ')}`;
+
+    if (abortSignal?.aborted) {
+      this.log.debug(`Skipping aborted command: ${cmdString}`);
+      return err(new GitError('Cancelled', 'CANCELLED', cmdString));
+    }
+
     this.log.debug(`Executing: ${cmdString}`);
     const startTime = Date.now();
 
@@ -36,12 +47,20 @@ export class GitExecutor {
       let stderr = '';
       let resolved = false;
 
+      const onAbort = () => {
+        gitProcess.kill();
+        safeResolve(err(new GitError('Cancelled', 'CANCELLED', cmdString)));
+      };
+
       const safeResolve = (result: Result<GitExecResult>) => {
         if (resolved) return;
         resolved = true;
         clearTimeout(timeoutId);
+        if (abortSignal) abortSignal.removeEventListener('abort', onAbort);
         resolve(result);
       };
+
+      if (abortSignal) abortSignal.addEventListener('abort', onAbort, { once: true });
 
       const timeoutId = setTimeout(() => {
         gitProcess.kill();

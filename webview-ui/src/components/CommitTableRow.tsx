@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react';
 import type { Commit, CommitTableColumnId, UserSettings } from '@shared/types';
 import type { GraphTopology } from '../utils/graphTopology';
+import { useGraphStore } from '../stores/graphStore';
 import { GraphCell } from './GraphCell';
 import { CommitContextMenu } from './CommitContextMenu';
 import { BranchContextMenu } from './BranchContextMenu';
@@ -17,6 +18,22 @@ import { AuthorContextMenu } from './AuthorContextMenu';
 import { DateContextMenu } from './DateContextMenu';
 import { getColor, getLaneColorStyle, DEFAULT_GRAPH_PALETTE } from '../utils/colorUtils';
 import type { ResolvedCommitTableLayout } from '../utils/commitTableLayout';
+
+/** Compare-refs A/B markers (042-compare-refs FR-026/027/028) — table-row variant. */
+function CompareABMarker({ commitHash, isUncommitted }: { commitHash: string; isUncommitted: boolean }) {
+  const aHash = useGraphStore((s) => s.compareSelection.aResolvedHash);
+  const bHash = useGraphStore((s) => s.compareSelection.bResolvedHash);
+  if (isUncommitted) return null;
+  const isA = aHash !== null && aHash === commitHash;
+  const isB = bHash !== null && bHash === commitHash;
+  if (!isA && !isB) return null;
+  return (
+    <span className="ml-1 flex flex-shrink-0 items-center gap-0.5">
+      {isA && <span className="rounded bg-sky-500 px-1 py-0 text-[10px] font-bold text-white" title="Compare: Base">A</span>}
+      {isB && <span className="rounded bg-emerald-500 px-1 py-0 text-[10px] font-bold text-white" title="Compare: Target">B</span>}
+    </span>
+  );
+}
 
 interface CommitTableRowProps {
   commit: Commit;
@@ -231,6 +248,7 @@ function renderColumn({
           >
             {commit.abbreviatedHash}
           </span>
+          <CompareABMarker commitHash={commit.hash} isUncommitted={isUncommitted} />
         </div>
       );
     case 'message':

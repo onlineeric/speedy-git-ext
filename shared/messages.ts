@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult } from './types.js';
 
 /** Payload for the batched initial data message */
 export interface InitialDataPayload {
@@ -131,7 +131,11 @@ export type RequestMessage =
   | { type: 'stashWithMessage'; payload: { message?: string; paths?: string[] } }
   | { type: 'stashSelected'; payload: { message: string; paths: string[]; addUntrackedFirst: boolean } }
   | { type: 'getConflictState'; payload: Record<string, never> }
-  | { type: 'openStagedDiff'; payload: { filePath: string } };
+  | { type: 'openStagedDiff'; payload: { filePath: string } }
+  // Compare refs (042-compare-refs)
+  | { type: 'compareRefs'; payload: { a: SlotValue; b: SlotValue; mode: CompareMode; requestId: string } }
+  | { type: 'cancelCompare'; payload: { requestId: string } }
+  | { type: 'openCompareDiff'; payload: { filePath: string; aHash: string | null; bHash: string | null; status: FileChangeStatus; title: string } };
 
 export type ResponseMessage =
   | { type: 'commits'; payload: { commits: Commit[]; branches?: Branch[]; hasMore?: boolean; totalLoadedWithoutFilter?: number } }
@@ -167,7 +171,9 @@ export type ResponseMessage =
   | { type: 'authorList'; payload: { authors: Author[] } }
   | { type: 'uncommittedChanges'; payload: UncommittedSummary }
   | { type: 'conflictState'; payload: ConflictState }
-  | { type: 'initialData'; payload: InitialDataPayload };
+  | { type: 'initialData'; payload: InitialDataPayload }
+  // Compare refs (042-compare-refs)
+  | { type: 'compareResult'; payload: { requestId: string; result: CompareResult } };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -198,6 +204,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   stageFiles: true, unstageFiles: true, stageAll: true, unstageAll: true,
   discardFiles: true, discardAllUnstaged: true, stashWithMessage: true, stashSelected: true,
   getConflictState: true, openStagedDiff: true,
+  compareRefs: true, cancelCompare: true, openCompareDiff: true,
 };
 
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
@@ -211,6 +218,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   pushResult: true, avatarUrls: true, worktreeList: true, containingBranches: true,
   persistedUIState: true, authorList: true, uncommittedChanges: true, conflictState: true,
   initialData: true,
+  compareResult: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {

@@ -1,10 +1,11 @@
 import { memo, useCallback, useRef, useEffect, useState } from 'react';
-import type { CommitDetails, FileChange, DetailsPanelPosition, FileViewMode, CommitSignatureInfo } from '@shared/types';
+import type { CommitDetails, CompareResult, FileChange, DetailsPanelPosition, FileViewMode, CommitSignatureInfo, SlotValue } from '@shared/types';
 import { UNCOMMITTED_HASH } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { formatRelativeDate } from '../utils/formatDate';
 import { renderInlineCode } from '../utils/inlineCodeRenderer';
+import { slotLabel } from '../utils/compareSlot';
 import { CloseIcon, MoveRightIcon, MoveBottomIcon, ChevronDownIcon, ChevronRightIcon } from './icons';
 import { FileChangesTreeView } from './FileChangesTreeView';
 import { FileChangeRow, ViewModeToggle } from './FileChangeShared';
@@ -21,6 +22,8 @@ type BottomPanelLayoutMode = 'stacked' | 'split';
 export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
   const {
     commitDetails,
+    compareResult,
+    comparePanelUI,
     detailsPanelOpen,
     detailsPanelPosition,
     bottomPanelHeight,
@@ -30,6 +33,13 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
     setBottomPanelHeight,
     setRightPanelWidth,
   } = useGraphStore();
+
+  // FR-022 (042-compare-refs): compare results render in this panel; auto-open when a compare arrives.
+  useEffect(() => {
+    if (compareResult && !detailsPanelOpen) {
+      setDetailsPanelOpen(true);
+    }
+  }, [compareResult, detailsPanelOpen, setDetailsPanelOpen]);
 
   const resizing = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -96,7 +106,12 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
     return () => observer.disconnect();
   }, []);
 
-  if (!detailsPanelOpen || !commitDetails) {
+  // FR-022/FR-025a (042-compare-refs): compare result takes precedence over commit details.
+  // The panel also stays open while a compare is loading (loading + Cancel UI).
+  const showCompare = compareResult !== null;
+  const showCompareLoading = comparePanelUI.loading && !showCompare;
+
+  if (!detailsPanelOpen || (!commitDetails && !showCompare && !showCompareLoading)) {
     return null;
   }
 
@@ -115,20 +130,200 @@ export const CommitDetailsPanel = memo(function CommitDetailsPanel() {
       style={panelStyle}
     >
       <ResizeHandle position={detailsPanelPosition} onMouseDown={handleResizeStart} />
-      <PanelHeader
-        details={commitDetails}
-        position={detailsPanelPosition}
-        onClose={() => setDetailsPanelOpen(false)}
-        onTogglePosition={handleTogglePosition}
-      />
-      <PanelBody
-        details={commitDetails}
-        position={detailsPanelPosition}
-        bottomLayoutMode={bottomLayoutMode}
-      />
+      {showCompare || showCompareLoading ? (
+        <CompareHeader
+          result={compareResult}
+          loading={comparePanelUI.loading}
+          activeRequestId={comparePanelUI.activeRequestId}
+          position={detailsPanelPosition}
+          onClose={() => setDetailsPanelOpen(false)}
+          onTogglePosition={handleTogglePosition}
+        />
+      ) : (
+        <PanelHeader
+          details={commitDetails!}
+          position={detailsPanelPosition}
+          onClose={() => setDetailsPanelOpen(false)}
+          onTogglePosition={handleTogglePosition}
+        />
+      )}
+      {showCompare ? (
+        <CompareBody result={compareResult} />
+      ) : showCompareLoading ? (
+        <CompareLoadingBody />
+      ) : (
+        <PanelBody
+          details={commitDetails!}
+          position={detailsPanelPosition}
+          bottomLayoutMode={bottomLayoutMode}
+        />
+      )}
     </div>
   );
 });
+
+function CompareHeader({
+  result,
+  loading,
+  activeRequestId,
+  position,
+  onClose,
+  onTogglePosition,
+}: {
+  result: CompareResult | null;
+  loading: boolean;
+  activeRequestId: string | null;
+  position: DetailsPanelPosition;
+  onClose: () => void;
+  onTogglePosition: () => void;
+}) {
+  const handleCancel = () => {
+    if (activeRequestId) rpcClient.cancelCompare(activeRequestId);
+  };
+  return (
+    <div className="flex items-center gap-2 border-b border-[var(--vscode-panel-border)] px-3 py-1.5 flex-shrink-0">
+      <span className="text-xs font-medium text-[var(--vscode-descriptionForeground)]">Compare:</span>
+      {result ? (
+        <>
+          <SlotChip value={result.a} role="Base" />
+          <span className="text-xs text-[var(--vscode-descriptionForeground)]">→</span>
+          <SlotChip value={result.b} role="Target" />
+          <span
+            className="rounded bg-[var(--vscode-badge-background)] px-1.5 py-0.5 text-[10px] uppercase text-[var(--vscode-badge-foreground)]"
+            title={result.fellBackToTwoDot ? 'Three-dot fell back to two-dot (no common ancestor)' : undefined}
+          >
+            {result.mode === 'three-dot' ? '3-dot' : '2-dot'}
+          </span>
+          {result.fellBackToTwoDot && (
+            <span
+              className="text-[10px] text-[var(--vscode-editorWarning-foreground)]"
+              title="No common ancestor; showing endpoint diff"
+            >
+              ⓘ no common ancestor
+            </span>
+          )}
+        </>
+      ) : (
+        <span className="text-xs text-[var(--vscode-descriptionForeground)]">Loading…</span>
+      )}
+      <span className="flex-1" />
+      {loading && (
+        <button
+          onClick={handleCancel}
+          className="rounded px-2 py-1 text-xs text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)]"
+          title="Cancel comparison"
+        >
+          Cancel
+        </button>
+      )}
+      <button
+        onClick={onTogglePosition}
+        className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)]"
+        title={`Move panel to ${position === 'bottom' ? 'right' : 'bottom'}`}
+      >
+        <span>Move</span>
+        {position === 'bottom' ? <MoveRightIcon /> : <MoveBottomIcon />}
+      </button>
+      <button
+        onClick={onClose}
+        className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)]"
+        title="Close panel"
+      >
+        <CloseIcon />
+      </button>
+    </div>
+  );
+}
+
+function SlotChip({ value, role }: { value: SlotValue; role: 'Base' | 'Target' }) {
+  const kindIcon = (() => {
+    switch (value.kind) {
+      case 'workingTree': return '✎';
+      case 'head': return '⌂';
+      case 'branch': return '⎇';
+      case 'tag': return '🏷';
+      case 'commit': return '◉';
+      case 'expression': return 'ƒ';
+      case 'emptyTree': return '∅';
+    }
+  })();
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] px-1.5 py-0.5 text-xs"
+      title={`${role}: ${value.kind}`}
+    >
+      <span className="opacity-70">{kindIcon}</span>
+      <span className="font-mono">{slotLabel(value)}</span>
+    </span>
+  );
+}
+
+function CompareLoadingBody() {
+  return (
+    <div className="flex flex-1 items-center justify-center text-sm text-[var(--vscode-descriptionForeground)]">
+      Comparing…
+    </div>
+  );
+}
+
+function CompareBody({ result }: { result: CompareResult }) {
+  const fileViewMode = useGraphStore((state) => state.fileViewMode);
+
+  const handleFileClick = (file: FileChange) => {
+    rpcClient.openCompareDiff({
+      filePath: file.path,
+      aHash: result.aResolvedHash,
+      bHash: result.bResolvedHash,
+      status: file.status,
+      title: `${slotLabel(result.a)} → ${slotLabel(result.b)} · ${file.path}`,
+    });
+  };
+
+  return (
+    <div className="flex-1 overflow-auto">
+      <div className="border-b border-[var(--vscode-panel-border)] px-3 py-2 text-xs">
+        {result.files.length === 0 ? (
+          <span className="text-[var(--vscode-descriptionForeground)]">No changes</span>
+        ) : (
+          <span className="text-[var(--vscode-descriptionForeground)]">
+            {result.files.length} file{result.files.length !== 1 ? 's' : ''} changed
+            {(result.stats.additions > 0 || result.stats.deletions > 0) && (
+              <>
+                {'  '}<span className="text-green-400">+{result.stats.additions}</span>{' '}
+                <span className="text-red-400">−{result.stats.deletions}</span>
+              </>
+            )}
+          </span>
+        )}
+      </div>
+      <div className="px-3 py-2">
+        <div className="mb-1 flex items-center gap-2">
+          <ViewModeToggle />
+        </div>
+        {fileViewMode === 'list' ? (
+          <div className="space-y-0.5">
+            {result.files.map((file) => (
+              <FileChangeRow
+                key={file.path}
+                file={file}
+                onFileNameClick={() => handleFileClick(file)}
+                commitHash={result.bResolvedHash ?? ''}
+                parentHash={result.aResolvedHash ?? undefined}
+              />
+            ))}
+          </div>
+        ) : (
+          <FileChangesTreeView
+            files={result.files}
+            commitHash={result.bResolvedHash ?? ''}
+            parentHash={result.aResolvedHash ?? undefined}
+            onFileNameClick={handleFileClick}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
 function getBottomLayoutMode(panelWidth: number): BottomPanelLayoutMode {
   return panelWidth >= SPLIT_DETAILS_MIN_WIDTH + SPLIT_FILES_MIN_WIDTH + SPLIT_LAYOUT_PADDING
