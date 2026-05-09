@@ -32,7 +32,7 @@ function CompareABMarker({ commitHash, isUncommitted }: { commitHash: string; is
           className="rounded bg-sky-500 px-1 py-0 text-[10px] font-bold text-white"
           title="Compare: Base"
         >
-          A
+          B
         </span>
       )}
       {isB && (
@@ -40,7 +40,7 @@ function CompareABMarker({ commitHash, isUncommitted }: { commitHash: string; is
           className="rounded bg-emerald-500 px-1 py-0 text-[10px] font-bold text-white"
           title="Compare: Target"
         >
-          B
+          T
         </span>
       )}
     </span>

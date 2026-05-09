@@ -109,8 +109,8 @@ The light yellow signals "you have pending compare state here" so users don't lo
 
 ### 3.5 Visual feedback in the graph
 
-- When A points to a commit visible in the graph, mark its row with a colored ring / "A" badge.
-- When B is also set and visible, mark its row similarly with "B".
+- When A points to a commit visible in the graph, mark its row with a colored ring / "B" badge.
+- When B is also set and visible, mark its row similarly with "T".
 - Non-graph refs (e.g., Working Tree) get no graph marker — only the panel chip.
 
 ### 3.6 Result rendering

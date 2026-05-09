@@ -146,7 +146,7 @@ The following edge cases must be handled. Where a default is listed, the default
 
 **Visual indicators**
 
-- A and B both visible in the graph viewport: each row shows a subtle marker / "A" or "B" badge on the commit row.
+- A and B both visible in the graph viewport: each row shows a subtle marker / "B" or "T" badge on the commit row.
 - A or B is a non-graph ref (Working Tree, a hash that isn't currently rendered because of pagination, an ancestor outside the loaded window): no graph marker appears; the panel slot chip is the only indicator.
 - The visible commit for A is also tagged or branched: the marker coexists with existing ref labels (does not replace them).
 
@@ -218,7 +218,7 @@ The following edge cases must be handled. Where a default is listed, the default
 
 #### Visual graph markers
 
-- **FR-026**: When the resolved A commit is currently visible in the graph, its row MUST be marked with an "A" indicator. Same for B.
+- **FR-026**: When the resolved A (Base) commit is currently visible in the graph, its row MUST be marked with a "B" indicator. The resolved B (Target) commit MUST be marked with a "T" indicator.
 - **FR-027**: Markers MUST coexist with existing ref labels (branch / tag chips, HEAD pointer) without replacing them.
 - **FR-028**: When A or B is the `Working Tree` sentinel, no graph marker MUST be applied (only the slot chip in the panel indicates the value).
 

@@ -144,13 +144,13 @@ the backend with a 5s `setTimeout` for testing).
 ## Scenario 8 — Graph A/B markers (FR-026 — FR-028)
 
 1. Run a compare where both A and B resolve to commits visible in the graph viewport.
-2. Verify a small "A" badge on the row whose hash matches `aResolvedHash`.
-3. Verify a small "B" badge on the row whose hash matches `bResolvedHash`.
+2. Verify a small "B" badge on the row whose hash matches `aResolvedHash`.
+3. Verify a small "T" badge on the row whose hash matches `bResolvedHash`.
 4. Verify existing branch/tag/HEAD chips still appear on those rows (FR-027 — markers coexist).
 5. Now set slot A to **Working Tree** and slot B to a branch.
 6. Click Compare.
-7. Verify no "A" badge appears on any row (FR-028 — Working Tree never gets a graph marker).
-   "B" badge still appears on the resolved branch tip.
+7. Verify no "B" badge appears on any row (FR-028 — Working Tree never gets a graph marker).
+   "T" badge still appears on the resolved branch tip.
 
 ---
 

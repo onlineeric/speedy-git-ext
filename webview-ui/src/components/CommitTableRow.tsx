@@ -29,8 +29,8 @@ function CompareABMarker({ commitHash, isUncommitted }: { commitHash: string; is
   if (!isA && !isB) return null;
   return (
     <span className="ml-1 flex flex-shrink-0 items-center gap-0.5">
-      {isA && <span className="rounded bg-sky-500 px-1 py-0 text-[10px] font-bold text-white" title="Compare: Base">A</span>}
-      {isB && <span className="rounded bg-emerald-500 px-1 py-0 text-[10px] font-bold text-white" title="Compare: Target">B</span>}
+      {isA && <span className="rounded bg-sky-500 px-1 py-0 text-[10px] font-bold text-white" title="Compare: Base">B</span>}
+      {isB && <span className="rounded bg-emerald-500 px-1 py-0 text-[10px] font-bold text-white" title="Compare: Target">T</span>}
     </span>
   );
 }

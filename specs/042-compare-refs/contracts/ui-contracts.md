@@ -167,7 +167,7 @@ const aResolvedHash = useGraphStore(s => s.compareSelection.aResolvedHash);
 const bResolvedHash = useGraphStore(s => s.compareSelection.bResolvedHash);
 ```
 
-…and render a small "A" or "B" badge to the left of the commit hash chip when the row's
+…and render a small "B" or "T" badge to the left of the commit hash chip when the row's
 `commit.hash === aResolvedHash` or `=== bResolvedHash`. Both badges may show on the same row
 (if A and B resolved to the same hash, but FR-021 prevents the user from clicking Compare in
 that case so this is rare; render both anyway).

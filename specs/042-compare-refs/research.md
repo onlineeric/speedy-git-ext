@@ -226,10 +226,10 @@ the ref-vs-ref skip exactly matches FR-033.
 
 ---
 
-## Decision 9 — Right-click "A"/"B" graph markers (FR-026/028)
+## Decision 9 — Right-click "B"/"T" graph markers (FR-026/028)
 
 **Decision**: The graph row component reads `compareSelection.aResolvedHash` and
-`compareSelection.bResolvedHash` from the store on each render and shows a small "A"/"B" badge
+`compareSelection.bResolvedHash` from the store on each render and shows a small "B"/"T" badge
 when the row's hash matches. Resolved hashes are cached on the store after each successful
 Compare; until then (e.g., before the first Compare run with a freshly-set slot), the badges are
 not shown for branch/tag/expression slots — only for slots that already carry a resolved hash

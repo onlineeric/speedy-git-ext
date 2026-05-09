@@ -158,7 +158,7 @@ description: "Task list for feature 042-compare-refs implementation"
 
 **Purpose**: Cross-cutting visual affordances (graph A/B markers, recently-used) and final validation gates. None of these block any single user story; they round out the feature.
 
-- [X] T046 [P] In `webview-ui/src/components/CommitRow.tsx`, read `compareSelection.aResolvedHash` and `compareSelection.bResolvedHash`; render small "A" / "B" badges next to the commit hash chip when the row's hash matches, coexisting with existing branch/tag/HEAD chips (FR-026 / FR-027). Working Tree never gets a marker (FR-028) (depends on T007).
+- [X] T046 [P] In `webview-ui/src/components/CommitRow.tsx`, read `compareSelection.aResolvedHash` and `compareSelection.bResolvedHash`; render small "B" / "T" badges next to the commit hash chip when the row's hash matches, coexisting with existing branch/tag/HEAD chips (FR-026 / FR-027). Working Tree never gets a marker (FR-028) (depends on T007).
 - [X] T047 [P] Mirror T046 in `webview-ui/src/components/CommitTableRow.tsx` for the table-style commit row (depends on T007).
 - [X] T048 [P] In `webview-ui/src/stores/graphStore.ts`, append a slot value to `compareSelection.recents` (most-recent-first, max 8) inside `setSlotA` / `setSlotB`. Surface `recents` to `CompareWidget` so the dropdown pins recent items at the top per FR-005 + research.md Decision 10 (depends on T007, T022).
 - [ ] T049 **Manual gate (deferred)**: Run `quickstart.md` Scenarios 1–10 against the test repo (`pnpm generate-test-repo` + F5 → Run Extension). Cannot be exercised from headless CLI; requires the VS Code Extension Development Host. File any deviation as a follow-up task before marking the feature complete.
