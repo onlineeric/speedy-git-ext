@@ -33,13 +33,28 @@ export function dispatchCompare(a: SlotValue, b: SlotValue, mode: CompareMode): 
   rpcClient.compareRefs({ a, b, mode, requestId });
 }
 
+/**
+ * Make the Compare toggle panel the active panel (FR-013, Session 2026-05-09).
+ * Closes any other open toggle panel (Filter / Search) since only one panel may
+ * be open at a time. No-op when Compare is already active. Idempotent.
+ */
+export function ensureComparePanelOpen(): void {
+  const store = useGraphStore.getState();
+  if (store.activeToggleWidget === 'compare') return;
+  // setActiveToggleWidget toggles when called with the current value; calling it
+  // with 'compare' from any other state ('search', 'filter', or null) sets it to
+  // 'compare' and closes whatever was open.
+  store.setActiveToggleWidget('compare');
+}
+
 /** Dispatch a compare run by setting both slots and dispatching with the
  *  effective mode. Used by right-click entry points that auto-fill A and B
- *  and run immediately (FR-019). */
+ *  and run immediately (FR-019). Also opens the Compare panel (FR-013). */
 export function setSlotsAndCompare(a: SlotValue, b: SlotValue): void {
   const store = useGraphStore.getState();
   store.setSlotA(a);
   store.setSlotB(b);
+  ensureComparePanelOpen();
   // Read fresh state after the setters so modeOverride reflects any kind-change reset.
   const fresh = useGraphStore.getState().compareSelection;
   const mode = effectiveCompareMode(a, b, fresh.modeOverride);

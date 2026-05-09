@@ -28,6 +28,8 @@ A developer is reviewing recent history on the graph. They right-click a commit 
 3. **Given** commit X has been selected for compare, **When** the user right-clicks a different commit Z, **Then** "Compare with Base" appears enabled and uses Z as B; "Set as Compare Base" also still appears so the user can override A.
 4. **Given** no prior selection, **When** the user right-clicks a commit, **Then** only "Set as Compare Base" appears (no "Compare with Base" until A is set).
 5. **Given** an active comparison is showing in the Commit Details panel, **When** the user clicks a single commit row, **Then** the panel returns to single-commit detail view for that commit (compare result is dismissed by normal commit selection, just like any other detail view).
+6. **Given** the Compare panel is closed (or another toggle panel — Filter / Search — is open), **When** the user picks "Set as Compare Base" or "Compare with Base" from any context menu, **Then** the Compare panel becomes the active toggle panel (any other open toggle panel is closed first, since only one toggle panel can be open at a time) so the user immediately sees the slot state and can adjust it.
+7. **Given** the user has clicked "Set as Compare Base" on a commit, branch, tag, or the working-tree pseudo-row, **When** the slot value resolves to a commit row that is currently visible in the graph, **Then** the "B" badge on that row appears immediately — it does NOT wait for a comparison to run.
 
 ---
 
@@ -72,18 +74,17 @@ A developer wants to see how their uncommitted local edits differ from `origin/m
 
 ### User Story 4 - Compare a range of commits at once (Priority: P3)
 
-A developer wants to see what a specific feature work spanning N commits introduced. They multi-select those commits in the graph (Ctrl/Cmd+click), right-click and choose "Compare these commits." The result is the diff from the parent of the oldest selected commit to the newest selected commit.
+A developer wants to compare the endpoints of a selected range of commits. They multi-select two or more commits in the graph (Ctrl/Cmd+click), right-click and choose "Compare these commits." The result is the diff between the **oldest** and the **newest** selected commit.
 
-**Why this priority**: This is the way users naturally express "show me what this batch of work added." Without it, users must manually identify and pick the parent of the oldest commit, which is friction. Same plumbing as Story 1 with one extra entry point.
+**Why this priority**: Multi-selection followed by a single right-click is the natural gesture for "compare what I've got highlighted." Same plumbing as Story 1 with one extra entry point.
 
-**Independent Test**: Multi-select two or more commits in the graph, right-click → "Compare these commits." Verify the Commit Details panel shows the union diff that matches `git diff <oldest>^ <newest>`.
+**Independent Test**: Multi-select two or more commits in the graph, right-click → "Compare these commits." Verify the Commit Details panel shows the diff that matches `git diff <oldest> <newest>` (e.g., selecting commits B and D from history A→B→C→D yields Base=B, Target=D).
 
 **Acceptance Scenarios**:
 
-1. **Given** the user has multi-selected ≥2 commits in the graph, **When** they right-click and choose "Compare these commits," **Then** slot A is filled with `<oldest>^` (parent of the oldest selected commit) and slot B with `<newest>`, and the comparison runs immediately.
+1. **Given** the user has multi-selected ≥2 commits in the graph, **When** they right-click and choose "Compare these commits," **Then** slot A is filled with the **oldest** selected commit and slot B is filled with the **newest** selected commit, and the comparison runs immediately.
 2. **Given** the user has multi-selected exactly 1 commit, **When** the right-click menu opens, **Then** "Compare these commits" is hidden (single-commit selection has no range; "Set as Compare Base" is still offered).
 3. **Given** the multi-selection includes non-contiguous commits, **When** the user runs "Compare these commits," **Then** the system collapses the selection to its endpoints (oldest → newest) — non-contiguous selection does not produce a separate model; the user is shown the resulting endpoint pair in slots A and B.
-4. **Given** the oldest selected commit is a root commit (no parent), **When** "Compare these commits" runs, **Then** A is set to the empty-tree sentinel so the diff shows "everything in B" (matches `git diff` against the empty tree).
 
 ---
 
@@ -173,7 +174,7 @@ The following edge cases must be handled. Where a default is listed, the default
 
 - **FR-001**: System MUST provide a third toggle panel ("Compare") alongside the existing Filter and Search panels, using the same panel framework.
 - **FR-002**: The toolbar Compare button MUST follow the existing Filter-button three-state convention: Idle (panel closed and both slots empty) → default color; Open (panel visible) → light blue; Pending (panel closed AND at least one slot filled) → light yellow.
-- **FR-003**: The Compare panel MUST contain: slot A combobox (labeled **Base**), slot B combobox (labeled **Target**), swap (⇄) button between them, a two-dot / three-dot toggle, a Compare action button, and a per-slot clear (✕) affordance.
+- **FR-003**: The Compare panel MUST contain: slot A combobox (labeled **Base**), slot B combobox (labeled **Target**), swap (⇄) button between them, a two-dot / three-dot toggle, a Compare action button, a **Reset** button placed next to the Compare button that clears slot A, slot B, the mode override, the recents list, and any showing compare result, and a per-slot clear (✕) affordance.
 
 #### Slot input
 
@@ -193,10 +194,10 @@ The following edge cases must be handled. Where a default is listed, the default
 
 #### Right-click entry points
 
-- **FR-013**: Commit row, branch label, and tag label context menus MUST include "Set as Compare Base" whenever the right-clicked target is a single commit-ish.
+- **FR-013**: Commit row, branch label, and tag label context menus MUST include "Set as Compare Base" whenever the right-clicked target is a single commit-ish. Selecting **Set as Compare Base** or **Compare with Base** from any context menu MUST also open the Compare toggle panel as the active panel (closing any other toggle panel that is currently open, since only one toggle panel can be open at a time).
 - **FR-014**: Those same context menus MUST include "Compare with Base" whenever slot A is set, disabled when the right-clicked target resolves to the same commit-ish as slot A.
-- **FR-015**: When the user right-clicks a multi-selection of ≥2 commits, the menu MUST include "Compare these commits," which fills slot A with `<oldest>^` and slot B with `<newest>` and runs the comparison immediately. For non-contiguous multi-selections the system MUST collapse to oldest/newest endpoints.
-- **FR-016**: When the oldest selected commit is a root commit (no parent), the system MUST use the empty-tree sentinel for slot A so the diff shows the full content of B.
+- **FR-015**: When the user right-clicks a multi-selection of ≥2 commits, the menu MUST include "Compare these commits," which fills slot A with the **oldest** selected commit and slot B with the **newest** selected commit, then runs the comparison immediately. For non-contiguous multi-selections the system MUST collapse to oldest/newest endpoints. Rationale: this matches users' direct mental model of the selection ("compare the commits I selected, B through D, so Base = B and Target = D"). To inspect what the selected range *introduced* (i.e., `git diff <oldest>^ <newest>`), users can right-click the oldest commit and use the parent commit-ish via the existing single-commit Compare flow.
+- **FR-016**: This requirement is intentionally left blank. (Earlier draft addressed the empty-tree edge case for `<oldest>^`; that scenario no longer applies because slot A is now the oldest selected commit itself, never its parent. The empty-tree sentinel remains supported for callers that explicitly need it.)
 - **FR-017**: Stash row context menus MUST NOT include any compare entries (out of scope for v1).
 - **FR-018**: The "Uncommitted" / working-tree pseudo-row context menu MUST include "Set as Compare Base" and "Compare with Base" using the `Working Tree` sentinel.
 
@@ -205,6 +206,7 @@ The following edge cases must be handled. Where a default is listed, the default
 - **FR-019**: Right-click "Compare with Base" and "Compare these commits" MUST run the comparison immediately (the user has committed intent).
 - **FR-020**: Combobox edits, slot swaps, slot clears, and toggle changes in the panel MUST NOT auto-run; they require an explicit click of the Compare button. Any showing compare result MUST be dismissed when one of these inputs changes (the prior result no longer matches the inputs).
 - **FR-021**: The Compare button MUST be disabled when either slot is empty or A == B.
+- **FR-021a**: The Compare panel MUST expose a **Reset** button (placed next to the Compare button) that clears slot A, slot B, the mode override, the recents list, and any showing compare result. The Reset button MUST be disabled only when there is nothing to reset (both slots null, no override, no recents, no showing result).
 
 #### Result rendering
 
@@ -218,9 +220,9 @@ The following edge cases must be handled. Where a default is listed, the default
 
 #### Visual graph markers
 
-- **FR-026**: When the resolved A (Base) commit is currently visible in the graph, its row MUST be marked with a "B" indicator. The resolved B (Target) commit MUST be marked with a "T" indicator.
+- **FR-026**: When slot A (Base) points at a commit that is currently visible in the graph, its row MUST be marked with a "B" indicator. When slot B (Target) points at such a commit, its row MUST be marked with a "T" indicator. The marker MUST appear *immediately* on slot fill — it MUST NOT wait for a comparison to finish or for `aResolvedHash` / `bResolvedHash` to be populated. Slot kinds map to commit rows as follows: `commit` → match by hash; `branch` → match the row whose refs include the same branch (matching local vs. remote per the slot's `remote` field); `tag` → match the row whose refs include the same tag; `head` → match the row whose refs include the HEAD pointer. After a successful comparison, the resolved hashes (`aResolvedHash` / `bResolvedHash`) act as a fallback that also drives the marker — this covers `expression` slots whose resolution requires git.
 - **FR-027**: Markers MUST coexist with existing ref labels (branch / tag chips, HEAD pointer) without replacing them.
-- **FR-028**: When A or B is the `Working Tree` sentinel, no graph marker MUST be applied (only the slot chip in the panel indicates the value).
+- **FR-028**: When A or B is the `Working Tree`, `expression`, or `emptyTree` sentinel (and no resolved hash matches a visible row for the expression case), no graph marker MUST be applied — only the slot chip in the panel indicates the value.
 
 #### Persistence
 
@@ -255,6 +257,13 @@ The following edge cases must be handled. Where a default is listed, the default
 - Q: What does the user see while a comparison is being computed? → A: Reuse the existing Commit Details panel loading indicator (same spinner/skeleton already shown when single-commit details are loading). No new compare-specific loading UI.
 - Q: When does a slot's value resolve to a commit hash — at slot fill or at Compare click? → A: Lazy resolve at Compare click for branches, tags, and typed expressions (e.g., `HEAD~3`). Only raw commit hashes are stored as their resolved hash. The slot's user intent ("compare against `main` as it currently is") is preserved across panel close/open and across graph refreshes.
 - Q: How are very large compare results handled — hard cap, soft cap with confirmation, or unbounded? → A: No hard cap; the loading indicator exposes a **Cancel** affordance that aborts the in-flight git process and clears the loading state. Virtualization handles render-side performance for any size that completes.
+
+### Session 2026-05-09
+
+- Q: When the user picks "Set as Compare Base" or "Compare with Base" from a context menu while the Compare panel is closed (or a different toggle panel is open), should the panel be auto-opened? → A: Yes — selecting either item makes the Compare toggle panel the active panel. Because only one toggle panel can be open at a time, any other open toggle panel (Filter / Search) is closed first. This eliminates the "I set the base, but I can't see what happened" usability gap.
+- Q: Should the graph "B" / "T" markers wait for a comparison to finish before appearing, or appear immediately on slot fill? → A: Appear immediately on slot fill. Slot kinds that map deterministically to a commit row (commit-hash, branch, tag, HEAD) drive the marker right away. Resolved hashes from a completed compare provide a fallback path for `expression` slots.
+- Q: Does the Compare panel need a Reset button distinct from the per-slot ✕ clears? → A: Yes — a single Reset button placed next to Compare clears slot A, slot B, the mode override, the recents list, and any showing compare result in one click. Per-slot ✕ remains for clearing one side without affecting the other.
+- Q: Should "Compare these commits" set Base = `<oldest>^` (parent of oldest, "what these commits added") or Base = `<oldest>` (oldest selected itself, "compare the commits I selected")? → A: Base = `<oldest>` (the oldest selected commit itself). Selecting B through D yields Base=B, Target=D, matching the user's literal mental model. The previous `<oldest>^` semantics surprised users who expected "compare the selection" to mean "the endpoints of what I picked."
 
 ## Success Criteria *(mandatory)*
 

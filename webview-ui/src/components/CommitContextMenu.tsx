@@ -4,7 +4,7 @@ import type { Commit, CherryPickOptions, ResetMode, RebaseEntry, CommitParentInf
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { buildResetCommand } from '../utils/gitCommandBuilder';
-import { setSlotsAndCompare } from '../utils/compareDispatch';
+import { ensureComparePanelOpen, setSlotsAndCompare } from '../utils/compareDispatch';
 import { slotsEqual } from '../utils/compareSlot';
 import { ConfirmDialog } from './ConfirmDialog';
 import { InputDialog } from './InputDialog';
@@ -141,6 +141,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
 
   const handleSetAsBase = () => {
     setSlotA(compareSlotForThisCommit);
+    ensureComparePanelOpen();
   };
 
   const handleCompareWithBase = () => {
@@ -148,7 +149,8 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
     setSlotsAndCompare(compareSelection.a, compareSlotForThisCommit);
   };
 
-  // FR-015 / FR-016 — "Compare these commits" range compare for multi-selection
+  // FR-015 (Session 2026-05-09): "Compare these commits" sets Base = oldest selected,
+  // Target = newest selected — direct mental model "compare the commits I selected."
   const handleCompareRange = () => {
     if (selectedCommits.length < 2) return;
     // Order by index in commits[] (committer-date-descending). Newest = lowest index, oldest = highest index.
@@ -161,9 +163,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
       oldest = c;
     }
     if (!oldest || !newest) return;
-    const a: SlotValue = oldest.parents.length > 0
-      ? { kind: 'commit', hash: oldest.parents[0] }
-      : { kind: 'emptyTree' };
+    const a: SlotValue = { kind: 'commit', hash: oldest.hash };
     const b: SlotValue = { kind: 'commit', hash: newest.hash };
     clearSelectedCommits();
     setSlotsAndCompare(a, b);

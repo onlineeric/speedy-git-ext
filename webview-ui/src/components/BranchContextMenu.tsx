@@ -11,7 +11,7 @@ import {
   buildStashAndCheckoutCommand,
 } from '../utils/gitCommandBuilder';
 import { resolveDefaultRemote } from '../utils/resolveDefaultRemote';
-import { setSlotsAndCompare } from '../utils/compareDispatch';
+import { ensureComparePanelOpen, setSlotsAndCompare } from '../utils/compareDispatch';
 import { slotsEqual } from '../utils/compareSlot';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DeleteBranchDialog } from './DeleteBranchDialog';
@@ -91,6 +91,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
   const handleSetAsBaseRef = () => {
     if (!compareSlotForThisRef) return;
     setSlotA(compareSlotForThisRef);
+    ensureComparePanelOpen();
   };
   const handleCompareWithBaseRef = () => {
     if (!compareSlotForThisRef || !compareSelection.a || sameAsACompare) return;

@@ -201,12 +201,14 @@ function SlotKindIcon({ kind }: { kind: SlotValue['kind'] }) {
 export function CompareWidget() {
   const compareSelection = useGraphStore((s) => s.compareSelection);
   const comparePanelUI = useGraphStore((s) => s.comparePanelUI);
+  const compareResult = useGraphStore((s) => s.compareResult);
   const setSlotA = useGraphStore((s) => s.setSlotA);
   const setSlotB = useGraphStore((s) => s.setSlotB);
   const swapSlots = useGraphStore((s) => s.swapSlots);
   const setCompareModeOverride = useGraphStore((s) => s.setCompareModeOverride);
+  const clearCompareState = useGraphStore((s) => s.clearCompareState);
 
-  const { a, b, modeOverride } = compareSelection;
+  const { a, b, modeOverride, recents } = compareSelection;
 
   // Default mode rule (research Decision 4) — re-applies whenever slot kinds change because
   // the store clears modeOverride on kind change.
@@ -216,9 +218,18 @@ export function CompareWidget() {
   const slotsAreEqual = a !== null && b !== null && slotsEqual(a, b);
   const compareDisabled = a === null || b === null || slotsAreEqual || comparePanelUI.loading;
 
+  // FR-021a: Reset is available iff there is anything to reset.
+  const resetDisabled =
+    a === null && b === null && modeOverride === null && recents.length === 0 && compareResult === null;
+
   const handleCompareClick = () => {
     if (compareDisabled || !a || !b) return;
     dispatchCompare(a, b, effectiveMode);
+  };
+
+  const handleResetClick = () => {
+    if (resetDisabled) return;
+    clearCompareState();
   };
 
   return (
@@ -278,6 +289,17 @@ export function CompareWidget() {
           }
         >
           Compare
+        </button>
+
+        {/* FR-021a (042-compare-refs): Reset clears slots, mode override, recents, and result. */}
+        <button
+          type="button"
+          onClick={handleResetClick}
+          disabled={resetDisabled}
+          className="ml-1 rounded border border-[var(--vscode-button-secondaryBackground,var(--vscode-input-border))] bg-[var(--vscode-button-secondaryBackground)] px-3 py-1 text-xs text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] disabled:cursor-not-allowed disabled:opacity-50"
+          title="Reset Base, Target, mode, recents, and any showing result"
+        >
+          Reset
         </button>
       </div>
 

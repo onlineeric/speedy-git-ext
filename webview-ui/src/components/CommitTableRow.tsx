@@ -17,15 +17,18 @@ import { AuthorAvatar } from './AuthorAvatar';
 import { AuthorContextMenu } from './AuthorContextMenu';
 import { DateContextMenu } from './DateContextMenu';
 import { getColor, getLaneColorStyle, DEFAULT_GRAPH_PALETTE } from '../utils/colorUtils';
+import { slotMatchesCommitRow } from '../utils/compareMarker';
 import type { ResolvedCommitTableLayout } from '../utils/commitTableLayout';
 
 /** Compare-refs A/B markers (042-compare-refs FR-026/027/028) — table-row variant. */
-function CompareABMarker({ commitHash, isUncommitted }: { commitHash: string; isUncommitted: boolean }) {
+function CompareABMarker({ commit, isUncommitted }: { commit: Commit; isUncommitted: boolean }) {
+  const a = useGraphStore((s) => s.compareSelection.a);
+  const b = useGraphStore((s) => s.compareSelection.b);
   const aHash = useGraphStore((s) => s.compareSelection.aResolvedHash);
   const bHash = useGraphStore((s) => s.compareSelection.bResolvedHash);
   if (isUncommitted) return null;
-  const isA = aHash !== null && aHash === commitHash;
-  const isB = bHash !== null && bHash === commitHash;
+  const isA = slotMatchesCommitRow(a, commit) || (aHash !== null && aHash === commit.hash);
+  const isB = slotMatchesCommitRow(b, commit) || (bHash !== null && bHash === commit.hash);
   if (!isA && !isB) return null;
   return (
     <span className="ml-1 flex flex-shrink-0 items-center gap-0.5">
@@ -248,7 +251,7 @@ function renderColumn({
           >
             {commit.abbreviatedHash}
           </span>
-          <CompareABMarker commitHash={commit.hash} isUncommitted={isUncommitted} />
+          <CompareABMarker commit={commit} isUncommitted={isUncommitted} />
         </div>
       );
     case 'message':

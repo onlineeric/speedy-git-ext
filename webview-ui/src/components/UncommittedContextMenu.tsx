@@ -6,7 +6,7 @@ import { rpcClient } from '../rpc/rpcClient';
 import { StashDialog } from './StashDialog';
 import { DiscardAllDialog } from './DiscardAllDialog';
 import { FilePickerDialog } from './FilePickerDialog';
-import { setSlotsAndCompare } from '../utils/compareDispatch';
+import { ensureComparePanelOpen, setSlotsAndCompare } from '../utils/compareDispatch';
 import { slotsEqual } from '../utils/compareSlot';
 
 interface UncommittedContextMenuProps {
@@ -52,7 +52,10 @@ export function UncommittedContextMenu({ children }: UncommittedContextMenuProps
   const aSetForCompare = compareSelection.a !== null;
   const sameAsACompare = aSetForCompare && slotsEqual(compareSelection.a, wtSlot);
 
-  const handleSetWorkingTreeAsBase = () => setSlotA(wtSlot);
+  const handleSetWorkingTreeAsBase = () => {
+    setSlotA(wtSlot);
+    ensureComparePanelOpen();
+  };
   const handleCompareWorkingTreeWithBase = () => {
     if (!compareSelection.a || sameAsACompare) return;
     setSlotsAndCompare(compareSelection.a, wtSlot);
