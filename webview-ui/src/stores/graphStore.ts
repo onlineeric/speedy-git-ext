@@ -705,10 +705,20 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setSelectedCommits: (selectedCommits) => set({ selectedCommits }),
   setSelectionAnchor: (lastClickedHash) => set({ lastClickedHash }),
   toggleSelectedCommit: (hash) => set((state) => {
-    const exists = state.selectedCommits.includes(hash);
+    // When the user single-clicks a row to select it, then Ctrl/Cmd-clicks
+    // additional rows, the originally clicked row must be part of the
+    // multi-selection — that is the standard UX (file managers, IDEs).
+    // Seed the selection list with the current single-click anchor before
+    // toggling, so the anchor isn't dropped from the range.
+    const seeded = state.selectedCommits.length === 0
+      && state.selectedCommit !== undefined
+      && state.selectedCommit !== hash
+      ? [state.selectedCommit]
+      : state.selectedCommits;
+    const exists = seeded.includes(hash);
     const selectedCommits = exists
-      ? state.selectedCommits.filter((item) => item !== hash)
-      : [...state.selectedCommits, hash];
+      ? seeded.filter((item) => item !== hash)
+      : [...seeded, hash];
     return { selectedCommits, lastClickedHash: hash };
   }),
   selectCommitRange: (toHash) => set((state) => {
