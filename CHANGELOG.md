@@ -4,10 +4,34 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [4.0.0] - pre-release - 2026-05-10
 
-### future planned features
-- Compare branches, commits, HEAD, etc.
+### Added
+- **Compare Refs (A vs B)** — new "Compare" toggle panel alongside Filter and Search for inspecting the diff between any two commit-ish references in the active repository.
+- Two slot comboboxes (**Base** and **Target**) that accept commits (full or short hash), local branches, remote branches, tags, the `HEAD` sentinel, the `Working Tree` sentinel, and `git rev-parse`-compatible typed expressions (e.g., `HEAD~3`, `origin/main^2`).
+- Lazy ref resolution — branches, tags, and typed expressions are stored by user intent and resolved to a hash at Compare-click time, so branch movement or fetched updates between slot fill and Compare are reflected in the result. Only raw pasted hashes are stored as resolved hashes.
+- Recently-used items surfaced at the top of each slot's dropdown (per-session, cleared on repo switch).
+- Two-dot / three-dot toggle with smart defaults — three-dot when both slots are branches or tags (PR-style "what Target adds since branching off Base"), two-dot when at least one slot is a commit hash or typed expression. Three-dot is automatically disabled when either slot is `Working Tree`.
+- Automatic fallback to two-dot with an inline notice when a three-dot comparison resolves to two refs with no common ancestor.
+- Swap (⇄) button to exchange Base and Target, per-slot clear (✕) affordances, and a **Reset** button next to Compare that clears both slots, the mode override, recents, and any showing result in one click.
+- Right-click entry points on commit rows, branch labels, tag labels, and the uncommitted pseudo-row: **Set as Compare Base** and **Compare with Base** — selecting either also opens the Compare panel as the active toggle so users immediately see slot state.
+- **Compare these commits** menu item on multi-selections of ≥2 commits — fills Base with the oldest selected commit, Target with the newest, and runs immediately. Non-contiguous selections collapse to their endpoints.
+- Visual **B** and **T** badges on graph rows whose commits match Base or Target, appearing immediately on slot fill (no wait for a comparison to run). Markers coexist with existing branch/tag/HEAD chips.
+- Compare result rendered in the existing Commit Details panel with a header naming both ends and the active mode (2-dot or 3-dot); selecting a single commit row dismisses the result and returns to single-commit details.
+- Working-tree comparisons auto-refresh on the same signal as the graph — edit a file and the diff updates on the next tick. Ref-vs-ref comparisons stay frozen as a snapshot.
+- "No changes" empty state when Base and Target are content-identical (not an error), and a **Cancel** affordance on the loading indicator that aborts the in-flight git diff and leaves slots intact for retry.
+- Toolbar Compare button uses the existing three-state convention: default (idle), light blue (panel open), light yellow (panel closed but at least one slot filled) so pending state is never lost behind a closed panel.
+- Within-session persistence of slots and mode across panel close/open and graph refreshes; slots clear automatically on active-repo switch and on VS Code window reload.
+
+### Changed
+- Default `speedyGit.overScan` lowered from `50` to `20`. Profiling on large repos showed the row count is the only knob that materially affects scroll smoothness — fewer rendered DOM rows means less browser style recalculation, which dominated the trace. Existing user overrides are unaffected.
+
+### Internal
+- Extracted pure data-transformation helpers out of `webview-ui/src/stores/graphStore.ts` into focused utility modules with unit tests: `computeHiddenCommitHashes` → `commitVisibility.ts`; `mergeStashesIntoCommits`, `mergeUncommittedIntoCommits`, `computeMergedTopology`, and `UncommittedContext` → `mergedCommits.ts`; `joinRepoPath` → `repoPath.ts`. `graphStore.ts` shrank from 1216 → 1051 lines with no behavior change.
+- Added a reusable `createReachabilityChecker(commits)` factory that builds the commit map once and answers repeated reachability checks; `CommitTooltip` and `CommitContextMenu` now memoize one checker per `mergedCommits` change instead of rebuilding an O(n) map on every call.
+- `GraphCell` now receives `graphColors` as a prop instead of subscribing to the Zustand store, aligning with the prop-drilled `userSettings` pattern used by `CommitRow` and `CommitTableRow`. Added a shared `resolvePalette(graphColors)` helper in `colorUtils.ts` so the empty-palette fallback lives in one place.
+- Extracted a small `PromiseSettledResult<T>` unwrap helper in `WebviewProvider.sendInitialData` to consolidate the eight inline settled-result unwraps and standardize error logging without changing the public message protocol.
+- Removed two debug-only `useEffect` blocks in `MultiSelectDropdown.tsx` that logged mount/unmount and open-state changes; clears the lingering lint warnings.
 
 ## [3.2.0] - 2026-05-08
 

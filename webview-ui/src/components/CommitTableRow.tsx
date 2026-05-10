@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react';
 import type { Commit, CommitTableColumnId, UserSettings } from '@shared/types';
 import type { GraphTopology } from '../utils/graphTopology';
+import { useGraphStore } from '../stores/graphStore';
 import { GraphCell } from './GraphCell';
 import { CommitContextMenu } from './CommitContextMenu';
 import { BranchContextMenu } from './BranchContextMenu';
@@ -15,8 +16,27 @@ import { formatAbsoluteDateTime, formatRelativeDate } from '../utils/formatDate'
 import { AuthorAvatar } from './AuthorAvatar';
 import { AuthorContextMenu } from './AuthorContextMenu';
 import { DateContextMenu } from './DateContextMenu';
-import { getColor, getLaneColorStyle, DEFAULT_GRAPH_PALETTE } from '../utils/colorUtils';
+import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils';
+import { slotMatchesCommitRow } from '../utils/compareMarker';
 import type { ResolvedCommitTableLayout } from '../utils/commitTableLayout';
+
+/** Compare-refs A/B markers (042-compare-refs FR-026/027/028) — table-row variant. */
+function CompareABMarker({ commit, isUncommitted }: { commit: Commit; isUncommitted: boolean }) {
+  const a = useGraphStore((s) => s.compareSelection.a);
+  const b = useGraphStore((s) => s.compareSelection.b);
+  const aHash = useGraphStore((s) => s.compareSelection.aResolvedHash);
+  const bHash = useGraphStore((s) => s.compareSelection.bResolvedHash);
+  if (isUncommitted) return null;
+  const isA = slotMatchesCommitRow(a, commit) || (aHash !== null && aHash === commit.hash);
+  const isB = slotMatchesCommitRow(b, commit) || (bHash !== null && bHash === commit.hash);
+  if (!isA && !isB) return null;
+  return (
+    <span className="ml-1 flex flex-shrink-0 items-center gap-0.5">
+      {isA && <span className="rounded bg-sky-500 px-1 py-0 text-[10px] font-bold text-white" title="Compare: Base">B</span>}
+      {isB && <span className="rounded bg-emerald-500 px-1 py-0 text-[10px] font-bold text-white" title="Compare: Target">T</span>}
+    </span>
+  );
+}
 
 interface CommitTableRowProps {
   commit: Commit;
@@ -62,7 +82,7 @@ export const CommitTableRow = memo(function CommitTableRow({
   const graphColumn = layout.columns.find((column) => column.id === 'graph');
 
   const node = topology.nodes.get(commit.hash);
-  const palette = graphColors.length > 0 ? graphColors : DEFAULT_GRAPH_PALETTE;
+  const palette = resolvePalette(graphColors);
   const laneColor = node ? getColor(node.colorIndex, palette) : undefined;
   const laneColorStyle = laneColor ? getLaneColorStyle(laneColor) : undefined;
 
@@ -123,6 +143,7 @@ export const CommitTableRow = memo(function CommitTableRow({
             topology,
             rowHeight,
             graphWidth: graphColumn?.effectiveWidth ?? 0,
+            graphColors,
             isHead,
             visibleRefs,
             overflowRefs,
@@ -172,6 +193,7 @@ function renderColumn({
   topology,
   rowHeight,
   graphWidth,
+  graphColors,
   isHead,
   visibleRefs,
   overflowRefs,
@@ -192,6 +214,7 @@ function renderColumn({
   topology: GraphTopology;
   rowHeight: number;
   graphWidth: number;
+  graphColors: readonly string[];
   isHead: boolean;
   visibleRefs: ReturnType<typeof mergeRefs>['displayRefs'];
   overflowRefs: ReturnType<typeof mergeRefs>['displayRefs'];
@@ -216,6 +239,7 @@ function renderColumn({
             topology={topology}
             width={graphWidth}
             height={rowHeight}
+            graphColors={graphColors}
             isHeadCommit={isHead}
             onNodeMouseEnter={onNodeMouseEnter}
             onNodeMouseLeave={onNodeMouseLeave}
@@ -231,6 +255,7 @@ function renderColumn({
           >
             {commit.abbreviatedHash}
           </span>
+          <CompareABMarker commit={commit} isUncommitted={isUncommitted} />
         </div>
       );
     case 'message':

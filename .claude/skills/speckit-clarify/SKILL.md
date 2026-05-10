@@ -155,7 +155,7 @@ Execution steps:
        | C | <Option C description> (add D/E as needed up to 5) |
        | Short | Provide a different short answer (<=50 words) (Include only if free-form alternative is appropriate) |
 
-       - After the table, add: `You can reply with the option letter (e.g., "A"), accept the recommendation by saying "yes" or "recommended", or provide your own short answer.`
+       - After the table, add: `You can reply with the option letter (e.g., "B"), accept the recommendation by saying "yes" or "recommended", or provide your own short answer.`
     - For short‑answer style (no meaningful discrete options):
        - Provide your **suggested answer** based on best practices and context.
        - Format as: `**Suggested:** <your proposed answer> - <brief reasoning>`

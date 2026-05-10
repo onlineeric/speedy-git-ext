@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import type { Commit, CherryPickOptions, ResetMode, RebaseEntry, CommitParentInfo } from '@shared/types';
+import type { Commit, CherryPickOptions, ResetMode, RebaseEntry, CommitParentInfo, SlotValue } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { buildResetCommand } from '../utils/gitCommandBuilder';
+import { ensureComparePanelOpen, setSlotsAndCompare } from '../utils/compareDispatch';
+import { slotsEqual } from '../utils/compareSlot';
 import { ConfirmDialog } from './ConfirmDialog';
 import { InputDialog } from './InputDialog';
 import { TagCreationDialog } from './TagCreationDialog';
@@ -12,7 +14,7 @@ import { InteractiveRebaseDialog } from './InteractiveRebaseDialog';
 import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 import { RevertParentDialog } from './RevertParentDialog';
 import { DropCommitDialog } from './DropCommitDialog';
-import { isReachableFromHead } from '../utils/commitReachability';
+import { createReachabilityChecker } from '../utils/commitReachability';
 
 interface CommitContextMenuProps {
   commit: Commit;
@@ -62,6 +64,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
   const [dropCommitPushed, setDropCommitPushed] = useState(false);
 
   const branches = useGraphStore((s) => s.branches);
+  const commits = useGraphStore((s) => s.commits);
   const selectedCommits = useGraphStore((s) => s.selectedCommits);
   const mergedCommits = useGraphStore((s) => s.mergedCommits);
   const clearSelectedCommits = useGraphStore((s) => s.clearSelectedCommits);
@@ -69,6 +72,8 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
   const revertInProgress = useGraphStore((s) => s.revertInProgress);
   const cherryPickInProgress = useGraphStore((s) => s.cherryPickInProgress);
   const pendingRebaseEntries = useGraphStore((s) => s.pendingRebaseEntries);
+  const compareSelection = useGraphStore((s) => s.compareSelection);
+  const setSlotA = useGraphStore((s) => s.setSlotA);
   const loading = useGraphStore((s) => s.loading);
 
   useEffect(() => {
@@ -101,8 +106,11 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
   const isMergeCommit = commit.parents.length > 1;
   const isRootCommit = commit.parents.length === 0;
   const isOperationInProgress = loading || rebaseInProgress || cherryPickInProgress || revertInProgress;
+  // Memoize the reachability checker so the commit-by-hash map is built once per
+  // mergedCommits change instead of on every render of this per-row context menu.
+  const reachability = useMemo(() => createReachabilityChecker(mergedCommits), [mergedCommits]);
   const isCommitOnCurrentBranch = currentLocalBranch
-    ? isReachableFromHead(commit.hash, currentLocalBranch.hash, mergedCommits)
+    ? reachability.isReachableFromHead(commit.hash, currentLocalBranch.hash)
     : false;
 
   const canRebase = !isHeadCommit && !rebaseInProgress && !loading && !!currentLocalBranch;
@@ -125,6 +133,44 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
 
   const hasSelectedMergeCommit = isMultiSelectActive &&
     mergedCommits.some((item) => selectedCommits.includes(item.hash) && item.parents.length > 1);
+
+  // Compare-refs (042-compare-refs)
+  const compareSlotForThisCommit: SlotValue = { kind: 'commit', hash: commit.hash };
+  const aSet = compareSelection.a !== null;
+  const sameAsA = aSet && (
+    slotsEqual(compareSelection.a, compareSlotForThisCommit) ||
+    (compareSelection.aResolvedHash !== null && compareSelection.aResolvedHash === commit.hash)
+  );
+
+  const handleSetAsBase = () => {
+    setSlotA(compareSlotForThisCommit);
+    ensureComparePanelOpen();
+  };
+
+  const handleCompareWithBase = () => {
+    if (!compareSelection.a || sameAsA) return;
+    setSlotsAndCompare(compareSelection.a, compareSlotForThisCommit);
+  };
+
+  // FR-015 (Session 2026-05-09): "Compare these commits" sets Base = oldest selected,
+  // Target = newest selected — direct mental model "compare the commits I selected."
+  const handleCompareRange = () => {
+    if (selectedCommits.length < 2) return;
+    // Order by index in commits[] (committer-date-descending). Newest = lowest index, oldest = highest index.
+    const selectedSet = new Set(selectedCommits);
+    let oldest: Commit | null = null;
+    let newest: Commit | null = null;
+    for (const c of commits) {
+      if (!selectedSet.has(c.hash)) continue;
+      if (newest === null) newest = c;
+      oldest = c;
+    }
+    if (!oldest || !newest) return;
+    const a: SlotValue = { kind: 'commit', hash: oldest.hash };
+    const b: SlotValue = { kind: 'commit', hash: newest.hash };
+    clearSelectedCommits();
+    setSlotsAndCompare(a, b);
+  };
 
   const handleResetSelect = (mode: ResetMode) => {
     if (mode === 'hard' || hasRemoteUpstream) {
@@ -185,6 +231,32 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
         <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
         <ContextMenu.Portal>
           <ContextMenu.Content className="min-w-[180px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+            {/* Compare refs (042-compare-refs) */}
+            {isMultiSelectActive ? (
+              <ContextMenu.Item
+                className={menuItemClass}
+                onSelect={handleCompareRange}
+              >
+                Compare these commits
+              </ContextMenu.Item>
+            ) : (
+              <>
+                <ContextMenu.Item className={menuItemClass} onSelect={handleSetAsBase}>
+                  Set as Compare Base
+                </ContextMenu.Item>
+                {aSet && (
+                  <ContextMenu.Item
+                    className={sameAsA ? menuItemDisabledClass : menuItemClass}
+                    disabled={sameAsA}
+                    onSelect={handleCompareWithBase}
+                  >
+                    Compare with Base
+                  </ContextMenu.Item>
+                )}
+              </>
+            )}
+            <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+
             <ContextMenu.Item
               className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
               disabled={isOperationInProgress}

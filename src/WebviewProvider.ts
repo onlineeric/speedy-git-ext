@@ -7,10 +7,12 @@ import type {
   CommitListMode,
   CommitTableColumnId,
   CommitTableLayout,
+  CompareMode,
   FileChangeStatus,
   GraphFilters,
   PersistedUIState,
   RepoInfo,
+  SlotValue,
   SubmoduleNavEntry,
   UncommittedSummary,
   UserSettings,
@@ -45,6 +47,29 @@ import { GitHubAvatarService } from './services/GitHubAvatarService.js';
 function repoLayoutKey(repoPath: string): string {
   const hash = crypto.createHash('sha256').update(repoPath).digest('hex').slice(0, 16);
   return `speedyGit.repoTableLayout.${hash}`;
+}
+
+/**
+ * Unwrap a `PromiseSettledResult<Result<T>>` to `T | undefined`. On rejection or unsuccessful
+ * result, append a `${label}: ${reason}` entry to `errors` (skipping empty messages).
+ * Used to flatten the parallel data-fetch block in `sendInitialData`.
+ */
+function unwrapSettledResult<T>(
+  settled: PromiseSettledResult<Result<T>>,
+  label: string,
+  errors: string[],
+): T | undefined {
+  if (settled.status === 'rejected') {
+    const reason = String(settled.reason);
+    if (reason) errors.push(`${label}: ${reason}`);
+    return undefined;
+  }
+  if (settled.value.success) {
+    return settled.value.value;
+  }
+  const reason = settled.value.error.message;
+  if (reason) errors.push(`${label}: ${reason}`);
+  return undefined;
 }
 
 function clonePersistedUIStateDefaults(): PersistedUIState {
@@ -170,6 +195,9 @@ export class WebviewProvider {
   private lastCommitFingerprint = '';
   /** In-memory cache of persisted UI state to avoid stale reads in rapid sequential saves */
   private uiStateCache: PersistedUIState | undefined;
+
+  /** Active compare request — at most one runs at a time (latest-wins). */
+  private activeCompareController: { requestId: string; controller: AbortController } | null = null;
   private getSettingsHandler: (() => UserSettings) | undefined;
   private submoduleHandlers:
     | {
@@ -618,13 +646,14 @@ export class WebviewProvider {
       ]);
 
       // Extract commits with fingerprint optimization
+      const commitsValue = unwrapSettledResult(commitsSettled, 'commits', errors);
       let fetchedCommits: Commit[] = [];
       let commitsForPayload: Commit[] | null = [];
       let totalLoadedWithoutFilter = 0;
       let hasMore = true;
-      if (commitsSettled.status === 'fulfilled' && commitsSettled.value.success) {
-        fetchedCommits = commitsSettled.value.value.commits;
-        totalLoadedWithoutFilter = commitsSettled.value.value.totalLoadedWithoutFilter ?? 0;
+      if (commitsValue) {
+        fetchedCommits = commitsValue.commits;
+        totalLoadedWithoutFilter = commitsValue.totalLoadedWithoutFilter ?? 0;
         hasMore = fetchedCommits.length >= batchSize;
 
         const fingerprint = this.computeCommitFingerprint(fetchedCommits);
@@ -633,96 +662,21 @@ export class WebviewProvider {
 
         commitsForPayload = commitsUnchanged ? null : fetchedCommits;
       } else {
-        const reason = commitsSettled.status === 'rejected'
-          ? String(commitsSettled.reason)
-          : commitsSettled.value.success ? '' : commitsSettled.value.error.message;
-        if (reason) errors.push(`commits: ${reason}`);
         commitsForPayload = [];
         hasMore = false;
       }
 
-      // Extract uncommitted changes
       const defaultUncommitted: UncommittedSummary = {
         stagedFiles: [], unstagedFiles: [], conflictFiles: [],
         stagedCount: 0, unstagedCount: 0, untrackedCount: 0,
       };
-      let uncommittedChanges = defaultUncommitted;
-      if (uncommittedSettled.status === 'fulfilled' && uncommittedSettled.value.success) {
-        uncommittedChanges = uncommittedSettled.value.value;
-      } else {
-        const reason = uncommittedSettled.status === 'rejected'
-          ? String(uncommittedSettled.reason)
-          : uncommittedSettled.value.success ? '' : uncommittedSettled.value.error.message;
-        if (reason) errors.push(`uncommittedChanges: ${reason}`);
-      }
-
-      // Extract branches
-      let branches: import('../shared/types.js').Branch[] = [];
-      if (branchesSettled.status === 'fulfilled' && branchesSettled.value.success) {
-        branches = branchesSettled.value.value;
-      } else {
-        const reason = branchesSettled.status === 'rejected'
-          ? String(branchesSettled.reason)
-          : branchesSettled.value.success ? '' : branchesSettled.value.error.message;
-        if (reason) errors.push(`branches: ${reason}`);
-      }
-
-      // Extract authors
-      let authors: import('../shared/types.js').Author[] = [];
-      if (authorsSettled.status === 'fulfilled' && authorsSettled.value.success) {
-        authors = authorsSettled.value.value;
-      } else {
-        const reason = authorsSettled.status === 'rejected'
-          ? String(authorsSettled.reason)
-          : authorsSettled.value.success ? '' : authorsSettled.value.error.message;
-        if (reason) errors.push(`authors: ${reason}`);
-      }
-
-      // Extract remotes
-      let remotes: import('../shared/types.js').RemoteInfo[] = [];
-      if (remotesSettled.status === 'fulfilled' && remotesSettled.value.success) {
-        remotes = remotesSettled.value.value;
-      } else {
-        const reason = remotesSettled.status === 'rejected'
-          ? String(remotesSettled.reason)
-          : remotesSettled.value.success ? '' : remotesSettled.value.error.message;
-        if (reason) errors.push(`remotes: ${reason}`);
-      }
-
-      // Extract worktrees
-      let worktrees: import('../shared/types.js').WorktreeInfo[] = [];
-      if (worktreesSettled.status === 'fulfilled' && worktreesSettled.value.success) {
-        worktrees = worktreesSettled.value.value;
-      } else {
-        const reason = worktreesSettled.status === 'rejected'
-          ? String(worktreesSettled.reason)
-          : worktreesSettled.value.success ? '' : worktreesSettled.value.error.message;
-        if (reason) errors.push(`worktrees: ${reason}`);
-      }
-
-      // Extract stashes
-      let stashes: import('../shared/types.js').StashEntry[] = [];
-      if (stashesSettled.status === 'fulfilled') {
-        const val = stashesSettled.value;
-        if ('success' in val && val.success) {
-          stashes = val.value;
-        } else if ('success' in val && !val.success) {
-          errors.push(`stashes: ${val.error.message}`);
-        }
-      } else {
-        errors.push(`stashes: ${String(stashesSettled.reason)}`);
-      }
-
-      // Extract revert state
-      let revertState: import('../shared/types.js').RevertState = 'idle';
-      if (revertStateSettled.status === 'fulfilled' && revertStateSettled.value.success) {
-        revertState = revertStateSettled.value.value;
-      } else {
-        const reason = revertStateSettled.status === 'rejected'
-          ? String(revertStateSettled.reason)
-          : revertStateSettled.value.success ? '' : revertStateSettled.value.error.message;
-        if (reason) errors.push(`revertState: ${reason}`);
-      }
+      const uncommittedChanges = unwrapSettledResult(uncommittedSettled, 'uncommittedChanges', errors) ?? defaultUncommitted;
+      const branches = unwrapSettledResult(branchesSettled, 'branches', errors) ?? [];
+      const authors = unwrapSettledResult(authorsSettled, 'authors', errors) ?? [];
+      const remotes = unwrapSettledResult(remotesSettled, 'remotes', errors) ?? [];
+      const worktrees = unwrapSettledResult(worktreesSettled, 'worktrees', errors) ?? [];
+      const stashes = unwrapSettledResult(stashesSettled, 'stashes', errors) ?? [];
+      const revertState = unwrapSettledResult(revertStateSettled, 'revertState', errors) ?? 'idle';
 
       // Cherry-pick and rebase state checks are synchronous (fs.existsSync)
       let cherryPickState: import('../shared/types.js').CherryPickState = 'idle';
@@ -1861,6 +1815,86 @@ export class WebviewProvider {
         await this.openStagedDiffEditor(message.payload.filePath);
         break;
       }
+      // Compare refs (042-compare-refs)
+      case 'compareRefs': {
+        await this.handleCompareRefs(message.payload);
+        break;
+      }
+      case 'cancelCompare': {
+        const active = this.activeCompareController;
+        if (active && active.requestId === message.payload.requestId) {
+          active.controller.abort();
+        }
+        break;
+      }
+      case 'openCompareDiff': {
+        await this.openCompareDiffEditor(message.payload);
+        break;
+      }
+    }
+  }
+
+  /** Run a compare-refs RPC. Latest-wins: a new request aborts any in-flight compare. */
+  private async handleCompareRefs(payload: { a: SlotValue; b: SlotValue; mode: CompareMode; requestId: string }): Promise<void> {
+    // Latest-wins: if a previous compare is in flight, abort it before starting the new one.
+    if (this.activeCompareController) {
+      this.activeCompareController.controller.abort();
+    }
+    const controller = new AbortController();
+    this.activeCompareController = { requestId: payload.requestId, controller };
+
+    const result = await this.gitDiffService.compareRefs(payload.a, payload.b, payload.mode, controller.signal);
+
+    // If we were superseded by a newer request, the new request will already have replaced
+    // `activeCompareController`; only clear it if our requestId still owns the slot.
+    if (this.activeCompareController?.requestId === payload.requestId) {
+      this.activeCompareController = null;
+    }
+
+    if (result.success) {
+      this.postMessage({
+        type: 'compareResult',
+        payload: { requestId: payload.requestId, result: result.value },
+      });
+    } else {
+      // Always echo `requestId` so the webview can ignore stale cancellations and avoid
+      // routing unrelated RPC errors through the compare panel.
+      this.postMessage({
+        type: 'compareError',
+        payload: { requestId: payload.requestId, error: result.error },
+      });
+    }
+  }
+
+  /** Open VS Code's diff editor with two compare-side URIs. */
+  private async openCompareDiffEditor(payload: {
+    filePath: string;
+    aHash: string | null;
+    bHash: string | null;
+    status: FileChangeStatus;
+    title: string;
+  }): Promise<void> {
+    const fileName = payload.filePath.split('/').pop() ?? payload.filePath;
+
+    const buildUri = (hash: string | null): vscode.Uri => {
+      if (hash === null) {
+        return vscode.Uri.file(path.join(this.currentRepoPath, payload.filePath));
+      }
+      return vscode.Uri.from({
+        scheme: 'git-show',
+        authority: hash,
+        path: `/${hash.slice(0, 8)}: ${fileName}`,
+        query: payload.filePath,
+      });
+    };
+
+    const leftUri = buildUri(payload.aHash);
+    const rightUri = buildUri(payload.bHash);
+
+    try {
+      await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, payload.title);
+    } catch {
+      this.log.warn(`Compare diff editor failed for: ${payload.filePath}`);
     }
   }
 

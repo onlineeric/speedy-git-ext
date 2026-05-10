@@ -13,7 +13,7 @@ import { RefLabel } from './RefLabel';
 import { HeadIcon } from './icons';
 import { parseExternalRefs } from '../utils/externalRefParser';
 import { DEFAULT_GRAPH_PALETTE, getColor, getLaneColorStyle } from '../utils/colorUtils';
-import { isReachableFromHead } from '../utils/commitReachability';
+import { createReachabilityChecker } from '../utils/commitReachability';
 
 interface CommitTooltipProps {
   commit: Commit | undefined;
@@ -170,6 +170,8 @@ function ReferencesSection({ hash, isHead }: ReferencesSectionProps) {
     [mergedCommits]
   );
 
+  const reachability = useMemo(() => createReachabilityChecker(mergedCommits), [mergedCommits]);
+
   // Convert containing branches to display refs
   const branchDisplayRefs = useMemo(() => {
     if (containingResult?.status === 'loaded' && containingResult.branches.length > 0) {
@@ -185,7 +187,7 @@ function ReferencesSection({ hash, isHead }: ReferencesSectionProps) {
   }, [containingResult, directBranchRefs, knownBranches]);
 
   const headContainsCommit = headCommit
-    ? headCommit.hash === hash || isReachableFromHead(hash, headCommit.hash, mergedCommits)
+    ? headCommit.hash === hash || reachability.isReachableFromHead(hash, headCommit.hash)
     : false;
   const showHead = isHead || headContainsCommit;
   const palette = graphColors.length > 0 ? graphColors : DEFAULT_GRAPH_PALETTE;
@@ -218,7 +220,7 @@ function ReferencesSection({ hash, isHead }: ReferencesSectionProps) {
     const seen = new Set<string>();
 
     for (const commit of mergedCommits) {
-      if (!isReachableFromHead(hash, commit.hash, mergedCommits)) {
+      if (!reachability.isReachableFromHead(hash, commit.hash)) {
         continue;
       }
 
@@ -259,7 +261,7 @@ function ReferencesSection({ hash, isHead }: ReferencesSectionProps) {
       stashDisplayRefs: nextStashDisplayRefs,
       styleByRefKey: nextStyleByRefKey,
     };
-  }, [hash, mergedCommits, palette, topology]);
+  }, [hash, mergedCommits, palette, topology, reachability]);
 
   const getDisplayRefStyle = (displayRef: ReturnType<typeof mergeRefs>['displayRefs'][number]): CSSProperties | undefined => {
     switch (displayRef.type) {

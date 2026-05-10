@@ -44,4 +44,5 @@ export type GitErrorCode =
   | 'REVERT_IN_PROGRESS'
   | 'REBASE_CONFLICT'
   | 'OPERATION_IN_PROGRESS'
+  | 'CANCELLED'
   | 'UNKNOWN';

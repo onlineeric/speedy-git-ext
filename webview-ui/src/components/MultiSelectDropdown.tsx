@@ -96,14 +96,6 @@ function MultiSelectDropdownInner<T>({
   const idRef = useRef(`multi-select-dropdown-${++dropdownIdCounter}`);
   const dropdownId = idRef.current;
 
-  useEffect(() => {
-    console.log(`[MSD:${dropdownId}] MOUNT (items=${items.length})`);
-    return () => console.log(`[MSD:${dropdownId}] UNMOUNT`);
-  }, []);
-  useEffect(() => {
-    console.log(`[MSD:${dropdownId}] open changed to:`, open);
-  }, [open]);
-
   // Guard: suppress false popover closes caused by synchronous re-renders during item clicks.
   // When onToggle/onClearAll triggers a store update, React may re-render this component synchronously,
   // causing Radix's dismiss layer to misidentify the interaction as "outside" the content.

@@ -9,6 +9,10 @@ import type {
   CommitListMode,
   CommitTableLayout,
   CommitSignatureInfo,
+  CompareMode,
+  CompareResult,
+  CompareSelection,
+  ComparePanelUIState,
   ConflictState,
   ConflictType,
   ContainingBranchesResult,
@@ -22,6 +26,7 @@ import type {
   RebaseEntry,
   RepoInfo,
   SearchState,
+  SlotValue,
   StashEntry,
   Submodule,
   SubmoduleNavEntry,
@@ -30,49 +35,21 @@ import type {
   WorktreeInfo,
 } from '@shared/types';
 import {
+  COMPARE_RECENTS_MAX,
   DEFAULT_USER_SETTINGS,
   DEFAULT_PERSISTED_UI_STATE,
+  EMPTY_COMPARE_PANEL_UI_STATE,
+  EMPTY_COMPARE_SELECTION,
   UNCOMMITTED_HASH,
+  buildUncommittedSubject,
   cloneCommitTableLayout,
 } from '@shared/types';
+import { slotsEqual } from '../utils/compareSlot';
 import type { InitialDataPayload } from '@shared/messages';
-import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
-import { buildUncommittedSubject } from '../utils/uncommittedUtils';
-
-/**
- * Compute the set of commit hashes that should be hidden by active visibility filters.
- * Author and text filters are applied in a single pass (AND semantics).
- * Stash entries are excluded (stashes are merged separately after filtering).
- */
-function computeHiddenCommitHashes(commits: Commit[], filters: GraphFilters): Set<string> {
-  const hidden = new Set<string>();
-  const hasAuthorFilter = !!filters.authors && filters.authors.length > 0;
-  const hasTextFilter = !!filters.textFilter;
-
-  if (!hasAuthorFilter && !hasTextFilter) return hidden;
-
-  const includedAuthors = hasAuthorFilter ? new Set(filters.authors) : null;
-  const textLower = hasTextFilter ? filters.textFilter!.toLowerCase() : '';
-
-  for (const commit of commits) {
-    // Stash and uncommitted entries are never hidden by author/text filters
-    if (commit.refs.some(r => r.type === 'stash' || r.type === 'uncommitted')) continue;
-
-    if (includedAuthors && !includedAuthors.has(commit.authorEmail)) {
-      hidden.add(commit.hash);
-      continue;
-    }
-
-    if (hasTextFilter) {
-      const subjectMatch = commit.subject.toLowerCase().includes(textLower);
-      const hashMatch = textLower.length >= 4 && commit.hash.startsWith(textLower);
-      if (!subjectMatch && !hashMatch) {
-        hidden.add(commit.hash);
-      }
-    }
-  }
-  return hidden;
-}
+import { type GraphTopology } from '../utils/graphTopology';
+import { computeHiddenCommitHashes } from '../utils/commitVisibility';
+import { computeMergedTopology, type UncommittedContext } from '../utils/mergedCommits';
+import { joinRepoPath } from '../utils/repoPath';
 
 interface GraphStore {
   commits: Commit[];
@@ -160,6 +137,10 @@ interface GraphStore {
   consecutiveEmptyBatches: number;
   filteredOutCount: number;
   showGapIndicator: boolean;
+  // Compare refs (042-compare-refs) — transient session state, not persisted
+  compareSelection: CompareSelection;
+  compareResult: CompareResult | null;
+  comparePanelUI: ComparePanelUIState;
   setHoveredCommit: (hash: string | null, anchorRect: DOMRect | null) => void;
   setWorktreeList: (list: WorktreeInfo[]) => void;
   setContainingBranches: (hash: string, result: ContainingBranchesResult) => void;
@@ -232,6 +213,17 @@ interface GraphStore {
   setSubmodules: (submodules: Submodule[], stack?: SubmoduleNavEntry[]) => void;
   pushSubmodule: (entry: SubmoduleNavEntry) => void;
   popSubmodule: () => void;
+  // Compare refs (042-compare-refs)
+  setSlotA: (value: SlotValue | null) => void;
+  setSlotB: (value: SlotValue | null) => void;
+  swapSlots: () => void;
+  setCompareModeOverride: (mode: CompareMode | null) => void;
+  clearCompareState: () => void;
+  beginCompare: (requestId: string) => void;
+  endCompareSuccess: (result: CompareResult) => void;
+  endCompareError: (message: string) => void;
+  endCompareCancelled: () => void;
+  maybeRerunCompareForWorkingTree: () => void;
 }
 
 const emptyTopology: GraphTopology = {
@@ -248,140 +240,8 @@ const defaultSearchState: SearchState = {
   currentMatchIndex: -1,
 };
 
-function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[], filters?: GraphFilters): Commit[] {
-  if (stashes.length === 0) return commits;
-
-  // Parse active date filters so stashes outside the range are excluded
-  const afterMs = filters?.afterDate ? new Date(filters.afterDate).getTime() : undefined;
-  const beforeMs = filters?.beforeDate ? new Date(filters.beforeDate).getTime() : undefined;
-
-  const merged = [...commits];
-  const commitIndexByHash = new Map<string, number>();
-  for (let i = 0; i < merged.length; i++) {
-    commitIndexByHash.set(merged[i].hash, i);
-  }
-
-  const stashInsertions: { index: number; commit: Commit }[] = [];
-  for (const stash of stashes) {
-    const parentIndex = commitIndexByHash.get(stash.parentHash);
-    if (parentIndex === undefined) continue;
-
-    // Skip stashes outside the active date range
-    if (afterMs && stash.date < afterMs) continue;
-    if (beforeMs && stash.date > beforeMs) continue;
-
-    stashInsertions.push({
-      index: parentIndex,
-      commit: {
-        hash: stash.hash,
-        abbreviatedHash: stash.hash.slice(0, 7),
-        parents: [stash.parentHash],
-        author: stash.author,
-        authorEmail: stash.authorEmail,
-        authorDate: stash.date,
-        subject: stash.message,
-        refs: [{ name: `stash@{${stash.index}}`, type: 'stash' }],
-      },
-    });
-  }
-
-  stashInsertions.sort((a, b) => b.index - a.index);
-  for (const { index, commit } of stashInsertions) {
-    merged.splice(index, 0, commit);
-  }
-
-  return merged;
-}
-
-function mergeUncommittedIntoCommits(
-  commits: Commit[],
-  hasUncommittedChanges: boolean,
-  counts: { stagedCount: number; unstagedCount: number; untrackedCount: number },
-  branches: Branch[],
-  filters?: GraphFilters,
-): Commit[] {
-  if (!hasUncommittedChanges) return commits;
-
-  // Respect branch filter: only inject when HEAD branch is in the filter set (or no filter active)
-  if (filters?.branches && filters.branches.length > 0) {
-    const currentBranch = branches.find(b => b.current);
-    if (currentBranch && !filters.branches.includes(currentBranch.name)) {
-      return commits;
-    }
-  }
-
-  // Find HEAD commit hash (first commit with a 'head' ref, or just the first commit)
-  const headCommitHash = commits.length > 0
-    ? (commits.find(c => c.refs.some(r => r.type === 'head'))?.hash ?? commits[0].hash)
-    : '';
-
-  if (!headCommitHash) return commits;
-
-  const syntheticCommit: Commit = {
-    hash: UNCOMMITTED_HASH,
-    abbreviatedHash: '---',
-    parents: [headCommitHash],
-    author: '---',
-    authorEmail: '',
-    authorDate: Date.now(),
-    subject: buildUncommittedSubject(counts.stagedCount, counts.unstagedCount, counts.untrackedCount),
-    refs: [{ name: 'Uncommitted Changes', type: 'uncommitted' }],
-  };
-
-  return [syntheticCommit, ...commits];
-}
-
-interface UncommittedContext {
-  hasUncommittedChanges: boolean;
-  counts: { stagedCount: number; unstagedCount: number; untrackedCount: number };
-  branches: Branch[];
-}
-
 function getUncommittedContext(state: GraphStore): UncommittedContext {
   return { hasUncommittedChanges: state.hasUncommittedChanges, counts: state.uncommittedCounts, branches: state.branches };
-}
-
-function computeMergedTopology(
-  commits: Commit[],
-  stashes: StashEntry[],
-  filters?: GraphFilters,
-  hiddenHashes?: Set<string>,
-  uncommitted?: UncommittedContext,
-): { mergedCommits: Commit[]; topology: GraphTopology } {
-  // When hidden hashes are provided, filter commits to visible-only before merging stashes,
-  // but pass the full commit list to calculateTopology for correct lane assignment.
-  const visibleCommits = hiddenHashes && hiddenHashes.size > 0
-    ? commits.filter(c => !hiddenHashes.has(c.hash))
-    : commits;
-  let mergedCommits = mergeStashesIntoCommits(visibleCommits, stashes, filters);
-  // Inject uncommitted node at index 0 after stashes are merged
-  if (uncommitted) {
-    mergedCommits = mergeUncommittedIntoCommits(mergedCommits, uncommitted.hasUncommittedChanges, uncommitted.counts, uncommitted.branches, filters);
-  }
-  // Topology needs ALL commits (including hidden) for correct lane reservations.
-  // Merge stashes into the full list for topology too, so stash lane assignments work.
-  let allWithStashes = mergeStashesIntoCommits(commits, stashes, filters);
-  if (uncommitted) {
-    allWithStashes = mergeUncommittedIntoCommits(allWithStashes, uncommitted.hasUncommittedChanges, uncommitted.counts, uncommitted.branches, filters);
-  }
-  return { mergedCommits, topology: calculateTopology(allWithStashes, hiddenHashes, mergedCommits) };
-}
-
-/**
- * Join a parent repo absolute path with a submodule's relative path. The
- * webview is a sandboxed browser bundle and cannot import Node's `path` module,
- * so we detect the parent's native separator (backslash on Windows, forward on
- * Unix) and use it consistently — git always emits forward-slash relative
- * paths for submodules, so the relative segment is converted to match.
- */
-function joinRepoPath(parent: string, sub: string): string {
-  const useBackslash = parent.includes('\\') && !parent.includes('/');
-  const sep = useBackslash ? '\\' : '/';
-  const cleanParent = parent.replace(/[\\/]+$/, '');
-  const cleanSub = sub
-    .replace(/^[\\/]+/, '')
-    .replace(/[\\/]+/g, sep);
-  return `${cleanParent}${sep}${cleanSub}`;
 }
 
 export const useGraphStore = create<GraphStore>((set, get) => ({
@@ -456,6 +316,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   consecutiveEmptyBatches: 0,
   filteredOutCount: 0,
   showGapIndicator: false,
+  compareSelection: { ...EMPTY_COMPARE_SELECTION, recents: [] },
+  compareResult: null,
+  comparePanelUI: { ...EMPTY_COMPARE_PANEL_UI_STATE },
   setHoveredCommit: (hash, anchorRect) => set({ hoveredCommitHash: hash, tooltipAnchorRect: anchorRect }),
   setWorktreeList: (list) => {
     const byHead = new Map<string, WorktreeInfo>();
@@ -583,7 +446,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const index = selectedCommit
       ? get().mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
       : -1;
-    set({ selectedCommit, selectedCommitIndex: index });
+    // FR-023 (042-compare-refs): selecting a single commit dismisses any showing compare result
+    set({ selectedCommit, selectedCommitIndex: index, ...(selectedCommit ? { compareResult: null } : {}) });
   },
   selectCommit: (index) => {
     const commits = get().mergedCommits;
@@ -598,6 +462,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedCommitIndex: index,
       lastClickedHash: commit.hash,
       selectedCommits: [],
+      compareResult: null,
     });
   },
   moveSelection: (delta) => {
@@ -612,6 +477,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedCommitIndex: nextIndex,
       lastClickedHash: commit.hash,
       selectedCommits: [],
+      compareResult: null,
     });
   },
   setCommitDetails: (commitDetails) => set({
@@ -675,10 +541,20 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setSelectedCommits: (selectedCommits) => set({ selectedCommits }),
   setSelectionAnchor: (lastClickedHash) => set({ lastClickedHash }),
   toggleSelectedCommit: (hash) => set((state) => {
-    const exists = state.selectedCommits.includes(hash);
+    // When the user single-clicks a row to select it, then Ctrl/Cmd-clicks
+    // additional rows, the originally clicked row must be part of the
+    // multi-selection — that is the standard UX (file managers, IDEs).
+    // Seed the selection list with the current single-click anchor before
+    // toggling, so the anchor isn't dropped from the range.
+    const seeded = state.selectedCommits.length === 0
+      && state.selectedCommit !== undefined
+      && state.selectedCommit !== hash
+      ? [state.selectedCommit]
+      : state.selectedCommits;
+    const exists = seeded.includes(hash);
     const selectedCommits = exists
-      ? state.selectedCommits.filter((item) => item !== hash)
-      : [...state.selectedCommits, hash];
+      ? seeded.filter((item) => item !== hash)
+      : [...seeded, hash];
     return { selectedCommits, lastClickedHash: hash };
   }),
   selectCommitRange: (toHash) => set((state) => {
@@ -807,6 +683,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
    */
   resetTopMenuGroup: () => {
     get().resetAllFilters({ preserveBranches: false });
+    // FR-030 (042-compare-refs): clear compare state on repo / submodule switch
+    get().clearCompareState();
     set((state) => ({
       searchState: {
         ...defaultSearchState,
@@ -1063,4 +941,112 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   popSubmodule: () => set((state) => ({
     submoduleStack: state.submoduleStack.slice(0, -1),
   })),
+  // Compare refs (042-compare-refs)
+  setSlotA: (value) => set((state) => {
+    const prev = state.compareSelection.a;
+    const kindChanged = (prev?.kind ?? null) !== (value?.kind ?? null);
+    const recents = value
+      ? [value, ...state.compareSelection.recents.filter((r) => !slotsEqual(r, value))].slice(0, COMPARE_RECENTS_MAX)
+      : state.compareSelection.recents;
+    return {
+      compareSelection: {
+        ...state.compareSelection,
+        a: value,
+        aResolvedHash: null,
+        // Reset modeOverride when slot kind changes so the default rule re-applies (research Decision 4)
+        modeOverride: kindChanged ? null : state.compareSelection.modeOverride,
+        recents,
+      },
+      compareResult: null,
+      comparePanelUI: { ...state.comparePanelUI, inlineError: null },
+    };
+  }),
+  setSlotB: (value) => set((state) => {
+    const prev = state.compareSelection.b;
+    const kindChanged = (prev?.kind ?? null) !== (value?.kind ?? null);
+    const recents = value
+      ? [value, ...state.compareSelection.recents.filter((r) => !slotsEqual(r, value))].slice(0, COMPARE_RECENTS_MAX)
+      : state.compareSelection.recents;
+    return {
+      compareSelection: {
+        ...state.compareSelection,
+        b: value,
+        bResolvedHash: null,
+        modeOverride: kindChanged ? null : state.compareSelection.modeOverride,
+        recents,
+      },
+      compareResult: null,
+      comparePanelUI: { ...state.comparePanelUI, inlineError: null },
+    };
+  }),
+  swapSlots: () => set((state) => ({
+    compareSelection: {
+      ...state.compareSelection,
+      a: state.compareSelection.b,
+      b: state.compareSelection.a,
+      aResolvedHash: state.compareSelection.bResolvedHash,
+      bResolvedHash: state.compareSelection.aResolvedHash,
+    },
+    compareResult: null,
+    comparePanelUI: { ...state.comparePanelUI, inlineError: null },
+  })),
+  setCompareModeOverride: (mode) => set((state) => ({
+    compareSelection: { ...state.compareSelection, modeOverride: mode },
+    compareResult: null,
+  })),
+  clearCompareState: () => set({
+    compareSelection: { ...EMPTY_COMPARE_SELECTION, recents: [] },
+    compareResult: null,
+    comparePanelUI: { ...EMPTY_COMPARE_PANEL_UI_STATE },
+  }),
+  beginCompare: (requestId) => set({
+    comparePanelUI: { loading: true, inlineError: null, activeRequestId: requestId },
+    compareResult: null,
+  }),
+  endCompareSuccess: (result) => set((state) => ({
+    compareResult: result,
+    comparePanelUI: { loading: false, inlineError: null, activeRequestId: null },
+    compareSelection: {
+      ...state.compareSelection,
+      aResolvedHash: result.aResolvedHash,
+      bResolvedHash: result.bResolvedHash,
+    },
+  })),
+  endCompareError: (message) => set({
+    comparePanelUI: { loading: false, inlineError: message, activeRequestId: null },
+  }),
+  endCompareCancelled: () => set({
+    comparePanelUI: { loading: false, inlineError: null, activeRequestId: null },
+  }),
+  maybeRerunCompareForWorkingTree: () => {
+    const state = get();
+    if (!state.compareResult) return;
+    const { a, b } = state.compareSelection;
+    const involvesWorkingTree = a?.kind === 'workingTree' || b?.kind === 'workingTree';
+    if (!involvesWorkingTree) return;
+    if (!a || !b) return;
+    // Re-dispatch with the current selection. requestId generated here so the
+    // store can match the upcoming compareResult / error response.
+    const requestId = generateCompareRequestId();
+    state.beginCompare(requestId);
+    import('../rpc/rpcClient').then(({ rpcClient }) => {
+      const mode = computeEffectiveMode(a, b, state.compareSelection.modeOverride);
+      rpcClient.send({ type: 'compareRefs', payload: { a, b, mode, requestId } });
+    });
+  },
 }));
+
+function generateCompareRequestId(): string {
+  // Lightweight ID generator — does not need to be cryptographically unique,
+  // only unique within the lifetime of a single in-flight compare request.
+  return `cmp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function computeEffectiveMode(a: SlotValue, b: SlotValue, override: CompareMode | null): CompareMode {
+  if (override) return override;
+  if (a.kind === 'workingTree' || b.kind === 'workingTree') return 'two-dot';
+  const aIsRef = a.kind === 'branch' || a.kind === 'tag';
+  const bIsRef = b.kind === 'branch' || b.kind === 'tag';
+  if (aIsRef && bIsRef) return 'three-dot';
+  return 'two-dot';
+}

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import type { RefInfo } from '@shared/types';
+import type { RefInfo, SlotValue } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import {
@@ -11,6 +11,8 @@ import {
   buildStashAndCheckoutCommand,
 } from '../utils/gitCommandBuilder';
 import { resolveDefaultRemote } from '../utils/resolveDefaultRemote';
+import { ensureComparePanelOpen, setSlotsAndCompare } from '../utils/compareDispatch';
+import { slotsEqual } from '../utils/compareSlot';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DeleteBranchDialog } from './DeleteBranchDialog';
 import { InputDialog } from './InputDialog';
@@ -72,6 +74,29 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
   const isBranch = isLocalBranch || isRemoteBranch;
   const isTag = refInfo.type === 'tag';
   const isStash = refInfo.type === 'stash';
+
+  // Compare-refs (042-compare-refs). Stashes are excluded by FR-017.
+  const compareSelection = useGraphStore((s) => s.compareSelection);
+  const setSlotA = useGraphStore((s) => s.setSlotA);
+  const compareSlotForThisRef: SlotValue | null = isBranch
+    ? (refInfo.remote ? { kind: 'branch', name: refInfo.name, remote: refInfo.remote } : { kind: 'branch', name: refInfo.name })
+    : isTag
+      ? { kind: 'tag', name: refInfo.name }
+      : null;
+  const compareItemsAvailable = !isStash && compareSlotForThisRef !== null;
+  const aSetForCompare = compareSelection.a !== null;
+  const sameAsACompare = aSetForCompare && compareSlotForThisRef !== null
+    && slotsEqual(compareSelection.a, compareSlotForThisRef);
+
+  const handleSetAsBaseRef = () => {
+    if (!compareSlotForThisRef) return;
+    setSlotA(compareSlotForThisRef);
+    ensureComparePanelOpen();
+  };
+  const handleCompareWithBaseRef = () => {
+    if (!compareSlotForThisRef || !compareSelection.a || sameAsACompare) return;
+    setSlotsAndCompare(compareSelection.a, compareSlotForThisRef);
+  };
 
   // Identify whether this ref is the currently checked-out local branch.
   // displayRefToRefInfo never emits type 'head', so we match by name against the store.
@@ -156,6 +181,27 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
         <ContextMenu.Portal>
           <ContextMenu.Content className="min-w-[160px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+            {/* Compare-refs (042-compare-refs) — branches and tags only; stashes excluded (FR-017) */}
+            {compareItemsAvailable && (
+              <>
+                <ContextMenu.Item className={menuItemClass} onSelect={handleSetAsBaseRef}>
+                  Set as Compare Base
+                </ContextMenu.Item>
+                {aSetForCompare && (
+                  <ContextMenu.Item
+                    className={sameAsACompare
+                      ? 'px-3 py-1.5 text-sm text-[var(--vscode-disabledForeground)] cursor-not-allowed outline-none'
+                      : menuItemClass}
+                    disabled={sameAsACompare}
+                    onSelect={handleCompareWithBaseRef}
+                  >
+                    Compare with Base
+                  </ContextMenu.Item>
+                )}
+                <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+              </>
+            )}
+
             {isBranch && !isCurrentBranch && (
               <ContextMenu.Item className={menuItemClass} onSelect={handleCheckout}>
                 Checkout {refInfo.name}

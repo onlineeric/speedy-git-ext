@@ -404,6 +404,100 @@ export type RebaseState = 'idle' | 'in-progress';
 
 export type ActiveToggleWidget = 'search' | 'filter' | 'compare' | null;
 
+/** Well-known constant: the SHA of Git's empty tree object. Used as the synthetic
+ *  parent for root commits in compare ranges (FR-016, 042-compare-refs). */
+export const EMPTY_TREE_HASH = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+
+/**
+ * One side of a compare selection (slot A or slot B). 042-compare-refs.
+ * Stored by user intent (lazy resolve per FR-007a): branch/tag/expression slots
+ * carry the ref name/text and are resolved to a hash at Compare-click time;
+ * `commit` slots carry an already-resolved hash.
+ *
+ * `emptyTree` is synthetic — only emitted when "Compare these commits" runs
+ * against a selection whose oldest commit is a root commit (FR-016).
+ */
+export type SlotValue =
+  | { kind: 'workingTree' }
+  | { kind: 'head' }
+  | { kind: 'branch'; name: string; remote?: string }
+  | { kind: 'tag'; name: string }
+  | { kind: 'commit'; hash: string }
+  | { kind: 'expression'; text: string }
+  | { kind: 'emptyTree' };
+
+export type CompareMode = 'two-dot' | 'three-dot';
+
+/**
+ * The (A, B, mode) tuple plus per-slot resolved hashes (driving graph A/B markers
+ * per FR-026/028) and the recently-used ring buffer (FR-005). Lives in the
+ * webview's Zustand store; cleared on repo switch (FR-030) and window reload
+ * (FR-031). 042-compare-refs.
+ */
+export interface CompareSelection {
+  a: SlotValue | null;
+  b: SlotValue | null;
+  /** User's explicit mode override; null means "use the default rule" (FR-009/010). */
+  modeOverride: CompareMode | null;
+  /** Last successfully resolved hashes for A and B; used to drive graph A/B markers
+   *  (FR-026) and the FR-014 same-as-A guard. Null for working-tree side. */
+  aResolvedHash: string | null;
+  bResolvedHash: string | null;
+  /** Recently-used items, most-recent first, max 8 (FR-005). */
+  recents: SlotValue[];
+}
+
+export const EMPTY_COMPARE_SELECTION: CompareSelection = {
+  a: null,
+  b: null,
+  modeOverride: null,
+  aResolvedHash: null,
+  bResolvedHash: null,
+  recents: [],
+};
+
+/** Maximum number of recently-used slot values stored on `CompareSelection.recents`. */
+export const COMPARE_RECENTS_MAX = 8;
+
+/**
+ * Output of a compare operation. Rendered in the existing CommitDetailsPanel
+ * (FR-022). Same `FileChange[]` shape as `CommitDetails.files` so existing
+ * renderer reuses. 042-compare-refs.
+ */
+export interface CompareResult {
+  a: SlotValue;
+  b: SlotValue;
+  mode: CompareMode;
+  /** True iff a three-dot was requested but fell back to two-dot because no merge
+   *  base existed (FR-012 inline notice). */
+  fellBackToTwoDot: boolean;
+  /** Resolved hashes used for the diff. For working-tree side, null. */
+  aResolvedHash: string | null;
+  bResolvedHash: string | null;
+  files: FileChange[];
+  stats: { additions: number; deletions: number };
+}
+
+/**
+ * Transient UI state for the compare flow: in-flight loading, cancellation
+ * request id, and inline error text. Cleared on repo switch / reload.
+ * 042-compare-refs.
+ */
+export interface ComparePanelUIState {
+  /** True while a compare RPC is in flight (drives FR-025a loading and FR-025b Cancel). */
+  loading: boolean;
+  /** Inline error from the last Compare attempt, or null. */
+  inlineError: string | null;
+  /** Active compare requestId (used by Cancel to identify which request to abort). */
+  activeRequestId: string | null;
+}
+
+export const EMPTY_COMPARE_PANEL_UI_STATE: ComparePanelUIState = {
+  loading: false,
+  inlineError: null,
+  activeRequestId: null,
+};
+
 export interface RebaseConflictInfo {
   conflictedFiles: string[];
   conflictCommitHash: string;

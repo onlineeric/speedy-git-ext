@@ -43,3 +43,55 @@ describe('graphStore — setCommits', () => {
     expect(useGraphStore.getState().totalLoadedWithoutFilter).toBeNull();
   });
 });
+
+describe('graphStore — toggleSelectedCommit', () => {
+  beforeEach(() => {
+    useGraphStore.setState({
+      selectedCommit: undefined,
+      selectedCommitIndex: -1,
+      selectedCommits: [],
+      lastClickedHash: undefined,
+    });
+  });
+
+  it('seeds the multi-selection with the single-click anchor when Ctrl+clicking a different row', () => {
+    // User clicks A → selectedCommit set, selectedCommits empty (matches selectCommit action).
+    useGraphStore.setState({ selectedCommit: 'A', selectedCommits: [], lastClickedHash: 'A' });
+
+    // User Ctrl+clicks B.
+    useGraphStore.getState().toggleSelectedCommit('B');
+
+    // Both A (the original anchor) and B should be in the multi-selection.
+    expect(useGraphStore.getState().selectedCommits).toEqual(['A', 'B']);
+    expect(useGraphStore.getState().lastClickedHash).toBe('B');
+  });
+
+  it('does not duplicate the anchor when Ctrl+clicking the same row that was single-clicked', () => {
+    useGraphStore.setState({ selectedCommit: 'A', selectedCommits: [], lastClickedHash: 'A' });
+
+    useGraphStore.getState().toggleSelectedCommit('A');
+
+    // No seeding needed; toggling A on an empty list adds A once.
+    expect(useGraphStore.getState().selectedCommits).toEqual(['A']);
+  });
+
+  it('does not seed when there is no single-click anchor', () => {
+    useGraphStore.setState({ selectedCommit: undefined, selectedCommits: [], lastClickedHash: undefined });
+
+    useGraphStore.getState().toggleSelectedCommit('B');
+
+    expect(useGraphStore.getState().selectedCommits).toEqual(['B']);
+  });
+
+  it('does not re-seed once the multi-selection is already populated', () => {
+    useGraphStore.setState({ selectedCommit: 'A', selectedCommits: ['A', 'B'], lastClickedHash: 'B' });
+
+    // Toggling C should append it without re-seeding.
+    useGraphStore.getState().toggleSelectedCommit('C');
+    expect(useGraphStore.getState().selectedCommits).toEqual(['A', 'B', 'C']);
+
+    // Toggling B again should remove it.
+    useGraphStore.getState().toggleSelectedCommit('B');
+    expect(useGraphStore.getState().selectedCommits).toEqual(['A', 'C']);
+  });
+});
