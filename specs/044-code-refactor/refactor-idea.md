@@ -306,16 +306,17 @@ Tick items as they land. Each item is independently shippable; we can stop and r
   - Added `createReachabilityChecker(commits)` factory that builds the commit map once and returns a checker.
   - `CommitTooltip.tsx`: memoizes one checker per `mergedCommits` change — the loop over all merged commits now reuses a single map instead of rebuilding O(n) times.
   - `CommitContextMenu.tsx`: memoizes per-row to avoid rebuilding on unrelated re-renders. Note: each visible row still mounts its own checker; for further per-row reduction, hoist a precomputed `Set<string>` from `GraphContainer` (deferred — invasive prop-chain change, can pair with Step 6/9 row-interface work if profiling shows it's worth it).
-- [ ] **Step 5 — Profiling gate (USER INVOLVEMENT REQUIRED):** Profile large-repo scrolling using the steps in section 4. Decide whether Steps 6–9 are still worth their risk based on the trace.
-- [ ] **Step 6 — Item C:** Hoist `CompareABMarker` selection to `GraphContainer`; pass `isA`/`isB` as props into rows. Extract shared marker rendering used by classic and table rows.
-- [ ] **Step 7 — Item B:** Pass `graphColors` into `GraphCell` as a prop and remove its `useGraphStore` coupling.
-- [ ] **Step 8 — Item 1:** Replace bare `useGraphStore()` calls with explicit selectors (one component per session, honor the selector gotcha rule):
-  - [ ] `webview-ui/src/App.tsx`
-  - [ ] `webview-ui/src/components/GraphContainer.tsx`
-  - [ ] `webview-ui/src/components/ControlBar.tsx`
-  - [ ] `webview-ui/src/components/CommitDetailsPanel.tsx`
-  - [ ] `webview-ui/src/components/RemoteManagementDialog.tsx`
-- [ ] **Step 9 — Item E:** Convert context menus to the lazy-mount inner-content pattern used by `AuthorContextMenu`:
-  - [ ] `BranchContextMenu` (do first — multiple instances per row)
-  - [ ] `CommitContextMenu`
-- [ ] **Post-Step-9 profiling:** Re-run the trace to validate the actual scroll improvement.
+- [x] **Step 5 — Profiling gate (USER INVOLVEMENT REQUIRED):** Profiled 7.58s of fast scrolling on a real repo. Result: **JS is not the bottleneck.**
+  - Total breakdown: ~98% idle, **Scripting 78 ms (1%)**, Rendering 47 ms (0.6%), Painting 12 ms (0.2%).
+  - Largest single cost: "Recalculate style" at 13 ms — a browser CSS cost, not JS.
+  - `calculateTopology` did not appear in the trace (runs at load, not during scroll).
+  - Disabling avatars showed no measurable difference; lower `overScan` (50 → 10) helped because fewer DOM rows = less style recalc, not because of JS.
+- [ ] ~~**Step 6 — Item C:** Hoist `CompareABMarker` selection to `GraphContainer`.~~ **Skipped — profile shows ~zero JS cost during scroll, so removing subscriptions yields no measurable win. Risk not justified.**
+- [x] **Step 7 — Item B:** Pass `graphColors` into `GraphCell` as a prop and remove its `useGraphStore` coupling.
+  - Added `resolvePalette(graphColors)` helper in `colorUtils.ts` so the empty-palette fallback lives in one place.
+  - `GraphCell` now takes `graphColors: readonly string[]` as a prop; no `useGraphStore` import.
+  - `CommitRow` and `CommitTableRow` (which already destructure `graphColors` from `userSettings`) pass it through, and both also use `resolvePalette` for consistency.
+- [ ] ~~**Step 8 — Item 1:** Replace bare `useGraphStore()` calls with explicit selectors.~~ **Skipped — same reason as Step 6. JS subscription cost during scroll is negligible per the trace.**
+- [ ] ~~**Step 9 — Item E:** Convert context menus to lazy-mount inner-content pattern.~~ **Skipped — this was originally pitched as the largest per-row win (~600 subscriptions). The trace shows the cost of those subscriptions is invisible; the medium-high refactor risk is not justified.**
+- [x] **Default `overScan` lowered from 50 → 20** in `package.json`. Confirmed in profile to be the only knob that materially affects scroll smoothness.
+- [ ] ~~**Post-Step-9 profiling:** Re-run the trace.~~ Not needed — Steps 6/8/9 not pursued.
