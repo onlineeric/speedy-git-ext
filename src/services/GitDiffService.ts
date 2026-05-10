@@ -228,25 +228,26 @@ export class GitDiffService {
     const refA = resolveSlotValue(a);
     const refB = resolveSlotValue(b);
 
-    // Working-tree on slot A is not supported via plain `git diff` form (the
-    // command would compare working tree to refB which inverts user intent).
-    // The UI prevents this; returning a clear error makes backend defense-in-depth explicit.
     if (refA === null && refB === null) {
       return err(new GitError('Both slots are Working Tree; nothing to compare', 'VALIDATION_ERROR'));
     }
-    if (refA === null) {
-      return err(new GitError('Working Tree must be slot B (Target), not slot A (Base)', 'VALIDATION_ERROR'));
+    // FR-011: three-dot requires both sides resolve to a ref (Working Tree forbidden in either slot).
+    if (mode === 'three-dot' && (refA === null || refB === null)) {
+      return err(new GitError('three-dot is not supported with Working Tree', 'VALIDATION_ERROR'));
     }
-    if (mode === 'three-dot' && refB === null) {
-      return err(new GitError('three-dot is not supported with Working Tree', 'COMMAND_FAILED'));
+    // Reject expressions that begin with `-` so they cannot be parsed as git options.
+    // `--end-of-options` below is the deeper defense, but rejecting early gives a clearer error.
+    if ((a.kind === 'expression' && a.text.trim().startsWith('-')) ||
+        (b.kind === 'expression' && b.text.trim().startsWith('-'))) {
+      return err(new GitError('Expression must not start with "-"', 'VALIDATION_ERROR'));
     }
 
     let effectiveMode: CompareMode = mode;
     let fellBackToTwoDot = false;
 
-    if (mode === 'three-dot' && refB !== null) {
+    if (mode === 'three-dot' && refA !== null && refB !== null) {
       const mergeBase = await this.executor.execute({
-        args: ['merge-base', refA, refB],
+        args: ['merge-base', '--end-of-options', refA, refB],
         cwd: this.workspacePath,
         abortSignal,
       });
@@ -258,15 +259,22 @@ export class GitDiffService {
       }
     }
 
+    // FR-018: Working Tree may appear in slot A. `git diff <ref>` compares working tree to <ref>
+    // with output direction "<ref> → working tree". To honor user intent (Base=WT, Target=ref →
+    // changes from WT to ref), invert with `-R` when refA is null.
     const buildArgs = (extra: string[]): string[] => {
       const base = ['diff', ...extra, '-z'];
-      if (refB === null) {
-        return [...base, refA];
+      if (refA === null && refB !== null) {
+        return [...base, '-R', '--end-of-options', refB];
       }
+      if (refB === null && refA !== null) {
+        return [...base, '--end-of-options', refA];
+      }
+      // Both refs present (refA !== null && refB !== null).
       if (effectiveMode === 'three-dot') {
-        return [...base, `${refA}...${refB}`];
+        return [...base, '--end-of-options', `${refA!}...${refB!}`];
       }
-      return [...base, refA, refB];
+      return [...base, '--end-of-options', refA!, refB!];
     };
 
     const [namesResult, statsResult] = await Promise.all([
@@ -305,14 +313,17 @@ export class GitDiffService {
 
   private async resolveHashForMarker(slot: SlotValue, abortSignal?: AbortSignal): Promise<string | null> {
     if (slot.kind === 'workingTree') return null;
-    if (slot.kind === 'commit') return slot.hash;
     if (slot.kind === 'emptyTree') return EMPTY_TREE_HASH;
 
+    // FR-004: commit slots may carry a short hash; canonicalise via rev-parse so the
+    // returned value can be matched directly against the graph row's full 40-char hash.
     const ref = resolveSlotValue(slot);
     if (ref === null) return null;
 
+    // `--verify` ensures rev-parse outputs only the resolved object (no echoed args);
+    // `--end-of-options` keeps the ref safe even if a future caller passes a leading `-`.
     const result = await this.executor.execute({
-      args: ['rev-parse', ref],
+      args: ['rev-parse', '--verify', '--end-of-options', ref],
       cwd: this.workspacePath,
       abortSignal,
     });

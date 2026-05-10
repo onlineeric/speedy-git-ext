@@ -55,6 +55,9 @@ export interface FilterableSingleSelectDropdownProps<T> {
   renderTrigger: (isOpen: boolean) => ReactNode;
   placeholder?: string;
   className?: string;
+  /** Notifies the parent whenever the internal filter text changes. Lets callers
+   *  reflect the user's typing into derived state (e.g. a synthetic free-text item). */
+  onFilterTextChange?: (text: string) => void;
 }
 
 // --- Component ---
@@ -71,6 +74,7 @@ function FilterableSingleSelectDropdownInner<T>({
   renderTrigger,
   placeholder = 'Filter...',
   className,
+  onFilterTextChange,
 }: FilterableSingleSelectDropdownProps<T>) {
   const [open, setOpen] = useState(false);
   const [filterText, setFilterText] = useState('');
@@ -133,6 +137,12 @@ function FilterableSingleSelectDropdownInner<T>({
       });
     }
   }, [open]);
+
+  // --- Notify parent of filter-text changes ---
+
+  useEffect(() => {
+    onFilterTextChange?.(filterText);
+  }, [filterText, onFilterTextChange]);
 
   // --- Scroll highlighted item into view ---
 

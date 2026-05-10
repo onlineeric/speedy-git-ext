@@ -1908,10 +1908,11 @@ export class WebviewProvider {
         payload: { requestId: payload.requestId, result: result.value },
       });
     } else {
-      // CANCELLED is a non-toast outcome (FR-025b); the webview suppresses it.
+      // Always echo `requestId` so the webview can ignore stale cancellations and avoid
+      // routing unrelated RPC errors through the compare panel.
       this.postMessage({
-        type: 'error',
-        payload: { error: result.error },
+        type: 'compareError',
+        payload: { requestId: payload.requestId, error: result.error },
       });
     }
   }

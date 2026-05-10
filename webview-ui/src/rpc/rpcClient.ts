@@ -97,17 +97,6 @@ class RpcClient {
         break;
       case 'error': {
         const errorMessage = message.payload.error.message;
-        const errorCode = (message.payload.error as { code?: string }).code;
-        // Compare-related errors route through the inline panel error path, not the global toast.
-        // Cancellations are silent (FR-025b); other errors populate `comparePanelUI.inlineError`.
-        if (store.comparePanelUI.loading) {
-          if (errorCode === 'CANCELLED') {
-            store.endCompareCancelled();
-          } else {
-            store.endCompareError(errorMessage);
-          }
-          break;
-        }
         store.setError(errorMessage);
         store.setIsRefreshing(false);
         this.rejectPendingLookups(errorMessage);
@@ -115,6 +104,21 @@ class RpcClient {
           const { reject } = this.pendingDialogAction;
           this.pendingDialogAction = null;
           reject(errorMessage);
+        }
+        break;
+      }
+      case 'compareError': {
+        // Latest-wins: ignore stale errors (e.g. CANCELLED from a superseded compare) whose
+        // requestId no longer matches the active one. This guards both the cancellation race
+        // (a newer compare's success would otherwise get dropped) and accidental routing of
+        // unrelated errors into the compare panel.
+        if (store.comparePanelUI.activeRequestId !== message.payload.requestId) break;
+        const errorMessage = message.payload.error.message;
+        const errorCode = (message.payload.error as { code?: string }).code;
+        if (errorCode === 'CANCELLED') {
+          store.endCompareCancelled();
+        } else {
+          store.endCompareError(errorMessage);
         }
         break;
       }

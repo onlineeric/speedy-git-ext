@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import type { Branch, CompareMode, RefInfo, SlotValue } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { dispatchCompare, effectiveCompareMode } from '../utils/compareDispatch';
-import { defaultMode } from '../utils/compareDefaults';
 import { slotLabel, slotsEqual } from '../utils/compareSlot';
 import { FilterableSingleSelectDropdown } from './FilterableSingleSelectDropdown';
 
@@ -127,12 +126,9 @@ function SlotDropdown({
           setTypedText('');
           onSelect(item.value);
         }}
+        onFilterTextChange={setTypedText}
         getKey={slotItemKey}
-        getSearchText={(it) => {
-          // Side-effect: capture the typed text so the synthetic expression item can be added.
-          // This is an approximation — the dropdown does its own filtering.
-          return it.label;
-        }}
+        getSearchText={(it) => it.label}
         renderItem={(item, _isSelected, isHighlighted) => (
           <div className={`flex items-center gap-2 px-3 py-1 text-sm ${isHighlighted ? 'bg-[var(--vscode-list-hoverBackground)]' : ''}`}>
             <SlotKindIcon kind={item.value.kind} />
@@ -175,10 +171,6 @@ function SlotDropdown({
           ✕
         </button>
       )}
-      {/* Hidden input to capture free-text for the synthetic expression item.
-          Not perfect — the dropdown owns its own filter input — but provides a
-          fallback "type and press Enter on the synthetic row" path. */}
-      <input type="hidden" value={typedText} readOnly />
     </div>
   );
 }
@@ -346,6 +338,3 @@ function ModeRadio({
   );
 }
 
-// Suppress unused-warning for `defaultMode` (referenced via effectiveCompareMode but kept here
-// for callers that import the symbol from this module in the future).
-void defaultMode;

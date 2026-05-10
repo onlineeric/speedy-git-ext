@@ -173,7 +173,8 @@ export type ResponseMessage =
   | { type: 'conflictState'; payload: ConflictState }
   | { type: 'initialData'; payload: InitialDataPayload }
   // Compare refs (042-compare-refs)
-  | { type: 'compareResult'; payload: { requestId: string; result: CompareResult } };
+  | { type: 'compareResult'; payload: { requestId: string; result: CompareResult } }
+  | { type: 'compareError'; payload: { requestId: string; error: GitError | { message: string } } };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -218,7 +219,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   pushResult: true, avatarUrls: true, worktreeList: true, containingBranches: true,
   persistedUIState: true, authorList: true, uncommittedChanges: true, conflictState: true,
   initialData: true,
-  compareResult: true,
+  compareResult: true, compareError: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {

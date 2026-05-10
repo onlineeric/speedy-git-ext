@@ -125,22 +125,52 @@ describe('GitDiffService.compareRefs parser', () => {
     expect(result.value.mode).toBe('two-dot');
   });
 
-  it('rejects three-dot with Working Tree', async () => {
+  it('rejects three-dot with Working Tree (in either slot)', async () => {
     const service = new GitDiffService('/repo', mockLog);
-    const result = await service.compareRefs(
+    const resultB = await service.compareRefs(
       { kind: 'head' },
       { kind: 'workingTree' },
       'three-dot',
     );
-    expect(result.success).toBe(false);
-    if (result.success) return;
-    expect(result.error.code).toBe('COMMAND_FAILED');
+    expect(resultB.success).toBe(false);
+    if (resultB.success) return;
+    expect(resultB.error.code).toBe('VALIDATION_ERROR');
+
+    const resultA = await service.compareRefs(
+      { kind: 'workingTree' },
+      { kind: 'head' },
+      'three-dot',
+    );
+    expect(resultA.success).toBe(false);
+    if (resultA.success) return;
+    expect(resultA.error.code).toBe('VALIDATION_ERROR');
   });
 
-  it('rejects Working Tree as slot A', async () => {
+  it('allows Working Tree as slot A by inverting with -R (FR-018)', async () => {
     const service = new GitDiffService('/repo', mockLog);
+    const calls: string[][] = [];
+    vi.spyOn(service['executor'], 'execute').mockImplementation(async (opts) => {
+      calls.push(opts.args);
+      return { success: true, value: { stdout: '', stderr: '' } };
+    });
     const result = await service.compareRefs(
       { kind: 'workingTree' },
+      { kind: 'head' },
+      'two-dot',
+    );
+    expect(result.success).toBe(true);
+    // Verify -R was used so the diff direction matches user intent (Base=WT → Target=ref).
+    const diffCalls = calls.filter((args) => args[0] === 'diff');
+    expect(diffCalls.length).toBeGreaterThan(0);
+    for (const args of diffCalls) {
+      expect(args).toContain('-R');
+    }
+  });
+
+  it('rejects expression slots that begin with "-"', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    const result = await service.compareRefs(
+      { kind: 'expression', text: '-z' },
       { kind: 'head' },
       'two-dot',
     );
