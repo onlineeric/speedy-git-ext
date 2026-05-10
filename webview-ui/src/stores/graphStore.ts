@@ -9,6 +9,10 @@ import type {
   CommitListMode,
   CommitTableLayout,
   CommitSignatureInfo,
+  CompareMode,
+  CompareResult,
+  CompareSelection,
+  ComparePanelUIState,
   ConflictState,
   ConflictType,
   ContainingBranchesResult,
@@ -22,6 +26,7 @@ import type {
   RebaseEntry,
   RepoInfo,
   SearchState,
+  SlotValue,
   StashEntry,
   Submodule,
   SubmoduleNavEntry,
@@ -30,11 +35,15 @@ import type {
   WorktreeInfo,
 } from '@shared/types';
 import {
+  COMPARE_RECENTS_MAX,
   DEFAULT_USER_SETTINGS,
   DEFAULT_PERSISTED_UI_STATE,
+  EMPTY_COMPARE_PANEL_UI_STATE,
+  EMPTY_COMPARE_SELECTION,
   UNCOMMITTED_HASH,
   cloneCommitTableLayout,
 } from '@shared/types';
+import { slotsEqual } from '../utils/compareSlot';
 import type { InitialDataPayload } from '@shared/messages';
 import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
 import { buildUncommittedSubject } from '../utils/uncommittedUtils';
@@ -160,6 +169,10 @@ interface GraphStore {
   consecutiveEmptyBatches: number;
   filteredOutCount: number;
   showGapIndicator: boolean;
+  // Compare refs (042-compare-refs) — transient session state, not persisted
+  compareSelection: CompareSelection;
+  compareResult: CompareResult | null;
+  comparePanelUI: ComparePanelUIState;
   setHoveredCommit: (hash: string | null, anchorRect: DOMRect | null) => void;
   setWorktreeList: (list: WorktreeInfo[]) => void;
   setContainingBranches: (hash: string, result: ContainingBranchesResult) => void;
@@ -232,6 +245,17 @@ interface GraphStore {
   setSubmodules: (submodules: Submodule[], stack?: SubmoduleNavEntry[]) => void;
   pushSubmodule: (entry: SubmoduleNavEntry) => void;
   popSubmodule: () => void;
+  // Compare refs (042-compare-refs)
+  setSlotA: (value: SlotValue | null) => void;
+  setSlotB: (value: SlotValue | null) => void;
+  swapSlots: () => void;
+  setCompareModeOverride: (mode: CompareMode | null) => void;
+  clearCompareState: () => void;
+  beginCompare: (requestId: string) => void;
+  endCompareSuccess: (result: CompareResult) => void;
+  endCompareError: (message: string) => void;
+  endCompareCancelled: () => void;
+  maybeRerunCompareForWorkingTree: () => void;
 }
 
 const emptyTopology: GraphTopology = {
@@ -456,6 +480,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   consecutiveEmptyBatches: 0,
   filteredOutCount: 0,
   showGapIndicator: false,
+  compareSelection: { ...EMPTY_COMPARE_SELECTION, recents: [] },
+  compareResult: null,
+  comparePanelUI: { ...EMPTY_COMPARE_PANEL_UI_STATE },
   setHoveredCommit: (hash, anchorRect) => set({ hoveredCommitHash: hash, tooltipAnchorRect: anchorRect }),
   setWorktreeList: (list) => {
     const byHead = new Map<string, WorktreeInfo>();
@@ -583,7 +610,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const index = selectedCommit
       ? get().mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
       : -1;
-    set({ selectedCommit, selectedCommitIndex: index });
+    // FR-023 (042-compare-refs): selecting a single commit dismisses any showing compare result
+    set({ selectedCommit, selectedCommitIndex: index, ...(selectedCommit ? { compareResult: null } : {}) });
   },
   selectCommit: (index) => {
     const commits = get().mergedCommits;
@@ -598,6 +626,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedCommitIndex: index,
       lastClickedHash: commit.hash,
       selectedCommits: [],
+      compareResult: null,
     });
   },
   moveSelection: (delta) => {
@@ -612,6 +641,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedCommitIndex: nextIndex,
       lastClickedHash: commit.hash,
       selectedCommits: [],
+      compareResult: null,
     });
   },
   setCommitDetails: (commitDetails) => set({
@@ -675,10 +705,20 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setSelectedCommits: (selectedCommits) => set({ selectedCommits }),
   setSelectionAnchor: (lastClickedHash) => set({ lastClickedHash }),
   toggleSelectedCommit: (hash) => set((state) => {
-    const exists = state.selectedCommits.includes(hash);
+    // When the user single-clicks a row to select it, then Ctrl/Cmd-clicks
+    // additional rows, the originally clicked row must be part of the
+    // multi-selection — that is the standard UX (file managers, IDEs).
+    // Seed the selection list with the current single-click anchor before
+    // toggling, so the anchor isn't dropped from the range.
+    const seeded = state.selectedCommits.length === 0
+      && state.selectedCommit !== undefined
+      && state.selectedCommit !== hash
+      ? [state.selectedCommit]
+      : state.selectedCommits;
+    const exists = seeded.includes(hash);
     const selectedCommits = exists
-      ? state.selectedCommits.filter((item) => item !== hash)
-      : [...state.selectedCommits, hash];
+      ? seeded.filter((item) => item !== hash)
+      : [...seeded, hash];
     return { selectedCommits, lastClickedHash: hash };
   }),
   selectCommitRange: (toHash) => set((state) => {
@@ -807,6 +847,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
    */
   resetTopMenuGroup: () => {
     get().resetAllFilters({ preserveBranches: false });
+    // FR-030 (042-compare-refs): clear compare state on repo / submodule switch
+    get().clearCompareState();
     set((state) => ({
       searchState: {
         ...defaultSearchState,
@@ -1063,4 +1105,112 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   popSubmodule: () => set((state) => ({
     submoduleStack: state.submoduleStack.slice(0, -1),
   })),
+  // Compare refs (042-compare-refs)
+  setSlotA: (value) => set((state) => {
+    const prev = state.compareSelection.a;
+    const kindChanged = (prev?.kind ?? null) !== (value?.kind ?? null);
+    const recents = value
+      ? [value, ...state.compareSelection.recents.filter((r) => !slotsEqual(r, value))].slice(0, COMPARE_RECENTS_MAX)
+      : state.compareSelection.recents;
+    return {
+      compareSelection: {
+        ...state.compareSelection,
+        a: value,
+        aResolvedHash: null,
+        // Reset modeOverride when slot kind changes so the default rule re-applies (research Decision 4)
+        modeOverride: kindChanged ? null : state.compareSelection.modeOverride,
+        recents,
+      },
+      compareResult: null,
+      comparePanelUI: { ...state.comparePanelUI, inlineError: null },
+    };
+  }),
+  setSlotB: (value) => set((state) => {
+    const prev = state.compareSelection.b;
+    const kindChanged = (prev?.kind ?? null) !== (value?.kind ?? null);
+    const recents = value
+      ? [value, ...state.compareSelection.recents.filter((r) => !slotsEqual(r, value))].slice(0, COMPARE_RECENTS_MAX)
+      : state.compareSelection.recents;
+    return {
+      compareSelection: {
+        ...state.compareSelection,
+        b: value,
+        bResolvedHash: null,
+        modeOverride: kindChanged ? null : state.compareSelection.modeOverride,
+        recents,
+      },
+      compareResult: null,
+      comparePanelUI: { ...state.comparePanelUI, inlineError: null },
+    };
+  }),
+  swapSlots: () => set((state) => ({
+    compareSelection: {
+      ...state.compareSelection,
+      a: state.compareSelection.b,
+      b: state.compareSelection.a,
+      aResolvedHash: state.compareSelection.bResolvedHash,
+      bResolvedHash: state.compareSelection.aResolvedHash,
+    },
+    compareResult: null,
+    comparePanelUI: { ...state.comparePanelUI, inlineError: null },
+  })),
+  setCompareModeOverride: (mode) => set((state) => ({
+    compareSelection: { ...state.compareSelection, modeOverride: mode },
+    compareResult: null,
+  })),
+  clearCompareState: () => set({
+    compareSelection: { ...EMPTY_COMPARE_SELECTION, recents: [] },
+    compareResult: null,
+    comparePanelUI: { ...EMPTY_COMPARE_PANEL_UI_STATE },
+  }),
+  beginCompare: (requestId) => set({
+    comparePanelUI: { loading: true, inlineError: null, activeRequestId: requestId },
+    compareResult: null,
+  }),
+  endCompareSuccess: (result) => set((state) => ({
+    compareResult: result,
+    comparePanelUI: { loading: false, inlineError: null, activeRequestId: null },
+    compareSelection: {
+      ...state.compareSelection,
+      aResolvedHash: result.aResolvedHash,
+      bResolvedHash: result.bResolvedHash,
+    },
+  })),
+  endCompareError: (message) => set({
+    comparePanelUI: { loading: false, inlineError: message, activeRequestId: null },
+  }),
+  endCompareCancelled: () => set({
+    comparePanelUI: { loading: false, inlineError: null, activeRequestId: null },
+  }),
+  maybeRerunCompareForWorkingTree: () => {
+    const state = get();
+    if (!state.compareResult) return;
+    const { a, b } = state.compareSelection;
+    const involvesWorkingTree = a?.kind === 'workingTree' || b?.kind === 'workingTree';
+    if (!involvesWorkingTree) return;
+    if (!a || !b) return;
+    // Re-dispatch with the current selection. requestId generated here so the
+    // store can match the upcoming compareResult / error response.
+    const requestId = generateCompareRequestId();
+    state.beginCompare(requestId);
+    import('../rpc/rpcClient').then(({ rpcClient }) => {
+      const mode = computeEffectiveMode(a, b, state.compareSelection.modeOverride);
+      rpcClient.send({ type: 'compareRefs', payload: { a, b, mode, requestId } });
+    });
+  },
 }));
+
+function generateCompareRequestId(): string {
+  // Lightweight ID generator — does not need to be cryptographically unique,
+  // only unique within the lifetime of a single in-flight compare request.
+  return `cmp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function computeEffectiveMode(a: SlotValue, b: SlotValue, override: CompareMode | null): CompareMode {
+  if (override) return override;
+  if (a.kind === 'workingTree' || b.kind === 'workingTree') return 'two-dot';
+  const aIsRef = a.kind === 'branch' || a.kind === 'tag';
+  const bIsRef = b.kind === 'branch' || b.kind === 'tag';
+  if (aIsRef && bIsRef) return 'three-dot';
+  return 'two-dot';
+}

@@ -155,6 +155,8 @@ shared/                           # Shared types between backend & frontend
 
 ## Active Technologies
 - TypeScript 5.x (strict) + React 18, Zustand, Radix UI, Tailwind CSS (webview); esbuild (extension host), Vite (frontend)
+- TypeScript 5.x strict (`noUnusedLocals`, `noUnusedParameters`, + VS Code Extension API 1.80+; React 18 + Zustand + Tailwind + (042-compare-refs)
+- None new. Compare state lives in Zustand store (transient, session-only). (042-compare-refs)
 
 ## Recent Changes
 - 043-fast-forward-branch: Fast-forward a non-checked-out local branch from its remote without checkout
