@@ -14,6 +14,7 @@ A performance-first Git graph, Git history viewer, and history-editing tool buil
 |---|---|
 | **Instant graph rendering** | Virtual scrolling + batch prefetch keeps large repos responsive — no loading spinners, no lag |
 | **Real Git operations** | Merge, rebase, cherry-pick, revert, reset, drop commit, push, pull, fetch — all from context menus with live command preview |
+| **Compare anything to anything** | Two-click A vs B diff for any commit, branch, tag, or your working tree — with PR-style three-dot mode |
 | **Clean, scannable UI** | Color-coded branch lanes, merged local/remote labels, avatars, and clear HEAD indicators |
 | **History editing workflow** | Interactive rebase with drag-and-drop reordering (pick, squash, fixup, reword, drop) |
 | **Works in VS Code and Cursor** | Published on both VS Code Marketplace and Open VSX |
@@ -34,8 +35,21 @@ In additonal to branch filter, we have a new advanced filter panel with
 We have a new table-style commit list view with resizable columns, column reordering, and column visibility controls.
 ![Speedy Git Table View Commit List screenshot](./resources/speedy-git-screenshot-table-view.png)
 
-### Upcoming features in v4
-- Compare branches, commits, HEAD, etc.
+### Compare Refs — A vs B, Anything to Anything (new in v4 pre-release)
+
+![Speedy Git Compare screenshot](./resources/042-compare.png)
+
+Stop dropping into the terminal to figure out what changed between two points in history. Speedy Git now ships a first-class **Compare** panel right next to Filter and Search.
+
+- **Pick any two commit-ish references** in seconds — commit hashes, local branches, remote branches, tags, `HEAD`, your **Working Tree**, or typed expressions like `HEAD~3` and `origin/main^2`. One searchable combobox handles every input type, with recently-used items at the top.
+- **Two-click compare from the graph** — right-click a commit, branch, or tag → **Set as Compare Base**, then right-click another → **Compare with Base**. The diff opens in the Commit Details panel you already use.
+- **Multi-select and compare a range** — Ctrl/Cmd+click two or more commits, right-click → **Compare these commits**. Base = oldest, Target = newest, runs immediately.
+- **PR-style three-dot diff by default** for branch-vs-branch and tag-vs-tag — see exactly "what Target adds since branching off Base," matching GitHub's "Files changed" tab. Smart fallback to two-dot when slots are commit hashes or when there's no common ancestor.
+- **Compare your uncommitted work** against any ref — pick `Working Tree` in one slot and `HEAD`, `origin/main`, or a tag in the other. Auto-refreshes as you edit files on disk.
+- **B / T badges on the graph** light up the moment you fill a slot — no waiting for a comparison to finish to see where your endpoints are.
+- **Live, lazy-resolving slots** — branches and tags resolve to the current tip at Compare time, so a fetch or auto-refresh between picking and clicking is reflected in the result.
+- **Cancel any in-flight compare** mid-run; swap (⇄) Base and Target with one click; **Reset** clears everything in a single action.
+- **Pending-state toolbar button** turns light yellow when slots are filled but the panel is closed, so you never lose your place.
 
 ### Git Graph & Commit History
 
