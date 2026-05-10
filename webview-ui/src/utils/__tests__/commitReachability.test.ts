@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Commit } from '@shared/types';
-import { isReachableFromHead } from '../commitReachability';
+import { createReachabilityChecker, isReachableFromHead } from '../commitReachability';
 
 function makeCommit(hash: string, parents: string[] = []): Commit {
   return {
@@ -31,5 +31,35 @@ describe('isReachableFromHead', () => {
     const head = makeCommit('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', [root.hash]);
 
     expect(isReachableFromHead(side.hash, head.hash, [head, side, root])).toBe(false);
+  });
+});
+
+describe('createReachabilityChecker', () => {
+  it('answers multiple reachability queries against a shared commit map', () => {
+    const root = makeCommit('1111111111111111111111111111111111111111');
+    const middle = makeCommit('2222222222222222222222222222222222222222', [root.hash]);
+    const sibling = makeCommit('3333333333333333333333333333333333333333', [root.hash]);
+    const head = makeCommit('4444444444444444444444444444444444444444', [middle.hash]);
+
+    const checker = createReachabilityChecker([head, middle, sibling, root]);
+    expect(checker.isReachableFromHead(middle.hash, head.hash)).toBe(true);
+    expect(checker.isReachableFromHead(root.hash, head.hash)).toBe(true);
+    expect(checker.isReachableFromHead(sibling.hash, head.hash)).toBe(false);
+  });
+
+  it('resolves abbreviated hashes when the match is unique', () => {
+    const root = makeCommit('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    const head = makeCommit('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', [root.hash]);
+    const checker = createReachabilityChecker([head, root]);
+    expect(checker.isReachableFromHead('aaaaaa', 'bbbbbb')).toBe(true);
+  });
+
+  it('returns false when the abbreviated hash is ambiguous', () => {
+    const a = makeCommit('abc111111111111111111111111111111111aaaa');
+    const b = makeCommit('abc222222222222222222222222222222222bbbb', [a.hash]);
+    const checker = createReachabilityChecker([b, a]);
+    // 'abc' matches both commits → resolution falls back to the literal prefix string,
+    // which isn't a real hash, so reachability cannot be established.
+    expect(checker.isReachableFromHead('abc', b.hash)).toBe(false);
   });
 });

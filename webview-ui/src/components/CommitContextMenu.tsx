@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { Commit, CherryPickOptions, ResetMode, RebaseEntry, CommitParentInfo, SlotValue } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
@@ -14,7 +14,7 @@ import { InteractiveRebaseDialog } from './InteractiveRebaseDialog';
 import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 import { RevertParentDialog } from './RevertParentDialog';
 import { DropCommitDialog } from './DropCommitDialog';
-import { isReachableFromHead } from '../utils/commitReachability';
+import { createReachabilityChecker } from '../utils/commitReachability';
 
 interface CommitContextMenuProps {
   commit: Commit;
@@ -106,8 +106,11 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
   const isMergeCommit = commit.parents.length > 1;
   const isRootCommit = commit.parents.length === 0;
   const isOperationInProgress = loading || rebaseInProgress || cherryPickInProgress || revertInProgress;
+  // Memoize the reachability checker so the commit-by-hash map is built once per
+  // mergedCommits change instead of on every render of this per-row context menu.
+  const reachability = useMemo(() => createReachabilityChecker(mergedCommits), [mergedCommits]);
   const isCommitOnCurrentBranch = currentLocalBranch
-    ? isReachableFromHead(commit.hash, currentLocalBranch.hash, mergedCommits)
+    ? reachability.isReachableFromHead(commit.hash, currentLocalBranch.hash)
     : false;
 
   const canRebase = !isHeadCommit && !rebaseInProgress && !loading && !!currentLocalBranch;
