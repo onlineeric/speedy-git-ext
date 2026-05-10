@@ -41,47 +41,15 @@ import {
   EMPTY_COMPARE_PANEL_UI_STATE,
   EMPTY_COMPARE_SELECTION,
   UNCOMMITTED_HASH,
+  buildUncommittedSubject,
   cloneCommitTableLayout,
 } from '@shared/types';
 import { slotsEqual } from '../utils/compareSlot';
 import type { InitialDataPayload } from '@shared/messages';
-import { calculateTopology, type GraphTopology } from '../utils/graphTopology';
-import { buildUncommittedSubject } from '../utils/uncommittedUtils';
-
-/**
- * Compute the set of commit hashes that should be hidden by active visibility filters.
- * Author and text filters are applied in a single pass (AND semantics).
- * Stash entries are excluded (stashes are merged separately after filtering).
- */
-function computeHiddenCommitHashes(commits: Commit[], filters: GraphFilters): Set<string> {
-  const hidden = new Set<string>();
-  const hasAuthorFilter = !!filters.authors && filters.authors.length > 0;
-  const hasTextFilter = !!filters.textFilter;
-
-  if (!hasAuthorFilter && !hasTextFilter) return hidden;
-
-  const includedAuthors = hasAuthorFilter ? new Set(filters.authors) : null;
-  const textLower = hasTextFilter ? filters.textFilter!.toLowerCase() : '';
-
-  for (const commit of commits) {
-    // Stash and uncommitted entries are never hidden by author/text filters
-    if (commit.refs.some(r => r.type === 'stash' || r.type === 'uncommitted')) continue;
-
-    if (includedAuthors && !includedAuthors.has(commit.authorEmail)) {
-      hidden.add(commit.hash);
-      continue;
-    }
-
-    if (hasTextFilter) {
-      const subjectMatch = commit.subject.toLowerCase().includes(textLower);
-      const hashMatch = textLower.length >= 4 && commit.hash.startsWith(textLower);
-      if (!subjectMatch && !hashMatch) {
-        hidden.add(commit.hash);
-      }
-    }
-  }
-  return hidden;
-}
+import { type GraphTopology } from '../utils/graphTopology';
+import { computeHiddenCommitHashes } from '../utils/commitVisibility';
+import { computeMergedTopology, type UncommittedContext } from '../utils/mergedCommits';
+import { joinRepoPath } from '../utils/repoPath';
 
 interface GraphStore {
   commits: Commit[];
@@ -272,140 +240,8 @@ const defaultSearchState: SearchState = {
   currentMatchIndex: -1,
 };
 
-function mergeStashesIntoCommits(commits: Commit[], stashes: StashEntry[], filters?: GraphFilters): Commit[] {
-  if (stashes.length === 0) return commits;
-
-  // Parse active date filters so stashes outside the range are excluded
-  const afterMs = filters?.afterDate ? new Date(filters.afterDate).getTime() : undefined;
-  const beforeMs = filters?.beforeDate ? new Date(filters.beforeDate).getTime() : undefined;
-
-  const merged = [...commits];
-  const commitIndexByHash = new Map<string, number>();
-  for (let i = 0; i < merged.length; i++) {
-    commitIndexByHash.set(merged[i].hash, i);
-  }
-
-  const stashInsertions: { index: number; commit: Commit }[] = [];
-  for (const stash of stashes) {
-    const parentIndex = commitIndexByHash.get(stash.parentHash);
-    if (parentIndex === undefined) continue;
-
-    // Skip stashes outside the active date range
-    if (afterMs && stash.date < afterMs) continue;
-    if (beforeMs && stash.date > beforeMs) continue;
-
-    stashInsertions.push({
-      index: parentIndex,
-      commit: {
-        hash: stash.hash,
-        abbreviatedHash: stash.hash.slice(0, 7),
-        parents: [stash.parentHash],
-        author: stash.author,
-        authorEmail: stash.authorEmail,
-        authorDate: stash.date,
-        subject: stash.message,
-        refs: [{ name: `stash@{${stash.index}}`, type: 'stash' }],
-      },
-    });
-  }
-
-  stashInsertions.sort((a, b) => b.index - a.index);
-  for (const { index, commit } of stashInsertions) {
-    merged.splice(index, 0, commit);
-  }
-
-  return merged;
-}
-
-function mergeUncommittedIntoCommits(
-  commits: Commit[],
-  hasUncommittedChanges: boolean,
-  counts: { stagedCount: number; unstagedCount: number; untrackedCount: number },
-  branches: Branch[],
-  filters?: GraphFilters,
-): Commit[] {
-  if (!hasUncommittedChanges) return commits;
-
-  // Respect branch filter: only inject when HEAD branch is in the filter set (or no filter active)
-  if (filters?.branches && filters.branches.length > 0) {
-    const currentBranch = branches.find(b => b.current);
-    if (currentBranch && !filters.branches.includes(currentBranch.name)) {
-      return commits;
-    }
-  }
-
-  // Find HEAD commit hash (first commit with a 'head' ref, or just the first commit)
-  const headCommitHash = commits.length > 0
-    ? (commits.find(c => c.refs.some(r => r.type === 'head'))?.hash ?? commits[0].hash)
-    : '';
-
-  if (!headCommitHash) return commits;
-
-  const syntheticCommit: Commit = {
-    hash: UNCOMMITTED_HASH,
-    abbreviatedHash: '---',
-    parents: [headCommitHash],
-    author: '---',
-    authorEmail: '',
-    authorDate: Date.now(),
-    subject: buildUncommittedSubject(counts.stagedCount, counts.unstagedCount, counts.untrackedCount),
-    refs: [{ name: 'Uncommitted Changes', type: 'uncommitted' }],
-  };
-
-  return [syntheticCommit, ...commits];
-}
-
-interface UncommittedContext {
-  hasUncommittedChanges: boolean;
-  counts: { stagedCount: number; unstagedCount: number; untrackedCount: number };
-  branches: Branch[];
-}
-
 function getUncommittedContext(state: GraphStore): UncommittedContext {
   return { hasUncommittedChanges: state.hasUncommittedChanges, counts: state.uncommittedCounts, branches: state.branches };
-}
-
-function computeMergedTopology(
-  commits: Commit[],
-  stashes: StashEntry[],
-  filters?: GraphFilters,
-  hiddenHashes?: Set<string>,
-  uncommitted?: UncommittedContext,
-): { mergedCommits: Commit[]; topology: GraphTopology } {
-  // When hidden hashes are provided, filter commits to visible-only before merging stashes,
-  // but pass the full commit list to calculateTopology for correct lane assignment.
-  const visibleCommits = hiddenHashes && hiddenHashes.size > 0
-    ? commits.filter(c => !hiddenHashes.has(c.hash))
-    : commits;
-  let mergedCommits = mergeStashesIntoCommits(visibleCommits, stashes, filters);
-  // Inject uncommitted node at index 0 after stashes are merged
-  if (uncommitted) {
-    mergedCommits = mergeUncommittedIntoCommits(mergedCommits, uncommitted.hasUncommittedChanges, uncommitted.counts, uncommitted.branches, filters);
-  }
-  // Topology needs ALL commits (including hidden) for correct lane reservations.
-  // Merge stashes into the full list for topology too, so stash lane assignments work.
-  let allWithStashes = mergeStashesIntoCommits(commits, stashes, filters);
-  if (uncommitted) {
-    allWithStashes = mergeUncommittedIntoCommits(allWithStashes, uncommitted.hasUncommittedChanges, uncommitted.counts, uncommitted.branches, filters);
-  }
-  return { mergedCommits, topology: calculateTopology(allWithStashes, hiddenHashes, mergedCommits) };
-}
-
-/**
- * Join a parent repo absolute path with a submodule's relative path. The
- * webview is a sandboxed browser bundle and cannot import Node's `path` module,
- * so we detect the parent's native separator (backslash on Windows, forward on
- * Unix) and use it consistently — git always emits forward-slash relative
- * paths for submodules, so the relative segment is converted to match.
- */
-function joinRepoPath(parent: string, sub: string): string {
-  const useBackslash = parent.includes('\\') && !parent.includes('/');
-  const sep = useBackslash ? '\\' : '/';
-  const cleanParent = parent.replace(/[\\/]+$/, '');
-  const cleanSub = sub
-    .replace(/^[\\/]+/, '')
-    .replace(/[\\/]+/g, sep);
-  return `${cleanParent}${sep}${cleanSub}`;
 }
 
 export const useGraphStore = create<GraphStore>((set, get) => ({

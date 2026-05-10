@@ -14,7 +14,7 @@ import { renderInlineCode } from '../utils/inlineCodeRenderer';
 import { mergeRefs, displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
 import { formatAbsoluteDateTime, formatRelativeDate } from '../utils/formatDate';
 import { AuthorAvatar } from './AuthorAvatar';
-import { getColor, getLaneColorStyle, DEFAULT_GRAPH_PALETTE } from '../utils/colorUtils';
+import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils';
 import { slotMatchesCommitRow } from '../utils/compareMarker';
 
 /** Compare-refs A/B markers (042-compare-refs FR-026/027/028). Marker appears
@@ -95,7 +95,7 @@ export const CommitRow = memo(function CommitRow({
   const stashIndex = isStash ? parseStashIndex(commit.refs) : -1;
 
   const node = topology.nodes.get(commit.hash);
-  const palette = graphColors.length > 0 ? graphColors : DEFAULT_GRAPH_PALETTE;
+  const palette = resolvePalette(graphColors);
   const laneColor = node ? getColor(node.colorIndex, palette) : undefined;
   const laneColorStyle = laneColor ? getLaneColorStyle(laneColor) : undefined;
 
@@ -146,6 +146,7 @@ export const CommitRow = memo(function CommitRow({
         topology={topology}
         width={graphWidth}
         height={rowHeight}
+        graphColors={graphColors}
         isHeadCommit={isHead}
         onNodeMouseEnter={onNodeMouseEnter}
         onNodeMouseLeave={onNodeMouseLeave}

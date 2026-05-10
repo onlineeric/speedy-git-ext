@@ -16,7 +16,7 @@ import { formatAbsoluteDateTime, formatRelativeDate } from '../utils/formatDate'
 import { AuthorAvatar } from './AuthorAvatar';
 import { AuthorContextMenu } from './AuthorContextMenu';
 import { DateContextMenu } from './DateContextMenu';
-import { getColor, getLaneColorStyle, DEFAULT_GRAPH_PALETTE } from '../utils/colorUtils';
+import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils';
 import { slotMatchesCommitRow } from '../utils/compareMarker';
 import type { ResolvedCommitTableLayout } from '../utils/commitTableLayout';
 
@@ -82,7 +82,7 @@ export const CommitTableRow = memo(function CommitTableRow({
   const graphColumn = layout.columns.find((column) => column.id === 'graph');
 
   const node = topology.nodes.get(commit.hash);
-  const palette = graphColors.length > 0 ? graphColors : DEFAULT_GRAPH_PALETTE;
+  const palette = resolvePalette(graphColors);
   const laneColor = node ? getColor(node.colorIndex, palette) : undefined;
   const laneColorStyle = laneColor ? getLaneColorStyle(laneColor) : undefined;
 
@@ -143,6 +143,7 @@ export const CommitTableRow = memo(function CommitTableRow({
             topology,
             rowHeight,
             graphWidth: graphColumn?.effectiveWidth ?? 0,
+            graphColors,
             isHead,
             visibleRefs,
             overflowRefs,
@@ -192,6 +193,7 @@ function renderColumn({
   topology,
   rowHeight,
   graphWidth,
+  graphColors,
   isHead,
   visibleRefs,
   overflowRefs,
@@ -212,6 +214,7 @@ function renderColumn({
   topology: GraphTopology;
   rowHeight: number;
   graphWidth: number;
+  graphColors: readonly string[];
   isHead: boolean;
   visibleRefs: ReturnType<typeof mergeRefs>['displayRefs'];
   overflowRefs: ReturnType<typeof mergeRefs>['displayRefs'];
@@ -236,6 +239,7 @@ function renderColumn({
             topology={topology}
             width={graphWidth}
             height={rowHeight}
+            graphColors={graphColors}
             isHeadCommit={isHead}
             onNodeMouseEnter={onNodeMouseEnter}
             onNodeMouseLeave={onNodeMouseLeave}

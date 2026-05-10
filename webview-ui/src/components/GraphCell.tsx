@@ -1,8 +1,7 @@
 import { memo } from 'react';
 import type { Commit } from '@shared/types';
 import { type GraphTopology, getPassingLanes } from '../utils/graphTopology';
-import { useGraphStore } from '../stores/graphStore';
-import { getColor, DEFAULT_GRAPH_PALETTE } from '../utils/colorUtils';
+import { getColor, resolvePalette } from '../utils/colorUtils';
 
 interface GraphCellProps {
   commit: Commit;
@@ -11,6 +10,7 @@ interface GraphCellProps {
   topology: GraphTopology;
   width: number;
   height: number;
+  graphColors: readonly string[];
   isHeadCommit?: boolean;
   onNodeMouseEnter?: (hash: string, rect: DOMRect) => void;
   onNodeMouseLeave?: () => void;
@@ -31,13 +31,13 @@ export const GraphCell = memo(function GraphCell({
   topology,
   width,
   height,
+  graphColors,
   isHeadCommit = false,
   onNodeMouseEnter,
   onNodeMouseLeave,
 }: GraphCellProps) {
-  const graphColors = useGraphStore((state) => state.userSettings.graphColors);
   const node = topology.nodes.get(commit.hash);
-  const palette = graphColors.length > 0 ? graphColors : DEFAULT_GRAPH_PALETTE;
+  const palette = resolvePalette(graphColors);
 
 
   if (!node) {

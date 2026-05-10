@@ -1,8 +1,13 @@
 /** Default graph color palette when user has no custom colors configured. */
 export const DEFAULT_GRAPH_PALETTE = ['#4ec9b0'];
 
+/** Return the user's configured graph colors, or the default palette if none are set. */
+export function resolvePalette(graphColors: readonly string[]): readonly string[] {
+  return graphColors.length > 0 ? graphColors : DEFAULT_GRAPH_PALETTE;
+}
+
 /** Resolve a color index to a hex color from the palette (cycles via modulo). */
-export function getColor(colorIndex: number, palette: string[]): string {
+export function getColor(colorIndex: number, palette: readonly string[]): string {
   if (palette.length === 0) return DEFAULT_GRAPH_PALETTE[0];
   return palette[colorIndex % palette.length];
 }
