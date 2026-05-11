@@ -140,6 +140,14 @@ export function ControlBar() {
         <SearchIcon className={iconClass} />
       </button>
 
+      <button
+        onClick={() => setActiveToggleWidget('compare')}
+        className={`${iconButtonClass} ${compareColor}`}
+        title="Compare refs (Base vs Target)"
+      >
+        <CompareIcon className={iconClass} />
+      </button>
+
       <ToolbarSeparatorIcon className="h-6 w-4 text-[var(--vscode-panel-border)] opacity-90" />
 
       <button
@@ -157,14 +165,6 @@ export function ControlBar() {
         title="Fetch all remotes"
       >
         <FetchIcon className={iconClass} />
-      </button>
-
-      <button
-        onClick={() => setActiveToggleWidget('compare')}
-        className={`${iconButtonClass} ${compareColor}`}
-        title="Compare refs (Base vs Target)"
-      >
-        <CompareIcon className={iconClass} />
       </button>
 
       <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)] px-1">
