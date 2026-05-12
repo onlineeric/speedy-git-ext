@@ -4,6 +4,16 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.0.1] - 2026-05-12
+
+### Added
+Release v4.0.0 pre-release version to release version.
+
+### Fixed
+- "Rebase Current Branch onto This" (branch context menu) and "Rebase Current Branch onto This Commit" / "Start Interactive Rebase from Here" (commit context menu) no longer disappear intermittently. The visibility check previously hid the items whenever the global `loading` flag was true — and that flag flips on briefly during every `getCommits` refresh (any branch / author / date / text filter change), creating a short window where right-clicking would yield a menu missing the rebase entries.
+- These items now stay visible whenever they are structurally applicable (not the current branch / HEAD commit, not detached HEAD, not the same target hash) and are *disabled* — not hidden — while an operation is in progress, matching the existing "Checkout this commit" pattern.
+- Rebase items are now also correctly disabled during a cherry-pick or revert in progress (previously the click would fall through and fail at the git layer with "another git operation is already in progress").
+
 ## [4.0.0] - pre-release - 2026-05-10
 
 ### Added

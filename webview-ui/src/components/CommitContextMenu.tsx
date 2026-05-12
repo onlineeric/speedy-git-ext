@@ -113,7 +113,10 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
     ? reachability.isReachableFromHead(commit.hash, currentLocalBranch.hash)
     : false;
 
-  const canRebase = !isHeadCommit && !rebaseInProgress && !loading && !!currentLocalBranch;
+  // Rebase is applicable when there's a current branch and we're not already at this commit.
+  // Transient busy states (loading/rebase/cherry-pick/revert in progress) only *disable* the
+  // item — we keep it visible so the user can see the option exists.
+  const canRebase = !isHeadCommit && !!currentLocalBranch;
   const canRevert = !isRootCommit && !isStashPseudoCommit(commit);
   const canDrop = !isRootCommit && !isMergeCommit && !isStashPseudoCommit(commit) && isCommitOnCurrentBranch;
 
@@ -320,13 +323,15 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
             {canRebase && (
               <>
                 <ContextMenu.Item
-                  className={menuItemClass}
+                  className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
+                  disabled={isOperationInProgress}
                   onSelect={() => setRebaseOntoConfirmOpen(true)}
                 >
                   Rebase Current Branch onto This Commit
                 </ContextMenu.Item>
                 <ContextMenu.Item
-                  className={menuItemClass}
+                  className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
+                  disabled={isOperationInProgress}
                   onSelect={handleStartInteractiveRebase}
                 >
                   Start Interactive Rebase from Here
