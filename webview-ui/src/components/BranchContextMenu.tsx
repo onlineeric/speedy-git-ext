@@ -29,6 +29,8 @@ interface BranchContextMenuProps {
 
 const menuItemClass =
   'px-3 py-1.5 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
+const menuItemDisabledClass =
+  'px-3 py-1.5 text-sm text-[var(--vscode-disabledForeground)] cursor-not-allowed outline-none';
 const dangerItemClass =
   'px-3 py-1.5 text-sm text-[var(--vscode-errorForeground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
 
@@ -62,8 +64,12 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
   const branches = useGraphStore((s) => s.branches);
 
   const rebaseInProgress = useGraphStore((s) => s.rebaseInProgress);
+  const cherryPickInProgress = useGraphStore((s) => s.cherryPickInProgress);
+  const revertInProgress = useGraphStore((s) => s.revertInProgress);
   const pendingCheckout = useGraphStore((s) => s.pendingCheckout);
   const pendingForceDeleteBranch = useGraphStore((s) => s.pendingForceDeleteBranch);
+
+  const isOperationInProgress = loading || rebaseInProgress || cherryPickInProgress || revertInProgress;
 
   const displayName = refInfo.remote
     ? `${refInfo.remote}/${refInfo.name}`
@@ -122,13 +128,15 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
     rpcClient.copyToClipboard(displayName);
   };
 
-  // Standard rebase: show for non-current branches that aren't on the HEAD commit
+  // Standard rebase: applicable for non-current branches that aren't on the HEAD commit.
+  // Transient busy states (loading/rebase/cherry-pick/revert in progress) only *disable* the
+  // item — we keep it visible so the user can see the option exists. Hiding on `loading` was
+  // causing the menu item to disappear during the brief getCommits refresh that any filter
+  // change triggers, which read as an intermittent bug.
   const targetBranch = branches.find((b) => b.name === refInfo.name && b.remote === refInfo.remote);
   const targetHash = targetBranch?.hash;
   const canRebaseOnto =
     !isCurrentBranch &&
-    !rebaseInProgress &&
-    !loading &&
     isBranch &&
     !!targetHash &&
     !!headBranch &&
@@ -189,9 +197,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                 </ContextMenu.Item>
                 {aSetForCompare && (
                   <ContextMenu.Item
-                    className={sameAsACompare
-                      ? 'px-3 py-1.5 text-sm text-[var(--vscode-disabledForeground)] cursor-not-allowed outline-none'
-                      : menuItemClass}
+                    className={sameAsACompare ? menuItemDisabledClass : menuItemClass}
                     disabled={sameAsACompare}
                     onSelect={handleCompareWithBaseRef}
                   >
@@ -210,7 +216,8 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
 
             {canRebaseOnto && (
               <ContextMenu.Item
-                className={menuItemClass}
+                className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
+                disabled={isOperationInProgress}
                 onSelect={() => setRebaseConfirmOpen(true)}
               >
                 Rebase Current Branch onto This
