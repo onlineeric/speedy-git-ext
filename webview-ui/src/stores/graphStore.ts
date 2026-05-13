@@ -957,7 +957,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         modeOverride: kindChanged ? null : state.compareSelection.modeOverride,
         recents,
       },
-      compareResult: null,
       comparePanelUI: { ...state.comparePanelUI, inlineError: null },
     };
   }),
@@ -975,7 +974,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         modeOverride: kindChanged ? null : state.compareSelection.modeOverride,
         recents,
       },
-      compareResult: null,
       comparePanelUI: { ...state.comparePanelUI, inlineError: null },
     };
   }),
@@ -987,12 +985,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       aResolvedHash: state.compareSelection.bResolvedHash,
       bResolvedHash: state.compareSelection.aResolvedHash,
     },
-    compareResult: null,
     comparePanelUI: { ...state.comparePanelUI, inlineError: null },
   })),
   setCompareModeOverride: (mode) => set((state) => ({
     compareSelection: { ...state.compareSelection, modeOverride: mode },
-    compareResult: null,
   })),
   clearCompareState: () => set({
     compareSelection: { ...EMPTY_COMPARE_SELECTION, recents: [] },
