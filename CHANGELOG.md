@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - Compare panel option changes no longer dismiss the currently displayed compare result in the Commit Details panel. Changing Base, Target, 2-dot / 3-dot mode, or swapping slots now updates only the compare-panel draft state; the details panel updates only when clicking **Compare** or **Reset**.
+- Fetch from remote no longer stays disabled after closing and reopening the extension panel. The panel lifecycle now resets the initial-load state correctly, and incoming initial data always clears the webview loading flag so users do not need to restart the IDE to recover.
 
 ## [4.0.1] - 2026-05-12
 

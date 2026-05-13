@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useGraphStore } from '../graphStore';
 import type { Commit } from '@shared/types';
+import type { InitialDataPayload } from '@shared/messages';
 
 const makeCommit = (hash: string): Commit => ({
   hash,
@@ -11,6 +12,30 @@ const makeCommit = (hash: string): Commit => ({
   authorDate: 1000000,
   subject: `Commit ${hash}`,
   refs: [],
+});
+
+const makeInitialDataPayload = (commits: Commit[]): InitialDataPayload => ({
+  commits,
+  totalLoadedWithoutFilter: commits.length,
+  hasMore: false,
+  branches: [],
+  stashes: [],
+  uncommittedChanges: {
+    stagedFiles: [],
+    unstagedFiles: [],
+    conflictFiles: [],
+    stagedCount: 0,
+    unstagedCount: 0,
+    untrackedCount: 0,
+  },
+  remotes: [],
+  authors: [],
+  worktrees: [],
+  cherryPickState: 'idle',
+  rebaseState: 'idle',
+  rebaseConflictInfo: null,
+  revertState: 'idle',
+  errors: [],
 });
 
 describe('graphStore — setCommits', () => {
@@ -41,6 +66,24 @@ describe('graphStore — setCommits', () => {
     useGraphStore.setState({ totalLoadedWithoutFilter: 100 });
     useGraphStore.getState().setCommits([]);
     expect(useGraphStore.getState().totalLoadedWithoutFilter).toBeNull();
+  });
+});
+
+describe('graphStore — setInitialData', () => {
+  beforeEach(() => {
+    useGraphStore.setState({
+      commits: [],
+      branches: [],
+      loading: true,
+      isRefreshing: true,
+    });
+  });
+
+  it('clears loading when initial data arrives', () => {
+    useGraphStore.getState().setInitialData(makeInitialDataPayload([makeCommit('abc1234')]));
+
+    expect(useGraphStore.getState().loading).toBe(false);
+    expect(useGraphStore.getState().isRefreshing).toBe(false);
   });
 });
 

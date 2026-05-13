@@ -906,6 +906,14 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       topology,
       hiddenCommitHashes,
       hasMore: payload.hasMore,
+      loading: false,
+      ...(state.pendingUserSettings
+        ? {
+            userSettings: state.pendingUserSettings,
+            pendingUserSettings: undefined,
+            filters: { ...state.filters, maxCount: state.pendingUserSettings.batchCommitSize },
+          }
+        : {}),
       isRefreshing: false,
       // Reset pagination state when new commits arrive
       ...(payload.commits !== null ? {
