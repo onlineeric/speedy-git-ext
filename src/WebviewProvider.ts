@@ -516,6 +516,10 @@ export class WebviewProvider {
     this.panel.onDidDispose(() => {
       this.panel = undefined;
       this.isPanelVisible = false;
+      // The React webview state is recreated on the next panel open. Treat that
+      // next open as an initial load too so it receives the matching loading
+      // lifecycle messages instead of inheriting this provider's old flag.
+      this.initialLoadSent = false;
       // Submodule selection is not persisted across panel reloads (FR-008a),
       // so on dispose, drop any submodule-display context and rebind services
       // to the workspace's active parent. Without this, a panel reopen after

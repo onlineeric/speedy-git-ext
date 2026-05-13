@@ -83,10 +83,16 @@ describe('graphStore compare actions', () => {
     expect(sel.recents[0]).toEqual({ kind: 'branch', name: 'main' });
   });
 
-  it('setSlotA dismisses any showing compareResult', () => {
+  it('setSlotA preserves any showing compareResult', () => {
     useGraphStore.setState({ compareResult: FAKE_RESULT });
     useGraphStore.getState().setSlotA({ kind: 'branch', name: 'main' });
-    expect(useGraphStore.getState().compareResult).toBeNull();
+    expect(useGraphStore.getState().compareResult).toEqual(FAKE_RESULT);
+  });
+
+  it('setSlotB preserves any showing compareResult', () => {
+    useGraphStore.setState({ compareResult: FAKE_RESULT });
+    useGraphStore.getState().setSlotB({ kind: 'branch', name: 'feat' });
+    expect(useGraphStore.getState().compareResult).toEqual(FAKE_RESULT);
   });
 
   it('setSlotA clears modeOverride when slot kind changes', () => {
@@ -104,7 +110,7 @@ describe('graphStore compare actions', () => {
     expect(useGraphStore.getState().compareSelection.modeOverride).toBe('two-dot');
   });
 
-  it('swapSlots exchanges values and resolved hashes; clears compareResult', () => {
+  it('swapSlots exchanges values and resolved hashes while preserving compareResult', () => {
     useGraphStore.getState().setSlotA({ kind: 'branch', name: 'main' });
     useGraphStore.getState().setSlotB({ kind: 'branch', name: 'feat' });
     useGraphStore.setState((s) => ({
@@ -117,7 +123,13 @@ describe('graphStore compare actions', () => {
     expect(sel.b).toEqual({ kind: 'branch', name: 'main' });
     expect(sel.aResolvedHash).toBe('bbb');
     expect(sel.bResolvedHash).toBe('aaa');
-    expect(useGraphStore.getState().compareResult).toBeNull();
+    expect(useGraphStore.getState().compareResult).toEqual(FAKE_RESULT);
+  });
+
+  it('setCompareModeOverride preserves any showing compareResult', () => {
+    useGraphStore.setState({ compareResult: FAKE_RESULT });
+    useGraphStore.getState().setCompareModeOverride('three-dot');
+    expect(useGraphStore.getState().compareResult).toEqual(FAKE_RESULT);
   });
 
   it('clearCompareState resets to EMPTY', () => {
