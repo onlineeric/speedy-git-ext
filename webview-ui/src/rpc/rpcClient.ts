@@ -342,8 +342,8 @@ class RpcClient {
   }
 
   // Branch ops
-  createBranch(name: string, startPoint?: string) {
-    this.send({ type: 'createBranch', payload: { name, startPoint } });
+  createBranch(name: string, startPoint?: string, checkout?: boolean) {
+    this.send({ type: 'createBranch', payload: { name, startPoint, checkout } });
   }
 
   renameBranch(oldName: string, newName: string) {

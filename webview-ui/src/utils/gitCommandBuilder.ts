@@ -194,6 +194,20 @@ export function buildRenameBranchCommand(options: RenameBranchCommandOptions): s
   return `git branch -m ${options.oldName} ${options.newName}`;
 }
 
+export interface CreateBranchCommandOptions {
+  name: string;
+  startPoint: string;
+  checkout: boolean;
+}
+
+export function buildCreateBranchCommand(options: CreateBranchCommandOptions): string {
+  const { name, startPoint, checkout } = options;
+  if (checkout) {
+    return `git branch ${name} ${startPoint} && git checkout ${name}`;
+  }
+  return `git branch ${name} ${startPoint}`;
+}
+
 function quoteMessage(message: string): string {
   return `"${message.replace(/"/g, '\\"')}"`;
 }

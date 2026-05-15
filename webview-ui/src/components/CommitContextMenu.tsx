@@ -7,7 +7,7 @@ import { buildResetCommand } from '../utils/gitCommandBuilder';
 import { ensureComparePanelOpen, setSlotsAndCompare } from '../utils/compareDispatch';
 import { slotsEqual } from '../utils/compareSlot';
 import { ConfirmDialog } from './ConfirmDialog';
-import { InputDialog } from './InputDialog';
+import { CreateBranchDialog } from './CreateBranchDialog';
 import { TagCreationDialog } from './TagCreationDialog';
 import { CherryPickDialog } from './CherryPickDialog';
 import { InteractiveRebaseDialog } from './InteractiveRebaseDialog';
@@ -427,17 +427,10 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
         description={`Checkout commit ${commit.abbreviatedHash} will result in detached HEAD. Continue?`}
       />
 
-      <InputDialog
+      <CreateBranchDialog
         open={createBranchOpen}
-        onSubmit={(name) => {
-          setCreateBranchOpen(false);
-          rpcClient.createBranch(name, commit.hash);
-        }}
-        onCancel={() => setCreateBranchOpen(false)}
-        title="Create Branch"
-        label="Branch name"
-        placeholder="feature/my-branch"
-        validate={(value) => value.startsWith('-') ? 'Branch name cannot start with -' : undefined}
+        commit={commit}
+        onClose={() => setCreateBranchOpen(false)}
       />
 
       <TagCreationDialog

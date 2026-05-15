@@ -16,6 +16,7 @@ import {
   buildStashAndCheckoutCommand,
   buildRenameBranchCommand,
   buildFastForwardLocalBranchCommand,
+  buildCreateBranchCommand,
 } from '../gitCommandBuilder';
 
 describe('buildPushCommand', () => {
@@ -235,6 +236,18 @@ describe('buildRenameBranchCommand', () => {
   it('builds rename branch command', () => {
     expect(buildRenameBranchCommand({ oldName: 'old-branch', newName: 'new-branch' }))
       .toBe('git branch -m old-branch new-branch');
+  });
+});
+
+describe('buildCreateBranchCommand', () => {
+  it('builds create branch command without checkout', () => {
+    expect(buildCreateBranchCommand({ name: 'feature/foo', startPoint: 'abc123', checkout: false }))
+      .toBe('git branch feature/foo abc123');
+  });
+
+  it('appends checkout when checkout is true', () => {
+    expect(buildCreateBranchCommand({ name: 'feature/foo', startPoint: 'abc123', checkout: true }))
+      .toBe('git branch feature/foo abc123 && git checkout feature/foo');
   });
 });
 

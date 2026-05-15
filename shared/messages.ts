@@ -42,7 +42,7 @@ export type RequestMessage =
   | { type: 'openFile'; payload: { hash: string; filePath: string } }
   | { type: 'refresh'; payload: { filters?: Partial<GraphFilters> } }
   // Branch ops
-  | { type: 'createBranch'; payload: { name: string; startPoint?: string } }
+  | { type: 'createBranch'; payload: { name: string; startPoint?: string; checkout?: boolean } }
   | { type: 'renameBranch'; payload: { oldName: string; newName: string } }
   | { type: 'deleteBranch'; payload: { name: string; force?: boolean; deleteRemote?: { remote: string; name: string } } }
   | { type: 'deleteRemoteBranch'; payload: { remote: string; name: string } }

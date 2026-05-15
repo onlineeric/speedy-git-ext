@@ -4,6 +4,13 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.1.0] - 2026-05-15
+
+### Added
+- "Create Branch Here..." dialog now includes a **Checkout this branch after creating** checkbox (off by default), so a new branch can be created and switched to in a single step.
+- Live `git` command preview in the Create Branch dialog showing either `git branch <name> <hash>` or `git branch <name> <hash> && git checkout <name>` depending on the checkbox state, matching the preview pattern used by other dialogs.
+- When the checkout step fails after a successful branch creation (e.g., uncommitted changes would be overwritten), the branch is still kept and the git error message is surfaced through the standard error notification, so the user can resolve the working-tree state and check it out manually.
+
 ## [4.0.2] - 2026-05-13
 
 ### Fixed
