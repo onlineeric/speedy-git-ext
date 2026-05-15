@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - "Create Branch Here..." dialog now includes a **Checkout this branch after creating** checkbox (off by default), so a new branch can be created and switched to in a single step.
 - Live `git` command preview in the Create Branch dialog showing either `git branch <name> <hash>` or `git branch <name> <hash> && git checkout <name>` depending on the checkbox state, matching the preview pattern used by other dialogs.
 - When the checkout step fails after a successful branch creation (e.g., uncommitted changes would be overwritten), the branch is still kept and the git error message is surfaced through the standard error notification, so the user can resolve the working-tree state and check it out manually.
+- "Fast-forward Local Branch from Remote" right-click menu now also appears on **remote-only** branch badges — selecting it creates a local branch from the remote tip and sets the remote as its upstream, all without checkout (no working-tree or current-branch side effects).
+- Fast-forward operation now also sets upstream tracking (`git branch --set-upstream-to=<remote>/<branch> <branch>`) after the fetch, so a newly created local branch is immediately wired up to its remote counterpart; idempotent when tracking is already correct.
+- Dialog copy adapts to context — when the local branch already exists the description says "Update local branch …", and when it will be newly created it says "Create local branch … from <remote>/<branch> and set it as the upstream".
+
+### Changed
+- Fast-forward menu visibility now uses commit-hash matching instead of name-only: the menu shows on local-only and remote-only badges and on visually separate local/remote pairs that point to different commits (where a fast-forward is meaningful), and is hidden on truly merged badges (local and remote at the same commit) where it would be a no-op.
 
 ## [4.0.2] - 2026-05-13
 

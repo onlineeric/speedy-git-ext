@@ -42,7 +42,7 @@ describe('GitBranchService.deleteBranch', () => {
 });
 
 describe('GitBranchService.fastForwardFromRemote', () => {
-  it('runs `git fetch <remote> <branch>:<branch>` with the 60s timeout and returns success', async () => {
+  it('runs `git fetch <remote> <branch>:<branch>` with the 60s timeout, then sets upstream, and returns success', async () => {
     const service = new GitBranchService('/repo', mockLog);
     const executeSpy = vi.spyOn(service['executor'], 'execute').mockResolvedValue({
       success: true,
@@ -53,10 +53,14 @@ describe('GitBranchService.fastForwardFromRemote', () => {
 
     expect(result.success).toBe(true);
     if (result.success) expect(result.value).toBe('Fast-forward completed');
-    expect(executeSpy).toHaveBeenCalledWith({
+    expect(executeSpy).toHaveBeenNthCalledWith(1, {
       args: ['fetch', 'origin', 'feature-x:feature-x'],
       cwd: '/repo',
       timeout: 60000,
+    });
+    expect(executeSpy).toHaveBeenNthCalledWith(2, {
+      args: ['branch', '--set-upstream-to=origin/feature-x', 'feature-x'],
+      cwd: '/repo',
     });
   });
 
@@ -69,9 +73,54 @@ describe('GitBranchService.fastForwardFromRemote', () => {
 
     await service.fastForwardFromRemote('origin', 'release/1.2.x');
 
-    expect(executeSpy).toHaveBeenCalledWith(
+    expect(executeSpy).toHaveBeenNthCalledWith(1,
       expect.objectContaining({ args: ['fetch', 'origin', 'release/1.2.x:release/1.2.x'] })
     );
+    expect(executeSpy).toHaveBeenNthCalledWith(2,
+      expect.objectContaining({ args: ['branch', '--set-upstream-to=origin/release/1.2.x', 'release/1.2.x'] })
+    );
+  });
+
+  it('does not attempt to set upstream when the fetch fails', async () => {
+    const service = new GitBranchService('/repo', mockLog);
+    const { GitError } = await import('../../shared/errors.js');
+
+    const executeSpy = vi.spyOn(service['executor'], 'execute').mockResolvedValueOnce({
+      success: false,
+      error: new GitError(
+        'Git command failed with code 1',
+        'COMMAND_FAILED',
+        'git fetch origin missing:missing',
+        "fatal: couldn't find remote ref missing"
+      ),
+    });
+
+    const result = await service.fastForwardFromRemote('origin', 'missing');
+
+    expect(result.success).toBe(false);
+    expect(executeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces failures from the set-upstream step', async () => {
+    const service = new GitBranchService('/repo', mockLog);
+    const { GitError } = await import('../../shared/errors.js');
+
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
+      .mockResolvedValueOnce({
+        success: false,
+        error: new GitError(
+          'Git command failed with code 1',
+          'COMMAND_FAILED',
+          'git branch --set-upstream-to=origin/feature-x feature-x',
+          "error: the requested upstream branch 'origin/feature-x' does not exist"
+        ),
+      });
+
+    const result = await service.fastForwardFromRemote('origin', 'feature-x');
+
+    expect(result.success).toBe(false);
+    expect(executeSpy).toHaveBeenCalledTimes(2);
   });
 
   it('rejects shell-metachar remote names without invoking the executor', async () => {

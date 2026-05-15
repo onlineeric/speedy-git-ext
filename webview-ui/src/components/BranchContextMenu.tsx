@@ -111,6 +111,24 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
 
   const checkoutState = useMemo(() => getBranchCheckoutState(refInfo, branches), [refInfo, branches]);
 
+  // A badge is "merged" when its local and remote counterparts share the same commit hash —
+  // visually rendered as a single combined badge by mergeRefs. Fast-forward is meaningless in
+  // that case, so the menu item is hidden. When local and remote exist but point to different
+  // commits, mergeRefs renders them as separate badges and the menu should appear on both.
+  const isMergedBadge = useMemo(() => {
+    if (refInfo.type === 'branch') {
+      const local = branches.find((b) => !b.remote && b.name === refInfo.name);
+      const remote = branches.find((b) => b.remote && b.name === refInfo.name);
+      return !!local && !!remote && local.hash === remote.hash;
+    }
+    if (refInfo.type === 'remote' && refInfo.remote) {
+      const remote = branches.find((b) => b.remote === refInfo.remote && b.name === refInfo.name);
+      const local = branches.find((b) => !b.remote && b.name === refInfo.name);
+      return !!remote && !!local && remote.hash === local.hash;
+    }
+    return false;
+  }, [refInfo, branches]);
+
   const handleCheckout = () => {
     if (checkoutState === 'dual') {
       // Local branch with remote counterpart (or remote badge with local counterpart): show pull dialog
@@ -158,7 +176,11 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
     return buildStashAndCheckoutCommand({ branch: pendingCheckout.name, pull: pendingCheckout.pull ?? false });
   }, [pendingCheckout]);
 
-  const fastForwardRemote = useMemo(() => resolveDefaultRemote(branches), [branches]);
+  // For remote-only badges, use the badge's own remote; otherwise auto-pick the default remote.
+  const fastForwardRemote = useMemo(
+    () => (isRemoteBranch && refInfo.remote ? refInfo.remote : resolveDefaultRemote(branches)),
+    [isRemoteBranch, refInfo.remote, branches],
+  );
   const fastForwardPreview = useMemo(
     () => buildFastForwardLocalBranchCommand({ remote: fastForwardRemote, branch: refInfo.name }),
     [fastForwardRemote, refInfo.name],
@@ -237,7 +259,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                 <ContextMenu.Item className={menuItemClass} onSelect={() => setPushDialogOpen(true)}>
                   Push Branch
                 </ContextMenu.Item>
-                {!isCurrentBranch && (
+                {!isCurrentBranch && !isMergedBadge && (
                   <ContextMenu.Item
                     className={menuItemClass}
                     onSelect={() => setFastForwardOpen(true)}
@@ -268,6 +290,15 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
 
             {isRemoteBranch && refInfo.remote && (
               <>
+                {!isMergedBadge && (
+                  <ContextMenu.Item
+                    className={menuItemClass}
+                    onSelect={() => setFastForwardOpen(true)}
+                    disabled={loading || rebaseInProgress}
+                  >
+                    Fast-forward Local Branch from Remote
+                  </ContextMenu.Item>
+                )}
                 <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
                 <ContextMenu.Item className={dangerItemClass} onSelect={() => setDeleteConfirmOpen(true)}>
                   Delete Remote Branch
@@ -402,7 +433,9 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         onCancel={() => setCheckoutWithPullOpen(false)}
       />
 
-      {/* Fast-forward local branch from remote (no checkout) */}
+      {/* Fast-forward local branch from remote (no checkout).
+         Shared between two entry points: from a local/dual branch badge (local exists, fast-forward it),
+         and from a remote-only branch badge (local does not yet exist, create it from remote tip). */}
       <ConfirmDialog
         open={fastForwardOpen}
         onConfirm={() => {
@@ -411,7 +444,11 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         }}
         onCancel={() => setFastForwardOpen(false)}
         title="Fast-forward Local Branch from Remote"
-        description={`Update local branch '${refInfo.name}' to match remote branch without checkout. Your current branch and working tree are not affected.`}
+        description={
+          checkoutState === 'remote-only'
+            ? `Create local branch '${refInfo.name}' from '${fastForwardRemote}/${refInfo.name}' and set it as the upstream, without checkout. Your current branch and working tree are not affected.`
+            : `Update local branch '${refInfo.name}' to match remote branch without checkout. Your current branch and working tree are not affected.`
+        }
         confirmLabel="Fast-forward"
         variant="warning"
         commandPreview={fastForwardPreview}

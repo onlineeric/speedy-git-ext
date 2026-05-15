@@ -115,14 +115,25 @@ export class GitBranchService {
     const branchCheck = validateRefName(branch);
     if (!branchCheck.success) return branchCheck;
 
-    const result = await this.executor.execute({
+    const fetchResult = await this.executor.execute({
       args: ['fetch', remote, `${branch}:${branch}`],
       cwd: this.workspacePath,
       timeout: 60000,
     });
 
-    if (!result.success) {
-      return result;
+    if (!fetchResult.success) {
+      return fetchResult;
+    }
+
+    // After the fetch succeeds, refs/remotes/<remote>/<branch> is guaranteed to exist,
+    // so setting upstream tracking is safe. Idempotent when upstream already matches.
+    const upstreamResult = await this.executor.execute({
+      args: ['branch', `--set-upstream-to=${remote}/${branch}`, branch],
+      cwd: this.workspacePath,
+    });
+
+    if (!upstreamResult.success) {
+      return upstreamResult;
     }
 
     return ok('Fast-forward completed');
