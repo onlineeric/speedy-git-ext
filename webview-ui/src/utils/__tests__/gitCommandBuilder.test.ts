@@ -266,4 +266,14 @@ describe('buildFastForwardLocalBranchCommand', () => {
     expect(buildFastForwardLocalBranchCommand({ remote: 'upstream', branch: 'main' }))
       .toBe('git fetch upstream main:main');
   });
+
+  it('appends set-upstream when setUpstream is true', () => {
+    expect(buildFastForwardLocalBranchCommand({ remote: 'origin', branch: 'dev', setUpstream: true }))
+      .toBe('git fetch origin dev:dev && git branch --set-upstream-to=origin/dev dev');
+  });
+
+  it('omits set-upstream when setUpstream is false', () => {
+    expect(buildFastForwardLocalBranchCommand({ remote: 'origin', branch: 'dev', setUpstream: false }))
+      .toBe('git fetch origin dev:dev');
+  });
 });

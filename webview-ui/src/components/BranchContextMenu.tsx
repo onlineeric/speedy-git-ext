@@ -181,9 +181,13 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
     () => (isRemoteBranch && refInfo.remote ? refInfo.remote : resolveDefaultRemote(branches)),
     [isRemoteBranch, refInfo.remote, branches],
   );
+  // Only wire up upstream tracking on the remote-only-badge path, where a new
+  // local branch is being created and has no pre-existing upstream config.
+  // For established local branches, leave any user-configured upstream alone.
+  const fastForwardSetUpstream = checkoutState === 'remote-only';
   const fastForwardPreview = useMemo(
-    () => buildFastForwardLocalBranchCommand({ remote: fastForwardRemote, branch: refInfo.name }),
-    [fastForwardRemote, refInfo.name],
+    () => buildFastForwardLocalBranchCommand({ remote: fastForwardRemote, branch: refInfo.name, setUpstream: fastForwardSetUpstream }),
+    [fastForwardRemote, refInfo.name, fastForwardSetUpstream],
   );
 
   const handleRebaseConfirm = (ignoreDate: boolean) => {
@@ -440,7 +444,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         open={fastForwardOpen}
         onConfirm={() => {
           setFastForwardOpen(false);
-          rpcClient.fastForwardLocalBranch(fastForwardRemote, refInfo.name);
+          rpcClient.fastForwardLocalBranch(fastForwardRemote, refInfo.name, fastForwardSetUpstream);
         }}
         onCancel={() => setFastForwardOpen(false)}
         title="Fast-forward Local Branch from Remote"

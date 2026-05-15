@@ -48,6 +48,7 @@ export interface CheckoutCommandOptions {
 export interface FastForwardLocalBranchCommandOptions {
   remote: string;
   branch: string;
+  setUpstream?: boolean;
 }
 
 export interface TagCommandOptions {
@@ -67,7 +68,11 @@ export function buildPushCommand(options: PushCommandOptions): string {
 }
 
 export function buildFastForwardLocalBranchCommand(options: FastForwardLocalBranchCommandOptions): string {
-  return `git fetch ${options.remote} ${options.branch}:${options.branch}`;
+  const fetchCmd = `git fetch ${options.remote} ${options.branch}:${options.branch}`;
+  if (options.setUpstream) {
+    return `${fetchCmd} && git branch --set-upstream-to=${options.remote}/${options.branch} ${options.branch}`;
+  }
+  return fetchCmd;
 }
 
 export function buildMergeCommand(options: MergeCommandOptions): string {

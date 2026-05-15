@@ -42,7 +42,7 @@ describe('GitBranchService.deleteBranch', () => {
 });
 
 describe('GitBranchService.fastForwardFromRemote', () => {
-  it('runs `git fetch <remote> <branch>:<branch>` with the 60s timeout, then sets upstream, and returns success', async () => {
+  it('runs only `git fetch <remote> <branch>:<branch>` with the 60s timeout when setUpstream is not requested', async () => {
     const service = new GitBranchService('/repo', mockLog);
     const executeSpy = vi.spyOn(service['executor'], 'execute').mockResolvedValue({
       success: true,
@@ -53,6 +53,25 @@ describe('GitBranchService.fastForwardFromRemote', () => {
 
     expect(result.success).toBe(true);
     if (result.success) expect(result.value).toBe('Fast-forward completed');
+    expect(executeSpy).toHaveBeenCalledTimes(1);
+    expect(executeSpy).toHaveBeenNthCalledWith(1, {
+      args: ['fetch', 'origin', 'feature-x:feature-x'],
+      cwd: '/repo',
+      timeout: 60000,
+    });
+  });
+
+  it('also sets upstream when setUpstream=true (new-branch-from-remote-only-badge path)', async () => {
+    const service = new GitBranchService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: { stdout: '', stderr: '' },
+    });
+
+    const result = await service.fastForwardFromRemote('origin', 'feature-x', true);
+
+    expect(result.success).toBe(true);
+    expect(executeSpy).toHaveBeenCalledTimes(2);
     expect(executeSpy).toHaveBeenNthCalledWith(1, {
       args: ['fetch', 'origin', 'feature-x:feature-x'],
       cwd: '/repo',
@@ -71,7 +90,7 @@ describe('GitBranchService.fastForwardFromRemote', () => {
       value: { stdout: '', stderr: '' },
     });
 
-    await service.fastForwardFromRemote('origin', 'release/1.2.x');
+    await service.fastForwardFromRemote('origin', 'release/1.2.x', true);
 
     expect(executeSpy).toHaveBeenNthCalledWith(1,
       expect.objectContaining({ args: ['fetch', 'origin', 'release/1.2.x:release/1.2.x'] })
@@ -95,13 +114,13 @@ describe('GitBranchService.fastForwardFromRemote', () => {
       ),
     });
 
-    const result = await service.fastForwardFromRemote('origin', 'missing');
+    const result = await service.fastForwardFromRemote('origin', 'missing', true);
 
     expect(result.success).toBe(false);
     expect(executeSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('surfaces failures from the set-upstream step', async () => {
+  it('surfaces failures from the set-upstream step when setUpstream=true', async () => {
     const service = new GitBranchService('/repo', mockLog);
     const { GitError } = await import('../../shared/errors.js');
 
@@ -117,7 +136,7 @@ describe('GitBranchService.fastForwardFromRemote', () => {
         ),
       });
 
-    const result = await service.fastForwardFromRemote('origin', 'feature-x');
+    const result = await service.fastForwardFromRemote('origin', 'feature-x', true);
 
     expect(result.success).toBe(false);
     expect(executeSpy).toHaveBeenCalledTimes(2);

@@ -50,7 +50,7 @@ export type RequestMessage =
   // Remote ops
   | { type: 'push'; payload: { remote: string; branch: string; setUpstream?: boolean; forceMode?: PushForceMode } }
   | { type: 'pull'; payload: { remote?: string; branch?: string; rebase?: boolean } }
-  | { type: 'fastForwardLocalBranch'; payload: { remote: string; branch: string } }
+  | { type: 'fastForwardLocalBranch'; payload: { remote: string; branch: string; setUpstream?: boolean } }
   | { type: 'getRemotes'; payload: Record<string, never> }
   | { type: 'addRemote'; payload: { name: string; url: string } }
   | { type: 'removeRemote'; payload: { name: string } }

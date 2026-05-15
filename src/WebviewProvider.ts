@@ -1033,7 +1033,8 @@ export class WebviewProvider {
       case 'fastForwardLocalBranch': {
         const result = await this.gitBranchService.fastForwardFromRemote(
           message.payload.remote,
-          message.payload.branch
+          message.payload.branch,
+          message.payload.setUpstream
         );
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
