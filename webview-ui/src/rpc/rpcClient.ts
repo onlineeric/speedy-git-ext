@@ -300,8 +300,8 @@ class RpcClient {
     this.send({ type: 'fetch', payload: { remote, prune, filters } });
   }
 
-  fastForwardLocalBranch(remote: string, branch: string) {
-    this.send({ type: 'fastForwardLocalBranch', payload: { remote, branch } });
+  fastForwardLocalBranch(remote: string, branch: string, setUpstream?: boolean) {
+    this.send({ type: 'fastForwardLocalBranch', payload: { remote, branch, setUpstream } });
   }
 
   copyToClipboard(text: string) {
@@ -342,8 +342,8 @@ class RpcClient {
   }
 
   // Branch ops
-  createBranch(name: string, startPoint?: string) {
-    this.send({ type: 'createBranch', payload: { name, startPoint } });
+  createBranch(name: string, startPoint?: string, checkout?: boolean) {
+    this.send({ type: 'createBranch', payload: { name, startPoint, checkout } });
   }
 
   renameBranch(oldName: string, newName: string) {

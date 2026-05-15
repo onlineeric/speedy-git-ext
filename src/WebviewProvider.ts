@@ -1033,7 +1033,8 @@ export class WebviewProvider {
       case 'fastForwardLocalBranch': {
         const result = await this.gitBranchService.fastForwardFromRemote(
           message.payload.remote,
-          message.payload.branch
+          message.payload.branch,
+          message.payload.setUpstream
         );
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
@@ -1113,12 +1114,33 @@ export class WebviewProvider {
           message.payload.name,
           message.payload.startPoint
         );
-        if (result.success) {
-          this.postMessage({ type: 'success', payload: { message: result.value } });
-          await this.sendInitialData();
-        } else {
+        if (!result.success) {
           this.postMessage({ type: 'error', payload: { error: result.error } });
+          break;
         }
+        if (message.payload.checkout) {
+          const checkoutResult = await this.gitBranchService.checkout(message.payload.name);
+          if (!checkoutResult.success) {
+            // Branch was created successfully — surface the checkout failure but
+            // keep the branch. The user can resolve the working-tree state and
+            // check it out manually.
+            this.postMessage({
+              type: 'error',
+              payload: {
+                error: {
+                  message: `Branch '${message.payload.name}' created, but checkout failed: ${checkoutResult.error.message}`,
+                },
+              },
+            });
+            await this.sendInitialData();
+            break;
+          }
+          this.postMessage({ type: 'success', payload: { message: checkoutResult.value } });
+          await this.sendInitialData();
+          break;
+        }
+        this.postMessage({ type: 'success', payload: { message: result.value } });
+        await this.sendInitialData();
         break;
       }
       case 'renameBranch': {

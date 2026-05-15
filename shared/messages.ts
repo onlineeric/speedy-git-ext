@@ -42,7 +42,7 @@ export type RequestMessage =
   | { type: 'openFile'; payload: { hash: string; filePath: string } }
   | { type: 'refresh'; payload: { filters?: Partial<GraphFilters> } }
   // Branch ops
-  | { type: 'createBranch'; payload: { name: string; startPoint?: string } }
+  | { type: 'createBranch'; payload: { name: string; startPoint?: string; checkout?: boolean } }
   | { type: 'renameBranch'; payload: { oldName: string; newName: string } }
   | { type: 'deleteBranch'; payload: { name: string; force?: boolean; deleteRemote?: { remote: string; name: string } } }
   | { type: 'deleteRemoteBranch'; payload: { remote: string; name: string } }
@@ -50,7 +50,7 @@ export type RequestMessage =
   // Remote ops
   | { type: 'push'; payload: { remote: string; branch: string; setUpstream?: boolean; forceMode?: PushForceMode } }
   | { type: 'pull'; payload: { remote?: string; branch?: string; rebase?: boolean } }
-  | { type: 'fastForwardLocalBranch'; payload: { remote: string; branch: string } }
+  | { type: 'fastForwardLocalBranch'; payload: { remote: string; branch: string; setUpstream?: boolean } }
   | { type: 'getRemotes'; payload: Record<string, never> }
   | { type: 'addRemote'; payload: { name: string; url: string } }
   | { type: 'removeRemote'; payload: { name: string } }

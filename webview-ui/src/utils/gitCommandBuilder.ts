@@ -48,6 +48,7 @@ export interface CheckoutCommandOptions {
 export interface FastForwardLocalBranchCommandOptions {
   remote: string;
   branch: string;
+  setUpstream?: boolean;
 }
 
 export interface TagCommandOptions {
@@ -67,7 +68,11 @@ export function buildPushCommand(options: PushCommandOptions): string {
 }
 
 export function buildFastForwardLocalBranchCommand(options: FastForwardLocalBranchCommandOptions): string {
-  return `git fetch ${options.remote} ${options.branch}:${options.branch}`;
+  const fetchCmd = `git fetch ${options.remote} ${options.branch}:${options.branch}`;
+  if (options.setUpstream) {
+    return `${fetchCmd} && git branch --set-upstream-to=${options.remote}/${options.branch} ${options.branch}`;
+  }
+  return fetchCmd;
 }
 
 export function buildMergeCommand(options: MergeCommandOptions): string {
@@ -192,6 +197,20 @@ export function buildStashAndCheckoutCommand(options: StashAndCheckoutCommandOpt
 
 export function buildRenameBranchCommand(options: RenameBranchCommandOptions): string {
   return `git branch -m ${options.oldName} ${options.newName}`;
+}
+
+export interface CreateBranchCommandOptions {
+  name: string;
+  startPoint: string;
+  checkout: boolean;
+}
+
+export function buildCreateBranchCommand(options: CreateBranchCommandOptions): string {
+  const { name, startPoint, checkout } = options;
+  if (checkout) {
+    return `git branch ${name} ${startPoint} && git checkout ${name}`;
+  }
+  return `git branch ${name} ${startPoint}`;
 }
 
 function quoteMessage(message: string): string {

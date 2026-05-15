@@ -42,7 +42,7 @@ describe('GitBranchService.deleteBranch', () => {
 });
 
 describe('GitBranchService.fastForwardFromRemote', () => {
-  it('runs `git fetch <remote> <branch>:<branch>` with the 60s timeout and returns success', async () => {
+  it('runs only `git fetch <remote> <branch>:<branch>` with the 60s timeout when setUpstream is not requested', async () => {
     const service = new GitBranchService('/repo', mockLog);
     const executeSpy = vi.spyOn(service['executor'], 'execute').mockResolvedValue({
       success: true,
@@ -53,10 +53,33 @@ describe('GitBranchService.fastForwardFromRemote', () => {
 
     expect(result.success).toBe(true);
     if (result.success) expect(result.value).toBe('Fast-forward completed');
-    expect(executeSpy).toHaveBeenCalledWith({
+    expect(executeSpy).toHaveBeenCalledTimes(1);
+    expect(executeSpy).toHaveBeenNthCalledWith(1, {
       args: ['fetch', 'origin', 'feature-x:feature-x'],
       cwd: '/repo',
       timeout: 60000,
+    });
+  });
+
+  it('also sets upstream when setUpstream=true (new-branch-from-remote-only-badge path)', async () => {
+    const service = new GitBranchService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: { stdout: '', stderr: '' },
+    });
+
+    const result = await service.fastForwardFromRemote('origin', 'feature-x', true);
+
+    expect(result.success).toBe(true);
+    expect(executeSpy).toHaveBeenCalledTimes(2);
+    expect(executeSpy).toHaveBeenNthCalledWith(1, {
+      args: ['fetch', 'origin', 'feature-x:feature-x'],
+      cwd: '/repo',
+      timeout: 60000,
+    });
+    expect(executeSpy).toHaveBeenNthCalledWith(2, {
+      args: ['branch', '--set-upstream-to=origin/feature-x', 'feature-x'],
+      cwd: '/repo',
     });
   });
 
@@ -67,11 +90,56 @@ describe('GitBranchService.fastForwardFromRemote', () => {
       value: { stdout: '', stderr: '' },
     });
 
-    await service.fastForwardFromRemote('origin', 'release/1.2.x');
+    await service.fastForwardFromRemote('origin', 'release/1.2.x', true);
 
-    expect(executeSpy).toHaveBeenCalledWith(
+    expect(executeSpy).toHaveBeenNthCalledWith(1,
       expect.objectContaining({ args: ['fetch', 'origin', 'release/1.2.x:release/1.2.x'] })
     );
+    expect(executeSpy).toHaveBeenNthCalledWith(2,
+      expect.objectContaining({ args: ['branch', '--set-upstream-to=origin/release/1.2.x', 'release/1.2.x'] })
+    );
+  });
+
+  it('does not attempt to set upstream when the fetch fails', async () => {
+    const service = new GitBranchService('/repo', mockLog);
+    const { GitError } = await import('../../shared/errors.js');
+
+    const executeSpy = vi.spyOn(service['executor'], 'execute').mockResolvedValueOnce({
+      success: false,
+      error: new GitError(
+        'Git command failed with code 1',
+        'COMMAND_FAILED',
+        'git fetch origin missing:missing',
+        "fatal: couldn't find remote ref missing"
+      ),
+    });
+
+    const result = await service.fastForwardFromRemote('origin', 'missing', true);
+
+    expect(result.success).toBe(false);
+    expect(executeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces failures from the set-upstream step when setUpstream=true', async () => {
+    const service = new GitBranchService('/repo', mockLog);
+    const { GitError } = await import('../../shared/errors.js');
+
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
+      .mockResolvedValueOnce({
+        success: false,
+        error: new GitError(
+          'Git command failed with code 1',
+          'COMMAND_FAILED',
+          'git branch --set-upstream-to=origin/feature-x feature-x',
+          "error: the requested upstream branch 'origin/feature-x' does not exist"
+        ),
+      });
+
+    const result = await service.fastForwardFromRemote('origin', 'feature-x', true);
+
+    expect(result.success).toBe(false);
+    expect(executeSpy).toHaveBeenCalledTimes(2);
   });
 
   it('rejects shell-metachar remote names without invoking the executor', async () => {

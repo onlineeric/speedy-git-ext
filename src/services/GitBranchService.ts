@@ -107,22 +107,37 @@ export class GitBranchService {
     return ok('Fetch completed');
   }
 
-  async fastForwardFromRemote(remote: string, branch: string): Promise<Result<string>> {
-    this.log.info(`Fast-forward local branch: ${remote}/${branch}`);
+  async fastForwardFromRemote(remote: string, branch: string, setUpstream?: boolean): Promise<Result<string>> {
+    this.log.info(`Fast-forward local branch: ${remote}/${branch}${setUpstream ? ' (set upstream)' : ''}`);
 
     const remoteCheck = validateRefName(remote);
     if (!remoteCheck.success) return remoteCheck;
     const branchCheck = validateRefName(branch);
     if (!branchCheck.success) return branchCheck;
 
-    const result = await this.executor.execute({
+    const fetchResult = await this.executor.execute({
       args: ['fetch', remote, `${branch}:${branch}`],
       cwd: this.workspacePath,
       timeout: 60000,
     });
 
-    if (!result.success) {
-      return result;
+    if (!fetchResult.success) {
+      return fetchResult;
+    }
+
+    // Only wire up upstream tracking when the caller asked for it (i.e. a new
+    // local branch was just created from a remote-only badge). Skipping this
+    // step on established branches preserves any pre-existing upstream config
+    // (e.g. a fork workflow where `feature-x` tracks `upstream/feature-x`).
+    if (setUpstream) {
+      const upstreamResult = await this.executor.execute({
+        args: ['branch', `--set-upstream-to=${remote}/${branch}`, branch],
+        cwd: this.workspacePath,
+      });
+
+      if (!upstreamResult.success) {
+        return upstreamResult;
+      }
     }
 
     return ok('Fast-forward completed');

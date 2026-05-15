@@ -16,6 +16,7 @@ import {
   buildStashAndCheckoutCommand,
   buildRenameBranchCommand,
   buildFastForwardLocalBranchCommand,
+  buildCreateBranchCommand,
 } from '../gitCommandBuilder';
 
 describe('buildPushCommand', () => {
@@ -238,6 +239,18 @@ describe('buildRenameBranchCommand', () => {
   });
 });
 
+describe('buildCreateBranchCommand', () => {
+  it('builds create branch command without checkout', () => {
+    expect(buildCreateBranchCommand({ name: 'feature/foo', startPoint: 'abc123', checkout: false }))
+      .toBe('git branch feature/foo abc123');
+  });
+
+  it('appends checkout when checkout is true', () => {
+    expect(buildCreateBranchCommand({ name: 'feature/foo', startPoint: 'abc123', checkout: true }))
+      .toBe('git branch feature/foo abc123 && git checkout feature/foo');
+  });
+});
+
 describe('buildFastForwardLocalBranchCommand', () => {
   it('builds the refspec form against origin', () => {
     expect(buildFastForwardLocalBranchCommand({ remote: 'origin', branch: 'dev' }))
@@ -252,5 +265,15 @@ describe('buildFastForwardLocalBranchCommand', () => {
   it('uses a non-default remote when provided', () => {
     expect(buildFastForwardLocalBranchCommand({ remote: 'upstream', branch: 'main' }))
       .toBe('git fetch upstream main:main');
+  });
+
+  it('appends set-upstream when setUpstream is true', () => {
+    expect(buildFastForwardLocalBranchCommand({ remote: 'origin', branch: 'dev', setUpstream: true }))
+      .toBe('git fetch origin dev:dev && git branch --set-upstream-to=origin/dev dev');
+  });
+
+  it('omits set-upstream when setUpstream is false', () => {
+    expect(buildFastForwardLocalBranchCommand({ remote: 'origin', branch: 'dev', setUpstream: false }))
+      .toBe('git fetch origin dev:dev');
   });
 });
