@@ -26,7 +26,7 @@ export const COMMIT_TABLE_MIN_WIDTHS: Record<CommitTableColumnId, number> = {
   hash: 72,
   message: 160,
   author: 120,
-  date: 120,
+  date: 140,
 };
 
 export const COMMIT_TABLE_OPTIONAL_COLUMN_IDS = COMMIT_TABLE_COLUMN_IDS.filter(
@@ -197,6 +197,17 @@ export function resolveCommitTableLayout({
     remainingDeficit = shrinkColumn(visibleColumns, columnId, remainingDeficit);
     if (remainingDeficit <= 0) {
       break;
+    }
+  }
+
+  // Surplus space: expand the message column so the table spans the panel.
+  if (containerWidth > 0) {
+    const surplus = availableWidth - preferredTableWidth;
+    if (surplus > 0) {
+      const message = visibleColumns.find((column) => column.id === 'message');
+      if (message) {
+        message.effectiveWidth += surplus;
+      }
     }
   }
 

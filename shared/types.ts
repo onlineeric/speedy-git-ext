@@ -248,7 +248,7 @@ export const DEFAULT_COMMIT_TABLE_COLUMN_PREFERENCES: Record<CommitTableColumnId
   hash: { visible: true, preferredWidth: 72 },
   message: { visible: true, preferredWidth: 400 },
   author: { visible: true, preferredWidth: 160 },
-  date: { visible: true, preferredWidth: 120 },
+  date: { visible: true, preferredWidth: 140 },
 };
 
 export function createDefaultCommitTableLayout(): CommitTableLayout {

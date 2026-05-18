@@ -201,7 +201,7 @@ export const CommitRow = memo(function CommitRow({
         </span>
       </div>
 
-      <span className="w-24 flex-shrink-0 text-xs text-[var(--vscode-descriptionForeground)] text-right">
+      <span className="w-32 flex-shrink-0 whitespace-nowrap text-xs text-[var(--vscode-descriptionForeground)] text-right">
         {dateFormat === 'absolute'
           ? formatAbsoluteDateTime(commit.authorDate)
           : formatRelativeDate(commit.authorDate)}
