@@ -4,6 +4,12 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.1.1] - 2026-05-18
+
+### Fixed
+- Date column no longer wraps to two lines (Classic view) or gets truncated (Table view) on macOS and other environments where the system UI font renders wider than Windows' Segoe UI. The Classic-view date span widened from 96px to 128px and gained `whitespace-nowrap`; the Table-view date column minimum and default widths increased from 120px to 140px, giving the absolute format `YYYY-MM-DD HH:mm` enough headroom across platforms.
+- Table view now expands the Message column to fill any surplus container width, so all columns span to the right edge of the panel instead of leaving an empty strip when the panel is wider than the sum of preferred column widths.
+
 ## [4.1.0] - 2026-05-15
 
 ### Added
