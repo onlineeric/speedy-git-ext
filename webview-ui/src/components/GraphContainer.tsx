@@ -10,7 +10,11 @@ import { RebaseConflictBanner } from './RebaseConflictBanner';
 import { TogglePanel } from './TogglePanel';
 import { CommitTooltip } from './CommitTooltip';
 import { useTooltipHover } from '../hooks/useTooltipHover';
-import { resolveCommitTableLayout } from '../utils/commitTableLayout';
+import {
+  computeAutoFitWidth,
+  resolveCommitTableLayout,
+  setCommitTableColumnPreferredWidth,
+} from '../utils/commitTableLayout';
 
 const ROW_HEIGHT = 28;
 const LANE_WIDTH = 16;
@@ -174,6 +178,26 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
       virtualizer.scrollToIndex(currentMatch, { align: 'auto' });
     }
   }, [searchState.currentMatchIndex, searchState.matchIndices, virtualizer]);
+
+  // Auto-fit the date column when the user switches date format. Skips the
+  // initial mount so a previously persisted width is preserved on load.
+  const dateFormatKey = `${userSettings.dateFormat}|${userSettings.dateFormatCustom}`;
+  const lastDateFormatKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastDateFormatKeyRef.current === null) {
+      lastDateFormatKeyRef.current = dateFormatKey;
+      return;
+    }
+    if (lastDateFormatKeyRef.current === dateFormatKey) return;
+    lastDateFormatKeyRef.current = dateFormatKey;
+
+    const state = useGraphStore.getState();
+    if (state.commits.length === 0) return;
+    const autoWidth = computeAutoFitWidth('date', state.mergedCommits, state.topology, state.userSettings);
+    const nextLayout = setCommitTableColumnPreferredWidth(state.commitTableLayout, 'date', autoWidth);
+    state.updateCommitTableLayout(() => nextLayout);
+    rpcClient.persistUIState({ commitTableLayout: nextLayout });
+  }, [dateFormatKey]);
 
   const visibleMatchIndices = useMemo(() => {
     const visibleSet = new Set<number>();

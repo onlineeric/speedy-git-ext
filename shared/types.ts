@@ -11,11 +11,13 @@ export interface RepoInfo {
   displayName: string;
 }
 
-export type UserDateFormat = 'relative' | 'absolute';
+export type UserDateFormat = 'relative' | 'absolute' | 'absolute-date' | 'system' | 'custom';
 
 export interface UserSettings {
   graphColors: string[];
   dateFormat: UserDateFormat;
+  /** date-fns token string, used only when `dateFormat === 'custom'`. Invalid tokens fall back to `relative`. */
+  dateFormatCustom: string;
   avatarsEnabled: boolean;
   showRemoteBranches: boolean;
   showTags: boolean;
@@ -73,6 +75,7 @@ export const DEFAULT_GRAPH_COLORS = [
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   graphColors: [...DEFAULT_GRAPH_COLORS],
   dateFormat: 'relative',
+  dateFormatCustom: '',
   avatarsEnabled: true,
   showRemoteBranches: true,
   showTags: true,

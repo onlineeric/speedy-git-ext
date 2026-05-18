@@ -4,6 +4,21 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.2.0] - 2026-05-19
+
+### Added
+- Three new options for the **Speedy Git: Date Format** setting (`speedyGit.dateFormat`):
+  - `absolute-date` — `YYYY-MM-DD` (e.g. `2026-05-19`)
+  - `system` — follows the OS locale via `toLocaleString()`
+  - `custom` — user-supplied [date-fns format tokens](https://date-fns.org/docs/format)
+- New `speedyGit.dateFormatCustom` setting holding the token string used when `dateFormat` is `custom` (e.g. `yyyy-MM-dd HH:mm`, `MMM d, yyyy`). Invalid or empty token strings silently fall back to the `relative` format so the graph never breaks on a typo.
+- VS Code settings dropdown now shows per-option descriptions via `enumDescriptions`, and the custom-token setting cross-links to `#speedyGit.dateFormat#` for one-click navigation.
+
+### Fixed
+- Date column in Table view now auto-resizes when the date format changes — switching from `absolute` (`YYYY-MM-DD HH:mm`) to a shorter format (`relative`, `absolute-date`) shrinks the column, and switching to a longer format expands it. Previously the persisted column width was sized for the original format and never recalculated.
+- Double-click on the date column edge now produces a width that actually fits the current format. The hardcoded 140px minimum (sized for `YYYY-MM-DD HH:mm`) was clamping every shorter format; the date column minimum is now 64px so short formats like `relative` ("3h ago", "just now") can drag down to a sensible width.
+- Auto-fit column measurement now reads the **actual rendered font** (VS Code's `--vscode-font-family` / `--vscode-editor-font-family`) instead of the generic `sans-serif` / `monospace` fallbacks, so widths are correct on macOS (SF Pro / `-apple-system`) where the system UI font renders meaningfully wider than Windows' Segoe UI. A small 4px safety pad absorbs `canvas.measureText` subpixel rounding so columns no longer truncate by 1–2px after auto-fit.
+
 ## [4.1.1] - 2026-05-18
 
 ### Fixed

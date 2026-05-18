@@ -12,7 +12,7 @@ import { RefLabel } from './RefLabel';
 import { HeadIcon } from './icons';
 import { renderInlineCode } from '../utils/inlineCodeRenderer';
 import { mergeRefs, displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
-import { formatAbsoluteDateTime, formatRelativeDate } from '../utils/formatDate';
+import { getDateFormatter } from '../utils/formatDate';
 import { AuthorAvatar } from './AuthorAvatar';
 import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils';
 import { slotMatchesCommitRow } from '../utils/compareMarker';
@@ -89,7 +89,8 @@ export const CommitRow = memo(function CommitRow({
   onNodeMouseLeave,
   style,
 }: CommitRowProps) {
-  const { avatarsEnabled, dateFormat, showRemoteBranches, showTags, graphColors } = userSettings;
+  const { avatarsEnabled, dateFormat, dateFormatCustom, showRemoteBranches, showTags, graphColors } = userSettings;
+  const dateFormatter = getDateFormatter(dateFormat, dateFormatCustom);
   const isStash = commit.refs.some((r) => r.type === 'stash');
   const isUncommitted = commit.refs.some((r) => r.type === 'uncommitted');
   const stashIndex = isStash ? parseStashIndex(commit.refs) : -1;
@@ -202,9 +203,7 @@ export const CommitRow = memo(function CommitRow({
       </div>
 
       <span className="w-32 flex-shrink-0 whitespace-nowrap text-xs text-[var(--vscode-descriptionForeground)] text-right">
-        {dateFormat === 'absolute'
-          ? formatAbsoluteDateTime(commit.authorDate)
-          : formatRelativeDate(commit.authorDate)}
+        {dateFormatter(commit.authorDate)}
       </span>
     </div>
   );
