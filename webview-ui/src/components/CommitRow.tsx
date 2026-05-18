@@ -202,7 +202,7 @@ export const CommitRow = memo(function CommitRow({
         </span>
       </div>
 
-      <span className="w-32 flex-shrink-0 whitespace-nowrap text-xs text-[var(--vscode-descriptionForeground)] text-right">
+      <span className="min-w-[8rem] flex-shrink-0 whitespace-nowrap text-xs text-[var(--vscode-descriptionForeground)] text-right">
         {dateFormatter(commit.authorDate)}
       </span>
     </div>

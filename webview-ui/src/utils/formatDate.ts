@@ -124,5 +124,11 @@ function buildCustomFormatter(token: string): DateFormatter {
   } catch {
     return formatRelativeDate;
   }
-  return (timestamp) => dateFnsFormat(new Date(timestamp), trimmed);
+  return (timestamp) => {
+    try {
+      return dateFnsFormat(new Date(timestamp), trimmed);
+    } catch {
+      return formatRelativeDate(timestamp);
+    }
+  };
 }

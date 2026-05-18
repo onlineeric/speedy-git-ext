@@ -181,6 +181,8 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
 
   // Auto-fit the date column when the user switches date format. Skips the
   // initial mount so a previously persisted width is preserved on load.
+  // If commits aren't loaded yet, defer the auto-fit (without marking the
+  // change as "handled") so it still runs once commits arrive.
   const dateFormatKey = `${userSettings.dateFormat}|${userSettings.dateFormatCustom}`;
   const lastDateFormatKeyRef = useRef<string | null>(null);
   useEffect(() => {
@@ -189,15 +191,15 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
       return;
     }
     if (lastDateFormatKeyRef.current === dateFormatKey) return;
+    if (allCommitsCount === 0) return;
     lastDateFormatKeyRef.current = dateFormatKey;
 
     const state = useGraphStore.getState();
-    if (state.commits.length === 0) return;
     const autoWidth = computeAutoFitWidth('date', state.mergedCommits, state.topology, state.userSettings);
     const nextLayout = setCommitTableColumnPreferredWidth(state.commitTableLayout, 'date', autoWidth);
     state.updateCommitTableLayout(() => nextLayout);
     rpcClient.persistUIState({ commitTableLayout: nextLayout });
-  }, [dateFormatKey]);
+  }, [dateFormatKey, allCommitsCount]);
 
   const visibleMatchIndices = useMemo(() => {
     const visibleSet = new Set<number>();
