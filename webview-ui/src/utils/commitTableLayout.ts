@@ -9,7 +9,7 @@ import {
   type UserSettings,
 } from '@shared/types';
 import type { GraphTopology } from './graphTopology';
-import { formatAbsoluteDateTime, formatRelativeDate } from './formatDate';
+import { getDateFormatter } from './formatDate';
 
 export const COMMIT_TABLE_DEFAULT_ORDER = [...DEFAULT_COMMIT_TABLE_COLUMN_ORDER];
 
@@ -26,7 +26,9 @@ export const COMMIT_TABLE_MIN_WIDTHS: Record<CommitTableColumnId, number> = {
   hash: 72,
   message: 160,
   author: 120,
-  date: 120,
+  // Sized for the shortest formats (relative "just now", "3h ago"). Longer formats
+  // still display via `preferredWidth`; this only governs how small the user can drag.
+  date: 64,
 };
 
 export const COMMIT_TABLE_OPTIONAL_COLUMN_IDS = COMMIT_TABLE_COLUMN_IDS.filter(
@@ -200,6 +202,17 @@ export function resolveCommitTableLayout({
     }
   }
 
+  // Surplus space: expand the message column so the table spans the panel.
+  if (containerWidth > 0) {
+    const surplus = availableWidth - preferredTableWidth;
+    if (surplus > 0) {
+      const message = visibleColumns.find((column) => column.id === 'message');
+      if (message) {
+        message.effectiveWidth += surplus;
+      }
+    }
+  }
+
   const tableWidth = visibleColumns.reduce(
     (total, column) => total + column.effectiveWidth,
     0
@@ -223,6 +236,10 @@ const LANE_WIDTH = 16;
 const CELL_HORIZONTAL_PADDING = 16; // px-2 on each side = 8 + 8
 const AVATAR_WIDTH = 24; // h-6 w-6
 const AVATAR_GAP = 8; // gap-2
+// Safety pad for cross-OS font metric variance and `measureText` subpixel
+// rounding. Mac (SF Pro / Helvetica) renders ~1-3px wider than Windows (Segoe UI)
+// at the same point size; without this buffer auto-fit can truncate on Mac.
+const MEASURE_SAFETY_PAD = 4;
 
 let cachedCtx: CanvasRenderingContext2D | undefined;
 
@@ -231,6 +248,29 @@ function getCanvasContext(): CanvasRenderingContext2D | undefined {
     cachedCtx = document.createElement('canvas').getContext('2d') ?? undefined;
   }
   return cachedCtx;
+}
+
+const FALLBACK_SANS_FAMILY = 'sans-serif';
+const FALLBACK_MONO_FAMILY = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+
+let cachedSansFamily: string | undefined;
+let cachedMonoFamily: string | undefined;
+
+function getSansFamily(): string {
+  if (cachedSansFamily) return cachedSansFamily;
+  if (typeof document === 'undefined') return FALLBACK_SANS_FAMILY;
+  const family = getComputedStyle(document.body).fontFamily?.trim();
+  cachedSansFamily = family && family.length > 0 ? family : FALLBACK_SANS_FAMILY;
+  return cachedSansFamily;
+}
+
+function getMonoFamily(): string {
+  if (cachedMonoFamily) return cachedMonoFamily;
+  if (typeof document === 'undefined') return FALLBACK_MONO_FAMILY;
+  const root = document.documentElement;
+  const editorFamily = getComputedStyle(root).getPropertyValue('--vscode-editor-font-family')?.trim();
+  cachedMonoFamily = editorFamily && editorFamily.length > 0 ? editorFamily : FALLBACK_MONO_FAMILY;
+  return cachedMonoFamily;
 }
 
 function measureMaxTextWidth(texts: string[], font: string): number | undefined {
@@ -270,34 +310,31 @@ export function computeAutoFitWidth(
     }
     case 'hash': {
       const texts = commits.map((c) => c.abbreviatedHash);
-      const textWidth = measureMaxTextWidth(texts, '12px monospace');
+      const textWidth = measureMaxTextWidth(texts, `12px ${getMonoFamily()}`);
       if (textWidth === undefined) return minWidth;
-      return Math.max(minWidth, Math.round(textWidth + CELL_HORIZONTAL_PADDING));
+      return Math.max(minWidth, Math.round(textWidth + CELL_HORIZONTAL_PADDING + MEASURE_SAFETY_PAD));
     }
     case 'message': {
       const texts = commits.map((c) => c.subject);
-      const textWidth = measureMaxTextWidth(texts, '14px sans-serif');
+      const textWidth = measureMaxTextWidth(texts, `14px ${getSansFamily()}`);
       if (textWidth === undefined) return minWidth;
       // Add some padding for inline ref badges and icons
       const refPadding = 60;
-      return Math.max(minWidth, Math.round(textWidth + refPadding + CELL_HORIZONTAL_PADDING));
+      return Math.max(minWidth, Math.round(textWidth + refPadding + CELL_HORIZONTAL_PADDING + MEASURE_SAFETY_PAD));
     }
     case 'author': {
       const texts = commits.map((c) => c.author);
-      const textWidth = measureMaxTextWidth(texts, '12px sans-serif');
+      const textWidth = measureMaxTextWidth(texts, `12px ${getSansFamily()}`);
       if (textWidth === undefined) return minWidth;
       const avatarExtra = userSettings.avatarsEnabled ? AVATAR_WIDTH + AVATAR_GAP : 0;
-      return Math.max(minWidth, Math.round(textWidth + avatarExtra + CELL_HORIZONTAL_PADDING));
+      return Math.max(minWidth, Math.round(textWidth + avatarExtra + CELL_HORIZONTAL_PADDING + MEASURE_SAFETY_PAD));
     }
     case 'date': {
-      const texts = commits.map((c) =>
-        userSettings.dateFormat === 'absolute'
-          ? formatAbsoluteDateTime(c.authorDate)
-          : formatRelativeDate(c.authorDate)
-      );
-      const textWidth = measureMaxTextWidth(texts, '12px sans-serif');
+      const formatter = getDateFormatter(userSettings.dateFormat, userSettings.dateFormatCustom);
+      const texts = commits.map((c) => formatter(c.authorDate));
+      const textWidth = measureMaxTextWidth(texts, `12px ${getSansFamily()}`);
       if (textWidth === undefined) return minWidth;
-      return Math.max(minWidth, Math.round(textWidth + CELL_HORIZONTAL_PADDING));
+      return Math.max(minWidth, Math.round(textWidth + CELL_HORIZONTAL_PADDING + MEASURE_SAFETY_PAD));
     }
     default:
       return minWidth;

@@ -30,13 +30,14 @@ VS Code extension with **backend** (Node.js extension host) and **frontend** (Re
 src/                              # Backend — esbuild → dist/extension.js (CJS, node18)
 ├── extension.ts                  # Entry point, registers speedyGit.showGraph command
 ├── ExtensionController.ts        # Orchestrates services, repo discovery, settings
-├── WebviewProvider.ts            # Webview panel lifecycle, RPC dispatch (~1900 lines)
+├── WebviewProvider.ts            # Webview panel lifecycle, RPC dispatch (~2200 lines)
 ├── GitShowContentProvider.ts     # git-show:// URI protocol for diffs
 ├── services/
+│   ├── index.ts                  # Barrel export for all services
 │   ├── GitExecutor.ts            # Spawns git processes, 30s timeout, returns Result<T, GitError>
 │   ├── GitLogService.ts          # Parses git log (null-byte format), branches. Default 500 commits
 │   ├── GitDiffService.ts         # Commit details, file changes, file content at revision
-│   ├── GitBranchService.ts       # Checkout, create, rename, delete branches
+│   ├── GitBranchService.ts       # Checkout, create, rename, delete, fast-forward branches
 │   ├── GitRemoteService.ts       # Fetch, pull, remote management
 │   ├── GitHistoryService.ts      # Rebase, reset operations
 │   ├── GitRebaseService.ts       # Interactive rebase with drag-drop reordering
@@ -44,6 +45,8 @@ src/                              # Backend — esbuild → dist/extension.js (C
 │   ├── GitRevertService.ts       # Revert commits
 │   ├── GitTagService.ts          # Create, delete, push tags
 │   ├── GitStashService.ts        # Apply, pop, drop stash entries
+│   ├── GitIndexService.ts        # Stage/unstage, discard, commit (uncommitted-node operations)
+│   ├── GitWorktreeService.ts     # Worktree list/add/remove
 │   ├── GitSignatureService.ts    # GPG/SSH signature verification
 │   ├── GitSubmoduleService.ts    # Submodule status, init, update
 │   ├── GitWatcherService.ts      # File system watcher for auto-refresh
@@ -52,6 +55,7 @@ src/                              # Backend — esbuild → dist/extension.js (C
 │   └── GitConfigService.ts       # Git config reading
 └── utils/
     ├── gitParsers.ts             # Parse git log lines, refs (%D), branch list
+    ├── gitQueries.ts             # Shared read-only git queries (e.g., isDirtyWorkingTree)
     └── gitValidation.ts          # Input validation for git operations
 
 webview-ui/src/                   # Frontend — Vite + React → dist/webview/
@@ -72,20 +76,39 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
 │   ├── *ContextMenu.tsx          # Context menus (Commit, Branch, Stash, Author) via Radix UI
 │   └── CommandPreview.tsx        # Live git command preview shown in dialogs
 ├── stores/
-│   └── graphStore.ts             # Zustand store: commits, branches, topology, filters, UI state
+│   └── graphStore.ts             # Zustand store: commits, branches, topology, filters, UI state (~1050 lines, being split by domain in 044-code-refactor)
 ├── rpc/
 │   └── rpcClient.ts              # Singleton RPC client, webview↔extension via acquireVsCodeApi()
 ├── hooks/
 │   └── useTooltipHover.ts        # Tooltip positioning logic
+├── types/
+│   └── displayRefs.ts            # Discriminated union for ref-label rendering (local-branch/remote-branch/tag/HEAD/…)
 └── utils/
-    ├── graphTopology.ts          # Core graph algorithm (~470 lines): lanes, colors, connections
+    ├── graphTopology.ts          # Core graph algorithm (~700 lines): lanes, colors, connections
     ├── gitCommandBuilder.ts      # Constructs git command strings for preview display
     ├── commitReachability.ts     # Determines branch reachability for commits
+    ├── commitVisibility.ts       # Visibility/filter predicates for the virtualized row list
+    ├── compareSlot.ts            # Compare panel slot model (Base/Target, commit-ish parsing)
+    ├── compareDefaults.ts        # Default slot seeding for the Compare panel
+    ├── compareDispatch.ts        # Resolve compare request → backend RPC
+    ├── compareMarker.ts          # Per-row "B"ase / "T"arget badge derivation
+    ├── externalRefParser.ts      # Parse typed commit-ish expressions (HEAD~3, origin/main^2, …)
+    ├── resolveDefaultRemote.ts   # Pick `origin` else first-alpha remote (fast-forward, push, etc.)
+    ├── mergedCommits.ts          # Detect merged-branch commit grouping for badges
+    ├── refStyle.ts               # Per-ref-kind badge styling
+    ├── repoPath.ts               # Repo path normalization
+    ├── stashMessage.ts           # Format stash entries for display
+    ├── uncommittedUtils.ts       # Helpers for the uncommitted-node row
+    ├── radioAvailability.ts      # Enable/disable logic for mutually-exclusive options
     ├── filterUtils.ts            # Author/date filter logic
     ├── searchFilter.ts           # Client-side search by message, hash, author
     ├── fileTreeBuilder.ts        # Flat file list → tree structure
     ├── commitTableLayout.ts      # Column layout persistence & manipulation
-    └── mergeRefs.ts              # Merges local/remote refs for display
+    ├── colorUtils.ts             # Graph color cycling + theme helpers
+    ├── formatDate.ts             # Commit-date formatting
+    ├── gravatar.ts               # Gravatar URL builder
+    ├── inlineCodeRenderer.tsx    # Renders inline-code spans in commit messages
+    └── mergeRefs.ts              # Merges local/remote refs into DisplayRef[] for display
 
 shared/                           # Shared types between backend & frontend
 ├── types.ts                      # Domain types: Commit, Branch, RefInfo, GraphFilters, CommitDetails, etc.
@@ -159,7 +182,9 @@ shared/                           # Shared types between backend & frontend
 - None new. Compare state lives in Zustand store (transient, session-only). (042-compare-refs)
 
 ## Recent Changes
-- 043-fast-forward-branch: Fast-forward a non-checked-out local branch from its remote without checkout
+- 044-code-refactor: Split `graphStore.ts` (1,200+ lines) by domain; replace whole-store subscriptions with selectors (notably `CommitContextMenu`, `CompareABMarker`) to cut per-row re-render work
+- 043-fast-forward-branch: Fast-forward a non-checked-out local branch from its remote without checkout; extended to remote-only badges (auto-creates local branch + sets upstream)
+- 042-compare-refs: New "Compare" toggle panel + right-click "Set as Compare Base" / "Compare with Base" for A-vs-B diffs across commits, branches, tags, `HEAD`, working-tree, and typed `rev-parse` expressions
 - 041-submodule-selector: Replace submodule mode with submodule selector + filterable repo/submodule combo boxes + left→right top-menu reset chain
 - 039-uncommitted-node-ux2: File picker dialog enhancements
 

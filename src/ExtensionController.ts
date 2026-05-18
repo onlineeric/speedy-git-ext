@@ -310,6 +310,7 @@ export class ExtensionController {
     return [
       'speedyGit.graphColors',
       'speedyGit.dateFormat',
+      'speedyGit.dateFormatCustom',
       'speedyGit.avatars.enabled',
       'speedyGit.showRemoteBranches',
       'speedyGit.showTags',
@@ -325,6 +326,7 @@ export class ExtensionController {
     const dateFormat = this.normalizeDateFormat(
       config.get<string>('dateFormat', DEFAULT_USER_SETTINGS.dateFormat)
     );
+    const dateFormatCustom = config.get<string>('dateFormatCustom', DEFAULT_USER_SETTINGS.dateFormatCustom) ?? '';
     const batchCommitSize = this.normalizeBatchCommitSize(
       config.get<number>('batchCommitSize', DEFAULT_USER_SETTINGS.batchCommitSize)
     );
@@ -335,6 +337,7 @@ export class ExtensionController {
     return {
       graphColors,
       dateFormat,
+      dateFormatCustom,
       avatarsEnabled: config.get<boolean>('avatars.enabled', DEFAULT_USER_SETTINGS.avatarsEnabled),
       showRemoteBranches: config.get<boolean>('showRemoteBranches', DEFAULT_USER_SETTINGS.showRemoteBranches),
       showTags: config.get<boolean>('showTags', DEFAULT_USER_SETTINGS.showTags),
@@ -353,7 +356,16 @@ export class ExtensionController {
   }
 
   private normalizeDateFormat(value: string): UserDateFormat {
-    return value === 'absolute' ? 'absolute' : 'relative';
+    switch (value) {
+      case 'absolute':
+      case 'absolute-date':
+      case 'system':
+      case 'custom':
+      case 'relative':
+        return value;
+      default:
+        return 'relative';
+    }
   }
 
   private normalizeBatchCommitSize(value: number): number {

@@ -159,14 +159,18 @@ describe('reorderCommitTableColumns', () => {
 });
 
 describe('resolveCommitTableLayout', () => {
-  it('returns columns at preferred width when container is wide enough', () => {
+  it('expands the message column to fill surplus container width', () => {
     const layout = createDefaultCommitTableLayout();
     const totalPref = Object.values(layout.columns).reduce((s, c) => s + c.preferredWidth, 0);
 
     const resolved = resolveCommitTableLayout({ layout, containerWidth: totalPref + 200 });
+    const message = resolved.columns.find((c) => c.id === 'message')!;
+    expect(message.effectiveWidth).toBe(message.preferredWidth + 200);
     for (const col of resolved.columns) {
+      if (col.id === 'message') continue;
       expect(col.effectiveWidth).toBe(col.preferredWidth);
     }
+    expect(resolved.tableWidth).toBe(totalPref + 200);
   });
 
   it('shrinks message column first when space is tight', () => {

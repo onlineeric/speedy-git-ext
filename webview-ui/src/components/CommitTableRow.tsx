@@ -12,7 +12,7 @@ import { RefLabel } from './RefLabel';
 import { HeadIcon } from './icons';
 import { renderInlineCode } from '../utils/inlineCodeRenderer';
 import { mergeRefs, displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
-import { formatAbsoluteDateTime, formatRelativeDate } from '../utils/formatDate';
+import { getDateFormatter, type DateFormatter } from '../utils/formatDate';
 import { AuthorAvatar } from './AuthorAvatar';
 import { AuthorContextMenu } from './AuthorContextMenu';
 import { DateContextMenu } from './DateContextMenu';
@@ -75,7 +75,8 @@ export const CommitTableRow = memo(function CommitTableRow({
   onNodeMouseLeave,
   style,
 }: CommitTableRowProps) {
-  const { avatarsEnabled, dateFormat, showRemoteBranches, showTags, graphColors } = userSettings;
+  const { avatarsEnabled, dateFormat, dateFormatCustom, showRemoteBranches, showTags, graphColors } = userSettings;
+  const dateFormatter = getDateFormatter(dateFormat, dateFormatCustom);
   const isStash = commit.refs.some((ref) => ref.type === 'stash');
   const isUncommitted = commit.refs.some((ref) => ref.type === 'uncommitted');
   const stashIndex = isStash ? parseStashIndex(commit.refs) : -1;
@@ -148,7 +149,7 @@ export const CommitTableRow = memo(function CommitTableRow({
             visibleRefs,
             overflowRefs,
             avatarsEnabled,
-            dateFormat,
+            dateFormatter,
             laneColor,
             laneColorStyle,
             isStash,
@@ -198,7 +199,7 @@ function renderColumn({
   visibleRefs,
   overflowRefs,
   avatarsEnabled,
-  dateFormat,
+  dateFormatter,
   laneColor,
   laneColorStyle,
   isStash,
@@ -219,7 +220,7 @@ function renderColumn({
   visibleRefs: ReturnType<typeof mergeRefs>['displayRefs'];
   overflowRefs: ReturnType<typeof mergeRefs>['displayRefs'];
   avatarsEnabled: boolean;
-  dateFormat: UserSettings['dateFormat'];
+  dateFormatter: DateFormatter;
   laneColor: string | undefined;
   laneColorStyle: React.CSSProperties | undefined;
   isStash: boolean;
@@ -314,9 +315,7 @@ function renderColumn({
         <DateContextMenu authorDate={commit.authorDate}>
           <div className="flex h-full items-center justify-end">
             <span className="truncate text-right text-xs text-[var(--vscode-descriptionForeground)]">
-              {dateFormat === 'absolute'
-                ? formatAbsoluteDateTime(commit.authorDate)
-                : formatRelativeDate(commit.authorDate)}
+              {dateFormatter(commit.authorDate)}
             </span>
           </div>
         </DateContextMenu>

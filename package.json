@@ -2,7 +2,7 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "4.1.0",
+  "version": "4.2.0",
   "publisher": "onlineeric",
   "license": "MIT",
   "repository": {
@@ -82,9 +82,21 @@
         },
         "speedyGit.dateFormat": {
           "type": "string",
-          "enum": ["relative", "absolute"],
+          "enum": ["relative", "absolute", "absolute-date", "system", "custom"],
+          "enumDescriptions": [
+            "Short relative time (e.g. \"3h ago\")",
+            "YYYY-MM-DD HH:mm (e.g. 2026-05-18 14:32)",
+            "YYYY-MM-DD (e.g. 2026-05-18)",
+            "Follow the OS locale (toLocaleString)",
+            "Use the date-fns token string in `speedyGit.dateFormatCustom`"
+          ],
           "default": "relative",
-          "markdownDescription": "Date display format. `relative` shows short relative times, `absolute` shows `YYYY-MM-DD HH:mm`."
+          "markdownDescription": "Date display format for commit rows. Choose `custom` to provide your own [date-fns format tokens](https://date-fns.org/docs/format) in `#speedyGit.dateFormatCustom#`."
+        },
+        "speedyGit.dateFormatCustom": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Custom date format using [date-fns tokens](https://date-fns.org/docs/format) (e.g. `yyyy-MM-dd HH:mm`, `MMM d, yyyy`). Only used when `#speedyGit.dateFormat#` is set to `custom`. Falls back to `relative` if the token string is invalid or empty."
         },
         "speedyGit.avatars.enabled": {
           "type": "boolean",
