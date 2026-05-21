@@ -18,6 +18,26 @@ export function validateRefName(name: string): Result<string> {
   return { success: true, value: name };
 }
 
+const RESERVED_LOCAL_BRANCH_NAMES = new Set(['HEAD']);
+
+/**
+ * Validates a name that will be used to create or update a local branch
+ * (i.e. anything that ends up writing `refs/heads/<name>`).
+ *
+ * `git branch <name>` already refuses reserved names like "HEAD", but lower-level
+ * refspecs such as `git fetch origin HEAD:HEAD` bypass that check and silently
+ * create a stray `refs/heads/HEAD`, which then makes every subsequent ref lookup
+ * ambiguous. Guard the call sites that can hit that path.
+ */
+export function validateLocalBranchName(name: string): Result<string> {
+  const base = validateRefName(name);
+  if (!base.success) return base;
+  if (RESERVED_LOCAL_BRANCH_NAMES.has(name)) {
+    return err(new GitError(`'${name}' is reserved and cannot be used as a local branch name.`, 'VALIDATION_ERROR'));
+  }
+  return { success: true, value: name };
+}
+
 /** Validates a file path — rejects empty strings and values starting with '-'. */
 export function validateFilePath(filePath: string): Result<string> {
   if (!filePath || filePath.startsWith('-')) {

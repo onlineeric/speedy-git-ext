@@ -128,6 +128,18 @@ describe('parseRefs', () => {
       { type: 'remote', name: 'main', remote: 'origin' },
     ]);
   });
+
+  it('drops `<remote>/HEAD` symbolic refs from commit decorations', () => {
+    // origin/HEAD is git's symbolic default-branch marker, not a real branch.
+    // Surfacing it produced a foot-gun where right-click → Fast-Forward ran
+    // `git fetch origin HEAD:HEAD` and created a stray `refs/heads/HEAD`.
+    expect(parseRefs('HEAD -> main, origin/main, origin/HEAD')).toEqual([
+      { type: 'head', name: 'main' },
+      { type: 'remote', name: 'main', remote: 'origin' },
+    ]);
+    expect(parseRefs('upstream/HEAD')).toEqual([]);
+    expect(parseRefs('fork/HEAD')).toEqual([]);
+  });
 });
 
 describe('parseBranchLine', () => {
@@ -181,5 +193,10 @@ describe('parseBranchLine', () => {
     const result = parseBranchLine(branchLine('  main ', ' ', '  hash123  '));
     expect(result!.name).toBe('main');
     expect(result!.hash).toBe('hash123');
+  });
+
+  it('drops `<remote>/HEAD` entries from the branch list', () => {
+    expect(parseBranchLine(branchLine('origin/HEAD', ' ', 'aaa1111'))).toBeNull();
+    expect(parseBranchLine(branchLine('remotes/origin/HEAD', ' ', 'aaa1111'))).toBeNull();
   });
 });
