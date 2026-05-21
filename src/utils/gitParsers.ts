@@ -83,6 +83,10 @@ function parseRefPart(part: string): RefInfo | null {
     // Only treat as remote if it starts with a known remote prefix
     if (commonRemotes.includes(potentialRemote)) {
       const branchName = part.slice(slashIndex + 1);
+      // Skip `<remote>/HEAD` — it's git's symbolic ref recording the remote's default
+      // branch, not a real branch. Surfacing it as a branch led to actions like
+      // `git fetch origin HEAD:HEAD` creating a stray local `refs/heads/HEAD`.
+      if (branchName === 'HEAD') return null;
       return { name: branchName, type: 'remote', remote: potentialRemote };
     }
   }
@@ -134,6 +138,12 @@ export function parseBranchLine(line: string): Branch | null {
         branchName = restOfName;
       }
     }
+  }
+
+  // Drop `<remote>/HEAD` — symbolic ref pointing at the remote's default branch,
+  // not a branch we should let users act on.
+  if (remote && branchName === 'HEAD') {
+    return null;
   }
 
   return {

@@ -1,7 +1,7 @@
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, err, ok } from '../../shared/errors.js';
-import { validateRefName } from '../utils/gitValidation.js';
+import { validateLocalBranchName, validateRefName } from '../utils/gitValidation.js';
 import { isDirtyWorkingTree } from '../utils/gitQueries.js';
 
 function isBranchNotFullyMerged(stderr: string | undefined): boolean {
@@ -112,7 +112,7 @@ export class GitBranchService {
 
     const remoteCheck = validateRefName(remote);
     if (!remoteCheck.success) return remoteCheck;
-    const branchCheck = validateRefName(branch);
+    const branchCheck = validateLocalBranchName(branch);
     if (!branchCheck.success) return branchCheck;
 
     const fetchResult = await this.executor.execute({
@@ -145,7 +145,7 @@ export class GitBranchService {
 
   async createBranch(name: string, startPoint?: string): Promise<Result<string>> {
     this.log.info(`Create branch: ${name}${startPoint ? ` from ${startPoint}` : ''}`);
-    const nameCheck = validateRefName(name);
+    const nameCheck = validateLocalBranchName(name);
     if (!nameCheck.success) return nameCheck;
     if (startPoint) {
       const startCheck = validateRefName(startPoint);
@@ -164,7 +164,7 @@ export class GitBranchService {
     this.log.info(`Rename branch: ${oldName} → ${newName}`);
     const oldCheck = validateRefName(oldName);
     if (!oldCheck.success) return oldCheck;
-    const newCheck = validateRefName(newName);
+    const newCheck = validateLocalBranchName(newName);
     if (!newCheck.success) return newCheck;
 
     const result = await this.executor.execute({

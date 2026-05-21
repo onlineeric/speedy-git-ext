@@ -186,4 +186,42 @@ describe('GitBranchService.fastForwardFromRemote', () => {
       expect(result.error.stderr).toContain('non-fast-forward');
     }
   });
+
+  it('rejects "HEAD" as a branch name without invoking the executor', async () => {
+    // Guards against `git fetch <remote> HEAD:HEAD` ever being able to create a
+    // stray `refs/heads/HEAD`. Even if a UI badge slips through filtering, the
+    // service refuses the write.
+    const service = new GitBranchService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute');
+
+    const result = await service.fastForwardFromRemote('origin', 'HEAD');
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe('VALIDATION_ERROR');
+    expect(executeSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('GitBranchService reserved-name guards', () => {
+  it('createBranch refuses "HEAD" as the new branch name', async () => {
+    const service = new GitBranchService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute');
+
+    const result = await service.createBranch('HEAD');
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe('VALIDATION_ERROR');
+    expect(executeSpy).not.toHaveBeenCalled();
+  });
+
+  it('renameBranch refuses "HEAD" as the new branch name', async () => {
+    const service = new GitBranchService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute');
+
+    const result = await service.renameBranch('feature-x', 'HEAD');
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe('VALIDATION_ERROR');
+    expect(executeSpy).not.toHaveBeenCalled();
+  });
 });

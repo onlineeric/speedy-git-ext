@@ -4,6 +4,14 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.2.1] - 2026-05-21
+
+### Fixed
+- HEAD bullseye indicator no longer appears on the wrong commit. The previous build surfaced `<remote>/HEAD` (e.g. `origin/HEAD`) as a normal remote-branch badge, and right-clicking it → **Fast-forward Local Branch from Remote** ran `git fetch origin HEAD:HEAD`, which silently created a stray local branch named `HEAD` (`refs/heads/HEAD`). Once present, every subsequent git command produced `warning: refname 'HEAD' is ambiguous` and Speedy Git painted the HEAD bullseye on whatever commit that stray ref happened to point at — visible even after refresh, fetch, checkout, or IDE restart.
+- `<remote>/HEAD` is git's symbolic ref for the remote's default branch, not a real branch, so it is now filtered out of commit decorations and the branch list — no badge, no right-click menu, no Compare entry. Matches how Git Graph, GitLens, GitKraken, and Sourcetree handle it.
+- Defensive guards added at the service layer: `fastForwardFromRemote`, `createBranch`, and `renameBranch` now reject `HEAD` as a local branch name, so even if a future UI path passes it through, the extension refuses the write instead of creating another stray `refs/heads/HEAD`.
+- Users who already have the stray ref from a previous version can remove it with `git update-ref -d refs/heads/HEAD` (the bullseye disappears on next refresh). `git branch -d HEAD` does not work because git resolves `HEAD` to its symbolic ref instead of the literal branch.
+
 ## [4.2.0] - 2026-05-19
 
 ### Added
