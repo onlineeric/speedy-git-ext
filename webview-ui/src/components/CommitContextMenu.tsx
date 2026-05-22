@@ -220,7 +220,9 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
   };
 
   const handleRevertConfirm = (options: RevertOptions) => {
-    setRevertDialogOpen(false);
+    if (options.mode !== 'edit-message') {
+      setRevertDialogOpen(false);
+    }
     rpcClient.revert(commit.hash, options);
   };
 

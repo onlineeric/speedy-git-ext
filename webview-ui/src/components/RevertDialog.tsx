@@ -37,25 +37,33 @@ export function RevertDialog({ open, commit, parents, onConfirm, onCancel }: Rev
   // store success/error signals that fired from unrelated activity.
   const submittedRef = useRef(false);
   const lastCommitHashRef = useRef<string | null>(null);
+  const wasOpenRef = useRef(false);
 
   const isMergeCommit = commit.parents.length > 1;
 
   // Load last-used mode + reset commit-specific fields whenever the dialog opens
   // or whenever it opens with a different target commit.
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      wasOpenRef.current = false;
+      return;
+    }
+
+    const openedNow = !wasOpenRef.current;
+    const commitChanged = lastCommitHashRef.current !== commit.hash;
+    wasOpenRef.current = true;
+    if (!openedNow && !commitChanged) return;
+
     const timeout = window.setTimeout(() => {
       setMode(revertOptions.mode);
       setMainlineParent(null);
-      if (lastCommitHashRef.current !== commit.hash) {
-        setMessage(defaultRevertMessage(commit));
-        lastCommitHashRef.current = commit.hash;
-      }
+      setMessage(defaultRevertMessage(commit));
+      lastCommitHashRef.current = commit.hash;
       setSubmitting(false);
       submittedRef.current = false;
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [open, revertOptions, commit]);
+  }, [open, revertOptions.mode, commit]);
 
   // Stable callbacks for the subscriber, to keep the subscription effect's
   // dep list minimal (the subscription is the "external system" the effect

@@ -124,10 +124,12 @@ export class GitRevertService {
       ));
     }
 
-    // Step 2: commit with the user's verbatim message.
-    // Pass via argv -m so spawn quotes safely on all platforms (no shell).
+    // Step 2: commit with the user's message. Git's default cleanup would
+    // mutate whitespace, so disable cleanup after applying the spec's only
+    // allowed normalization: trim trailing whitespace on the final line.
+    const normalizedMessage = trimFinalLineTrailingWhitespace(message);
     const step2 = await this.executor.execute({
-      args: ['commit', '-m', message],
+      args: ['commit', '--cleanup=verbatim', '-m', normalizedMessage],
       cwd: this.workspacePath,
     });
     if (!step2.success) {
@@ -218,4 +220,15 @@ export class GitRevertService {
     if (!result.success) return result;
     return ok('Revert aborted.');
   }
+}
+
+function trimFinalLineTrailingWhitespace(message: string): string {
+  const lastNewlineIndex = message.lastIndexOf('\n');
+  if (lastNewlineIndex === -1) {
+    return message.trimEnd();
+  }
+
+  const prefix = message.slice(0, lastNewlineIndex + 1);
+  const finalLine = message.slice(lastNewlineIndex + 1).trimEnd();
+  return `${prefix}${finalLine}`;
 }

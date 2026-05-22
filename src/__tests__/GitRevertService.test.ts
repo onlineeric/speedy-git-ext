@@ -232,7 +232,31 @@ describe('GitRevertService', () => {
         expect.objectContaining({ args: ['diff', '--cached', '--quiet'] })
       );
       expect(executeSpy.mock.calls[4][0]).toEqual(
-        expect.objectContaining({ args: ['commit', '-m', message] })
+        expect.objectContaining({ args: ['commit', '--cleanup=verbatim', '-m', message] })
+      );
+    });
+
+    it('mode: edit-message disables git cleanup and trims only final-line trailing whitespace', async () => {
+      const executeSpy = vi.spyOn(service['executor'], 'execute')
+        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
+        .mockResolvedValueOnce({ success: false, error: new GitError('not found', 'COMMAND_FAILED') })
+        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
+        .mockResolvedValueOnce({ success: false, error: new GitError('staged', 'COMMAND_FAILED') })
+        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } });
+
+      const message = '\nBody line keeps spaces  \nFinal line loses spaces  \t';
+      const result = await service.revert('abc1234', { mode: 'edit-message', message });
+
+      expect(result.success).toBe(true);
+      expect(executeSpy.mock.calls[4][0]).toEqual(
+        expect.objectContaining({
+          args: [
+            'commit',
+            '--cleanup=verbatim',
+            '-m',
+            '\nBody line keeps spaces  \nFinal line loses spaces',
+          ],
+        })
       );
     });
 
