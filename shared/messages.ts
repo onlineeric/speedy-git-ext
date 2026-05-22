@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult } from './types.js';
 
 /** Payload for the batched initial data message */
 export interface InitialDataPayload {
@@ -70,7 +70,7 @@ export type RequestMessage =
   | { type: 'cherryPick'; payload: { hashes: string[]; options: CherryPickOptions } }
   | { type: 'abortCherryPick'; payload: Record<string, never> }
   | { type: 'continueCherryPick'; payload: Record<string, never> }
-  | { type: 'revert'; payload: { hash: string; mainlineParent?: number } }
+  | { type: 'revert'; payload: { hash: string; options: RevertOptions } }
   | { type: 'continueRevert'; payload: Record<string, never> }
   | { type: 'abortRevert'; payload: Record<string, never> }
   // Rebase ops

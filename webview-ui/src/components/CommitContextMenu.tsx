@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import type { Commit, CherryPickOptions, ResetMode, RebaseEntry, CommitParentInfo, SlotValue } from '@shared/types';
+import type { Commit, CherryPickOptions, ResetMode, RebaseEntry, CommitParentInfo, RevertOptions, SlotValue } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { buildResetCommand } from '../utils/gitCommandBuilder';
@@ -12,7 +12,7 @@ import { TagCreationDialog } from './TagCreationDialog';
 import { CherryPickDialog } from './CherryPickDialog';
 import { InteractiveRebaseDialog } from './InteractiveRebaseDialog';
 import { RebaseConfirmDialog } from './RebaseConfirmDialog';
-import { RevertParentDialog } from './RevertParentDialog';
+import { RevertDialog } from './RevertDialog';
 import { DropCommitDialog } from './DropCommitDialog';
 import { createReachabilityChecker } from '../utils/commitReachability';
 
@@ -203,18 +203,27 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
 
   const handleRevertSelect = async () => {
     if (!canRevert || isOperationInProgress) return;
-    if (!isMergeCommit) {
-      rpcClient.revert(commit.hash);
-      return;
+    // For merge commits, fetch parents so the inline picker can render names + subjects.
+    // For non-merge commits, parents is left empty; the dialog hides the picker.
+    if (isMergeCommit) {
+      try {
+        const parents = await rpcClient.getCommitParents(commit.parents);
+        setRevertParents(parents);
+      } catch {
+        // Store error state is already set by the RPC client.
+        return;
+      }
+    } else {
+      setRevertParents([]);
     }
+    setRevertDialogOpen(true);
+  };
 
-    try {
-      const parents = await rpcClient.getCommitParents(commit.parents);
-      setRevertParents(parents);
-      setRevertDialogOpen(true);
-    } catch {
-      // Store error state is already set by the RPC client.
+  const handleRevertConfirm = (options: RevertOptions) => {
+    if (options.mode !== 'edit-message') {
+      setRevertDialogOpen(false);
     }
+    rpcClient.revert(commit.hash, options);
   };
 
   const handleDropSelect = async () => {
@@ -485,16 +494,12 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
         />
       )}
 
-      <RevertParentDialog
+      <RevertDialog
         open={revertDialogOpen}
-        onOpenChange={setRevertDialogOpen}
-        commitHash={commit.hash}
-        commitSubject={commit.subject}
+        commit={commit}
         parents={revertParents}
-        onConfirm={(mainlineParent) => {
-          setRevertDialogOpen(false);
-          rpcClient.revert(commit.hash, mainlineParent);
-        }}
+        onConfirm={handleRevertConfirm}
+        onCancel={() => setRevertDialogOpen(false)}
       />
 
       <DropCommitDialog

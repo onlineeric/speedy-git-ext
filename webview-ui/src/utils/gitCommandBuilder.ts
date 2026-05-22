@@ -1,4 +1,4 @@
-import type { PushForceMode, ResetMode } from '@shared/types';
+import type { PushForceMode, ResetMode, RevertMode } from '@shared/types';
 
 export interface PushCommandOptions {
   remote: string;
@@ -33,6 +33,7 @@ export interface ResetCommandOptions {
 
 export interface RevertCommandOptions {
   hash: string;
+  mode: RevertMode;
   mainlineParent?: number;
 }
 
@@ -118,7 +119,13 @@ export function buildRevertCommand(options: RevertCommandOptions): string {
   if (options.mainlineParent !== undefined) {
     parts.push('-m', String(options.mainlineParent));
   }
-  parts.push('--no-edit', options.hash);
+  if (options.mode === 'commit') {
+    parts.push('--no-edit');
+  } else if (options.mode === 'no-commit') {
+    parts.push('--no-commit');
+  }
+  // mode === 'edit-message' emits the native form with no extra flag.
+  parts.push(options.hash);
   return parts.join(' ');
 }
 
