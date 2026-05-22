@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,6 +31,7 @@
 
 ## Notes
 
-- Two open questions are tracked in the spec's **Open Questions** section (Q1: dirty-tree precondition for non-committing modes; Q2: command-preview text for Edit-message mode). Both are deferred to `/speckit-clarify` per the user's request. They are not blocking spec completion — each question lists reasonable options with a recommended default.
-- The spec lightly references implementation files (`GitRevertService.ts`, `GitCherryPickService.ts`) only inside Open Questions to anchor the comparison concretely for the developer answering the clarifications. Body requirements remain implementation-agnostic.
-- Items marked incomplete require spec updates before `/speckit-plan`. The two [NEEDS CLARIFICATION] markers are intentional and will be resolved by `/speckit-clarify` in the next workflow step.
+- All clarifications resolved in session 2026-05-22 via `/speckit-clarify`:
+  - **Q1**: Dirty-tree precondition is **strict for all three modes** (no relaxation for non-committing modes). FR-016 updated; edge-case entry consolidated.
+  - **Q2**: **Edit message** command preview shows the **canonical/native** form `git revert [-m N] <hash>` (consistent with the other two modes). Command Preview Policy table updated.
+- Spec is ready for `/speckit-plan`.

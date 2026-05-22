@@ -5,6 +5,13 @@
 **Status**: Draft
 **Input**: User description: "Revert Commit dialog with mode selection (Commit now / Stage only / Edit message), modeled after CherryPickDialog with radio buttons, with command preview, replacing direct revert action in commit context menu."
 
+## Clarifications
+
+### Session 2026-05-22
+
+- Q: Should the dirty-working-tree precondition apply to all three modes, or be relaxed for the non-committing modes (matching the cherry-pick policy)? → A: Strict for all three modes. The dirty-tree check that exists today for the current single-mode revert applies equally to **Commit now**, **Stage only**, and **Edit message**. Users must commit, stash, or discard local changes before any revert mode runs.
+- Q: What text should the command preview show for **Edit message** mode? → A: Canonical/native. Show `git revert [-m N] <hash>` (no `--no-edit`, no `--no-commit`). This matches what a developer would type in a terminal to achieve the same outcome (editor opens) and stays consistent with the single-line previews for the other two modes. The actual internal execution (two-step `git revert --no-commit` + `git commit -m`) is an implementation detail and is not exposed in the preview.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Revert a commit and create the revert commit immediately (Priority: P1)
@@ -61,8 +68,7 @@ A developer wants to write a non-default commit message for the revert (e.g., to
 - **Merge commit + any mode**: The mainline-parent picker appears in the same dialog. The selected parent is forwarded to git for all three modes.
 - **Root commit or stash pseudo-commit**: The Revert Commit menu item is disabled (existing behavior preserved).
 - **Operation already in progress** (cherry-pick, rebase, or prior revert paused): The dialog can be opened, but confirming surfaces a clear error and does not start the revert. (Same gate as today's flow.)
-- **Dirty working tree on Commit-now mode**: Existing behavior — refuse with an explanatory error.
-- **Dirty working tree on Stage-only / Edit-message modes**: See [NEEDS CLARIFICATION: Q1] in Open Questions.
+- **Dirty working tree on any mode**: All three modes refuse to run with the same explanatory error used today ("Working tree has uncommitted changes. Commit, stash, or discard them before reverting."). The user must clean the tree first.
 - **Commit-now mode + conflict**: `REVERT_HEAD` is set; existing Continue Revert / Abort Revert flow recovers.
 - **Stage-only or Edit-message mode + conflict**: `REVERT_HEAD` is NOT set by git (these modes don't engage git's revert state machine). The user resolves conflicts and commits manually via the SCM panel; the dialog/menu must not pretend a revert-in-progress state exists.
 - **Edit-message mode + nothing to revert**: Inverse changes are empty after applying; no commit is produced; a friendly message is shown.
@@ -93,7 +99,7 @@ A developer wants to write a non-default commit message for the revert (e.g., to
 - **FR-013**: When **Commit now** mode produces a conflict, the system MUST behave exactly as today: surface a conflict error, set the revert-in-progress UI state, and ensure the Commit context menu offers **Continue Revert** and **Abort Revert** items.
 - **FR-014**: When **Stage only** or **Edit message** mode produces a conflict, the system MUST surface a conflict error explaining that conflicts must be resolved in the Source Control panel and committed manually, MUST NOT enter the revert-in-progress UI state, and MUST NOT offer Continue/Abort menu items for this revert.
 - **FR-015**: If another git operation (cherry-pick, rebase, or in-progress revert) is already in progress, confirming in the dialog MUST surface a friendly error and MUST NOT start the revert.
-- **FR-016**: The dirty-working-tree precondition behavior is governed by the resolution of [NEEDS CLARIFICATION: Q1] (see Open Questions).
+- **FR-016**: All three modes MUST refuse to run when the working tree is dirty, surfacing the same explanatory error used by today's revert flow. There is no relaxation for **Stage only** or **Edit message** — users must commit, stash, or discard local changes first.
 - **FR-017**: Cancelling the dialog (Escape, clicking outside, or clicking Cancel) MUST execute no git command and MUST leave repository state untouched.
 - **FR-018**: The dialog visual style, button labels, focus order, and keyboard navigation MUST match the Cherry-Pick dialog conventions (Radix Dialog, VS Code theme tokens, Cancel/primary-action buttons aligned right).
 - **FR-019**: The dialog MUST be dismissible by Escape and by clicking the overlay (matching Cherry-Pick dialog behavior).
@@ -107,7 +113,7 @@ The command preview shows the canonical git command line a developer would type 
 | --- | --- |
 | Commit now | `git revert --no-edit [-m N] <abbrev-hash>` |
 | Stage only | `git revert --no-commit [-m N] <abbrev-hash>` |
-| Edit message | See [NEEDS CLARIFICATION: Q2] in Open Questions |
+| Edit message | `git revert [-m N] <abbrev-hash>` |
 
 `[-m N]` only appears when the selected commit is a merge commit (and is filled with the chosen parent number). The hash is shown in its 7-character abbreviated form for readability.
 
@@ -128,34 +134,6 @@ The command preview shows the canonical git command line a developer would type 
 - **SC-005**: When **Edit message** mode finishes successfully, the new commit's message exactly equals the text the user typed in the dialog (after normalizing only trailing whitespace on the last line).
 - **SC-006**: The dialog is keyboard-fully-operable — a user can open the menu, navigate to **Revert Commit**, switch modes, edit the message (in Edit message mode), and confirm without touching the mouse, in under 10 keystrokes for the default flow.
 - **SC-007**: No regression in test coverage — `GitRevertService` retains coverage of every existing behavior and gains coverage of each new mode's success path, conflict path, and empty-revert path.
-
-## Open Questions
-
-> Use `/speckit-clarify` to resolve these before `/speckit-plan`.
-
-### Q1: Dirty-working-tree precondition for non-committing modes
-
-**Context**: Today, `GitRevertService.revert()` refuses to run if the working tree is dirty (`src/services/GitRevertService.ts:44`). The sibling `GitCherryPickService` *relaxes* this check when `--no-commit` is used (`src/services/GitCherryPickService.ts:38-49`) so users can stage cherry-picks on top of existing edits.
-
-For revert, two reasonable interpretations exist:
-
-- **Option A (strict, recommended default)**: Keep the dirty-tree check for **all three modes**. Reverts are sharper operations than cherry-picks and stacking a revert on top of unstaged work invites confusing diffs.
-- **Option B (relaxed for non-committing modes)**: Drop the dirty-tree check for **Stage only** and **Edit message**, matching the cherry-pick policy. Lets users layer a revert onto WIP changes.
-- **Option C (relaxed only for Stage only)**: Drop the check for **Stage only** (since that mode is explicitly about working with the index) but keep it strict for **Edit message** (which produces a commit and inherits the same "don't accidentally include WIP" concern as Commit now).
-
-This decision affects FR-016, edge-case handling, and acceptance-test expectations for User Stories 2 and 3.
-
-### Q2: Command-preview text for Edit message mode
-
-**Context**: The native git command that opens the editor is `git revert <hash>` (no `--no-edit` flag, no `--no-commit` flag). Because the extension's backend cannot host an interactive editor, the actual execution will be a two-step `git revert --no-commit <hash>` followed by `git commit -m "<message>"`. The preview can either reflect the native developer-typed command or the actual two-step internal command.
-
-Two reasonable options:
-
-- **Option A (canonical/native, recommended)**: Show `git revert [-m N] <hash>`. This matches what a developer would type in a terminal to achieve the same outcome (custom message via editor). The preview is honest about the *user intent* even though the implementation differs.
-- **Option B (actual two-step)**: Show `git revert --no-commit [-m N] <hash> && git commit -m "<message>"`. This is what the backend actually runs. More transparent about implementation but noisier and reveals an internal split.
-- **Option C (canonical with annotation)**: Show `git revert [-m N] <hash>` with a small inline note such as `(message captured in this dialog)` next to the preview, to bridge the gap.
-
-This decision affects FR-005 and the Command Preview Policy table.
 
 ## Assumptions
 
