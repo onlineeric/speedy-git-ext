@@ -135,14 +135,40 @@ describe('buildResetCommand', () => {
 });
 
 describe('buildRevertCommand', () => {
-  it('builds default revert with --no-edit', () => {
-    expect(buildRevertCommand({ hash: 'abc1234' }))
-      .toBe('git revert --no-edit abc1234');
+  describe('mode: commit', () => {
+    it('builds revert --no-edit for non-merge commit', () => {
+      expect(buildRevertCommand({ hash: 'abc1234', mode: 'commit' }))
+        .toBe('git revert --no-edit abc1234');
+    });
+
+    it('includes -m N for merge commit', () => {
+      expect(buildRevertCommand({ hash: 'abc1234', mode: 'commit', mainlineParent: 1 }))
+        .toBe('git revert -m 1 --no-edit abc1234');
+    });
   });
 
-  it('includes -m N for mainlineParent', () => {
-    expect(buildRevertCommand({ hash: 'abc1234', mainlineParent: 1 }))
-      .toBe('git revert -m 1 --no-edit abc1234');
+  describe('mode: no-commit', () => {
+    it('builds revert --no-commit for non-merge commit', () => {
+      expect(buildRevertCommand({ hash: 'abc1234', mode: 'no-commit' }))
+        .toBe('git revert --no-commit abc1234');
+    });
+
+    it('includes -m N for merge commit', () => {
+      expect(buildRevertCommand({ hash: 'abc1234', mode: 'no-commit', mainlineParent: 2 }))
+        .toBe('git revert -m 2 --no-commit abc1234');
+    });
+  });
+
+  describe('mode: edit-message', () => {
+    it('builds native revert (no flag) for non-merge commit', () => {
+      expect(buildRevertCommand({ hash: 'abc1234', mode: 'edit-message' }))
+        .toBe('git revert abc1234');
+    });
+
+    it('includes -m N for merge commit', () => {
+      expect(buildRevertCommand({ hash: 'abc1234', mode: 'edit-message', mainlineParent: 1 }))
+        .toBe('git revert -m 1 abc1234');
+    });
   });
 });
 

@@ -4,6 +4,20 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.3.0] - 2026-05-22
+
+### Added
+- **Revert Commit** now opens a dialog with three revert modes — **Commit now**, **Stage only**, and **Edit message** — replacing the previous direct-action menu item. The mode selector uses radio buttons (Cherry-Pick dialog conventions) and each label shows the equivalent git flag (`--no-edit`, `--no-commit`, or "(no flag; opens editor natively)") in a muted monospaced style next to the description.
+- **Commit now** mode preserves today's behavior: creates a new revert commit on the current branch with git's default revert message. Conflicts continue to set `REVERT_HEAD` and surface the existing **Continue Revert** / **Abort Revert** context menu items for recovery.
+- **Stage only** mode applies the inverse of the selected commit to the working tree and index without creating a commit, so the changes can be reviewed, combined with other edits, or amended into another commit via the Source Control panel. Conflicts in this mode do **not** enter revert-in-progress state — users resolve them in the Source Control panel and commit manually.
+- **Edit message** mode opens a multi-line text area pre-filled with git's standard default revert message (`Revert "<subject>"`, blank line, `This reverts commit <full-hash>.`) and creates the revert commit with exactly the text the user typed. Confirm is disabled while the message is empty or whitespace-only; if the inverse changes turn out to be empty, the typed message is offered back so it can be retried or copied rather than silently lost.
+- Live single-line command preview at the bottom of the dialog updates as the mode (and, for merge commits, the mainline parent) changes — `git revert --no-edit [-m N] <hash>` for Commit now, `git revert --no-commit [-m N] <hash>` for Stage only, and the canonical `git revert [-m N] <hash>` for Edit message. The preview is selectable and has a Copy button.
+- Merge-commit revert is now handled inside the same dialog: the mainline-parent picker appears inline (one merged dialog, not two sequential dialogs), and the confirm button stays disabled until a parent is chosen. The previous standalone `RevertParentDialog` is removed.
+- The dialog remembers the mode the user last confirmed with for the lifetime of the session, so reopening the dialog pre-selects that mode.
+
+### Changed
+- The dirty-working-tree precondition is now applied uniformly across all three modes — Commit now, Stage only, and Edit message all refuse to run when the working tree has uncommitted changes, with the same explanatory error used previously. Users must commit, stash, or discard local changes before any revert mode runs (no relaxation for the non-committing modes).
+
 ## [4.2.1] - 2026-05-21
 
 ### Fixed
