@@ -1,5 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, CompareMode, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, SlotValue, CommitParentInfo, FileChangeStatus } from '@shared/types';
+import type { CherryPickOptions, CompareMode, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 
 declare const acquireVsCodeApi: () => {
@@ -458,8 +458,8 @@ class RpcClient {
     this.send({ type: 'continueCherryPick', payload: {} });
   }
 
-  revert(hash: string, mainlineParent?: number) {
-    this.send({ type: 'revert', payload: { hash, mainlineParent } });
+  revert(hash: string, options: RevertOptions) {
+    this.send({ type: 'revert', payload: { hash, options } });
   }
 
   continueRevert() {

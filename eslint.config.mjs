@@ -12,6 +12,7 @@ export default tseslint.config(
       "test-repo/",
       "webview-ui/dist/",
       "webview-ui/node_modules/",
+      ".claude/",
       "**/*.js",
       "**/*.mjs",
     ],

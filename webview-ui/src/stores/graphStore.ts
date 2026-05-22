@@ -4,6 +4,7 @@ import type {
   Author,
   Branch,
   CherryPickOptions,
+  RevertOptions,
   Commit,
   CommitDetails,
   CommitListMode,
@@ -70,6 +71,7 @@ interface GraphStore {
   maxVisibleRefs: number;
   cherryPickInProgress: boolean;
   cherryPickOptions: CherryPickOptions;
+  revertOptions: RevertOptions;
   rebaseInProgress: boolean;
   rebaseConflictInfo: RebaseConflictInfo | undefined;
   revertInProgress: boolean;
@@ -171,6 +173,7 @@ interface GraphStore {
   setMaxVisibleRefs: (count: number) => void;
   setCherryPickInProgress: (inProgress: boolean) => void;
   setCherryPickOptions: (options: CherryPickOptions) => void;
+  setRevertOptions: (options: RevertOptions) => void;
   setRebaseInProgress: (inProgress: boolean) => void;
   setRebaseConflictInfo: (info: RebaseConflictInfo | undefined) => void;
   setRevertInProgress: (inProgress: boolean) => void;
@@ -265,6 +268,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   maxVisibleRefs: 3,
   cherryPickInProgress: false,
   cherryPickOptions: { appendSourceRef: false, noCommit: false },
+  revertOptions: { mode: 'commit' },
   rebaseInProgress: false,
   rebaseConflictInfo: undefined,
   revertInProgress: false,
@@ -526,6 +530,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setMaxVisibleRefs: (count) => set({ maxVisibleRefs: count }),
   setCherryPickInProgress: (cherryPickInProgress) => set({ cherryPickInProgress }),
   setCherryPickOptions: (cherryPickOptions) => set({ cherryPickOptions }),
+  setRevertOptions: (revertOptions) => set({ revertOptions }),
   setRebaseInProgress: (rebaseInProgress) => set({ rebaseInProgress }),
   setRebaseConflictInfo: (rebaseConflictInfo) => set({ rebaseConflictInfo }),
   setRevertInProgress: (revertInProgress) => set({ revertInProgress }),

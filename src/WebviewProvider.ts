@@ -1434,7 +1434,7 @@ export class WebviewProvider {
           this.postMessage({ type: 'revertState', payload: { state: 'idle' } });
           break;
         }
-        const result = await this.gitRevertService.revert(message.payload.hash, message.payload.mainlineParent);
+        const result = await this.gitRevertService.revert(message.payload.hash, message.payload.options);
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: result.value } });
           await this.sendInitialData();
@@ -1442,6 +1442,11 @@ export class WebviewProvider {
         } else if (result.error.code === 'REVERT_CONFLICT') {
           this.postMessage({ type: 'error', payload: { error: result.error } });
           this.postMessage({ type: 'revertState', payload: { state: 'in-progress' } });
+        } else if (result.error.code === 'REVERT_CONFLICT_NO_RECOVERY') {
+          // Stage-only / Edit-message conflict: git does not set REVERT_HEAD,
+          // so no Continue/Abort recovery flow — user resolves via SCM panel.
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+          this.postMessage({ type: 'revertState', payload: { state: 'idle' } });
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
           this.postMessage({ type: 'revertState', payload: { state: 'idle' } });

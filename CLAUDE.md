@@ -182,14 +182,14 @@ shared/                           # Shared types between backend & frontend
 - None new. Compare state lives in Zustand store (transient, session-only). (042-compare-refs)
 
 ## Recent Changes
+- 045-revert-mode-dialog: Three-mode Revert Commit dialog (Commit now / Stage only / Edit message) with inline mainline-parent picker, replacing the direct-action menu item and the standalone RevertParentDialog
 - 044-code-refactor: Split `graphStore.ts` (1,200+ lines) by domain; replace whole-store subscriptions with selectors (notably `CommitContextMenu`, `CompareABMarker`) to cut per-row re-render work
 - 043-fast-forward-branch: Fast-forward a non-checked-out local branch from its remote without checkout; extended to remote-only badges (auto-creates local branch + sets upstream)
 - 042-compare-refs: New "Compare" toggle panel + right-click "Set as Compare Base" / "Compare with Base" for A-vs-B diffs across commits, branches, tags, `HEAD`, working-tree, and typed `rev-parse` expressions
-- 041-submodule-selector: Replace submodule mode with submodule selector + filterable repo/submodule combo boxes + left→right top-menu reset chain
-- 039-uncommitted-node-ux2: File picker dialog enhancements
+
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/043-fast-forward-branch/plan.md
+specs/045-revert-mode-dialog/plan.md
 <!-- SPECKIT END -->

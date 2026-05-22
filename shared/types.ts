@@ -318,6 +318,18 @@ export type CherryPickState = 'idle' | 'in-progress';
 
 export type RevertState = 'idle' | 'in-progress';
 
+/** Mode for the Revert Commit dialog. */
+export type RevertMode = 'commit' | 'no-commit' | 'edit-message';
+
+/** Options collected from the RevertDialog and forwarded to the backend. */
+export interface RevertOptions {
+  mode: RevertMode;
+  /** Required when the target commit has >1 parent (i.e. is a merge commit). 1-indexed. */
+  mainlineParent?: number;
+  /** Required ONLY when mode === 'edit-message'. Non-empty after trim. */
+  message?: string;
+}
+
 export type SignatureStatus = 'good' | 'bad' | 'unknown' | 'none';
 
 export type SignatureFormat = 'gpg' | 'ssh';
