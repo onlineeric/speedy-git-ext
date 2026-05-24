@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { CommitTableColumnId } from '@shared/types';
+import type { CommitTableColumnId, CommitTableLayout } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import {
   COMMIT_TABLE_MIN_WIDTHS,
   computeAutoFitWidth,
   computeColumnMaxWidth,
+  materializeCommitTableEffectiveWidths,
+  resizeCommitTableColumnPair,
   resolveResizeTarget,
   setCommitTableColumnPreferredWidth,
   type ResolvedCommitTableLayout,
@@ -22,6 +24,13 @@ interface ResizeSession {
   /** Width ceiling: containerWidth minus every other visible column's minimum width. */
   maxWidth: number;
   isReverse?: boolean;
+  pairResize?: {
+    baseLayout: CommitTableLayout;
+    leftColumnId: CommitTableColumnId;
+    rightColumnId: CommitTableColumnId;
+    leftStartWidth: number;
+    rightStartWidth: number;
+  };
 }
 
 const COLUMN_LABELS: Record<CommitTableColumnId, string> = {
@@ -51,6 +60,27 @@ export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
 
     const handlePointerMove = (event: PointerEvent) => {
       const deltaX = event.clientX - resizeSession.startX;
+      if (resizeSession.pairResize) {
+        const {
+          baseLayout,
+          leftColumnId,
+          rightColumnId,
+          leftStartWidth,
+          rightStartWidth,
+        } = resizeSession.pairResize;
+        updateCommitTableLayout(() =>
+          resizeCommitTableColumnPair({
+            layout: baseLayout,
+            leftColumnId,
+            rightColumnId,
+            leftStartWidth,
+            rightStartWidth,
+            deltaX,
+          })
+        );
+        return;
+      }
+
       const effectiveDeltaX = resizeSession.isReverse ? -deltaX : deltaX;
 
       const nextWidth = Math.min(
@@ -97,6 +127,7 @@ export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
       {layout.columns.map((column, index) => {
         const { target: resizeTarget, isReverse } = resolveResizeTarget(layout.columns, index);
         const resizeLabel = `Resize ${COLUMN_LABELS[resizeTarget.id]} column`;
+        const nextColumn = layout.columns[index + 1];
         return (
           <div
             key={column.id}
@@ -116,12 +147,25 @@ export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
               onPointerDown={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
+                const pairResize = isReverse && nextColumn
+                  ? {
+                      baseLayout: materializeCommitTableEffectiveWidths(
+                        useGraphStore.getState().commitTableLayout,
+                        layout.columns
+                      ),
+                      leftColumnId: column.id,
+                      rightColumnId: nextColumn.id,
+                      leftStartWidth: column.effectiveWidth,
+                      rightStartWidth: nextColumn.effectiveWidth,
+                    }
+                  : undefined;
                 setResizeSession({
                   columnId: resizeTarget.id,
                   startX: event.clientX,
                   startWidth: resizeTarget.effectiveWidth,
                   maxWidth: computeColumnMaxWidth(layout.columns, resizeTarget.id, layout.tableWidth),
                   isReverse,
+                  pairResize,
                 });
               }}
             />

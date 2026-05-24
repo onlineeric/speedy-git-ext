@@ -124,6 +124,49 @@ export function setCommitTableColumnPreferredWidth(
   return nextLayout;
 }
 
+export function materializeCommitTableEffectiveWidths(
+  layout: CommitTableLayout,
+  columns: ResolvedCommitTableColumn[]
+): CommitTableLayout {
+  const nextLayout = cloneCommitTableLayout(layout);
+  for (const column of columns) {
+    nextLayout.columns[column.id].preferredWidth = Math.max(
+      COMMIT_TABLE_MIN_WIDTHS[column.id],
+      Math.round(column.effectiveWidth)
+    );
+  }
+  return nextLayout;
+}
+
+export function resizeCommitTableColumnPair({
+  layout,
+  leftColumnId,
+  rightColumnId,
+  leftStartWidth,
+  rightStartWidth,
+  deltaX,
+}: {
+  layout: CommitTableLayout;
+  leftColumnId: CommitTableColumnId;
+  rightColumnId: CommitTableColumnId;
+  leftStartWidth: number;
+  rightStartWidth: number;
+  deltaX: number;
+}): CommitTableLayout {
+  const maxLeftShrink = leftStartWidth - COMMIT_TABLE_MIN_WIDTHS[leftColumnId];
+  const maxRightShrink = rightStartWidth - COMMIT_TABLE_MIN_WIDTHS[rightColumnId];
+  const clampedDelta = Math.min(maxRightShrink, Math.max(-maxLeftShrink, deltaX));
+  return setCommitTableColumnPreferredWidth(
+    setCommitTableColumnPreferredWidth(
+      layout,
+      leftColumnId,
+      leftStartWidth + clampedDelta
+    ),
+    rightColumnId,
+    rightStartWidth - clampedDelta
+  );
+}
+
 export function setCommitTableColumnVisibility(
   layout: CommitTableLayout,
   columnId: CommitTableColumnId,

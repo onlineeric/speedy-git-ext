@@ -7,7 +7,9 @@ import {
   getOptionalCommitTableColumnIds,
   getOrderedCommitTableColumnIds,
   getVisibleCommitTableColumnIds,
+  materializeCommitTableEffectiveWidths,
   reorderCommitTableColumns,
+  resizeCommitTableColumnPair,
   resolveCommitTableLayout,
   resolveResizeTarget,
   setCommitTableColumnPreferredWidth,
@@ -324,5 +326,107 @@ describe('resolveResizeTarget', () => {
       expect(result.target.id).toBe('date');
       expect(result.isReverse).toBe(false);
     });
+  });
+});
+
+describe('resizeCommitTableColumnPair', () => {
+  it('resizes adjacent columns from a fixed baseline without accumulating previous pointer moves', () => {
+    const layout = createDefaultCommitTableLayout();
+    const resolved = resolveCommitTableLayout({ layout, containerWidth: 900 });
+    const baseLayout = materializeCommitTableEffectiveWidths(layout, resolved.columns);
+    const author = resolved.columns.find((c) => c.id === 'author')!;
+    const date = resolved.columns.find((c) => c.id === 'date')!;
+
+    const after20 = resizeCommitTableColumnPair({
+      layout: baseLayout,
+      leftColumnId: 'author',
+      rightColumnId: 'date',
+      leftStartWidth: author.effectiveWidth,
+      rightStartWidth: date.effectiveWidth,
+      deltaX: 20,
+    });
+    const after25 = resizeCommitTableColumnPair({
+      layout: baseLayout,
+      leftColumnId: 'author',
+      rightColumnId: 'date',
+      leftStartWidth: author.effectiveWidth,
+      rightStartWidth: date.effectiveWidth,
+      deltaX: 25,
+    });
+
+    expect(after20.columns.author.preferredWidth).toBe(author.effectiveWidth + 20);
+    expect(after20.columns.date.preferredWidth).toBe(date.effectiveWidth - 20);
+    expect(after25.columns.author.preferredWidth).toBe(author.effectiveWidth + 25);
+    expect(after25.columns.date.preferredWidth).toBe(date.effectiveWidth - 25);
+  });
+
+  it('keeps message from absorbing the author/date separator movement', () => {
+    const layout = createDefaultCommitTableLayout();
+    const resolved = resolveCommitTableLayout({ layout, containerWidth: 1200 });
+    const baseLayout = materializeCommitTableEffectiveWidths(layout, resolved.columns);
+    const message = resolved.columns.find((c) => c.id === 'message')!;
+    const author = resolved.columns.find((c) => c.id === 'author')!;
+    const date = resolved.columns.find((c) => c.id === 'date')!;
+    expect(message.effectiveWidth).toBeGreaterThan(message.preferredWidth);
+
+    const next = resizeCommitTableColumnPair({
+      layout: baseLayout,
+      leftColumnId: 'author',
+      rightColumnId: 'date',
+      leftStartWidth: author.effectiveWidth,
+      rightStartWidth: date.effectiveWidth,
+      deltaX: 15,
+    });
+    const nextResolved = resolveCommitTableLayout({ layout: next, containerWidth: resolved.tableWidth });
+
+    expect(nextResolved.columns.find((c) => c.id === 'message')!.effectiveWidth).toBe(message.effectiveWidth);
+    expect(nextResolved.columns.find((c) => c.id === 'author')!.effectiveWidth).toBe(author.effectiveWidth + 15);
+    expect(nextResolved.columns.find((c) => c.id === 'date')!.effectiveWidth).toBe(date.effectiveWidth - 15);
+  });
+
+  it('can grow author by dragging the date separator right when date is oversized', () => {
+    const layout = setCommitTableColumnPreferredWidth(
+      createDefaultCommitTableLayout(),
+      'date',
+      500
+    );
+    const resolved = resolveCommitTableLayout({ layout, containerWidth: 600 });
+    const baseLayout = materializeCommitTableEffectiveWidths(layout, resolved.columns);
+    const author = resolved.columns.find((c) => c.id === 'author')!;
+    const date = resolved.columns.find((c) => c.id === 'date')!;
+    expect(author.effectiveWidth).toBe(author.minWidth);
+
+    const next = resizeCommitTableColumnPair({
+      layout: baseLayout,
+      leftColumnId: 'author',
+      rightColumnId: 'date',
+      leftStartWidth: author.effectiveWidth,
+      rightStartWidth: date.effectiveWidth,
+      deltaX: 20,
+    });
+    const nextResolved = resolveCommitTableLayout({ layout: next, containerWidth: resolved.tableWidth });
+
+    expect(nextResolved.columns.find((c) => c.id === 'author')!.effectiveWidth).toBe(author.effectiveWidth + 20);
+    expect(nextResolved.columns.find((c) => c.id === 'date')!.effectiveWidth).toBe(date.effectiveWidth - 20);
+  });
+
+  it('clamps paired resizing at adjacent column minimum widths', () => {
+    const layout = createDefaultCommitTableLayout();
+    const resolved = resolveCommitTableLayout({ layout, containerWidth: 900 });
+    const baseLayout = materializeCommitTableEffectiveWidths(layout, resolved.columns);
+    const author = resolved.columns.find((c) => c.id === 'author')!;
+    const date = resolved.columns.find((c) => c.id === 'date')!;
+
+    const next = resizeCommitTableColumnPair({
+      layout: baseLayout,
+      leftColumnId: 'author',
+      rightColumnId: 'date',
+      leftStartWidth: author.effectiveWidth,
+      rightStartWidth: date.effectiveWidth,
+      deltaX: 999,
+    });
+
+    expect(next.columns.date.preferredWidth).toBe(date.minWidth);
+    expect(next.columns.author.preferredWidth).toBe(author.effectiveWidth + date.effectiveWidth - date.minWidth);
   });
 });
