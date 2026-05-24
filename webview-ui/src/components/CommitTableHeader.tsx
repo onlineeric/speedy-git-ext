@@ -17,6 +17,7 @@ interface ResizeSession {
   columnId: CommitTableColumnId;
   startX: number;
   startWidth: number;
+  isReverse?: boolean;
 }
 
 const COLUMN_LABELS: Record<CommitTableColumnId, string> = {
@@ -45,9 +46,12 @@ export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
     }
 
     const handlePointerMove = (event: PointerEvent) => {
+      const deltaX = event.clientX - resizeSession.startX;
+      const effectiveDeltaX = resizeSession.isReverse ? -deltaX : deltaX;
+
       const nextWidth = Math.max(
         COMMIT_TABLE_MIN_WIDTHS[resizeSession.columnId],
-        resizeSession.startWidth + (event.clientX - resizeSession.startX)
+        resizeSession.startWidth + effectiveDeltaX
       );
       updateCommitTableLayout((currentLayout) =>
         setCommitTableColumnPreferredWidth(currentLayout, resizeSession.columnId, nextWidth)
@@ -97,10 +101,25 @@ export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
             onDoubleClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
-              handleDoubleClick(column.id);
+              const messageIndex = layout.columns.findIndex((c) => c.id === 'message');
+              if (messageIndex !== -1 && index >= messageIndex && index < layout.columns.length - 1) {
+                handleDoubleClick(layout.columns[index + 1].id);
+              } else {
+                handleDoubleClick(column.id);
+              }
             }}
             onPointerDown={(event) => {
-              const target = layout.columns.find((item) => item.id === column.id);
+              const messageIndex = layout.columns.findIndex((c) => c.id === 'message');
+              let target = layout.columns.find((item) => item.id === column.id);
+              let isReverse = false;
+
+              // Since 'message' uses all remaining space, dragging any separator after it
+              // should resize the *next* column in reverse.
+              if (messageIndex !== -1 && index >= messageIndex && index < layout.columns.length - 1) {
+                target = layout.columns[index + 1];
+                isReverse = true;
+              }
+
               if (!target) {
                 return;
               }
@@ -108,9 +127,10 @@ export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
               event.preventDefault();
               event.stopPropagation();
               setResizeSession({
-                columnId: column.id,
+                columnId: target.id,
                 startX: event.clientX,
                 startWidth: target.effectiveWidth,
+                isReverse,
               });
             }}
           />

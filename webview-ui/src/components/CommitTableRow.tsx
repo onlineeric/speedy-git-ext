@@ -313,8 +313,8 @@ function renderColumn({
     case 'date':
       return (
         <DateContextMenu authorDate={commit.authorDate}>
-          <div className="flex h-full items-center justify-end">
-            <span className="truncate text-right text-xs text-[var(--vscode-descriptionForeground)]">
+          <div className="flex h-full items-center">
+            <span className="truncate text-xs text-[var(--vscode-descriptionForeground)]">
               {dateFormatter(commit.authorDate)}
             </span>
           </div>
