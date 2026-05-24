@@ -186,8 +186,7 @@ export function CommitListSettingsPopover() {
               </DndContext>
 
               {commitListMode === 'table' && (
-                <>
-                  <div className="border-t border-[var(--vscode-panel-border)]" />
+                <div className="mt-4 border-t border-[var(--vscode-panel-border)] pt-2">
                   <button
                     type="button"
                     onClick={handleResetWidths}
@@ -196,7 +195,7 @@ export function CommitListSettingsPopover() {
                   >
                     Reset column widths to defaults
                   </button>
-                </>
+                </div>
               )}
             </section>
           </div>
