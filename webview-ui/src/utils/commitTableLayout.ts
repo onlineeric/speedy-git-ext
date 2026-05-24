@@ -166,6 +166,21 @@ function shrinkColumn(
   return remainingDeficit - shrinkAmount;
 }
 
+// The `message` column absorbs surplus width, so its own preferredWidth cannot
+// be dragged. For any separator at or after `message` (except the last column's
+// outer edge), the grab targets the next column instead and inverts the delta —
+// keeping the visible boundary glued to the cursor.
+export function resolveResizeTarget(
+  columns: ResolvedCommitTableColumn[],
+  index: number
+): { target: ResolvedCommitTableColumn; isReverse: boolean } {
+  const messageIndex = columns.findIndex((c) => c.id === 'message');
+  if (messageIndex !== -1 && index >= messageIndex && index < columns.length - 1) {
+    return { target: columns[index + 1], isReverse: true };
+  }
+  return { target: columns[index], isReverse: false };
+}
+
 export function resolveCommitTableLayout({
   layout,
   containerWidth,

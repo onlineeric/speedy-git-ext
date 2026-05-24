@@ -4,6 +4,22 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.3.1] - 2026-05-24
+
+### Fixed
+- Table view: the separator between the **Message** column and the column to its right (default: **Author**) is now an active drag handle. Previously, dragging it produced no visible change because the handler targeted the Message column, which absorbs surplus container width and therefore cannot be resized by adjusting its own preferred width. The handler now targets the *next* column with an inverted delta, so the dragged boundary follows the cursor. The same logic cascades to every separator at or after Message (e.g., **Author │ Date**), so all interior boundaries are now independently draggable. Particularly noticeable on macOS, where the rightmost handle previously sat awkwardly against the VS Code window edge.
+- Accessibility: the `aria-label` and `title` on each separator button now name the column actually being resized, not the column the button sits inside. After the resize-target change, the button inside the Message cell was announcing "Resize Message column" while the drag actually resized Author — confusing for screen-reader users and anyone relying on the tooltip.
+
+### Changed
+- Table view: the **Date** column is now left-aligned, matching the alignment of the Author and Message columns. Previously it was right-aligned.
+
+### Internal
+- Extracted `resolveResizeTarget(columns, index)` from `CommitTableHeader.tsx` into the shared `commitTableLayout.ts` utility module so the Message-column carve-out logic lives in exactly one place; the separator label, double-click handler, and pointer-down handler all derive from the same call and cannot drift apart.
+- Added unit tests for `resolveResizeTarget` covering the carve-out across four layouts: default order (graph, hash, message, author, date), Message hidden, Message reordered to the last position, and Message reordered to second position. Each layout asserts the target column and `isReverse` value for every separator index.
+
+### Credits
+- Column resize behavior fix and date column left-alignment contributed by [@singularitti](https://github.com/singularitti) in [#126](https://github.com/onlineeric/speedy-git-ext/pull/126). First external contribution — thank you!
+
 ## [4.3.0] - 2026-05-22
 
 ### Added

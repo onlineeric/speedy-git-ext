@@ -5,6 +5,7 @@ import { useGraphStore } from '../stores/graphStore';
 import {
   COMMIT_TABLE_MIN_WIDTHS,
   computeAutoFitWidth,
+  resolveResizeTarget,
   setCommitTableColumnPreferredWidth,
   type ResolvedCommitTableLayout,
 } from '../utils/commitTableLayout';
@@ -87,55 +88,39 @@ export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
         width: layout.tableWidth,
       }}
     >
-      {layout.columns.map((column, index) => (
-        <div
-          key={column.id}
-          className={`relative flex h-8 items-center px-2 ${index < layout.columns.length - 1 ? 'border-r border-[var(--vscode-panel-border)]' : ''}`}
-        >
-          <span className="truncate">{COLUMN_LABELS[column.id]}</span>
-          <button
-            type="button"
-            className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none"
-            aria-label={`Resize ${COLUMN_LABELS[column.id]} column`}
-            title={`Resize ${COLUMN_LABELS[column.id]} column`}
-            onDoubleClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              const messageIndex = layout.columns.findIndex((c) => c.id === 'message');
-              if (messageIndex !== -1 && index >= messageIndex && index < layout.columns.length - 1) {
-                handleDoubleClick(layout.columns[index + 1].id);
-              } else {
-                handleDoubleClick(column.id);
-              }
-            }}
-            onPointerDown={(event) => {
-              const messageIndex = layout.columns.findIndex((c) => c.id === 'message');
-              let target = layout.columns.find((item) => item.id === column.id);
-              let isReverse = false;
-
-              // Since 'message' uses all remaining space, dragging any separator after it
-              // should resize the *next* column in reverse.
-              if (messageIndex !== -1 && index >= messageIndex && index < layout.columns.length - 1) {
-                target = layout.columns[index + 1];
-                isReverse = true;
-              }
-
-              if (!target) {
-                return;
-              }
-
-              event.preventDefault();
-              event.stopPropagation();
-              setResizeSession({
-                columnId: target.id,
-                startX: event.clientX,
-                startWidth: target.effectiveWidth,
-                isReverse,
-              });
-            }}
-          />
-        </div>
-      ))}
+      {layout.columns.map((column, index) => {
+        const { target: resizeTarget, isReverse } = resolveResizeTarget(layout.columns, index);
+        const resizeLabel = `Resize ${COLUMN_LABELS[resizeTarget.id]} column`;
+        return (
+          <div
+            key={column.id}
+            className={`relative flex h-8 items-center px-2 ${index < layout.columns.length - 1 ? 'border-r border-[var(--vscode-panel-border)]' : ''}`}
+          >
+            <span className="truncate">{COLUMN_LABELS[column.id]}</span>
+            <button
+              type="button"
+              className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none"
+              aria-label={resizeLabel}
+              title={resizeLabel}
+              onDoubleClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                handleDoubleClick(resizeTarget.id);
+              }}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setResizeSession({
+                  columnId: resizeTarget.id,
+                  startX: event.clientX,
+                  startWidth: resizeTarget.effectiveWidth,
+                  isReverse,
+                });
+              }}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
