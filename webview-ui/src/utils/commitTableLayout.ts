@@ -56,6 +56,25 @@ export interface ResolvedCommitTableLayout {
   minimumTableWidth: number;
 }
 
+/**
+ * Compute the maximum preferred width a column may grow to during a drag,
+ * given the current resolved layout and the actual container width.
+ *
+ * The ceiling is defined so that every *other* visible column can still render
+ * at its minimum width.  This is always at least the column's own minimum, so
+ * it can never go negative.
+ */
+export function computeColumnMaxWidth(
+  columns: ResolvedCommitTableColumn[],
+  columnId: CommitTableColumnId,
+  containerWidth: number,
+): number {
+  const otherColumnsMinWidth = columns
+    .filter((c) => c.id !== columnId)
+    .reduce((sum, c) => sum + c.minWidth, 0);
+  return Math.max(COMMIT_TABLE_MIN_WIDTHS[columnId], containerWidth - otherColumnsMinWidth);
+}
+
 function sanitizeOrder(order: CommitTableLayout['order']): CommitTableColumnId[] {
   const seen = new Set<CommitTableColumnId>();
   const sanitized: CommitTableColumnId[] = ['graph'];

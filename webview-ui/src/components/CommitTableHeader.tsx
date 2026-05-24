@@ -5,6 +5,7 @@ import { useGraphStore } from '../stores/graphStore';
 import {
   COMMIT_TABLE_MIN_WIDTHS,
   computeAutoFitWidth,
+  computeColumnMaxWidth,
   resolveResizeTarget,
   setCommitTableColumnPreferredWidth,
   type ResolvedCommitTableLayout,
@@ -18,6 +19,8 @@ interface ResizeSession {
   columnId: CommitTableColumnId;
   startX: number;
   startWidth: number;
+  /** Width ceiling: containerWidth minus every other visible column's minimum width. */
+  maxWidth: number;
   isReverse?: boolean;
 }
 
@@ -50,9 +53,12 @@ export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
       const deltaX = event.clientX - resizeSession.startX;
       const effectiveDeltaX = resizeSession.isReverse ? -deltaX : deltaX;
 
-      const nextWidth = Math.max(
-        COMMIT_TABLE_MIN_WIDTHS[resizeSession.columnId],
-        resizeSession.startWidth + effectiveDeltaX
+      const nextWidth = Math.min(
+        resizeSession.maxWidth,
+        Math.max(
+          COMMIT_TABLE_MIN_WIDTHS[resizeSession.columnId],
+          resizeSession.startWidth + effectiveDeltaX
+        )
       );
       updateCommitTableLayout((currentLayout) =>
         setCommitTableColumnPreferredWidth(currentLayout, resizeSession.columnId, nextWidth)
@@ -114,6 +120,7 @@ export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
                   columnId: resizeTarget.id,
                   startX: event.clientX,
                   startWidth: resizeTarget.effectiveWidth,
+                  maxWidth: computeColumnMaxWidth(layout.columns, resizeTarget.id, layout.tableWidth),
                   isReverse,
                 });
               }}

@@ -21,8 +21,10 @@ import type { CommitListMode, CommitTableColumnId } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import {
+  COMMIT_TABLE_DEFAULT_WIDTHS,
   getOptionalCommitTableColumnIds,
   reorderCommitTableColumns,
+  setCommitTableColumnPreferredWidth,
   setCommitTableColumnVisibility,
 } from '../utils/commitTableLayout';
 import { ColumnsIcon } from './icons';
@@ -83,6 +85,20 @@ export function CommitListSettingsPopover() {
 
     const nextOptionalOrder = arrayMove(optionalColumnIds, oldIndex, newIndex);
     const nextLayout = reorderCommitTableColumns(commitTableLayout, nextOptionalOrder);
+    setCommitTableLayout(nextLayout);
+    rpcClient.persistUIState({ commitTableLayout: nextLayout });
+  };
+
+  const handleResetWidths = () => {
+    // Restore every column's preferredWidth to its factory default.
+    let nextLayout = commitTableLayout;
+    for (const [columnId, defaultWidth] of Object.entries(COMMIT_TABLE_DEFAULT_WIDTHS)) {
+      nextLayout = setCommitTableColumnPreferredWidth(
+        nextLayout,
+        columnId as Parameters<typeof setCommitTableColumnPreferredWidth>[1],
+        defaultWidth
+      );
+    }
     setCommitTableLayout(nextLayout);
     rpcClient.persistUIState({ commitTableLayout: nextLayout });
   };
@@ -168,6 +184,20 @@ export function CommitListSettingsPopover() {
                   </div>
                 </SortableContext>
               </DndContext>
+
+              {commitListMode === 'table' && (
+                <>
+                  <div className="border-t border-[var(--vscode-panel-border)]" />
+                  <button
+                    type="button"
+                    onClick={handleResetWidths}
+                    className="w-full rounded px-2.5 py-1.5 text-left text-xs text-[var(--vscode-descriptionForeground)] transition-colors hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)] focus:outline-none"
+                    title="Restore all column widths to their factory defaults"
+                  >
+                    Reset column widths to defaults
+                  </button>
+                </>
+              )}
             </section>
           </div>
           <Popover.Arrow className="fill-[var(--vscode-menu-border)]" />
