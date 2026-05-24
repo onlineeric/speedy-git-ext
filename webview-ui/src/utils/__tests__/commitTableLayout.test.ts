@@ -9,10 +9,16 @@ import {
   getVisibleCommitTableColumnIds,
   reorderCommitTableColumns,
   resolveCommitTableLayout,
+  resolveResizeTarget,
   setCommitTableColumnPreferredWidth,
   setCommitTableColumnVisibility,
+  type ResolvedCommitTableColumn,
 } from '../commitTableLayout';
-import { createDefaultCommitTableLayout, type CommitTableLayout } from '@shared/types';
+import {
+  createDefaultCommitTableLayout,
+  type CommitTableColumnId,
+  type CommitTableLayout,
+} from '@shared/types';
 
 describe('constants', () => {
   it('exposes default order starting with graph', () => {
@@ -221,5 +227,102 @@ describe('resolveCommitTableLayout', () => {
     for (const col of resolved.columns) {
       expect(col.effectiveWidth).toBeGreaterThanOrEqual(col.minWidth);
     }
+  });
+});
+
+describe('resolveResizeTarget', () => {
+  const makeColumns = (ids: CommitTableColumnId[]): ResolvedCommitTableColumn[] =>
+    ids.map((id) => ({
+      id,
+      visible: true,
+      preferredWidth: 100,
+      effectiveWidth: 100,
+      minWidth: COMMIT_TABLE_MIN_WIDTHS[id],
+    }));
+
+  describe('default order: graph, hash, message, author, date', () => {
+    const columns = makeColumns(['graph', 'hash', 'message', 'author', 'date']);
+
+    it('separators before message target their own column with isReverse=false', () => {
+      expect(resolveResizeTarget(columns, 0)).toEqual({ target: columns[0], isReverse: false });
+      expect(resolveResizeTarget(columns, 1)).toEqual({ target: columns[1], isReverse: false });
+    });
+
+    it('separator on message targets the next column (author) in reverse', () => {
+      const result = resolveResizeTarget(columns, 2);
+      expect(result.target.id).toBe('author');
+      expect(result.isReverse).toBe(true);
+    });
+
+    it('separator on a column between message and last targets the next column in reverse', () => {
+      const result = resolveResizeTarget(columns, 3);
+      expect(result.target.id).toBe('date');
+      expect(result.isReverse).toBe(true);
+    });
+
+    it('separator on the last column targets itself with isReverse=false', () => {
+      const result = resolveResizeTarget(columns, 4);
+      expect(result.target.id).toBe('date');
+      expect(result.isReverse).toBe(false);
+    });
+  });
+
+  describe('message hidden: graph, hash, author, date', () => {
+    const columns = makeColumns(['graph', 'hash', 'author', 'date']);
+
+    it('every separator targets its own column with isReverse=false (no carve-out)', () => {
+      for (let i = 0; i < columns.length; i++) {
+        const result = resolveResizeTarget(columns, i);
+        expect(result.target).toBe(columns[i]);
+        expect(result.isReverse).toBe(false);
+      }
+    });
+  });
+
+  describe('message last: graph, hash, author, date, message', () => {
+    const columns = makeColumns(['graph', 'hash', 'author', 'date', 'message']);
+
+    it('separator on message (last position) targets itself with isReverse=false', () => {
+      const result = resolveResizeTarget(columns, 4);
+      expect(result.target.id).toBe('message');
+      expect(result.isReverse).toBe(false);
+    });
+
+    it('separators before message-last target their own column with isReverse=false', () => {
+      for (let i = 0; i < 4; i++) {
+        const result = resolveResizeTarget(columns, i);
+        expect(result.target).toBe(columns[i]);
+        expect(result.isReverse).toBe(false);
+      }
+    });
+  });
+
+  describe('message reordered earlier: graph, message, hash, author, date', () => {
+    const columns = makeColumns(['graph', 'message', 'hash', 'author', 'date']);
+
+    it('separator before message targets its own column with isReverse=false', () => {
+      const result = resolveResizeTarget(columns, 0);
+      expect(result.target.id).toBe('graph');
+      expect(result.isReverse).toBe(false);
+    });
+
+    it('separator on message targets the next column (hash) in reverse', () => {
+      const result = resolveResizeTarget(columns, 1);
+      expect(result.target.id).toBe('hash');
+      expect(result.isReverse).toBe(true);
+    });
+
+    it('separators after message (except last) cascade in reverse to the next column', () => {
+      expect(resolveResizeTarget(columns, 2).target.id).toBe('author');
+      expect(resolveResizeTarget(columns, 2).isReverse).toBe(true);
+      expect(resolveResizeTarget(columns, 3).target.id).toBe('date');
+      expect(resolveResizeTarget(columns, 3).isReverse).toBe(true);
+    });
+
+    it('separator on the last column targets itself with isReverse=false', () => {
+      const result = resolveResizeTarget(columns, 4);
+      expect(result.target.id).toBe('date');
+      expect(result.isReverse).toBe(false);
+    });
   });
 });
