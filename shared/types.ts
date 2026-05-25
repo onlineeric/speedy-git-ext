@@ -254,6 +254,18 @@ export const DEFAULT_COMMIT_TABLE_COLUMN_PREFERENCES: Record<CommitTableColumnId
   date: { visible: true, preferredWidth: 140 },
 };
 
+// Per-column minimum widths — shared so the backend can heal oversized
+// persisted widths using the same ceiling logic as the webview.
+// The `date` minimum is sized for the shortest format ("just now"); longer
+// formats render via `preferredWidth`.
+export const COMMIT_TABLE_MIN_WIDTHS: Record<CommitTableColumnId, number> = {
+  graph: 52,
+  hash: 72,
+  message: 160,
+  author: 120,
+  date: 64,
+};
+
 export function createDefaultCommitTableLayout(): CommitTableLayout {
   return {
     order: [...DEFAULT_COMMIT_TABLE_COLUMN_ORDER],

@@ -19,6 +19,7 @@ import type {
 } from '../shared/types.js';
 import {
   COMMIT_TABLE_COLUMN_IDS,
+  COMMIT_TABLE_MIN_WIDTHS,
   DEFAULT_PERSISTED_UI_STATE,
   UNCOMMITTED_HASH,
   buildUncommittedSubject,
@@ -44,23 +45,29 @@ import { GitError, type Result } from '../shared/errors.js';
 import { GitExecutor } from './services/GitExecutor.js';
 import { GitHubAvatarService } from './services/GitHubAvatarService.js';
 
-// Per-column minimum widths — mirrors COMMIT_TABLE_MIN_WIDTHS in commitTableLayout.ts
-// (kept here to avoid a backend ↔ webview-util import).
-const COLUMN_MIN_WIDTHS: Record<string, number> = {
-  graph: 52, hash: 72, message: 160, author: 120, date: 64,
-};
-
 // When healing an oversized stored preferredWidth, derive a per-column ceiling
 // using the same logic as the frontend: max = containerWidth - sum(other min widths).
 // We use 4000 px as a conservative assumed container width (safely within 4K monitors).
 const HEALING_ASSUMED_CONTAINER_WIDTH = 4000;
 
-function computeHealingMaxWidth(columnId: string): number {
-  const minWidth = COLUMN_MIN_WIDTHS[columnId] ?? 0;
-  const otherMinWidths = Object.entries(COLUMN_MIN_WIDTHS)
-    .filter(([id]) => id !== columnId)
-    .reduce((sum, [, w]) => sum + w, 0);
+const SUM_OF_ALL_MIN_WIDTHS = Object.values(COMMIT_TABLE_MIN_WIDTHS).reduce(
+  (sum, w) => sum + w,
+  0,
+);
+
+function computeHealingMaxWidth(columnId: CommitTableColumnId): number {
+  const minWidth = COMMIT_TABLE_MIN_WIDTHS[columnId];
+  const otherMinWidths = SUM_OF_ALL_MIN_WIDTHS - minWidth;
   return Math.max(minWidth, HEALING_ASSUMED_CONTAINER_WIDTH - otherMinWidths);
+}
+
+function healPersistedColumnWidth(
+  columnId: CommitTableColumnId,
+  rawWidth: number,
+): number {
+  const minWidth = COMMIT_TABLE_MIN_WIDTHS[columnId];
+  const maxWidth = computeHealingMaxWidth(columnId);
+  return Math.min(maxWidth, Math.max(minWidth, Math.round(rawWidth)));
 }
 
 function repoLayoutKey(repoPath: string): string {
@@ -168,13 +175,7 @@ function validateCommitTableLayout(
         typeof columnRecord.preferredWidth === 'number'
         && isFinite(columnRecord.preferredWidth)
         && columnRecord.preferredWidth > 0
-          ? Math.min(
-              computeHealingMaxWidth(columnId),
-              Math.max(
-                COLUMN_MIN_WIDTHS[columnId] ?? 0,
-                Math.round(columnRecord.preferredWidth)
-              )
-            )
+          ? healPersistedColumnWidth(columnId, columnRecord.preferredWidth)
           : columnRecord.preferredWidth !== undefined
             ? defaultColumn.preferredWidth
             : baseColumn.preferredWidth,

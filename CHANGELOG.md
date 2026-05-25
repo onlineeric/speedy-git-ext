@@ -4,6 +4,28 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.3.2] - 2026-05-25
+
+### Fixed
+- Table view: dragging the separator between **Message** and the column to its right (default: **Author**) no longer makes the Message column silently absorb the motion. Previously, each pointer move was applied on top of the latest layout — so the inverted delta meant for the right neighbour also shrank Message, leaving Message visibly smaller after a brief drag even though Message has no draggable preferred width. The pointer-down handler now snapshots the effective widths of every visible column into a fixed baseline (`materializeCommitTableEffectiveWidths`), and each pointer move computes the new widths from that snapshot using a single shared `resizeCommitTableColumnPair` helper. Message stays put; only the two columns adjacent to the dragged separator change.
+- Table view: a column can no longer be dragged so wide that its neighbours collapse below their minimum widths, which previously produced an "unrecoverable" layout where the only way out was to reset the layout entirely. Both during drag and at load time, each `preferredWidth` is now clamped against a per-column ceiling defined as `containerWidth − Σ(other visible columns' min widths)`. At load time the backend applies the same ceiling against an assumed 4000 px container, healing any oversized values that may have been persisted by older builds.
+
+### Added
+- "Reset column widths to defaults" item in the table-view settings popover (shown only when the commit list is in table mode). Restores every column's `preferredWidth` to its factory default in one click, without touching column order or visibility. Renders as a full-width text button under the column list, separated by a divider so it cannot be confused with a column toggle.
+
+### Internal
+- Added `resizeCommitTableColumnPair({ layout, leftColumnId, rightColumnId, leftStartWidth, rightStartWidth, deltaX })` to `commitTableLayout.ts` — a pure helper that clamps `deltaX` against both neighbours' minimum widths and returns a new layout with the two columns adjusted symmetrically. Unit-tested across fixed-baseline non-accumulation, Message-doesn't-absorb-the-delta, growth via an oversized neighbour, and clamping at both the left and right column minimums.
+- Added `computeColumnMaxWidth(columns, columnId, containerWidth)` — derives the per-column ceiling used while dragging so the resize session knows the upper bound at pointer-down time. Mirrored on the backend via a `HEALING_ASSUMED_CONTAINER_WIDTH = 4000` constant when validating persisted layouts.
+- Added `materializeCommitTableEffectiveWidths(layout, resolvedColumns)` — produces a new layout where every column's `preferredWidth` equals its current `effectiveWidth` (clamped to its minimum, rounded to an integer). Used as the fixed baseline for paired resizing so accumulated pointer moves cannot drift the layout.
+- Moved `COMMIT_TABLE_MIN_WIDTHS` from `webview-ui/src/utils/commitTableLayout.ts` into `shared/types.ts` so the backend `validateCommitTableLayout` healing logic and the frontend resize logic share one source of truth. The webview util re-exports the symbol so existing imports continue to work unchanged.
+- Extracted `healPersistedColumnWidth(columnId, rawWidth)` helper in `WebviewProvider.ts` to flatten the nested `Math.min`/`Math.max` clamping previously inlined inside `validateCommitTableLayout`. `computeHealingMaxWidth` now reads from a precomputed `SUM_OF_ALL_MIN_WIDTHS` constant instead of re-walking the per-column map on every call.
+- Added unit tests for `computeColumnMaxWidth` (correct ceiling, fallback to column min when the container is too small, consistency with `resolveCommitTableLayout` after growing a column to the ceiling) and `materializeCommitTableEffectiveWidths` (captures surplus message width, immutability of the input, fractional rounding, and the min-width clamp on pathological inputs).
+- Added unit tests for the backend healing path in `WebviewProvider.test.ts` covering: oversized persisted widths clamped to the healing ceiling, sub-minimum values raised to the minimum, fractional widths rounded, reasonable widths preserved unchanged, and `NaN` values falling back to the default.
+- Fixed unrelated minor spacing inconsistency on the **Reset** item inside the view-mode popover so it visually aligns with the other items in the same list.
+
+### Credits
+- Column resize safety fixes (paired-baseline resize and per-column max-width clamping) and the "Reset column widths to defaults" action contributed by [@singularitti](https://github.com/singularitti) in [#128](https://github.com/onlineeric/speedy-git-ext/pull/128). Thank you for the second contribution!
+
 ## [4.3.1] - 2026-05-24
 
 ### Fixed

@@ -1,5 +1,6 @@
 import {
   COMMIT_TABLE_COLUMN_IDS,
+  COMMIT_TABLE_MIN_WIDTHS,
   DEFAULT_COMMIT_TABLE_COLUMN_ORDER,
   DEFAULT_COMMIT_TABLE_LAYOUT,
   cloneCommitTableLayout,
@@ -8,6 +9,8 @@ import {
   type CommitTableLayout,
   type UserSettings,
 } from '@shared/types';
+
+export { COMMIT_TABLE_MIN_WIDTHS };
 import type { GraphTopology } from './graphTopology';
 import { getDateFormatter } from './formatDate';
 
@@ -19,16 +22,6 @@ export const COMMIT_TABLE_DEFAULT_WIDTHS: Record<CommitTableColumnId, number> = 
   message: DEFAULT_COMMIT_TABLE_LAYOUT.columns.message.preferredWidth,
   author: DEFAULT_COMMIT_TABLE_LAYOUT.columns.author.preferredWidth,
   date: DEFAULT_COMMIT_TABLE_LAYOUT.columns.date.preferredWidth,
-};
-
-export const COMMIT_TABLE_MIN_WIDTHS: Record<CommitTableColumnId, number> = {
-  graph: 52,
-  hash: 72,
-  message: 160,
-  author: 120,
-  // Sized for the shortest formats (relative "just now", "3h ago"). Longer formats
-  // still display via `preferredWidth`; this only governs how small the user can drag.
-  date: 64,
 };
 
 export const COMMIT_TABLE_OPTIONAL_COLUMN_IDS = COMMIT_TABLE_COLUMN_IDS.filter(

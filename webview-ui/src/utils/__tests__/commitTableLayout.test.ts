@@ -4,6 +4,7 @@ import {
   COMMIT_TABLE_DEFAULT_WIDTHS,
   COMMIT_TABLE_MIN_WIDTHS,
   COMMIT_TABLE_OPTIONAL_COLUMN_IDS,
+  computeColumnMaxWidth,
   getOptionalCommitTableColumnIds,
   getOrderedCommitTableColumnIds,
   getVisibleCommitTableColumnIds,
@@ -428,5 +429,114 @@ describe('resizeCommitTableColumnPair', () => {
 
     expect(next.columns.date.preferredWidth).toBe(date.minWidth);
     expect(next.columns.author.preferredWidth).toBe(author.effectiveWidth + date.effectiveWidth - date.minWidth);
+  });
+
+  it('clamps paired resizing leftward at the left column minimum width', () => {
+    const layout = createDefaultCommitTableLayout();
+    const resolved = resolveCommitTableLayout({ layout, containerWidth: 900 });
+    const baseLayout = materializeCommitTableEffectiveWidths(layout, resolved.columns);
+    const author = resolved.columns.find((c) => c.id === 'author')!;
+    const date = resolved.columns.find((c) => c.id === 'date')!;
+
+    const next = resizeCommitTableColumnPair({
+      layout: baseLayout,
+      leftColumnId: 'author',
+      rightColumnId: 'date',
+      leftStartWidth: author.effectiveWidth,
+      rightStartWidth: date.effectiveWidth,
+      deltaX: -9999,
+    });
+
+    expect(next.columns.author.preferredWidth).toBe(author.minWidth);
+    expect(next.columns.date.preferredWidth).toBe(date.effectiveWidth + (author.effectiveWidth - author.minWidth));
+  });
+});
+
+describe('computeColumnMaxWidth', () => {
+  function makeColumns(): ResolvedCommitTableColumn[] {
+    return (['graph', 'hash', 'message', 'author', 'date'] as const).map((id) => ({
+      id,
+      visible: true,
+      preferredWidth: 100,
+      effectiveWidth: 100,
+      minWidth: COMMIT_TABLE_MIN_WIDTHS[id],
+    }));
+  }
+
+  it('returns containerWidth minus the sum of every other column minWidth', () => {
+    const columns = makeColumns();
+    const otherMinWidths =
+      COMMIT_TABLE_MIN_WIDTHS.graph
+      + COMMIT_TABLE_MIN_WIDTHS.hash
+      + COMMIT_TABLE_MIN_WIDTHS.message
+      + COMMIT_TABLE_MIN_WIDTHS.date;
+    expect(computeColumnMaxWidth(columns, 'author', 1200)).toBe(1200 - otherMinWidths);
+  });
+
+  it('falls back to the column min width when container is too small', () => {
+    const columns = makeColumns();
+    expect(computeColumnMaxWidth(columns, 'author', 50)).toBe(COMMIT_TABLE_MIN_WIDTHS.author);
+  });
+
+  it('is consistent with resizing: a column may grow up to the returned max without breaking neighbours', () => {
+    const layout = createDefaultCommitTableLayout();
+    const resolved = resolveCommitTableLayout({ layout, containerWidth: 1100 });
+    const max = computeColumnMaxWidth(resolved.columns, 'author', 1100);
+    const next = setCommitTableColumnPreferredWidth(layout, 'author', max);
+    const nextResolved = resolveCommitTableLayout({ layout: next, containerWidth: 1100 });
+
+    // After growing author to the ceiling, every other visible column still
+    // renders at least at its minimum width.
+    for (const col of nextResolved.columns) {
+      expect(col.effectiveWidth).toBeGreaterThanOrEqual(col.minWidth);
+    }
+  });
+});
+
+describe('materializeCommitTableEffectiveWidths', () => {
+  it('overwrites each preferredWidth with the column\'s current effectiveWidth', () => {
+    const layout = createDefaultCommitTableLayout();
+    // Container > sum(preferred) so message gets surplus → effective > preferred.
+    const totalPref = Object.values(layout.columns).reduce((s, c) => s + c.preferredWidth, 0);
+    const resolved = resolveCommitTableLayout({ layout, containerWidth: totalPref + 300 });
+
+    const next = materializeCommitTableEffectiveWidths(layout, resolved.columns);
+
+    const messageResolved = resolved.columns.find((c) => c.id === 'message')!;
+    expect(next.columns.message.preferredWidth).toBe(Math.round(messageResolved.effectiveWidth));
+  });
+
+  it('returns a new layout without mutating the input', () => {
+    const layout = createDefaultCommitTableLayout();
+    const resolved = resolveCommitTableLayout({ layout, containerWidth: 900 });
+    const originalMessageWidth = layout.columns.message.preferredWidth;
+
+    const next = materializeCommitTableEffectiveWidths(layout, resolved.columns);
+
+    expect(next).not.toBe(layout);
+    expect(layout.columns.message.preferredWidth).toBe(originalMessageWidth);
+  });
+
+  it('rounds fractional effectiveWidths', () => {
+    const layout = createDefaultCommitTableLayout();
+    const resolved = resolveCommitTableLayout({ layout, containerWidth: 900 });
+    // Fabricate a fractional effective width to lock the rounding contract.
+    const author = resolved.columns.find((c) => c.id === 'author')!;
+    author.effectiveWidth = 123.6;
+
+    const next = materializeCommitTableEffectiveWidths(layout, resolved.columns);
+
+    expect(next.columns.author.preferredWidth).toBe(124);
+  });
+
+  it('clamps preferredWidth at COMMIT_TABLE_MIN_WIDTHS when effectiveWidth is below it', () => {
+    const layout = createDefaultCommitTableLayout();
+    const resolved = resolveCommitTableLayout({ layout, containerWidth: 900 });
+    const date = resolved.columns.find((c) => c.id === 'date')!;
+    date.effectiveWidth = 10; // pathological: below the minimum
+
+    const next = materializeCommitTableEffectiveWidths(layout, resolved.columns);
+
+    expect(next.columns.date.preferredWidth).toBe(COMMIT_TABLE_MIN_WIDTHS.date);
   });
 });
