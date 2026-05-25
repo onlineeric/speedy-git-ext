@@ -56,6 +56,25 @@ export interface ResolvedCommitTableLayout {
   minimumTableWidth: number;
 }
 
+/**
+ * Compute the maximum preferred width a column may grow to during a drag,
+ * given the current resolved layout and the actual container width.
+ *
+ * The ceiling is defined so that every *other* visible column can still render
+ * at its minimum width.  This is always at least the column's own minimum, so
+ * it can never go negative.
+ */
+export function computeColumnMaxWidth(
+  columns: ResolvedCommitTableColumn[],
+  columnId: CommitTableColumnId,
+  containerWidth: number,
+): number {
+  const otherColumnsMinWidth = columns
+    .filter((c) => c.id !== columnId)
+    .reduce((sum, c) => sum + c.minWidth, 0);
+  return Math.max(COMMIT_TABLE_MIN_WIDTHS[columnId], containerWidth - otherColumnsMinWidth);
+}
+
 function sanitizeOrder(order: CommitTableLayout['order']): CommitTableColumnId[] {
   const seen = new Set<CommitTableColumnId>();
   const sanitized: CommitTableColumnId[] = ['graph'];
@@ -103,6 +122,49 @@ export function setCommitTableColumnPreferredWidth(
     Math.round(preferredWidth)
   );
   return nextLayout;
+}
+
+export function materializeCommitTableEffectiveWidths(
+  layout: CommitTableLayout,
+  columns: ResolvedCommitTableColumn[]
+): CommitTableLayout {
+  const nextLayout = cloneCommitTableLayout(layout);
+  for (const column of columns) {
+    nextLayout.columns[column.id].preferredWidth = Math.max(
+      COMMIT_TABLE_MIN_WIDTHS[column.id],
+      Math.round(column.effectiveWidth)
+    );
+  }
+  return nextLayout;
+}
+
+export function resizeCommitTableColumnPair({
+  layout,
+  leftColumnId,
+  rightColumnId,
+  leftStartWidth,
+  rightStartWidth,
+  deltaX,
+}: {
+  layout: CommitTableLayout;
+  leftColumnId: CommitTableColumnId;
+  rightColumnId: CommitTableColumnId;
+  leftStartWidth: number;
+  rightStartWidth: number;
+  deltaX: number;
+}): CommitTableLayout {
+  const maxLeftShrink = leftStartWidth - COMMIT_TABLE_MIN_WIDTHS[leftColumnId];
+  const maxRightShrink = rightStartWidth - COMMIT_TABLE_MIN_WIDTHS[rightColumnId];
+  const clampedDelta = Math.min(maxRightShrink, Math.max(-maxLeftShrink, deltaX));
+  return setCommitTableColumnPreferredWidth(
+    setCommitTableColumnPreferredWidth(
+      layout,
+      leftColumnId,
+      leftStartWidth + clampedDelta
+    ),
+    rightColumnId,
+    rightStartWidth - clampedDelta
+  );
 }
 
 export function setCommitTableColumnVisibility(
