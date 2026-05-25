@@ -1,7 +1,11 @@
 import * as crypto from 'crypto';
 import { describe, expect, it, vi } from 'vitest';
 import type { Commit } from '../../shared/types.js';
-import { createDefaultCommitTableLayout, DEFAULT_PERSISTED_UI_STATE } from '../../shared/types.js';
+import {
+  COMMIT_TABLE_MIN_WIDTHS,
+  createDefaultCommitTableLayout,
+  DEFAULT_PERSISTED_UI_STATE,
+} from '../../shared/types.js';
 import { WebviewProvider } from '../WebviewProvider.js';
 
 vi.mock('vscode', () => ({
@@ -225,6 +229,112 @@ describe('WebviewProvider per-repo column layout', () => {
 
     const state = testable.loadPersistedUIState();
     expect(state.commitListMode).toBe('table');
+  });
+});
+
+describe('WebviewProvider validateCommitTableLayout healing', () => {
+  // The backend "heals" persisted widths so a column whose stored preferredWidth
+  // would push neighbours below their minimum cannot make the layout
+  // unrecoverable. Healing happens lazily when the layout is loaded.
+  const HEALING_ASSUMED_CONTAINER_WIDTH = 4000;
+  const SUM_OF_ALL_MIN_WIDTHS = Object.values(COMMIT_TABLE_MIN_WIDTHS).reduce(
+    (sum, w) => sum + w,
+    0,
+  );
+
+  it('clamps an absurdly large persisted preferredWidth to a healing ceiling', () => {
+    const layout = createDefaultCommitTableLayout();
+    // 10x bigger than any realistic monitor width.
+    layout.columns.message.preferredWidth = 100_000;
+
+    const store: Record<string, unknown> = {
+      [repoLayoutKey('/repo-a')]: layout,
+    };
+    const { provider } = createProvider(store, '/repo-a');
+    const testable = provider as unknown as {
+      loadPersistedUIState: () => typeof DEFAULT_PERSISTED_UI_STATE;
+    };
+
+    const state = testable.loadPersistedUIState();
+    const healed = state.commitTableLayout.columns.message.preferredWidth;
+    const expectedCeiling =
+      HEALING_ASSUMED_CONTAINER_WIDTH
+      - (SUM_OF_ALL_MIN_WIDTHS - COMMIT_TABLE_MIN_WIDTHS.message);
+    expect(healed).toBe(expectedCeiling);
+  });
+
+  it('clamps a persisted preferredWidth below the min up to the min', () => {
+    const layout = createDefaultCommitTableLayout();
+    layout.columns.author.preferredWidth = 5;
+
+    const store: Record<string, unknown> = {
+      [repoLayoutKey('/repo-a')]: layout,
+    };
+    const { provider } = createProvider(store, '/repo-a');
+    const testable = provider as unknown as {
+      loadPersistedUIState: () => typeof DEFAULT_PERSISTED_UI_STATE;
+    };
+
+    const state = testable.loadPersistedUIState();
+    expect(state.commitTableLayout.columns.author.preferredWidth).toBe(
+      COMMIT_TABLE_MIN_WIDTHS.author,
+    );
+  });
+
+  it('rounds fractional persisted widths and preserves in-range values', () => {
+    const layout = createDefaultCommitTableLayout();
+    layout.columns.hash.preferredWidth = 123.7;
+
+    const store: Record<string, unknown> = {
+      [repoLayoutKey('/repo-a')]: layout,
+    };
+    const { provider } = createProvider(store, '/repo-a');
+    const testable = provider as unknown as {
+      loadPersistedUIState: () => typeof DEFAULT_PERSISTED_UI_STATE;
+    };
+
+    const state = testable.loadPersistedUIState();
+    expect(state.commitTableLayout.columns.hash.preferredWidth).toBe(124);
+  });
+
+  it('keeps a reasonable persisted preferredWidth unchanged', () => {
+    const layout = createDefaultCommitTableLayout();
+    layout.columns.message.preferredWidth = 600;
+
+    const store: Record<string, unknown> = {
+      [repoLayoutKey('/repo-a')]: layout,
+    };
+    const { provider } = createProvider(store, '/repo-a');
+    const testable = provider as unknown as {
+      loadPersistedUIState: () => typeof DEFAULT_PERSISTED_UI_STATE;
+    };
+
+    const state = testable.loadPersistedUIState();
+    expect(state.commitTableLayout.columns.message.preferredWidth).toBe(600);
+  });
+
+  it('falls back to default preferredWidth when stored value is NaN', () => {
+    const layout = createDefaultCommitTableLayout();
+    const malformed = {
+      ...layout,
+      columns: {
+        ...layout.columns,
+        date: { visible: true, preferredWidth: Number.NaN },
+      },
+    };
+
+    const store: Record<string, unknown> = {
+      [repoLayoutKey('/repo-a')]: malformed,
+    };
+    const { provider } = createProvider(store, '/repo-a');
+    const testable = provider as unknown as {
+      loadPersistedUIState: () => typeof DEFAULT_PERSISTED_UI_STATE;
+    };
+
+    const state = testable.loadPersistedUIState();
+    expect(state.commitTableLayout.columns.date.preferredWidth).toBe(
+      DEFAULT_PERSISTED_UI_STATE.commitTableLayout.columns.date.preferredWidth,
+    );
   });
 });
 
