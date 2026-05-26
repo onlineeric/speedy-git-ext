@@ -485,7 +485,7 @@ function CommitMetadata({ details }: { details: CommitDetails }) {
       )}
       <div className="flex gap-2">
         <span className="w-16 flex-shrink-0 text-[var(--vscode-descriptionForeground)]">Author:</span>
-        <AuthorBadge name={details.author} email={details.authorEmail} />
+        <AuthorBadge name={details.author} email={details.authorEmail} inheritTextColor showBorder={false} />
       </div>
       <MetadataRow label="Date" value={formatRelativeDate(details.authorDate)} />
       {details.committer !== details.author && (
