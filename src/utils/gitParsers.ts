@@ -67,6 +67,10 @@ function parseRefPart(part: string): RefInfo | null {
     return { name: tagName, type: 'tag' };
   }
 
+  if (part.startsWith('refs/')) {
+    return parseQualifiedRef(part);
+  }
+
   // Stash ref (e.g. "refs/stash") — should not normally appear since stash
   // refs are excluded from git log, but handle defensively.
   if (part === 'refs/stash' || part.startsWith('stash@{')) {
@@ -93,6 +97,34 @@ function parseRefPart(part: string): RefInfo | null {
 
   // Local branch (may contain slashes like "feature/login")
   return { name: part, type: 'branch' };
+}
+
+function parseQualifiedRef(refName: string): RefInfo | null {
+  if (refName.startsWith('refs/heads/')) {
+    return { name: refName.slice('refs/heads/'.length), type: 'branch' };
+  }
+
+  if (refName.startsWith('refs/remotes/')) {
+    const remoteRef = refName.slice('refs/remotes/'.length);
+    const slashIndex = remoteRef.indexOf('/');
+    if (slashIndex <= 0) return null;
+
+    const remote = remoteRef.slice(0, slashIndex);
+    const branchName = remoteRef.slice(slashIndex + 1);
+    if (!branchName || branchName === 'HEAD') return null;
+
+    return { name: branchName, type: 'remote', remote };
+  }
+
+  if (refName.startsWith('refs/tags/')) {
+    return { name: refName.slice('refs/tags/'.length), type: 'tag' };
+  }
+
+  if (refName === 'refs/stash') {
+    return { name: refName, type: 'stash' };
+  }
+
+  return null;
 }
 
 export function parseBranchLine(line: string): Branch | null {

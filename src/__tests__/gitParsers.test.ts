@@ -90,6 +90,18 @@ describe('parseRefs', () => {
     expect(parseRefs('tag: v1.2.3')).toEqual([{ type: 'tag', name: 'v1.2.3' }]);
   });
 
+  it('parses fully-qualified standard refs', () => {
+    expect(parseRefs('refs/heads/feature/login, refs/remotes/my-fork/main, refs/tags/v2.0')).toEqual([
+      { type: 'branch', name: 'feature/login' },
+      { type: 'remote', remote: 'my-fork', name: 'main' },
+      { type: 'tag', name: 'v2.0' },
+    ]);
+  });
+
+  it('drops fully-qualified refs outside the supported graph ref types', () => {
+    expect(parseRefs('refs/jj/keep/abc123, refs/notes/commits, refs/replace/abc123')).toEqual([]);
+  });
+
   it('parses stash refs', () => {
     expect(parseRefs('refs/stash')).toEqual([{ type: 'stash', name: 'refs/stash' }]);
     expect(parseRefs('stash@{0}')).toEqual([{ type: 'stash', name: 'stash@{0}' }]);
