@@ -72,6 +72,11 @@
           "minimum": 1,
           "markdownDescription": "Number of commits to load per batch in the Git graph panel. Lower values give faster initial load; higher values reduce scroll-triggered fetches for large repositories."
         },
+        "speedyGit.statusBarText": {
+          "type": "string",
+          "default": "$(zap) Speedy Git",
+          "markdownDescription": "Text shown for the Speedy Git status bar item. Supports VS Code codicon syntax such as `$(zap)`."
+        },
         "speedyGit.graphColors": {
           "type": "array",
           "items": {

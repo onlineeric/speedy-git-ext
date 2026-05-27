@@ -75,7 +75,7 @@ export class ExtensionController {
 
     // Create status bar item
     const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1);
-    statusBar.text = '$(zap) Speedy Git';
+    statusBar.text = this.readStatusBarText();
     statusBar.tooltip = 'Open Speedy Git';
     statusBar.command = 'speedyGit.showGraph';
     this.statusBarItem = statusBar;
@@ -91,6 +91,7 @@ export class ExtensionController {
 
   private updateStatusBar() {
     if (!this.statusBarItem || !this.gitRepoDiscoveryService) return;
+    this.statusBarItem.text = this.readStatusBarText();
     const repos = this.gitRepoDiscoveryService.getRepos();
     if (repos.length === 0) {
       this.statusBarItem.hide();
@@ -149,11 +150,13 @@ export class ExtensionController {
   private registerSettingsListener() {
     this.context.subscriptions.push(
       vscode.workspace.onDidChangeConfiguration((event) => {
-        if (!this.didSpeedyGitSettingsChange(event)) {
-          return;
+        if (event.affectsConfiguration('speedyGit.statusBarText')) {
+          this.updateStatusBar();
         }
 
-        this.webviewProvider?.sendSettingsData(this.readUserSettings());
+        if (this.didSpeedyGitWebviewSettingsChange(event)) {
+          this.webviewProvider?.sendSettingsData(this.readUserSettings());
+        }
       })
     );
   }
@@ -306,7 +309,7 @@ export class ExtensionController {
       ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   }
 
-  private didSpeedyGitSettingsChange(event: vscode.ConfigurationChangeEvent): boolean {
+  private didSpeedyGitWebviewSettingsChange(event: vscode.ConfigurationChangeEvent): boolean {
     return [
       'speedyGit.graphColors',
       'speedyGit.dateFormat',
@@ -316,6 +319,11 @@ export class ExtensionController {
       'speedyGit.showTags',
       'speedyGit.batchCommitSize',
     ].some((section) => event.affectsConfiguration(section));
+  }
+
+  private readStatusBarText(): string {
+    const value = vscode.workspace.getConfiguration('speedyGit').get<string>('statusBarText');
+    return typeof value === 'string' ? value : '$(zap) Speedy Git';
   }
 
   private readUserSettings(): UserSettings {
