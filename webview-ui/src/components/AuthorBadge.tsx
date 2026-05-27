@@ -5,12 +5,28 @@ interface AuthorBadgeProps {
   email: string;
   onRemove?: () => void;
   className?: string;
+  inheritTextColor?: boolean;
+  showBorder?: boolean;
 }
 
-export function AuthorBadge({ name, email, onRemove, className }: AuthorBadgeProps) {
+export function AuthorBadge({
+  name,
+  email,
+  onRemove,
+  className,
+  inheritTextColor = false,
+  showBorder = true,
+}: AuthorBadgeProps) {
+  const textColorClass = inheritTextColor
+    ? 'text-inherit'
+    : 'text-[var(--vscode-badge-foreground)]';
+  const borderClass = showBorder
+    ? 'border border-[var(--vscode-badge-background)]'
+    : 'border border-transparent';
+
   return (
     <span
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded border border-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)] ${className ?? ''}`}
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded ${borderClass} ${textColorClass} ${className ?? ''}`}
     >
       <AuthorAvatar author={name} email={email} />
       <span className="truncate max-w-[120px]">{name}</span>
