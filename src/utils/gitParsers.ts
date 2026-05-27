@@ -71,9 +71,10 @@ function parseRefPart(part: string): RefInfo | null {
     return parseQualifiedRef(part);
   }
 
-  // Stash ref (e.g. "refs/stash") — should not normally appear since stash
-  // refs are excluded from git log, but handle defensively.
-  if (part === 'refs/stash' || part.startsWith('stash@{')) {
+  // Stash shorthand (e.g. "stash@{0}") — `refs/stash` is handled by
+  // parseQualifiedRef above. Stashes should not normally appear in %D
+  // since they are excluded from log traversal, but handle defensively.
+  if (part.startsWith('stash@{')) {
     return { name: part, type: 'stash' };
   }
 
