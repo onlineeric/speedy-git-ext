@@ -1,32 +1,30 @@
 import { AuthorAvatar } from './AuthorAvatar';
 
+type AuthorBadgeVariant = 'chip' | 'inline';
+
 interface AuthorBadgeProps {
   name: string;
   email: string;
   onRemove?: () => void;
   className?: string;
-  inheritTextColor?: boolean;
-  showBorder?: boolean;
+  variant?: AuthorBadgeVariant;
 }
+
+const VARIANT_CLASSES: Record<AuthorBadgeVariant, string> = {
+  chip: 'border border-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]',
+  inline: 'text-inherit',
+};
 
 export function AuthorBadge({
   name,
   email,
   onRemove,
   className,
-  inheritTextColor = false,
-  showBorder = true,
+  variant = 'chip',
 }: AuthorBadgeProps) {
-  const textColorClass = inheritTextColor
-    ? 'text-inherit'
-    : 'text-[var(--vscode-badge-foreground)]';
-  const borderClass = showBorder
-    ? 'border border-[var(--vscode-badge-background)]'
-    : 'border border-transparent';
-
   return (
     <span
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded ${borderClass} ${textColorClass} ${className ?? ''}`}
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded ${VARIANT_CLASSES[variant]} ${className ?? ''}`}
     >
       <AuthorAvatar author={name} email={email} />
       <span className="truncate max-w-[120px]">{name}</span>
