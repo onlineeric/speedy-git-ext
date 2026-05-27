@@ -74,8 +74,17 @@
         },
         "speedyGit.statusBarText": {
           "type": "string",
-          "default": "$(zap) Speedy Git",
-          "markdownDescription": "Text shown for the Speedy Git status bar item. Supports VS Code codicon syntax such as `$(zap)`."
+          "enum": ["iconAndText", "icon"],
+          "enumItemLabels": [
+            "Icon + text",
+            "Icon only"
+          ],
+          "enumDescriptions": [
+            "Show the lightning icon followed by 'Speedy Git'.",
+            "Show only the lightning icon."
+          ],
+          "default": "iconAndText",
+          "markdownDescription": "Label shown for the Speedy Git status bar item."
         },
         "speedyGit.graphColors": {
           "type": "array",
