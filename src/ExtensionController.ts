@@ -91,7 +91,6 @@ export class ExtensionController {
 
   private updateStatusBar() {
     if (!this.statusBarItem || !this.gitRepoDiscoveryService) return;
-    this.statusBarItem.text = this.readStatusBarText();
     const repos = this.gitRepoDiscoveryService.getRepos();
     if (repos.length === 0) {
       this.statusBarItem.hide();
@@ -150,8 +149,8 @@ export class ExtensionController {
   private registerSettingsListener() {
     this.context.subscriptions.push(
       vscode.workspace.onDidChangeConfiguration((event) => {
-        if (event.affectsConfiguration('speedyGit.statusBarText')) {
-          this.updateStatusBar();
+        if (event.affectsConfiguration('speedyGit.statusBarText') && this.statusBarItem) {
+          this.statusBarItem.text = this.readStatusBarText();
         }
 
         if (this.didSpeedyGitWebviewSettingsChange(event)) {
@@ -318,12 +317,13 @@ export class ExtensionController {
       'speedyGit.showRemoteBranches',
       'speedyGit.showTags',
       'speedyGit.batchCommitSize',
+      'speedyGit.overScan',
     ].some((section) => event.affectsConfiguration(section));
   }
 
   private readStatusBarText(): string {
-    const value = vscode.workspace.getConfiguration('speedyGit').get<string>('statusBarText');
-    return typeof value === 'string' ? value : '$(zap) Speedy Git';
+    const mode = vscode.workspace.getConfiguration('speedyGit').get<string>('statusBarText', 'iconAndText');
+    return mode === 'icon' ? '$(zap)' : '$(zap) Speedy Git';
   }
 
   private readUserSettings(): UserSettings {
