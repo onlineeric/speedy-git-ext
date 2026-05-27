@@ -102,6 +102,34 @@ describe('parseRefs', () => {
     expect(parseRefs('refs/jj/keep/abc123, refs/notes/commits, refs/replace/abc123')).toEqual([]);
   });
 
+  it('drops fully-qualified `refs/remotes/<remote>/HEAD` symbolic refs', () => {
+    // `refs/remotes/origin/HEAD` is a symbolic ref pointing at the remote's
+    // default branch, not a real branch. Treat it like the shorthand
+    // `origin/HEAD` and drop it.
+    expect(parseRefs('refs/remotes/origin/HEAD')).toEqual([]);
+    expect(parseRefs('refs/remotes/upstream/HEAD')).toEqual([]);
+  });
+
+  it('drops malformed `refs/remotes/...` entries with no branch part', () => {
+    // Without a `<remote>/<branch>` split we can't classify the remote, so
+    // these defensively return null rather than guessing.
+    expect(parseRefs('refs/remotes/origin')).toEqual([]);
+    expect(parseRefs('refs/remotes/origin/')).toEqual([]);
+    expect(parseRefs('refs/remotes/')).toEqual([]);
+  });
+
+  it('parses slash-containing branch and tag names under fully-qualified refs', () => {
+    expect(parseRefs('refs/heads/feature/sub/leaf')).toEqual([
+      { type: 'branch', name: 'feature/sub/leaf' },
+    ]);
+    expect(parseRefs('refs/tags/release/2.0')).toEqual([
+      { type: 'tag', name: 'release/2.0' },
+    ]);
+    expect(parseRefs('refs/remotes/origin/feature/login')).toEqual([
+      { type: 'remote', remote: 'origin', name: 'feature/login' },
+    ]);
+  });
+
   it('parses stash refs', () => {
     expect(parseRefs('refs/stash')).toEqual([{ type: 'stash', name: 'refs/stash' }]);
     expect(parseRefs('stash@{0}')).toEqual([{ type: 'stash', name: 'stash@{0}' }]);

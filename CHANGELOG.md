@@ -4,6 +4,24 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.3.3] - 2026-05-27
+
+### Added
+- New **Speedy Git: Status Bar Text** setting (`speedyGit.statusBarText`) for choosing the label of the status bar item. Two options: `Icon + text` (default — shows `$(zap) Speedy Git`) and `Icon only` (shows just `$(zap)`). The choice applies immediately on save with no reload.
+
+### Fixed
+- Default git graph no longer surfaces tool-owned refs (e.g., Jujutsu's `refs/jj/keep/*`, notes, replace refs, Gerrit refs) as side branches with blank commit messages. The default commit and author queries now list `HEAD`, branches, remotes, and tags explicitly instead of using `git log --all`, so only refs the extension actually models are traversed. `HEAD` is included explicitly so detached checkouts remain visible even when no branch or tag names the checked-out commit. Stashes continue to be fetched separately via `GitStashService` and injected into the graph.
+- Ref-decoration parsing now classifies fully-qualified refs strictly by namespace — `refs/heads/*` → branch, `refs/remotes/*` → remote, `refs/tags/*` → tag, `refs/stash` → stash — and ignores anything else. Previously, unknown fully-qualified refs that slipped into a decoration line could be misclassified as local branches, exposing branch-only right-click actions on refs that are not branches.
+- Commit Details panel author badge is now readable across light, dark, and high-contrast themes. The badge inside the Commit Details panel previously used `--vscode-badge-foreground` against the panel background, producing low contrast in some themes. It now inherits the surrounding text color and drops the badge-coloured border, while the same `AuthorBadge` component continues to render with full badge styling in the filter panel.
+
+### Internal
+- `AuthorBadge` accepts two new optional props — `inheritTextColor` (default `false`) and `showBorder` (default `true`) — so the same component can render either as a standalone badge (filter panel, default) or as inline text inside a metadata row (Commit Details panel).
+- `ExtensionController` now treats the status bar text setting independently from webview settings: changes to `speedyGit.statusBarText` only refresh the status bar item, while changes to webview-visible settings (`graphColors`, `dateFormat`, `dateFormatCustom`, `showRemoteBranches`, `showTags`, `batchCommitSize`, `overScan`) re-send `userSettings` to the webview. Renamed the predicate to `didSpeedyGitWebviewSettingsChange` to reflect the narrower scope, and added `overScan` to the watched list so virtual-scroll overscan changes propagate without a graph refresh.
+- Added `parseQualifiedRef(refName)` helper in `gitParsers.ts` plus regression tests covering each accepted namespace and the rejection of unrecognized ones. `GitLogService.test.ts` extended to assert the new explicit ref-set arguments on the default log and `getAuthors` queries.
+
+### Credits
+- Graph ref-namespace hardening contributed by [@singularitti](https://github.com/singularitti) in [#130](https://github.com/onlineeric/speedy-git-ext/pull/130), status bar text setting in [#131](https://github.com/onlineeric/speedy-git-ext/pull/131), and Commit Details author badge theme fix in [#132](https://github.com/onlineeric/speedy-git-ext/pull/132). Third, fourth, and fifth contributions in a row — thank you!
+
 ## [4.3.2] - 2026-05-25
 
 ### Fixed
