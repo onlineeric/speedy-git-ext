@@ -26,7 +26,7 @@ describe('GitLogService.getCommits', () => {
     }));
   });
 
-  it('uses --all with stash exclusion when no branch filter is active', async () => {
+  it('uses HEAD and user-facing ref namespaces when no branch filter is active', async () => {
     const service = new GitLogService('/repo', mockLog);
     const executeSpy = vi.spyOn(service['executor'], 'execute')
       .mockResolvedValue({ success: true, value: { stdout: '', stderr: '' } });
@@ -40,10 +40,25 @@ describe('GitLogService.getCommits', () => {
         '--max-count=25',
         '--format=%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D',
         '--date-order',
-        '--exclude=refs/stash',
-        '--all',
+        'HEAD',
+        '--branches',
+        '--remotes',
+        '--tags',
         '--',
       ],
+    }));
+  });
+
+  it('fetches authors from user-facing ref namespaces', async () => {
+    const service = new GitLogService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockResolvedValue({ success: true, value: { stdout: '', stderr: '' } });
+
+    const result = await service.getAuthors();
+
+    expect(result.success).toBe(true);
+    expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({
+      args: ['log', 'HEAD', '--branches', '--remotes', '--tags', '--format=%an%x00%ae'],
     }));
   });
 });

@@ -47,15 +47,16 @@ export class GitLogService {
       args.push(`--before=${filters.beforeDate}`);
     }
 
-    // Add branch filter(s) or --all flag after options so refs are parsed as revisions.
+    // Add branch filter(s) or default ref namespaces after options so refs are parsed as revisions.
     if (filters?.branches && filters.branches.length > 0) {
       revisionArgs.push(...filters.branches);
     } else {
-      // Exclude stash refs — stashes are fetched separately via GitStashService
-      // and merged into the graph by the frontend. Without this exclusion,
-      // stash internal commits (index, untracked) pollute the graph and the
-      // latest stash appears as a duplicate merge node.
-      args.push('--exclude=refs/stash', '--all');
+      // Show user-facing Git history only. `--all` also includes tool-owned
+      // namespaces such as refs/jj/keep/*, which can surface internal commits
+      // as blank side branches in the graph. Include HEAD explicitly so a
+      // detached checkout remains visible even when no branch/tag names it.
+      // Stashes are fetched separately.
+      args.push('HEAD', '--branches', '--remotes', '--tags');
     }
 
     // Separate revisions from paths to avoid ambiguous argument errors
@@ -91,7 +92,7 @@ export class GitLogService {
   async getAuthors(): Promise<Result<Author[]>> {
     this.log.info('Fetching authors');
     const result = await this.executor.execute({
-      args: ['log', '--all', '--format=%an%x00%ae'],
+      args: ['log', 'HEAD', '--branches', '--remotes', '--tags', '--format=%an%x00%ae'],
       cwd: this.workspacePath,
     });
 
