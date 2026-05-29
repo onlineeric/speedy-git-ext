@@ -133,6 +133,11 @@
           "minimum": 0,
           "maximum": 200,
           "markdownDescription": "Number of commit rows to render above and below the visible graph viewport. Higher values reduce blank-row flicker during fast scrolling at the cost of more DOM nodes. Lower values use less memory but may show empty rows when scrolling quickly."
+        },
+        "speedyGit.worktree.basePath": {
+          "type": "string",
+          "default": "../${repoName}.worktrees",
+          "markdownDescription": "Parent directory where new git worktrees are created. The sanitized ref name is always appended as the leaf folder (e.g. `../myrepo.worktrees/feature-foo`). Supports the `${repoName}` token. Defaults to a sibling folder so worktrees stay outside the watched working tree (protects graph performance)."
         }
       }
     }
