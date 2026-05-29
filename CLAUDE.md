@@ -180,6 +180,8 @@ shared/                           # Shared types between backend & frontend
 - TypeScript 5.x (strict) + React 18, Zustand, Radix UI, Tailwind CSS (webview); esbuild (extension host), Vite (frontend)
 - TypeScript 5.x strict (`noUnusedLocals`, `noUnusedParameters`, + VS Code Extension API 1.80+; React 18 + Zustand + Tailwind + (042-compare-refs)
 - None new. Compare state lives in Zustand store (transient, session-only). (042-compare-refs)
+- TypeScript 5.x (strict: `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) (046-git-worktrees)
+- N/A for app state. New persistent setting `speedyGit.worktree.basePath` (already registered in `package.json`) read via the existing settings provider. Worktree list is transient store state. (046-git-worktrees)
 
 ## Recent Changes
 - 045-revert-mode-dialog: Three-mode Revert Commit dialog (Commit now / Stage only / Edit message) with inline mainline-parent picker, replacing the direct-action menu item and the standalone RevertParentDialog
@@ -191,5 +193,5 @@ shared/                           # Shared types between backend & frontend
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/045-revert-mode-dialog/plan.md
+specs/046-git-worktrees/plan.md
 <!-- SPECKIT END -->
