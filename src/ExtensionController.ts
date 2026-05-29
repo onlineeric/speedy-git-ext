@@ -318,6 +318,7 @@ export class ExtensionController {
       'speedyGit.showTags',
       'speedyGit.batchCommitSize',
       'speedyGit.overScan',
+      'speedyGit.worktree.basePath',
     ].some((section) => event.affectsConfiguration(section));
   }
 
@@ -341,6 +342,9 @@ export class ExtensionController {
     const overScan = this.normalizeOverScan(
       config.get<number>('overScan', DEFAULT_USER_SETTINGS.overScan)
     );
+    const worktreeBasePath = this.normalizeWorktreeBasePath(
+      config.get<string>('worktree.basePath', DEFAULT_USER_SETTINGS.worktreeBasePath)
+    );
 
     return {
       graphColors,
@@ -351,6 +355,7 @@ export class ExtensionController {
       showTags: config.get<boolean>('showTags', DEFAULT_USER_SETTINGS.showTags),
       batchCommitSize,
       overScan,
+      worktreeBasePath,
     };
   }
 
@@ -378,6 +383,11 @@ export class ExtensionController {
 
   private normalizeBatchCommitSize(value: number): number {
     return Number.isFinite(value) && value >= 1 ? value : DEFAULT_USER_SETTINGS.batchCommitSize;
+  }
+
+  private normalizeWorktreeBasePath(value: string): string {
+    const trimmed = (value ?? '').trim();
+    return trimmed.length > 0 ? trimmed : DEFAULT_USER_SETTINGS.worktreeBasePath;
   }
 
   private normalizeOverScan(value: number): number {

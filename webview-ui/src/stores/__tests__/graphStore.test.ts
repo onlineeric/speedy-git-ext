@@ -1,7 +1,18 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useGraphStore } from '../graphStore';
-import type { Commit } from '@shared/types';
+import type { Commit, WorktreeInfo } from '@shared/types';
 import type { InitialDataPayload } from '@shared/messages';
+
+const makeWorktree = (path: string, head: string, overrides: Partial<WorktreeInfo> = {}): WorktreeInfo => ({
+  path,
+  head,
+  branch: `refs/heads/${path.split('/').pop()}`,
+  isMain: false,
+  isDetached: false,
+  isCurrent: false,
+  isPrunable: false,
+  ...overrides,
+});
 
 const makeCommit = (hash: string): Commit => ({
   hash,
@@ -84,6 +95,30 @@ describe('graphStore — setInitialData', () => {
 
     expect(useGraphStore.getState().loading).toBe(false);
     expect(useGraphStore.getState().isRefreshing).toBe(false);
+  });
+});
+
+describe('graphStore — setWorktreeList (array-valued worktreeByHead)', () => {
+  it('keeps both worktrees that share the same HEAD commit', () => {
+    const head = 'aaaa1111';
+    useGraphStore.getState().setWorktreeList([
+      makeWorktree('/wt/feature-a', head, { branch: 'refs/heads/feature-a' }),
+      makeWorktree('/wt/feature-b', head, { branch: 'refs/heads/feature-b' }),
+    ]);
+
+    const entries = useGraphStore.getState().worktreeByHead.get(head);
+    expect(entries).toHaveLength(2);
+    expect(entries?.map((w) => w.path)).toEqual(['/wt/feature-a', '/wt/feature-b']);
+  });
+
+  it('groups worktrees by distinct HEAD', () => {
+    useGraphStore.getState().setWorktreeList([
+      makeWorktree('/wt/one', 'hash1'),
+      makeWorktree('/wt/two', 'hash2'),
+    ]);
+    const byHead = useGraphStore.getState().worktreeByHead;
+    expect(byHead.get('hash1')).toHaveLength(1);
+    expect(byHead.get('hash2')).toHaveLength(1);
   });
 });
 

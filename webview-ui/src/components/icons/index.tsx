@@ -192,6 +192,23 @@ export function CompareIcon({ className }: IconProps) {
   );
 }
 
+/** Worktree shape — two linked checkout folders, 12×12, inherits text color via currentColor */
+export function WorktreeIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      {/* Main worktree node */}
+      <circle cx={3} cy={2.5} r={1.5} fill="currentColor" />
+      {/* Trunk */}
+      <line x1={3} y1={4} x2={3} y2={9.5} stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" />
+      {/* Linked worktree branches */}
+      <path d="M 3 5 Q 3 6 9 6" stroke="currentColor" strokeWidth={1.3} fill="none" />
+      <path d="M 3 8 Q 3 9.5 9 9.5" stroke="currentColor" strokeWidth={1.3} fill="none" />
+      <circle cx={9.5} cy={6} r={1.4} fill="currentColor" />
+      <circle cx={9.5} cy={9.5} r={1.4} fill="currentColor" />
+    </svg>
+  );
+}
+
 /** Gear/settings shape — 12×12, inherits text color via currentColor */
 export function SettingsIcon({ className }: IconProps) {
   return (

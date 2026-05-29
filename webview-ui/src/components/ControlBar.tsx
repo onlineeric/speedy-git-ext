@@ -15,6 +15,7 @@ import {
   RefreshIcon,
   FetchIcon,
   ToolbarSeparatorIcon,
+  WorktreeIcon,
 } from './icons';
 
 const TOGGLE_BUTTON_COLORS = {
@@ -102,6 +103,8 @@ export function ControlBar() {
         : TOGGLE_BUTTON_COLORS.inactive;
   const searchColor =
     activeToggleWidget === 'search' ? TOGGLE_BUTTON_COLORS.active : TOGGLE_BUTTON_COLORS.inactive;
+  const worktreeColor =
+    activeToggleWidget === 'worktree' ? TOGGLE_BUTTON_COLORS.active : TOGGLE_BUTTON_COLORS.inactive;
   // FR-002 (042-compare-refs): three-state Compare toolbar color (idle / open / pending).
   const compareSelection = useGraphStore((state) => state.compareSelection);
   const anyCompareSlotFilled = compareSelection.a !== null || compareSelection.b !== null;
@@ -146,6 +149,14 @@ export function ControlBar() {
         title="Compare refs (Base vs Target)"
       >
         <CompareIcon className={iconClass} />
+      </button>
+
+      <button
+        onClick={() => setActiveToggleWidget('worktree')}
+        className={`${iconButtonClass} ${worktreeColor}`}
+        title="Worktrees"
+      >
+        <WorktreeIcon className={iconClass} />
       </button>
 
       <ToolbarSeparatorIcon className="h-6 w-4 text-[var(--vscode-panel-border)] opacity-90" />

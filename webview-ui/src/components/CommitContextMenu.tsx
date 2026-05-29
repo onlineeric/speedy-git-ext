@@ -14,6 +14,7 @@ import { InteractiveRebaseDialog } from './InteractiveRebaseDialog';
 import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 import { RevertDialog } from './RevertDialog';
 import { DropCommitDialog } from './DropCommitDialog';
+import { CreateWorktreeDialog } from './CreateWorktreeDialog';
 import { createReachabilityChecker } from '../utils/commitReachability';
 
 interface CommitContextMenuProps {
@@ -50,6 +51,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
   const [checkoutCommitConfirmOpen, setCheckoutCommitConfirmOpen] = useState(false);
   const [createBranchOpen, setCreateBranchOpen] = useState(false);
   const [createTagOpen, setCreateTagOpen] = useState(false);
+  const [createWorktreeOpen, setCreateWorktreeOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [cherryPickOpen, setCherryPickOpen] = useState(false);
   const [pendingResetMode, setPendingResetMode] = useState<ResetMode | null>(null);
@@ -284,6 +286,9 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
             <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateTagOpen(true)}>
               Create Tag Here...
             </ContextMenu.Item>
+            <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
+              Create worktree…
+            </ContextMenu.Item>
             <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
 
             {!isHeadCommit && (
@@ -447,6 +452,14 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
         commit={commit}
         onClose={() => setCreateTagOpen(false)}
       />
+
+      {createWorktreeOpen && (
+        <CreateWorktreeDialog
+          open
+          source={{ ref: commit.hash, label: commit.abbreviatedHash, kind: 'commit' }}
+          onClose={() => setCreateWorktreeOpen(false)}
+        />
+      )}
 
       <ConfirmDialog
         open={resetConfirmOpen}

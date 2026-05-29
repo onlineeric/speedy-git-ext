@@ -16,6 +16,15 @@ import { getDateFormatter } from '../utils/formatDate';
 import { AuthorAvatar } from './AuthorAvatar';
 import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils';
 import { slotMatchesCommitRow } from '../utils/compareMarker';
+import { WorktreeBadgeMenu } from './WorktreeBadgeMenu';
+
+/** Worktree badge for rows whose HEAD is a worktree checkout. Subscribes to its own
+ *  slice of `worktreeByHead` so it re-renders independently of the memoized CommitRow. */
+function WorktreeRowBadge({ hash }: { hash: string }) {
+  const worktrees = useGraphStore((s) => s.worktreeByHead.get(hash));
+  if (!worktrees || worktrees.length === 0) return null;
+  return <WorktreeBadgeMenu worktrees={worktrees} />;
+}
 
 /** Compare-refs A/B markers (042-compare-refs FR-026/027/028). Marker appears
  *  immediately on slot fill for deterministic kinds (commit/branch/tag/head);
@@ -184,6 +193,8 @@ export const CommitRow = memo(function CommitRow({
           <OverflowRefsBadge hiddenRefs={overflowRefs} laneColorStyle={laneColorStyle} />
         </div>
       )}
+
+      {!isStash && !isUncommitted && <WorktreeRowBadge hash={commit.hash} />}
 
       <span
         className={`flex-1 truncate text-sm ${isStash ? 'italic text-[var(--vscode-descriptionForeground)]' : isUncommitted ? 'italic text-[#E8A317]' : ''}`}
