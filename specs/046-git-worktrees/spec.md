@@ -163,13 +163,13 @@ A user is working in a window opened on a linked worktree (not the main repo). T
 
 - **FR-012**: A new toolbar toggle MUST open a worktree panel that lists every worktree with its path, branch (or "detached"), short HEAD, and a marker on the main worktree.
 - **FR-013**: The panel MUST mark which worktree is the currently-open one ("you are here").
-- **FR-014**: Each non-main, non-current worktree row MUST offer Open (new window), Reveal in OS, and Remove actions. The main worktree and the current worktree MUST NOT be removable.
+- **FR-014**: Each non-main, non-current worktree row MUST offer Open (new window), Reveal in OS, and Remove actions. The main worktree and the current worktree MUST NOT be removable. (The Remove action's dialog and behavior are specified by User Story 3; Open / Reveal are part of the panel itself.)
 - **FR-015**: The panel MUST offer a panel-level Prune action that, before running, shows a confirmation listing the stale entries (worktrees whose folders no longer exist) that will be pruned; after confirmation it prunes them and explicitly refreshes.
 
 #### Removal & branch deletion
 
 - **FR-016**: Removing a worktree MUST be confirmed via a dialog. If the worktree is dirty, the dialog MUST warn about data loss and require an explicit force confirmation.
-- **FR-017**: If the worktree being removed is open in another IDE window, the dialog MUST warn that the other window will be left pointing at a deleted folder.
+- **FR-017**: The remove dialog MUST display a caution that, if the worktree is open in another IDE window, that window will be left pointing at a deleted folder. (The caution is shown unconditionally: the platform exposes no reliable way to detect whether a folder is open in another window — see plan research R6. The *current* window's worktree is detectable and is instead blocked from removal per FR-014.)
 - **FR-018**: The remove dialog MUST offer an "Also delete branch `<name>`" option (unchecked by default), hidden/disabled for detached worktrees, with a nested "force delete" sub-option (unchecked by default, enabled only when "also delete branch" is checked).
 - **FR-019**: Branch deletion MUST occur only after the worktree is successfully removed, reusing the existing branch-delete capability (safe delete by default, force delete when chosen).
 - **FR-020**: If a safe branch delete is refused because the branch is unmerged, the extension MUST surface the git error and keep the dialog open so the user can enable force delete and retry the branch deletion alone (the worktree is already removed).
