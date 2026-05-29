@@ -17,6 +17,9 @@ import {
   buildRenameBranchCommand,
   buildFastForwardLocalBranchCommand,
   buildCreateBranchCommand,
+  buildAddWorktreeCommand,
+  buildRemoveWorktreeCommand,
+  buildPruneWorktreeCommand,
 } from '../gitCommandBuilder';
 
 describe('buildPushCommand', () => {
@@ -301,5 +304,60 @@ describe('buildFastForwardLocalBranchCommand', () => {
   it('omits set-upstream when setUpstream is false', () => {
     expect(buildFastForwardLocalBranchCommand({ remote: 'origin', branch: 'dev', setUpstream: false }))
       .toBe('git fetch origin dev:dev');
+  });
+});
+
+describe('buildAddWorktreeCommand', () => {
+  it('builds the existing-branch form', () => {
+    expect(buildAddWorktreeCommand({ path: '/wt/feature', ref: 'feature', branchMode: 'existing' }))
+      .toBe('git worktree add /wt/feature feature');
+  });
+
+  it('builds the new-branch form with -b', () => {
+    expect(buildAddWorktreeCommand({ path: '/wt/x', ref: 'origin/x', branchMode: 'new', newBranchName: 'x' }))
+      .toBe('git worktree add -b x /wt/x origin/x');
+  });
+
+  it('builds the detached form with --detach', () => {
+    expect(buildAddWorktreeCommand({ path: '/wt/d', ref: 'abc1234', branchMode: 'detached' }))
+      .toBe('git worktree add --detach /wt/d abc1234');
+  });
+
+  it('inserts --force after add', () => {
+    expect(buildAddWorktreeCommand({ path: '/wt/f', ref: 'feature', branchMode: 'existing', force: true }))
+      .toBe('git worktree add --force /wt/f feature');
+  });
+
+  it('quotes paths containing spaces', () => {
+    expect(buildAddWorktreeCommand({ path: '/my worktrees/feat', ref: 'feat', branchMode: 'existing' }))
+      .toBe('git worktree add "/my worktrees/feat" feat');
+  });
+
+  it('derives a remote-tracking new-branch form for remote-only sources', () => {
+    expect(buildAddWorktreeCommand({ path: '/wt/release', ref: 'origin/release', branchMode: 'new', newBranchName: 'release' }))
+      .toBe('git worktree add -b release /wt/release origin/release');
+  });
+});
+
+describe('buildRemoveWorktreeCommand', () => {
+  it('builds the plain remove form', () => {
+    expect(buildRemoveWorktreeCommand({ path: '/wt/feature' }))
+      .toBe('git worktree remove /wt/feature');
+  });
+
+  it('includes --force when requested', () => {
+    expect(buildRemoveWorktreeCommand({ path: '/wt/feature', force: true }))
+      .toBe('git worktree remove --force /wt/feature');
+  });
+
+  it('quotes paths with spaces', () => {
+    expect(buildRemoveWorktreeCommand({ path: '/my worktrees/feat' }))
+      .toBe('git worktree remove "/my worktrees/feat"');
+  });
+});
+
+describe('buildPruneWorktreeCommand', () => {
+  it('builds the prune command', () => {
+    expect(buildPruneWorktreeCommand()).toBe('git worktree prune');
   });
 });

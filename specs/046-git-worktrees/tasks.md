@@ -26,7 +26,7 @@ VS Code extension: backend `src/`, frontend `webview-ui/src/`, shared contracts 
 
 **Purpose**: Confirm prerequisites; no new dependencies required.
 
-- [ ] T001 Confirm `speedyGit.worktree.basePath` is registered in `package.json` `contributes.configuration` (already present) and confirm no new npm dependencies are needed for this feature.
+- [X] T001 Confirm `speedyGit.worktree.basePath` is registered in `package.json` `contributes.configuration` (already present) and confirm no new npm dependencies are needed for this feature.
 
 ---
 
@@ -36,13 +36,13 @@ VS Code extension: backend `src/`, frontend `webview-ui/src/`, shared contracts 
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T002 Update `shared/types.ts`: add `isCurrent: boolean` to `WorktreeInfo`; add `worktreeBasePath: string` to `UserSettings` and `DEFAULT_USER_SETTINGS` (default `'../${repoName}.worktrees'`); add `'worktree'` to the `ActiveToggleWidget` union; declare `export type WorktreeBranchMode = 'existing' | 'new' | 'detached'` as the single source of truth for the branch-mode union used by RPC payloads, the command builder, and the create dialog.
-- [ ] T003 Update `shared/messages.ts` (after T002, same-module type dependency): add `RequestMessage` variants `addWorktree`, `removeWorktree`, `pruneWorktree`, `resolveWorktreePath`, `openWorktree`, `revealWorktree` (payloads using the `WorktreeBranchMode` type from T002, not inline literals); add `ResponseMessage` variant `worktreePathResolved`; register all new `type` strings in the request/response type-guard maps (mirroring existing `getWorktreeList` / `worktreeList`).
-- [ ] T004 [P] Read `speedyGit.worktree.basePath` in `src/ExtensionController.ts` (add to the settings key list and the `UserSettings` provider) so the backend can resolve worktree paths.
-- [ ] T005 Enrich `GitWorktreeService.listWorktrees()` in `src/services/GitWorktreeService.ts` to set `isCurrent` by normalized path-match of each `worktree.path` against the active `workspacePath` (research R3).
-- [ ] T006 Change `worktreeByHead` to `Map<string, WorktreeInfo[]>` in `webview-ui/src/stores/graphStore.ts`; update `setWorktreeList` and `setBatchData` to append per `head` (research R7).
-- [ ] T007 Update `WorktreeSection` in `webview-ui/src/components/CommitTooltip.tsx` to read the array-valued `worktreeByHead` (render the matching worktree(s)) so the webview compiles after T006.
-- [ ] T008 [P] Unit test `listWorktrees` porcelain parsing + `isCurrent` derivation in `src/__tests__/GitWorktreeService.test.ts`.
+- [X] T002 Update `shared/types.ts`: add `isCurrent: boolean` to `WorktreeInfo`; add `worktreeBasePath: string` to `UserSettings` and `DEFAULT_USER_SETTINGS` (default `'../${repoName}.worktrees'`); add `'worktree'` to the `ActiveToggleWidget` union; declare `export type WorktreeBranchMode = 'existing' | 'new' | 'detached'` as the single source of truth for the branch-mode union used by RPC payloads, the command builder, and the create dialog.
+- [X] T003 Update `shared/messages.ts` (after T002, same-module type dependency): add `RequestMessage` variants `addWorktree`, `removeWorktree`, `pruneWorktree`, `resolveWorktreePath`, `openWorktree`, `revealWorktree` (payloads using the `WorktreeBranchMode` type from T002, not inline literals); add `ResponseMessage` variant `worktreePathResolved`; register all new `type` strings in the request/response type-guard maps (mirroring existing `getWorktreeList` / `worktreeList`).
+- [X] T004 [P] Read `speedyGit.worktree.basePath` in `src/ExtensionController.ts` (add to the settings key list and the `UserSettings` provider) so the backend can resolve worktree paths.
+- [X] T005 Enrich `GitWorktreeService.listWorktrees()` in `src/services/GitWorktreeService.ts` to set `isCurrent` by normalized path-match of each `worktree.path` against the active `workspacePath` (research R3).
+- [X] T006 Change `worktreeByHead` to `Map<string, WorktreeInfo[]>` in `webview-ui/src/stores/graphStore.ts`; update `setWorktreeList` and `setBatchData` to append per `head` (research R7).
+- [X] T007 Update `WorktreeSection` in `webview-ui/src/components/CommitTooltip.tsx` to read the array-valued `worktreeByHead` (render the matching worktree(s)) so the webview compiles after T006.
+- [X] T008 [P] Unit test `listWorktrees` porcelain parsing + `isCurrent` derivation in `src/__tests__/GitWorktreeService.test.ts`.
 
 **Checkpoint**: Shared types, RPC contracts, settings, store shape, and tooltip all build green — user stories can begin.
 
@@ -54,15 +54,15 @@ VS Code extension: backend `src/`, frontend `webview-ui/src/`, shared contracts 
 
 **Independent Test**: Right-click a branch not checked out anywhere, confirm with defaults; verify the sibling folder exists, a new window opens, and `git worktree list` shows the entry.
 
-- [ ] T009 [P] [US1] Add worktree path + new-branch-name validation in `src/utils/gitValidation.ts` (reuse `validateRefName`; non-empty path).
-- [ ] T010 [US1] Implement `resolveWorktreePath` helper in `src/services/GitWorktreeService.ts`: read base path, expand `${repoName}` and resolve leading `..` **anchored to the main worktree**, sanitize ref → leaf, append numeric collision suffix; return `{ path, leafName }` (research R1/R2).
-- [ ] T011 [US1] Implement `addWorktree({ path, ref, branchMode, newBranchName?, force? })` in `src/services/GitWorktreeService.ts` producing the existing / `-b` new / `--detach` command forms (research R4); returns `Result<void>`.
-- [ ] T012 [P] [US1] Add `buildAddWorktreeCommand({ path, ref, branchMode, newBranchName })` in `webview-ui/src/utils/gitCommandBuilder.ts` (quote paths with spaces).
-- [ ] T013 [US1] Add RPC dispatch in `src/WebviewProvider.ts` for `resolveWorktreePath` (→ `worktreePathResolved`), `addWorktree` (on success: re-post `worktreeList` + call `sendInitialData()`, then run `openWorktree`), and `openWorktree` (`vscode.commands.executeCommand('vscode.openFolder', Uri.file(path), { forceNewWindow: true })`).
-- [ ] T014 [US1] Add `addWorktree`, `resolveWorktreePath`, `openWorktree` send-helpers and a `worktreePathResolved` handler in `webview-ui/src/rpc/rpcClient.ts`.
-- [ ] T015 [US1] Create `webview-ui/src/components/CreateWorktreeDialog.tsx` (existing-branch mode): source display, editable target path seeded via `resolveWorktreePath`, live `CommandPreview`, and a note that the worktree opens in a new window. Surface backend `error` and keep the dialog open on failure.
-- [ ] T016 [US1] Add "Create worktree…" to `webview-ui/src/components/BranchContextMenu.tsx` for local branches and wire the dialog open-state following the existing dialog pattern (as `DeleteBranchDialog`/`MergeDialog` are opened from menus).
-- [ ] T017 [P] [US1] Unit tests in `src/__tests__/GitWorktreeService.test.ts` (addWorktree command forms, resolveWorktreePath sanitize/collision) and `webview-ui/src/utils/__tests__/gitCommandBuilder.test.ts` (buildAddWorktreeCommand).
+- [X] T009 [P] [US1] Add worktree path + new-branch-name validation in `src/utils/gitValidation.ts` (reuse `validateRefName`; non-empty path).
+- [X] T010 [US1] Implement `resolveWorktreePath` helper in `src/services/GitWorktreeService.ts`: read base path, expand `${repoName}` and resolve leading `..` **anchored to the main worktree**, sanitize ref → leaf, append numeric collision suffix; return `{ path, leafName }` (research R1/R2).
+- [X] T011 [US1] Implement `addWorktree({ path, ref, branchMode, newBranchName?, force? })` in `src/services/GitWorktreeService.ts` producing the existing / `-b` new / `--detach` command forms (research R4); returns `Result<void>`.
+- [X] T012 [P] [US1] Add `buildAddWorktreeCommand({ path, ref, branchMode, newBranchName })` in `webview-ui/src/utils/gitCommandBuilder.ts` (quote paths with spaces).
+- [X] T013 [US1] Add RPC dispatch in `src/WebviewProvider.ts` for `resolveWorktreePath` (→ `worktreePathResolved`), `addWorktree` (on success: re-post `worktreeList` + call `sendInitialData()`, then run `openWorktree`), and `openWorktree` (`vscode.commands.executeCommand('vscode.openFolder', Uri.file(path), { forceNewWindow: true })`).
+- [X] T014 [US1] Add `addWorktree`, `resolveWorktreePath`, `openWorktree` send-helpers and a `worktreePathResolved` handler in `webview-ui/src/rpc/rpcClient.ts`.
+- [X] T015 [US1] Create `webview-ui/src/components/CreateWorktreeDialog.tsx` (existing-branch mode): source display, editable target path seeded via `resolveWorktreePath`, live `CommandPreview`, and a note that the worktree opens in a new window. Surface backend `error` and keep the dialog open on failure.
+- [X] T016 [US1] Add "Create worktree…" to `webview-ui/src/components/BranchContextMenu.tsx` for local branches and wire the dialog open-state following the existing dialog pattern (as `DeleteBranchDialog`/`MergeDialog` are opened from menus).
+- [X] T017 [P] [US1] Unit tests in `src/__tests__/GitWorktreeService.test.ts` (addWorktree command forms, resolveWorktreePath sanitize/collision) and `webview-ui/src/utils/__tests__/gitCommandBuilder.test.ts` (buildAddWorktreeCommand).
 
 **Checkpoint**: MVP — creating a worktree for an existing branch works end-to-end and opens a new window.
 
@@ -74,14 +74,14 @@ VS Code extension: backend `src/`, frontend `webview-ui/src/`, shared contracts 
 
 **Independent Test**: With ≥2 worktrees, open the panel; verify the list matches `git worktree list`, Open/Reveal work, the main worktree has no Remove, and Prune shows a confirmation listing stale entries.
 
-- [ ] T018 [US2] Implement `pruneWorktrees()` (`git worktree prune`) in `src/services/GitWorktreeService.ts`; returns `Result<void>`.
-- [ ] T019 [US2] Add RPC dispatch in `src/WebviewProvider.ts` for `pruneWorktree` (on success: re-post `worktreeList` + `sendInitialData()`) and `revealWorktree` (`vscode.commands.executeCommand('revealFileInOS', Uri.file(path))`).
-- [ ] T020 [US2] Add `pruneWorktree` and `revealWorktree` send-helpers in `webview-ui/src/rpc/rpcClient.ts`.
-- [ ] T021 [P] [US2] Add `buildPruneWorktreeCommand()` in `webview-ui/src/utils/gitCommandBuilder.ts`.
-- [ ] T022 [US2] Add a Worktree toggle button to `webview-ui/src/components/ControlBar.tsx` (calls `setActiveToggleWidget('worktree')`).
-- [ ] T023 [US2] Render `WorktreeWidget` when `activeToggleWidget === 'worktree'` in `webview-ui/src/components/TogglePanel.tsx`.
-- [ ] T024 [US2] Create `webview-ui/src/components/WorktreeWidget.tsx`: list rows (path, branch or "detached", short HEAD, main badge), per-row Open + Reveal in OS, and a panel-level Prune action that opens a `ConfirmDialog` listing stale entries (worktree paths whose folders are missing). Main worktree row has no Remove.
-- [ ] T025 [P] [US2] Unit tests for `pruneWorktrees` (`src/__tests__/GitWorktreeService.test.ts`) and `buildPruneWorktreeCommand` (`webview-ui/src/utils/__tests__/gitCommandBuilder.test.ts`).
+- [X] T018 [US2] Implement `pruneWorktrees()` (`git worktree prune`) in `src/services/GitWorktreeService.ts`; returns `Result<void>`.
+- [X] T019 [US2] Add RPC dispatch in `src/WebviewProvider.ts` for `pruneWorktree` (on success: re-post `worktreeList` + `sendInitialData()`) and `revealWorktree` (`vscode.commands.executeCommand('revealFileInOS', Uri.file(path))`).
+- [X] T020 [US2] Add `pruneWorktree` and `revealWorktree` send-helpers in `webview-ui/src/rpc/rpcClient.ts`.
+- [X] T021 [P] [US2] Add `buildPruneWorktreeCommand()` in `webview-ui/src/utils/gitCommandBuilder.ts`.
+- [X] T022 [US2] Add a Worktree toggle button to `webview-ui/src/components/ControlBar.tsx` (calls `setActiveToggleWidget('worktree')`).
+- [X] T023 [US2] Render `WorktreeWidget` when `activeToggleWidget === 'worktree'` in `webview-ui/src/components/TogglePanel.tsx`.
+- [X] T024 [US2] Create `webview-ui/src/components/WorktreeWidget.tsx`: list rows (path, branch or "detached", short HEAD, main badge), per-row Open + Reveal in OS, and a panel-level Prune action that opens a `ConfirmDialog` listing stale entries (worktree paths whose folders are missing). Main worktree row has no Remove.
+- [X] T025 [P] [US2] Unit tests for `pruneWorktrees` (`src/__tests__/GitWorktreeService.test.ts`) and `buildPruneWorktreeCommand` (`webview-ui/src/utils/__tests__/gitCommandBuilder.test.ts`).
 
 **Checkpoint**: Panel lists, opens, reveals, and prunes worktrees independently of removal.
 
@@ -93,13 +93,13 @@ VS Code extension: backend `src/`, frontend `webview-ui/src/`, shared contracts 
 
 **Independent Test**: Remove a clean worktree (folder + entry gone); remove a dirty worktree (force required); tick "also delete branch" and confirm the branch is gone; for an unmerged branch, confirm the safe-delete error surfaces and force-retry succeeds.
 
-- [ ] T026 [US3] Implement `removeWorktree(path, { force? })` in `src/services/GitWorktreeService.ts` (`git worktree remove [--force] <path>`) plus a dirty pre-check reusing `isDirtyWorkingTree` from `src/utils/gitQueries.ts` against the target path (research R9); returns `Result<void>`.
-- [ ] T027 [US3] Add RPC dispatch in `src/WebviewProvider.ts` for `removeWorktree` (reject `isMain`/`isCurrent`; on success re-post `worktreeList` + `sendInitialData()`); branch deletion is handled by the webview via the existing `deleteBranch` request after success (research R10).
-- [ ] T028 [P] [US3] Add `removeWorktree` send-helper in `webview-ui/src/rpc/rpcClient.ts`.
-- [ ] T029 [P] [US3] Add `buildRemoveWorktreeCommand({ path, force })` in `webview-ui/src/utils/gitCommandBuilder.ts`.
-- [ ] T030 [US3] Create `webview-ui/src/components/RemoveWorktreeDialog.tsx`: dirty data-loss warning + force requirement, "Also delete branch `<name>`" (hidden/disabled when detached) with nested "force delete", static "open in another window" caution, and retry flow on `BRANCH_NOT_FULLY_MERGED` (worktree already removed → retry only the branch delete) using `CommandPreview`.
-- [ ] T031 [US3] Wire a Remove action on non-main, non-current rows in `webview-ui/src/components/WorktreeWidget.tsx` to open `RemoveWorktreeDialog`.
-- [ ] T032 [P] [US3] Unit tests for `removeWorktree` (force / no-force) in `src/__tests__/GitWorktreeService.test.ts` and `buildRemoveWorktreeCommand` in `webview-ui/src/utils/__tests__/gitCommandBuilder.test.ts`.
+- [X] T026 [US3] Implement `removeWorktree(path, { force? })` in `src/services/GitWorktreeService.ts` (`git worktree remove [--force] <path>`) plus a dirty pre-check reusing `isDirtyWorkingTree` from `src/utils/gitQueries.ts` against the target path (research R9); returns `Result<void>`.
+- [X] T027 [US3] Add RPC dispatch in `src/WebviewProvider.ts` for `removeWorktree` (reject `isMain`/`isCurrent`; on success re-post `worktreeList` + `sendInitialData()`); branch deletion is handled by the webview via the existing `deleteBranch` request after success (research R10).
+- [X] T028 [P] [US3] Add `removeWorktree` send-helper in `webview-ui/src/rpc/rpcClient.ts`.
+- [X] T029 [P] [US3] Add `buildRemoveWorktreeCommand({ path, force })` in `webview-ui/src/utils/gitCommandBuilder.ts`.
+- [X] T030 [US3] Create `webview-ui/src/components/RemoveWorktreeDialog.tsx`: dirty data-loss warning + force requirement, "Also delete branch `<name>`" (hidden/disabled when detached) with nested "force delete", static "open in another window" caution, and retry flow on `BRANCH_NOT_FULLY_MERGED` (worktree already removed → retry only the branch delete) using `CommandPreview`.
+- [X] T031 [US3] Wire a Remove action on non-main, non-current rows in `webview-ui/src/components/WorktreeWidget.tsx` to open `RemoveWorktreeDialog`.
+- [X] T032 [P] [US3] Unit tests for `removeWorktree` (force / no-force) in `src/__tests__/GitWorktreeService.test.ts` and `buildRemoveWorktreeCommand` in `webview-ui/src/utils/__tests__/gitCommandBuilder.test.ts`.
 
 **Checkpoint**: Full create→work→remove loop closed, with safe branch deletion.
 
@@ -111,10 +111,10 @@ VS Code extension: backend `src/`, frontend `webview-ui/src/`, shared contracts 
 
 **Independent Test**: Right-click a commit → dialog defaults to new-branch with detached option; right-click a remote-only badge → new branch named after the remote, tracking it.
 
-- [ ] T033 [US4] Extend `webview-ui/src/components/CreateWorktreeDialog.tsx` with new-branch + detached modes and remote-only default (pre-fill new branch name from the remote branch, set tracking); reuses `buildAddWorktreeCommand`/`resolveWorktreePath` from US1.
-- [ ] T034 [P] [US4] Add "Create worktree…" to `webview-ui/src/components/CommitContextMenu.tsx` for commits and tag badges (default new-branch mode, source = clicked ref).
-- [ ] T035 [US4] Add "Create worktree…" for remote-only branch badges in `webview-ui/src/components/BranchContextMenu.tsx` (new-branch tracking default).
-- [ ] T036 [P] [US4] Unit tests in `webview-ui/src/utils/__tests__/gitCommandBuilder.test.ts` for `buildAddWorktreeCommand` new-branch and detached variants, plus remote-only branch-name derivation.
+- [X] T033 [US4] Extend `webview-ui/src/components/CreateWorktreeDialog.tsx` with new-branch + detached modes and remote-only default (pre-fill new branch name from the remote branch, set tracking); reuses `buildAddWorktreeCommand`/`resolveWorktreePath` from US1.
+- [X] T034 [P] [US4] Add "Create worktree…" to `webview-ui/src/components/CommitContextMenu.tsx` for commits and tag badges (default new-branch mode, source = clicked ref).
+- [X] T035 [US4] Add "Create worktree…" for remote-only branch badges in `webview-ui/src/components/BranchContextMenu.tsx` (new-branch tracking default).
+- [X] T036 [P] [US4] Unit tests in `webview-ui/src/utils/__tests__/gitCommandBuilder.test.ts` for `buildAddWorktreeCommand` new-branch and detached variants, plus remote-only branch-name derivation.
 
 **Checkpoint**: Creation works from any history point and from remote-only branches.
 
@@ -126,9 +126,9 @@ VS Code extension: backend `src/`, frontend `webview-ui/src/`, shared contracts 
 
 **Independent Test**: A commit that is a worktree HEAD shows a badge; two worktrees on the same commit both appear as separate open targets.
 
-- [ ] T037 [US5] Render a worktree badge on rows whose `head` has a non-empty `worktreeByHead` array in `webview-ui/src/components/CommitRow.tsx` (and/or `GraphCell.tsx`), memo-safe for virtual scrolling.
-- [ ] T038 [US5] Create `webview-ui/src/components/WorktreeBadgeMenu.tsx`: a context menu listing one "Open in new window" item per worktree at that commit (calls `openWorktree`).
-- [ ] T039 [P] [US5] Extend `webview-ui/src/stores/__tests__/graphStore.test.ts` to assert two worktrees sharing one `head` both survive in `worktreeByHead`.
+- [X] T037 [US5] Render a worktree badge on rows whose `head` has a non-empty `worktreeByHead` array in `webview-ui/src/components/CommitRow.tsx` (and/or `GraphCell.tsx`), memo-safe for virtual scrolling.
+- [X] T038 [US5] Create `webview-ui/src/components/WorktreeBadgeMenu.tsx`: a context menu listing one "Open in new window" item per worktree at that commit (calls `openWorktree`).
+- [X] T039 [P] [US5] Extend `webview-ui/src/stores/__tests__/graphStore.test.ts` to assert two worktrees sharing one `head` both survive in `worktreeByHead`.
 
 **Checkpoint**: Worktree locations are visible and openable from the graph.
 
@@ -140,8 +140,8 @@ VS Code extension: backend `src/`, frontend `webview-ui/src/`, shared contracts 
 
 **Independent Test**: In a worktree window, open the panel (current marked "you are here", non-removable) and create a worktree with defaults → it lands beside the main repo, not nested.
 
-- [ ] T040 [US6] In `webview-ui/src/components/WorktreeWidget.tsx`, render the "you are here" marker on the `isCurrent` row (marker only — the non-removable guard for `isMain`/`isCurrent` is already delivered by the backend reject in T027 and the row-action gating in T031).
-- [ ] T041 [P] [US6] Unit tests in `src/__tests__/GitWorktreeService.test.ts`: `resolveWorktreePath` anchors `..`/`${repoName}` to the main worktree when the active cwd is a linked worktree; `isCurrent` detection via path-match.
+- [X] T040 [US6] In `webview-ui/src/components/WorktreeWidget.tsx`, render the "you are here" marker on the `isCurrent` row (marker only — the non-removable guard for `isMain`/`isCurrent` is already delivered by the backend reject in T027 and the row-action gating in T031).
+- [X] T041 [P] [US6] Unit tests in `src/__tests__/GitWorktreeService.test.ts`: `resolveWorktreePath` anchors `..`/`${repoName}` to the main worktree when the active cwd is a linked worktree; `isCurrent` detection via path-match.
 
 **Checkpoint**: Feature behaves correctly from inside any worktree.
 
@@ -149,9 +149,9 @@ VS Code extension: backend `src/`, frontend `webview-ui/src/`, shared contracts 
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T042 Map the branch-checked-out-elsewhere conflict to a readable message naming the conflicting worktree in both directions — `addWorktree` (`src/services/GitWorktreeService.ts`) and the reverse main-window checkout via `GitBranchService` (`src/services/GitBranchService.ts`) — per FR-024/SC-003.
-- [ ] T043 [P] Run `pnpm typecheck` and `pnpm lint`; fix any issues across touched files.
-- [ ] T044 Run `pnpm build` (clean) and execute the `quickstart.md` smoke test (all 8 sections) via the "Run Extension" launch config.
+- [X] T042 Map the branch-checked-out-elsewhere conflict to a readable message naming the conflicting worktree in both directions — `addWorktree` (`src/services/GitWorktreeService.ts`) and the reverse main-window checkout via `GitBranchService` (`src/services/GitBranchService.ts`) — per FR-024/SC-003.
+- [X] T043 [P] Run `pnpm typecheck` and `pnpm lint`; fix any issues across touched files.
+- [X] T044 Run `pnpm build` (clean) and execute the `quickstart.md` smoke test (all 8 sections) via the "Run Extension" launch config.
 
 ---
 

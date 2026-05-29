@@ -21,6 +21,7 @@ import {
   COMMIT_TABLE_COLUMN_IDS,
   COMMIT_TABLE_MIN_WIDTHS,
   DEFAULT_PERSISTED_UI_STATE,
+  DEFAULT_USER_SETTINGS,
   UNCOMMITTED_HASH,
   buildUncommittedSubject,
   cloneCommitTableLayout,
@@ -41,7 +42,7 @@ import type { GitSubmoduleService } from './services/GitSubmoduleService.js';
 import type { GitWorktreeService } from './services/GitWorktreeService.js';
 import type { GitIndexService } from './services/GitIndexService.js';
 import type { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
-import { GitError, type Result } from '../shared/errors.js';
+import { GitError, type Result, err, ok } from '../shared/errors.js';
 import { GitExecutor } from './services/GitExecutor.js';
 import { GitHubAvatarService } from './services/GitHubAvatarService.js';
 
@@ -1127,11 +1128,79 @@ export class WebviewProvider {
         break;
       }
       case 'getWorktreeList': {
-        const result = await this.gitWorktreeService.listWorktrees();
-        this.postMessage({
-          type: 'worktreeList',
-          payload: { worktrees: result.success ? result.value : [] },
+        await this.postWorktreeList();
+        break;
+      }
+      case 'resolveWorktreePath': {
+        const basePath = this.getSettingsHandler?.().worktreeBasePath ?? DEFAULT_USER_SETTINGS.worktreeBasePath;
+        const result = await this.gitWorktreeService.resolveWorktreePath(
+          {
+            ref: message.payload.ref,
+            branchMode: message.payload.branchMode,
+            newBranchName: message.payload.newBranchName,
+          },
+          basePath
+        );
+        if (result.success) {
+          this.postMessage({ type: 'worktreePathResolved', payload: result.value });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'addWorktree': {
+        const result = await this.gitWorktreeService.addWorktree({
+          path: message.payload.path,
+          ref: message.payload.ref,
+          branchMode: message.payload.branchMode,
+          newBranchName: message.payload.newBranchName,
+          force: message.payload.force,
         });
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: 'Worktree created' } });
+          await this.postWorktreeList();
+          await this.sendInitialData();
+          await this.openWorktreeFolder(message.payload.path);
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'removeWorktree': {
+        const guard = await this.findRemovableWorktree(message.payload.path);
+        if (!guard.success) {
+          this.postMessage({ type: 'error', payload: { error: guard.error } });
+          break;
+        }
+        const result = await this.gitWorktreeService.removeWorktree(message.payload.path, {
+          force: message.payload.force,
+        });
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: 'Worktree removed' } });
+          await this.postWorktreeList();
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'pruneWorktree': {
+        const result = await this.gitWorktreeService.pruneWorktrees();
+        if (result.success) {
+          this.postMessage({ type: 'success', payload: { message: 'Worktrees pruned' } });
+          await this.postWorktreeList();
+          await this.sendInitialData();
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'openWorktree': {
+        await this.openWorktreeFolder(message.payload.path);
+        break;
+      }
+      case 'revealWorktree': {
+        await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(message.payload.path));
         break;
       }
       case 'getContainingBranches': {
@@ -2175,6 +2244,40 @@ export class WebviewProvider {
     }
     const folders = vscode.workspace.workspaceFolders;
     return folders?.[0]?.uri.fsPath;
+  }
+
+  /** Re-fetch the worktree list and push it to the webview (explicit refresh after mutations). */
+  private async postWorktreeList(): Promise<void> {
+    const result = await this.gitWorktreeService.listWorktrees();
+    this.postMessage({
+      type: 'worktreeList',
+      payload: { worktrees: result.success ? result.value : [] },
+    });
+  }
+
+  /** Open a worktree folder in a new IDE window (shared command across VS Code forks). */
+  private async openWorktreeFolder(worktreePath: string): Promise<void> {
+    await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(worktreePath), {
+      forceNewWindow: true,
+    });
+  }
+
+  /**
+   * Guard against removing the main or current worktree (the UI also disables these,
+   * but the host enforces it — git itself refuses, and we want a readable message).
+   */
+  private async findRemovableWorktree(worktreePath: string): Promise<Result<void>> {
+    const list = await this.gitWorktreeService.listWorktrees();
+    if (!list.success) return list;
+    const normalize = (p: string) => path.resolve(p);
+    const match = list.value.find((w) => normalize(w.path) === normalize(worktreePath));
+    if (match?.isMain) {
+      return err(new GitError('The main worktree cannot be removed.', 'VALIDATION_ERROR'));
+    }
+    if (match?.isCurrent) {
+      return err(new GitError('You cannot remove the worktree you are currently in.', 'VALIDATION_ERROR'));
+    }
+    return ok(undefined);
   }
 
   private resolveWorkspaceFilePath(filePath: string): string | undefined {

@@ -406,18 +406,22 @@ function ExternalLinksSection({ subject }: { subject: string }) {
 }
 
 function WorktreeSection({ hash }: { hash: string }) {
-  const worktreeInfo = useGraphStore((s) => s.worktreeByHead.get(hash));
+  const worktrees = useGraphStore((s) => s.worktreeByHead.get(hash));
 
-  if (!worktreeInfo) return null;
-
-  const label = worktreeInfo.isMain ? 'Primary Workspace' : 'Worktree';
+  if (!worktrees || worktrees.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="font-semibold text-[var(--vscode-descriptionForeground)]">{label}</div>
-      <div className="font-mono text-[var(--vscode-descriptionForeground)] break-all">
-        {worktreeInfo.path}
-      </div>
+      {worktrees.map((worktreeInfo) => (
+        <div key={worktreeInfo.path} className="flex flex-col gap-0.5">
+          <div className="font-semibold text-[var(--vscode-descriptionForeground)]">
+            {worktreeInfo.isMain ? 'Primary Workspace' : 'Worktree'}
+          </div>
+          <div className="font-mono text-[var(--vscode-descriptionForeground)] break-all">
+            {worktreeInfo.path}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

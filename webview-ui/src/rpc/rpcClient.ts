@@ -1,5 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, CompareMode, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus } from '@shared/types';
+import type { CherryPickOptions, CompareMode, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 
 declare const acquireVsCodeApi: () => {
@@ -16,6 +16,8 @@ class RpcClient {
   private pendingParentLookups = new Map<number, { resolve: (parents: CommitParentInfo[]) => void; reject: (error: Error) => void }>();
   private parentRequestIdByHash = new Map<string, number>();
   private pendingPush: { resolve: (message: string) => void; reject: (error: Error) => void } | null = null;
+  /** One-shot slot for a `resolveWorktreePath` request awaiting its `worktreePathResolved` response. */
+  private pendingWorktreePath: { resolve: (value: { path: string; leafName: string }) => void; reject: (error: Error) => void } | null = null;
   /**
    * Promise slot for correlating a dialog-initiated git action with its
    * backend response. Used by FilePickerDialog to lift its `isRunning` busy
@@ -44,6 +46,10 @@ class RpcClient {
     window.removeEventListener('message', this.messageHandler);
     this.initialized = false;
     this.rejectPendingLookups('RPC client disposed');
+    if (this.pendingWorktreePath) {
+      this.pendingWorktreePath.reject(new Error('RPC client disposed'));
+      this.pendingWorktreePath = null;
+    }
     this.clearPendingDialogAction();
   }
 
@@ -105,6 +111,10 @@ class RpcClient {
         // blocks every retry for the rest of the session.
         store.setAuthorListLoading(false);
         this.rejectPendingLookups(errorMessage);
+        if (this.pendingWorktreePath) {
+          this.pendingWorktreePath.reject(new Error(errorMessage));
+          this.pendingWorktreePath = null;
+        }
         if (this.pendingDialogAction) {
           const { reject } = this.pendingDialogAction;
           this.pendingDialogAction = null;
@@ -209,6 +219,12 @@ class RpcClient {
         break;
       case 'worktreeList':
         store.setWorktreeList(message.payload.worktrees);
+        break;
+      case 'worktreePathResolved':
+        if (this.pendingWorktreePath) {
+          this.pendingWorktreePath.resolve(message.payload);
+          this.pendingWorktreePath = null;
+        }
         break;
       case 'commitParents': {
         const lookupKey = message.payload.parents.map((parent) => parent.hash).join(',');
@@ -593,6 +609,42 @@ class RpcClient {
   // Worktree ops
   getWorktreeList() {
     this.send({ type: 'getWorktreeList', payload: {} });
+  }
+
+  /**
+   * Ask the backend to compose a target path for a new worktree. Resolves with
+   * the absolute path + leaf name; rejects if a previous request is superseded
+   * or the backend returns an error. Non-blocking — used to seed the dialog field.
+   */
+  resolveWorktreePath(payload: { ref: string; branchMode: WorktreeBranchMode; newBranchName?: string }): Promise<{ path: string; leafName: string }> {
+    if (this.pendingWorktreePath) {
+      this.pendingWorktreePath.reject(new Error('superseded'));
+      this.pendingWorktreePath = null;
+    }
+    return new Promise((resolve, reject) => {
+      this.pendingWorktreePath = { resolve, reject };
+      this.send({ type: 'resolveWorktreePath', payload });
+    });
+  }
+
+  addWorktree(payload: { path: string; ref: string; branchMode: WorktreeBranchMode; newBranchName?: string; force?: boolean }) {
+    this.send({ type: 'addWorktree', payload });
+  }
+
+  removeWorktree(path: string, force?: boolean) {
+    this.send({ type: 'removeWorktree', payload: { path, force } });
+  }
+
+  pruneWorktree() {
+    this.send({ type: 'pruneWorktree', payload: {} });
+  }
+
+  openWorktree(path: string) {
+    this.send({ type: 'openWorktree', payload: { path } });
+  }
+
+  revealWorktree(path: string) {
+    this.send({ type: 'revealWorktree', payload: { path } });
   }
 
   // Containing branches

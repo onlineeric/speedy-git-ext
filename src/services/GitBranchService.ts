@@ -12,6 +12,25 @@ export function isCheckoutConflict(error: GitError): boolean {
   return error.message.includes('would be overwritten by checkout');
 }
 
+/**
+ * Map git's "branch is already checked out at <path>" refusal (raised when the
+ * target branch is held by another worktree) to a readable message naming the
+ * conflicting worktree (FR-024 / T042). Returns the original error otherwise.
+ */
+export function mapWorktreeCheckoutError(error: GitError): GitError {
+  const text = error.stderr ?? error.message;
+  const match = text.match(/is already (?:checked out|used by worktree) at '([^']+)'/);
+  if (match) {
+    return new GitError(
+      `That branch is checked out in another worktree at "${match[1]}". Open that worktree's window to work on it, or remove the worktree first.`,
+      'COMMAND_FAILED',
+      error.command,
+      error.stderr
+    );
+  }
+  return error;
+}
+
 export class GitBranchService {
   private executor: GitExecutor;
 
@@ -54,10 +73,10 @@ export class GitBranchService {
         return ok(`Checked out '${name}' tracking ${remote}/${name}`);
       }
 
-      return trackResult;
+      return err(mapWorktreeCheckoutError(trackResult.error));
     }
 
-    return result;
+    return err(mapWorktreeCheckoutError(result.error));
   }
 
   async checkoutCommit(hash: string): Promise<Result<string, GitError>> {
