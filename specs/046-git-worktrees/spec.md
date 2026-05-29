@@ -19,6 +19,17 @@ The feature is built around one fast loop:
 
 Richer worktree *session* management (locking, naming schemes, multi-window orchestration) is explicitly out of scope; it is left to the editor / GitLens.
 
+## Clarifications
+
+### Session 2026-05-29
+
+- Q: Default base ref for new-branch worktrees — clicked source ref vs. a fixed integration branch like `dev`? → A: Default base = the clicked source ref (the commit/tag/branch the user right-clicked); the new branch starts exactly where they clicked.
+- Q: Should the create dialog offer "open in current window", or always open a new window? → A: Always open in a new window. Drop the checkbox entirely to keep the flow simple and avoid handling unsaved-file / workspace-replacement edge cases.
+- Q: Should Prune run silently, and where is it offered? → A: Panel-level Prune button that shows a confirmation listing the stale entries to be pruned before running.
+- Q: Can a worktree be created from a remote-only branch badge? → A: Yes. Offer Create worktree… on remote-only badges; it creates a new local branch tracking the remote (named after the remote branch), consistent with the existing fast-forward (043) pattern.
+- Q: Should the target-path field have a native folder picker? → A: No. A plain editable text field pre-filled with the suggested default, matching the existing dialog + command-preview pattern.
+- Q: If the target path's parent directory does not exist, create it or error? → A: Rely on git, which creates missing intermediate directories itself; surface a readable error only if the operation fails (e.g. permissions).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Create a worktree for an existing branch and open it (Priority: P1)
@@ -121,6 +132,7 @@ A user is working in a window opened on a linked worktree (not the main repo). T
 - **Worktree open in another window during removal**: that window is left pointing at a deleted folder; warn before proceeding.
 - **Worktree folder deleted outside the extension**: the entry becomes stale; the user can prune it.
 - **Target path collision**: the suggested folder name collides with an existing one → a numeric suffix is appended (`-2`, `-3`, …); if the user edits the path to an existing non-empty folder, git's error is surfaced.
+- **Missing parent directory**: if the target path's parent does not exist, git creates the intermediate directories itself; only a genuine failure (e.g. permissions) surfaces an error.
 - **Paths containing spaces**: quoted correctly in the command preview and when the command is run.
 - **Multiple worktrees on one commit**: both are tracked and shown; neither overwrites the other.
 - **Worktree changes not caught by the file watcher**: worktree metadata lives inside `.git`, which watchers commonly ignore; the list and graph MUST be refreshed explicitly after every create/remove/prune rather than relying on the watcher.
@@ -131,13 +143,14 @@ A user is working in a window opened on a linked worktree (not the main repo). T
 
 #### Creation
 
-- **FR-001**: Users MUST be able to start worktree creation from a right-click on a local branch, a commit, or a tag badge in the graph, via a "Create worktree…" action.
+- **FR-001**: Users MUST be able to start worktree creation from a right-click on a local branch, a remote-only branch badge, a commit, or a tag badge in the graph, via a "Create worktree…" action.
+- **FR-001a**: When the source is a remote-only branch, the dialog MUST default to "new branch" mode, pre-filling the new branch name from the remote branch and setting it to track that remote.
 - **FR-002**: The create dialog MUST pre-fill the source ref from the clicked item and offer three branch modes: (a) check out an existing local branch that is not checked out elsewhere, (b) create a new branch from the source ref, (c) create a detached worktree at the source ref.
 - **FR-003**: When the source branch is already checked out in another worktree, or when the source is a bare commit/tag/remote branch, the dialog MUST default to "new branch" mode.
-- **FR-004**: The create dialog MUST show a suggested, editable target folder path derived from the configured base path plus a sanitized ref name.
-- **FR-005**: The create dialog MUST include an "Open worktree in new window" checkbox, checked by default. When checked, the worktree opens in a new IDE window; when unchecked, it opens in the current window (replacing the current workspace folder).
+- **FR-004**: The create dialog MUST show a suggested target folder path (derived from the configured base path plus a sanitized ref name) in a plain editable text field, with no native folder picker.
+- **FR-005**: After creation, the worktree MUST always open in a new IDE window. The dialog offers no "open in current window" option, avoiding workspace-replacement and unsaved-file edge cases.
 - **FR-006**: The create dialog MUST display a live preview of the exact git command that will run, with paths containing spaces quoted correctly.
-- **FR-007**: After a successful create, the extension MUST open the worktree per the checkbox and MUST explicitly refresh the worktree list and graph.
+- **FR-007**: After a successful create, the extension MUST open the worktree in a new IDE window and MUST explicitly refresh the worktree list and graph.
 
 #### Path composition & settings
 
@@ -151,7 +164,7 @@ A user is working in a window opened on a linked worktree (not the main repo). T
 - **FR-012**: A new toolbar toggle MUST open a worktree panel that lists every worktree with its path, branch (or "detached"), short HEAD, and a marker on the main worktree.
 - **FR-013**: The panel MUST mark which worktree is the currently-open one ("you are here").
 - **FR-014**: Each non-main, non-current worktree row MUST offer Open (new window), Reveal in OS, and Remove actions. The main worktree and the current worktree MUST NOT be removable.
-- **FR-015**: The panel MUST offer a Prune action that removes administrative entries for worktrees whose folders no longer exist, followed by an explicit refresh.
+- **FR-015**: The panel MUST offer a panel-level Prune action that, before running, shows a confirmation listing the stale entries (worktrees whose folders no longer exist) that will be pruned; after confirmation it prunes them and explicitly refreshes.
 
 #### Removal & branch deletion
 
@@ -198,20 +211,20 @@ A user is working in a window opened on a linked worktree (not the main repo). T
 
 ## Assumptions
 
-- **Default base for new branches**: When "new branch" mode is used, the new branch is created from the clicked source ref by default. See Open Question Q1 regarding the recorded preference to default new branches off the integration branch (`dev`).
+- **Default base for new branches**: When "new branch" mode is used, the new branch is created from the clicked source ref by default (resolved in Clarifications). The recorded `dev`-default preference applies to the generic "new branch" action, not to this branch-from-here gesture.
 - **Open behavior is the shared workspace open-folder action**, which behaves identically in VS Code and forks (Cursor, etc.); this is treated as a git/workspace action and therefore in scope.
 - **Worktrees live outside the watched working tree** (sibling folder by default), preserving the "performance first" principle by keeping a second full checkout out of file-watcher / search / build traversal. No `.gitignore` edits are needed.
 - **Existing read-only plumbing is reused**: the worktree list parser, the `getWorktreeList` data flow, and the store's worktree state already exist; this feature adds create/remove/prune and the per-commit-collision-safe lookup, panel, badge, and dialogs on top.
 - **Branch deletion reuses the existing branch-delete capability** rather than introducing a new one in the worktree layer.
-- **Prune is treated as a safe metadata cleanup** (it only removes records for already-missing folders) and therefore does not require a force confirmation.
+- **Prune is a safe metadata cleanup** (it only removes records for already-missing folders); a confirmation listing the stale entries is shown for transparency rather than as a force/data-loss guard.
 
-## Outstanding Clarifications (for `/speckit-clarify`)
+## Clarification Log
 
-The following decisions are genuinely ambiguous or carry notable UX trade-offs and should be resolved in the clarify step. The three highest-impact ones are also marked inline below as [NEEDS CLARIFICATION].
+All open questions have been resolved in the Clarifications section (Session 2026-05-29). Tracking summary:
 
-- **Q1 — Default base ref for new-branch worktrees** [NEEDS CLARIFICATION: should "new branch" mode default its base to the clicked source ref, or to a configurable integration branch such as `dev` per the recorded team preference? The two diverge when the user right-clicks something other than the integration branch.]
-- **Q2 — "Open in current window" option** [NEEDS CLARIFICATION: should the create dialog keep the "open in current window" path (unchecking the checkbox replaces the current workspace folder and closes the present graph view), or should the feature always open in a new window to avoid disrupting the user's current context?]
-- **Q3 — Prune scope and confirmation** [NEEDS CLARIFICATION: should Prune run silently as a safe cleanup, or show a confirmation listing which stale entries will be pruned? And should it be panel-level only, or also offered when a worktree is detected as missing?]
-- **Q4 (lower impact)** — Should "Create worktree…" appear on remote-only branch badges (auto-creating a local tracking branch), or only on local branches, commits, and tags?
-- **Q5 (lower impact)** — Should the target-path field include a folder picker / browse affordance, or remain a plain editable text field with the suggested default?
-- **Q6 (lower impact)** — When the user edits the target path to a location whose parent directory does not yet exist, should the extension create intermediate directories or surface git's error?
+- **Q1 — Default base ref for new-branch worktrees** ✅ Resolved: default base = the clicked source ref.
+- **Q2 — "Open in current window" option** ✅ Resolved: always open in a new window; the option is dropped.
+- **Q3 — Prune scope and confirmation** ✅ Resolved: panel-level Prune with a confirmation listing the stale entries to be pruned.
+- **Q4** ✅ Resolved: yes — remote-only badges offer Create worktree…, creating a new local branch tracking the remote.
+- **Q5** ✅ Resolved: plain editable text field, no folder picker.
+- **Q6** ✅ Resolved: rely on git to create intermediate directories; surface an error only on genuine failure.
