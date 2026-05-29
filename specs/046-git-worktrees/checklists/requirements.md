@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,6 +31,5 @@
 
 ## Notes
 
-- **3 inline [NEEDS CLARIFICATION] markers remain on purpose** (Q1 new-branch base ref, Q2 open-in-current-window, Q3 prune scope/confirmation). Per the user's instruction, uncertainties are documented for the next `/speckit-clarify` step rather than resolved during specification. Three additional lower-impact questions (Q4–Q6) are listed in the "Outstanding Clarifications" section without inline markers.
+- All six clarification questions (Q1–Q6) were resolved in the `/speckit-clarify` session on 2026-05-29; no [NEEDS CLARIFICATION] markers remain.
 - Some implementation nouns appear in the spec (e.g. "git worktree add", "`.git`", setting key `speedyGit.worktree.basePath`) because they are user-facing contract details (the command preview, the existing setting) inherited from the idea doc — they describe *what* the user sees, not *how* it is built.
-- This checklist intentionally leaves the "No [NEEDS CLARIFICATION]" item unchecked until `/speckit-clarify` resolves Q1–Q3.
