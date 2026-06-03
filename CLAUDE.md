@@ -191,5 +191,5 @@ shared/                           # Shared types between backend & frontend
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/045-revert-mode-dialog/plan.md
+specs/047-signing-verification/plan.md
 <!-- SPECKIT END -->
