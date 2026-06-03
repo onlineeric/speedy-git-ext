@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.3.4] - 2026-06-03
+
+### Fixed
+- The **Checkout Commit** confirmation dialog now shows the developer command preview (`git checkout <hash>`), matching the Checkout Branch dialog and every other operation dialog. Previously the dialog confirmed a detached-HEAD checkout without previewing the underlying git command.
+
 ## [4.3.3] - 2026-05-27
 
 ### Added
