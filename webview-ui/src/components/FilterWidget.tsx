@@ -49,6 +49,7 @@ function getAuthorSearchText(author: Author): string {
 export function FilterWidget() {
   const filters = useGraphStore((s) => s.filters);
   const authorList = useGraphStore((s) => s.authorList);
+  const authorListLoading = useGraphStore((s) => s.authorListLoading);
   const setFilters = useGraphStore((s) => s.setFilters);
   const recomputeVisibility = useGraphStore((s) => s.recomputeVisibility);
   const resetAllFilters = useGraphStore((s) => s.resetAllFilters);
@@ -57,6 +58,11 @@ export function FilterWidget() {
   const topology = useGraphStore((s) => s.topology);
   const graphColors = useGraphStore((s) => s.userSettings.graphColors);
   const branches = useGraphStore((s) => s.branches);
+
+  useEffect(() => {
+    if (authorList.length > 0 || authorListLoading) return;
+    rpcClient.getAuthors();
+  }, [authorList.length, authorListLoading]);
 
   // Message filter local state
   const [messageText, setMessageText] = useState<string>(() => filters.textFilter ?? '');

@@ -5,6 +5,7 @@ import {
   COMMIT_TABLE_MIN_WIDTHS,
   createDefaultCommitTableLayout,
   DEFAULT_PERSISTED_UI_STATE,
+  DEFAULT_USER_SETTINGS,
 } from '../../shared/types.js';
 import { WebviewProvider } from '../WebviewProvider.js';
 
@@ -79,6 +80,81 @@ function createProvider(
 
   return { provider, extensionContext, globalStateStore };
 }
+
+function makeTestCommit(hash: string): Commit {
+  return {
+    hash,
+    abbreviatedHash: hash.slice(0, 7),
+    parents: [],
+    author: 'Test',
+    authorEmail: 'test@example.com',
+    authorDate: 0,
+    subject: `commit ${hash}`,
+    refs: [],
+  };
+}
+
+describe('WebviewProvider initial load performance', () => {
+  it('posts initialData without waiting for deferred repo data or authors', async () => {
+    const { provider } = createProvider();
+    const deferredUncommitted = new Promise<never>(() => undefined);
+    const commit = makeTestCommit('aaa1111');
+
+    const gitLogService = {
+      getCommits: vi.fn().mockResolvedValue({
+        success: true,
+        value: { commits: [commit], totalLoadedWithoutFilter: 1 },
+      }),
+      getBranches: vi.fn().mockResolvedValue({ success: true, value: [] }),
+      getAuthors: vi.fn().mockResolvedValue({ success: true, value: [] }),
+    };
+
+    const testable = provider as unknown as {
+      postMessage: ReturnType<typeof vi.fn>;
+      sendInitialData: () => Promise<void>;
+      sendSubmodulesData: ReturnType<typeof vi.fn>;
+      gitLogService: typeof gitLogService;
+      gitDiffService: { getUncommittedSummary: ReturnType<typeof vi.fn> };
+      gitRemoteService: { getRemotes: ReturnType<typeof vi.fn> };
+      gitWorktreeService: { listWorktrees: ReturnType<typeof vi.fn> };
+      gitStashService: { getStashes: ReturnType<typeof vi.fn> };
+      gitRevertService: { getRevertState: ReturnType<typeof vi.fn> };
+      gitCherryPickService: { getCherryPickState: ReturnType<typeof vi.fn> };
+      gitRebaseService: { getRebaseState: ReturnType<typeof vi.fn>; getConflictInfo: ReturnType<typeof vi.fn> };
+    };
+
+    testable.postMessage = vi.fn();
+    testable.sendSubmodulesData = vi.fn();
+    testable.gitLogService = gitLogService;
+    testable.gitDiffService = { getUncommittedSummary: vi.fn(() => deferredUncommitted) };
+    testable.gitRemoteService = { getRemotes: vi.fn().mockResolvedValue({ success: true, value: [] }) };
+    testable.gitWorktreeService = { listWorktrees: vi.fn().mockResolvedValue({ success: true, value: [] }) };
+    testable.gitStashService = { getStashes: vi.fn().mockResolvedValue({ success: true, value: [] }) };
+    testable.gitRevertService = { getRevertState: vi.fn().mockResolvedValue({ success: true, value: 'idle' }) };
+    testable.gitCherryPickService = { getCherryPickState: vi.fn(() => ({ success: true, value: 'idle' })) };
+    testable.gitRebaseService = {
+      getRebaseState: vi.fn(() => ({ success: true, value: { state: 'idle' } })),
+      getConflictInfo: vi.fn(),
+    };
+    provider.setSettingsProvider(() => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }));
+
+    await testable.sendInitialData();
+
+    expect(testable.gitLogService.getAuthors).not.toHaveBeenCalled();
+    expect(testable.gitDiffService.getUncommittedSummary).toHaveBeenCalledTimes(1);
+    expect(testable.postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'initialData',
+      payload: expect.objectContaining({
+        commits: [commit],
+        branches: [],
+        authors: [],
+        remotes: [],
+        stashes: [],
+        worktrees: [],
+      }),
+    }));
+  });
+});
 
 describe('WebviewProvider switchRepo', () => {
   it('clears remembered branch filters before reloading the new repository', async () => {

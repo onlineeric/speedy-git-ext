@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useGraphStore } from '../graphStore';
-import type { Commit } from '@shared/types';
+import type { Commit, FileChange, RemoteInfo, StashEntry, WorktreeInfo } from '@shared/types';
 import type { InitialDataPayload } from '@shared/messages';
 
 const makeCommit = (hash: string): Commit => ({
@@ -74,6 +74,15 @@ describe('graphStore — setInitialData', () => {
     useGraphStore.setState({
       commits: [],
       branches: [],
+      remotes: [],
+      stashes: [],
+      worktreeList: [],
+      worktreeByHead: new Map(),
+      uncommittedStagedFiles: [],
+      uncommittedUnstagedFiles: [],
+      uncommittedConflictFiles: [],
+      uncommittedCounts: { stagedCount: 0, unstagedCount: 0, untrackedCount: 0 },
+      hasUncommittedChanges: false,
       loading: true,
       isRefreshing: true,
     });
@@ -84,6 +93,87 @@ describe('graphStore — setInitialData', () => {
 
     expect(useGraphStore.getState().loading).toBe(false);
     expect(useGraphStore.getState().isRefreshing).toBe(false);
+  });
+
+  it('retains already-hydrated deferred data when a fast initial payload omits it', () => {
+    const stagedFile: FileChange = { path: 'src/file.ts', status: 'modified', stageState: 'staged' };
+    const remote: RemoteInfo = { name: 'origin', fetchUrl: 'git@example.com/repo.git', pushUrl: 'git@example.com/repo.git' };
+    const stash: StashEntry = {
+      index: 0,
+      hash: 'stash000',
+      parentHash: 'abc1234',
+      message: 'WIP',
+      date: 1,
+      author: 'Test User',
+      authorEmail: 'test@example.com',
+    };
+    const worktree: WorktreeInfo = {
+      path: '/repo-wt',
+      head: 'abc1234',
+      branch: 'feature',
+      isMain: false,
+      isDetached: false,
+    };
+
+    useGraphStore.setState({
+      remotes: [remote],
+      stashes: [stash],
+      worktreeList: [worktree],
+      worktreeByHead: new Map([[worktree.head, worktree]]),
+      uncommittedStagedFiles: [stagedFile],
+      uncommittedCounts: { stagedCount: 1, unstagedCount: 0, untrackedCount: 0 },
+      hasUncommittedChanges: true,
+    });
+
+    useGraphStore.getState().setInitialData(makeInitialDataPayload([makeCommit('abc1234')]));
+
+    const after = useGraphStore.getState();
+    expect(after.remotes).toEqual([remote]);
+    expect(after.stashes).toEqual([stash]);
+    expect(after.worktreeList).toEqual([worktree]);
+    expect(after.worktreeByHead.get('abc1234')).toEqual(worktree);
+    expect(after.uncommittedStagedFiles).toEqual([stagedFile]);
+    expect(after.uncommittedCounts.stagedCount).toBe(1);
+    expect(after.hasUncommittedChanges).toBe(true);
+  });
+
+  it('clears deferred repo data when the active parent repo changes', () => {
+    useGraphStore.setState({
+      activeParentRepoPath: '/old',
+      authorList: [{ name: 'Old Author', email: 'old@example.com' }],
+      authorListLoading: true,
+      remotes: [{ name: 'origin', fetchUrl: 'old', pushUrl: 'old' }],
+      stashes: [{
+        index: 0,
+        hash: 'stash000',
+        parentHash: 'abc1234',
+        message: 'WIP',
+        date: 1,
+        author: 'Test User',
+        authorEmail: 'test@example.com',
+      }],
+      worktreeList: [{ path: '/old-wt', head: 'abc1234', branch: 'main', isMain: false, isDetached: false }],
+      worktreeByHead: new Map([['abc1234', { path: '/old-wt', head: 'abc1234', branch: 'main', isMain: false, isDetached: false }]]),
+      uncommittedStagedFiles: [{ path: 'src/file.ts', status: 'modified', stageState: 'staged' }],
+      uncommittedCounts: { stagedCount: 1, unstagedCount: 0, untrackedCount: 0 },
+      hasUncommittedChanges: true,
+    });
+
+    useGraphStore.getState().setRepos(
+      [{ path: '/new', name: 'new', displayName: 'new' }],
+      '/new',
+    );
+
+    const after = useGraphStore.getState();
+    expect(after.authorList).toEqual([]);
+    expect(after.authorListLoading).toBe(false);
+    expect(after.remotes).toEqual([]);
+    expect(after.stashes).toEqual([]);
+    expect(after.worktreeList).toEqual([]);
+    expect(after.worktreeByHead.size).toBe(0);
+    expect(after.uncommittedStagedFiles).toEqual([]);
+    expect(after.uncommittedCounts.stagedCount).toBe(0);
+    expect(after.hasUncommittedChanges).toBe(false);
   });
 });
 

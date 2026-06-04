@@ -703,6 +703,18 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
             submoduleSelection: 'parent' as const,
             displayedRepoPath: activeRepoPath,
             submodules: [],
+            authorList: [],
+            authorListLoading: false,
+            remotes: [],
+            stashes: [],
+            worktreeList: [],
+            worktreeByHead: new Map(),
+            uncommittedStagedFiles: [],
+            uncommittedUnstagedFiles: [],
+            uncommittedConflictFiles: [],
+            conflictType: undefined,
+            uncommittedCounts: { stagedCount: 0, unstagedCount: 0, untrackedCount: 0 },
+            hasUncommittedChanges: false,
             ...(parentChanged ? { pendingCommitCheckout: null } : {}),
           }
         : {}),
@@ -731,6 +743,18 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       lastClickedHash: undefined,
       commitDetails: undefined,
       detailsPanelOpen: false,
+      authorList: [],
+      authorListLoading: false,
+      remotes: [],
+      stashes: [],
+      worktreeList: [],
+      worktreeByHead: new Map(),
+      uncommittedStagedFiles: [],
+      uncommittedUnstagedFiles: [],
+      uncommittedConflictFiles: [],
+      conflictType: undefined,
+      uncommittedCounts: { stagedCount: 0, unstagedCount: 0, untrackedCount: 0 },
+      hasUncommittedChanges: false,
     });
     import('../rpc/rpcClient').then(({ rpcClient }) => {
       rpcClient.send({ type: 'switchRepo', payload: { repoPath } });
@@ -761,6 +785,18 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       lastClickedHash: undefined,
       commitDetails: undefined,
       detailsPanelOpen: false,
+      authorList: [],
+      authorListLoading: false,
+      remotes: [],
+      stashes: [],
+      worktreeList: [],
+      worktreeByHead: new Map(),
+      uncommittedStagedFiles: [],
+      uncommittedUnstagedFiles: [],
+      uncommittedConflictFiles: [],
+      conflictType: undefined,
+      uncommittedCounts: { stagedCount: 0, unstagedCount: 0, untrackedCount: 0 },
+      hasUncommittedChanges: false,
     });
     import('../rpc/rpcClient').then(({ rpcClient }) => {
       // Submodule selector navigation: change the displayed repo without
@@ -953,15 +989,35 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const state = get();
     // Use new commits if provided, else reuse existing (fingerprint-unchanged refresh)
     const commits = payload.commits ?? state.commits;
-    const stashes = payload.stashes;
+    const stashes = payload.stashes.length > 0 ? payload.stashes : state.stashes;
+    const remotes = payload.remotes.length > 0 ? payload.remotes : state.remotes;
+    const worktrees = payload.worktrees.length > 0 ? payload.worktrees : state.worktreeList;
+    const payloadHasUncommitted =
+      payload.uncommittedChanges.stagedCount > 0
+      || payload.uncommittedChanges.unstagedCount > 0
+      || payload.uncommittedChanges.untrackedCount > 0
+      || payload.uncommittedChanges.conflictFiles.length > 0
+      || payload.uncommittedChanges.stagedFiles.length > 0
+      || payload.uncommittedChanges.unstagedFiles.length > 0;
+    const uncommittedChanges = payloadHasUncommitted
+      ? payload.uncommittedChanges
+      : {
+          stagedFiles: state.uncommittedStagedFiles,
+          unstagedFiles: state.uncommittedUnstagedFiles,
+          conflictFiles: state.uncommittedConflictFiles,
+          conflictType: state.conflictType,
+          stagedCount: state.uncommittedCounts.stagedCount,
+          unstagedCount: state.uncommittedCounts.unstagedCount,
+          untrackedCount: state.uncommittedCounts.untrackedCount,
+        };
     const filters = state.filters;
 
     // Extract uncommitted changes
-    const hasChanges = payload.uncommittedChanges.stagedCount + payload.uncommittedChanges.unstagedCount + payload.uncommittedChanges.untrackedCount > 0;
+    const hasChanges = uncommittedChanges.stagedCount + uncommittedChanges.unstagedCount + uncommittedChanges.untrackedCount > 0;
     const counts = {
-      stagedCount: payload.uncommittedChanges.stagedCount,
-      unstagedCount: payload.uncommittedChanges.unstagedCount,
-      untrackedCount: payload.uncommittedChanges.untrackedCount,
+      stagedCount: uncommittedChanges.stagedCount,
+      unstagedCount: uncommittedChanges.unstagedCount,
+      untrackedCount: uncommittedChanges.untrackedCount,
     };
 
     // Compute hidden hashes, merged commits, and topology in one pass
@@ -978,7 +1034,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
 
     // Build worktree lookup map
     const worktreeByHead = new Map<string, WorktreeInfo>();
-    for (const wt of payload.worktrees) {
+    for (const wt of worktrees) {
       worktreeByHead.set(wt.head, wt);
     }
 
@@ -986,15 +1042,14 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       commits,
       branches: payload.branches,
       stashes,
-      uncommittedStagedFiles: payload.uncommittedChanges.stagedFiles,
-      uncommittedUnstagedFiles: payload.uncommittedChanges.unstagedFiles,
-      uncommittedConflictFiles: payload.uncommittedChanges.conflictFiles,
-      conflictType: payload.uncommittedChanges.conflictType,
+      uncommittedStagedFiles: uncommittedChanges.stagedFiles,
+      uncommittedUnstagedFiles: uncommittedChanges.unstagedFiles,
+      uncommittedConflictFiles: uncommittedChanges.conflictFiles,
+      conflictType: uncommittedChanges.conflictType,
       uncommittedCounts: counts,
       hasUncommittedChanges: hasChanges,
-      remotes: payload.remotes,
-      authorList: payload.authors,
-      worktreeList: payload.worktrees,
+      remotes,
+      worktreeList: worktrees,
       worktreeByHead,
       cherryPickInProgress: payload.cherryPickState === 'in-progress',
       rebaseInProgress: payload.rebaseState === 'in-progress',

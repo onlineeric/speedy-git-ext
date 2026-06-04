@@ -4,6 +4,17 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.4.1] - 2026-06-04
+
+### Performance
+- Opening the graph in parent repos with many submodules is now substantially lighter. The initial graph render now waits only for commits and branches; uncommitted-change details, remotes, worktrees, stashes, operation state, submodule selector data, and avatars hydrate afterward in the background.
+- The author list for the Filter panel is now loaded on demand when the Filter panel opens instead of during graph startup. This avoids an unbounded author-history scan on every open.
+- Parent-repo uncommitted status now uses `git status --ignore-submodules=dirty`, so dirty submodule working trees do not force a parent status walk across every submodule.
+- Submodule selector data is now read from `.gitmodules` plus local initialization checks instead of `git submodule status`, avoiding the expensive per-submodule status pass during graph open.
+
+### Fixed
+- Repo and submodule switches now clear stale deferred repo data while normal refreshes retain the previous hydrated data until background updates arrive, avoiding brief UI flicker during refresh.
+
 ## [4.4.0] - 2026-06-04
 
 ### Added
