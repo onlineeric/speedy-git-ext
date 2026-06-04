@@ -3,7 +3,7 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { Commit, CherryPickOptions, ResetMode, RebaseEntry, CommitParentInfo, RevertOptions, SlotValue } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
-import { buildResetCommand } from '../utils/gitCommandBuilder';
+import { buildResetCommand, buildCheckoutCommand } from '../utils/gitCommandBuilder';
 import { ensureComparePanelOpen, setSlotsAndCompare } from '../utils/compareDispatch';
 import { slotsEqual } from '../utils/compareSlot';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -434,6 +434,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
         onCancel={() => setCheckoutCommitConfirmOpen(false)}
         title="Checkout Commit"
         description={`Checkout commit ${commit.abbreviatedHash} will result in detached HEAD. Continue?`}
+        commandPreview={buildCheckoutCommand({ branch: commit.abbreviatedHash, pull: false })}
       />
 
       <CreateBranchDialog
