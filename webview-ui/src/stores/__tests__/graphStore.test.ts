@@ -87,6 +87,85 @@ describe('graphStore — setInitialData', () => {
   });
 });
 
+describe('graphStore — signature cache retention on refresh (FR-015)', () => {
+  const verified = { status: 'verified', signer: '', keyId: '', fingerprint: '', format: 'gpg' } as const;
+
+  beforeEach(() => {
+    useGraphStore.setState({
+      commits: [],
+      signatureCache: {},
+      signatureLoading: {},
+      signaturePresence: {},
+      signaturePresenceLoading: {},
+      signaturePresenceFailed: {},
+    });
+  });
+
+  it('setCommits retains cached verdicts/presence for commits still loaded and prunes the rest', () => {
+    useGraphStore.getState().setCommits([makeCommit('aaaaaaa'), makeCommit('bbbbbbb')]);
+    // Simulate the async loader having verified both commits.
+    useGraphStore.setState({
+      signatureCache: { aaaaaaa: { ...verified }, bbbbbbb: null },
+      signaturePresence: { aaaaaaa: 'signed', bbbbbbb: 'not-signed' },
+    });
+
+    // Refresh: bbbbbbb disappears, ccccccc is new.
+    useGraphStore.getState().setCommits([makeCommit('aaaaaaa'), makeCommit('ccccccc')]);
+
+    const after = useGraphStore.getState();
+    expect(after.signatureCache['aaaaaaa']?.status).toBe('verified'); // retained, no re-verify
+    expect(after.signaturePresence['aaaaaaa']).toBe('signed');        // retained
+    expect('bbbbbbb' in after.signatureCache).toBe(false);            // gone → pruned
+    expect('bbbbbbb' in after.signaturePresence).toBe(false);
+    expect('ccccccc' in after.signatureCache).toBe(false);           // new → verified later
+  });
+
+  it('setInitialData retains cached signatures by hash across a refresh', () => {
+    useGraphStore.getState().setInitialData(
+      makeInitialDataPayload([makeCommit('aaaaaaa'), makeCommit('bbbbbbb')])
+    );
+    useGraphStore.setState({
+      signatureCache: { aaaaaaa: { ...verified } },
+      signaturePresence: { aaaaaaa: 'signed', bbbbbbb: 'not-signed' },
+    });
+
+    useGraphStore.getState().setInitialData(makeInitialDataPayload([makeCommit('aaaaaaa')]));
+
+    const after = useGraphStore.getState();
+    expect(after.signatureCache['aaaaaaa']?.status).toBe('verified');
+    expect(after.signaturePresence['aaaaaaa']).toBe('signed');
+    expect('bbbbbbb' in after.signaturePresence).toBe(false); // pruned
+  });
+
+  it('clears presence loading/failed guards when presence results arrive', () => {
+    useGraphStore.setState({
+      signaturePresenceLoading: { aaaaaaa: true },
+      signaturePresenceFailed: { aaaaaaa: true },
+      signaturePresence: {},
+    });
+
+    useGraphStore.getState().mergeSignaturePresence({ aaaaaaa: 'signed' });
+
+    const after = useGraphStore.getState();
+    expect(after.signaturePresence['aaaaaaa']).toBe('signed');
+    expect(after.signaturePresenceLoading['aaaaaaa']).toBeUndefined();
+    expect(after.signaturePresenceFailed['aaaaaaa']).toBeUndefined();
+  });
+
+  it('marks failed presence requests without leaving them in flight', () => {
+    useGraphStore.setState({
+      signaturePresenceLoading: { aaaaaaa: true },
+      signaturePresenceFailed: {},
+    });
+
+    useGraphStore.getState().markSignaturePresenceFailed(['aaaaaaa']);
+
+    const after = useGraphStore.getState();
+    expect(after.signaturePresenceLoading['aaaaaaa']).toBeUndefined();
+    expect(after.signaturePresenceFailed['aaaaaaa']).toBe(true);
+  });
+});
+
 describe('graphStore — toggleSelectedCommit', () => {
   beforeEach(() => {
     useGraphStore.setState({

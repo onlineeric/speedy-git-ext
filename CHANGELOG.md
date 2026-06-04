@@ -4,6 +4,25 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.4.0] - 2026-06-04
+
+### Added
+- The **Commit Details** panel now shows each commit's full signature state — Verified, Bad Signature, Signed (key not trusted / key missing / expired or revoked), Signed-not-verified-locally, or No signature — along with the signer, key id, fingerprint, and signature format (SSH or GPG). Verification uses your local git only; no host API is ever called.
+- New optional **Signature** history-table column (hidden by default). When enabled it shows a compact glyph per commit — verified, problem, or "signed but cannot verify" — with a blank cell for unsigned commits. It resizes, reorders, hides, and persists like every other column.
+- A **help affordance** next to the signature display and the Signature column header opens bundled, offline setup documentation covering SSH allowed-signers setup, importing and trusting GitHub's GPG key, the meaning of each state, and why a commit GitHub calls "Verified" may not verify locally until your trust stores are configured.
+
+### Changed
+- Signature verification states are now modeled as a single flat 7-state enum, replacing the previous good/bad/unknown/none model plus a separate "verification unavailable" flag.
+
+### Fixed
+- An SSH-signed commit on a machine with no `gpg.ssh.allowedSignersFile` is now reported as **Signed, not verified locally** instead of **unsigned**. Signature presence is detected from the commit object itself, independently of git's verification verdict, so a signed commit is never mislabeled as unsigned.
+- Signature glyphs now populate on their own when the working tree has uncommitted changes. Previously the synthetic "uncommitted" (and stash) rows were sent for verification, which raised an "Invalid commit hash: UNCOMMITTED" error and left the visible signed commits blank until each row was clicked. Those non-commit rows are now skipped.
+- A single unverifiable or unknown commit no longer blanks the glyphs for the rest of the visible rows; signature lookups are resilient and skip only the affected commit.
+
+### Performance
+- All signature work is excluded from the default history load — keeping the Signature column hidden incurs zero signature cost. When enabled, verification runs asynchronously and viewport-first (visible rows first), is cached per commit hash, and never re-runs during scrolling, so scrolling stays as responsive as with the column hidden.
+- Cached signature results now survive a history refresh (e.g. an auto-refresh after saving a file). Glyphs no longer blank out and re-verify on every refresh; only brand-new commits are verified, while already-seen commits resolve instantly from cache.
+
 ## [4.3.4] - 2026-06-03
 
 ### Fixed

@@ -1615,16 +1615,42 @@ export class WebviewProvider {
             payload: {
               hash: message.payload.hash,
               signature: {
-                status: 'unknown',
+                status: 'unavailable',
                 signer: '',
                 keyId: '',
                 fingerprint: '',
                 format: 'gpg',
-                verificationUnavailable: true,
               },
             },
           });
         }
+        break;
+      }
+      case 'detectSignaturePresence': {
+        const result = await this.gitSignatureService.detectPresence(message.payload.hashes);
+        if (result.success) {
+          this.postMessage({ type: 'signaturePresence', payload: { presence: result.value } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+          this.postMessage({
+            type: 'signaturePresenceFailed',
+            payload: { hashes: message.payload.hashes },
+          });
+        }
+        break;
+      }
+      case 'verifySignatures': {
+        const result = await this.gitSignatureService.verifySignatures(message.payload.hashes);
+        if (result.success) {
+          this.postMessage({ type: 'signaturesVerified', payload: { results: result.value } });
+        } else {
+          this.postMessage({ type: 'error', payload: { error: result.error } });
+        }
+        break;
+      }
+      case 'openSignatureHelp': {
+        const docUri = vscode.Uri.joinPath(this.context.extensionUri, 'docs', 'signing-verification.md');
+        await vscode.commands.executeCommand('markdown.showPreview', docUri);
         break;
       }
       case 'isCommitPushed': {

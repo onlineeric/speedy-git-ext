@@ -10,6 +10,7 @@ import { RebaseConflictBanner } from './RebaseConflictBanner';
 import { TogglePanel } from './TogglePanel';
 import { CommitTooltip } from './CommitTooltip';
 import { useTooltipHover } from '../hooks/useTooltipHover';
+import { useSignatureColumnLoader } from '../hooks/useSignatureColumnLoader';
 import {
   computeAutoFitWidth,
   resolveCommitTableLayout,
@@ -105,7 +106,19 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
 
   const virtualItems = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
+  const rangeStart = virtualizer.range?.startIndex;
   const rangeEnd = virtualizer.range?.endIndex;
+
+  // Signature history column (047): viewport-first presence + verify scheduling,
+  // active only while the column is visible (FR-013/016).
+  const signatureColumnVisible =
+    commitListMode === 'table' && commitTableLayout.columns.signature.visible;
+  useSignatureColumnLoader({
+    enabled: signatureColumnVisible,
+    commits,
+    rangeStart: rangeStart ?? 0,
+    rangeEnd: rangeEnd ?? -1,
+  });
 
   useEffect(() => {
     if (!hasMore || prefetching) return;

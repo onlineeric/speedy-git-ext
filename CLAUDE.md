@@ -182,6 +182,7 @@ shared/                           # Shared types between backend & frontend
 - None new. Compare state lives in Zustand store (transient, session-only). (042-compare-refs)
 
 ## Recent Changes
+- 047-signing-verification: 7-state flat `SignatureStatus` enum (drops `verificationUnavailable`); presence detection via raw `gpgsig` header (`git cat-file --batch`, no crypto) so SSH-signed commits without `allowedSignersFile` read as `unavailable` not `unsigned` (FR-017); opt-in hidden-by-default "Signature" history column with 3 grouped glyphs, async viewport-first + cached-by-hash (zero cost when hidden); bundled offline help doc (`docs/signing-verification.md`) opened via `openSignatureHelp` RPC
 - 045-revert-mode-dialog: Three-mode Revert Commit dialog (Commit now / Stage only / Edit message) with inline mainline-parent picker, replacing the direct-action menu item and the standalone RevertParentDialog
 - 044-code-refactor: Split `graphStore.ts` (1,200+ lines) by domain; replace whole-store subscriptions with selectors (notably `CommitContextMenu`, `CompareABMarker`) to cut per-row re-render work
 - 043-fast-forward-branch: Fast-forward a non-checked-out local branch from its remote without checkout; extended to remote-only badges (auto-creates local branch + sets upstream)
@@ -191,5 +192,5 @@ shared/                           # Shared types between backend & frontend
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/045-revert-mode-dialog/plan.md
+specs/047-signing-verification/plan.md
 <!-- SPECKIT END -->

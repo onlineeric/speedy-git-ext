@@ -147,7 +147,8 @@ describe('reorderCommitTableColumns', () => {
   it('places new optional ordering after graph', () => {
     const layout = createDefaultCommitTableLayout();
     const next = reorderCommitTableColumns(layout, ['date', 'author', 'hash', 'message']);
-    expect(next.order).toEqual(['graph', 'date', 'author', 'hash', 'message']);
+    // `signature` is an optional column not named in the input, so it is appended last.
+    expect(next.order).toEqual(['graph', 'date', 'author', 'hash', 'message', 'signature']);
   });
 
   it('ignores graph if passed in optional list', () => {
@@ -170,7 +171,10 @@ describe('reorderCommitTableColumns', () => {
 describe('resolveCommitTableLayout', () => {
   it('expands the message column to fill surplus container width', () => {
     const layout = createDefaultCommitTableLayout();
-    const totalPref = Object.values(layout.columns).reduce((s, c) => s + c.preferredWidth, 0);
+    // Only visible columns contribute to table width (signature is hidden by default).
+    const totalPref = Object.values(layout.columns)
+      .filter((c) => c.visible)
+      .reduce((s, c) => s + c.preferredWidth, 0);
 
     const resolved = resolveCommitTableLayout({ layout, containerWidth: totalPref + 200 });
     const message = resolved.columns.find((c) => c.id === 'message')!;
@@ -219,7 +223,10 @@ describe('resolveCommitTableLayout', () => {
 
   it('uses preferred total width when containerWidth is 0', () => {
     const layout = createDefaultCommitTableLayout();
-    const totalPref = Object.values(layout.columns).reduce((s, c) => s + c.preferredWidth, 0);
+    // Only visible columns contribute to table width (signature is hidden by default).
+    const totalPref = Object.values(layout.columns)
+      .filter((c) => c.visible)
+      .reduce((s, c) => s + c.preferredWidth, 0);
     const resolved = resolveCommitTableLayout({ layout, containerWidth: 0 });
     expect(resolved.tableWidth).toBe(totalPref);
   });

@@ -22,6 +22,7 @@ export const COMMIT_TABLE_DEFAULT_WIDTHS: Record<CommitTableColumnId, number> = 
   message: DEFAULT_COMMIT_TABLE_LAYOUT.columns.message.preferredWidth,
   author: DEFAULT_COMMIT_TABLE_LAYOUT.columns.author.preferredWidth,
   date: DEFAULT_COMMIT_TABLE_LAYOUT.columns.date.preferredWidth,
+  signature: DEFAULT_COMMIT_TABLE_LAYOUT.columns.signature.preferredWidth,
 };
 
 export const COMMIT_TABLE_OPTIONAL_COLUMN_IDS = COMMIT_TABLE_COLUMN_IDS.filter(
@@ -405,6 +406,10 @@ export function computeAutoFitWidth(
       const textWidth = measureMaxTextWidth(texts, `12px ${getSansFamily()}`);
       if (textWidth === undefined) return minWidth;
       return Math.max(minWidth, Math.round(textWidth + CELL_HORIZONTAL_PADDING + MEASURE_SAFETY_PAD));
+    }
+    case 'signature': {
+      // Single glyph per cell — fixed width, no text measurement.
+      return COMMIT_TABLE_DEFAULT_WIDTHS.signature;
     }
     default:
       return minWidth;

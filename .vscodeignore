@@ -9,6 +9,7 @@ test-repo/**
 .codex/**
 .specify/**
 docs/**
+!docs/signing-verification.md
 scripts/**
 specs/**
 AGENTS.md
