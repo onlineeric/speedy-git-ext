@@ -83,7 +83,7 @@ export interface CommitSignatureInfo {
   signer: string;              // %GS — empty when not resolvable
   keyId: string;               // %GK — empty when not resolvable
   fingerprint: string;         // %GP — empty when not resolvable
-  format: SignatureFormat;     // SSH vs GPG (from raw verification message / header)
+  format: SignatureFormat;     // SSH vs GPG (from the `gpgsig` header marker, not %GG)
   // verificationUnavailable REMOVED — folded into status: 'unavailable'
 }
 ```

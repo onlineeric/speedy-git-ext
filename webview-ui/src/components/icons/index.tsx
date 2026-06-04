@@ -354,3 +354,46 @@ export function HeadIcon({ className, style }: IconProps) {
     </svg>
   );
 }
+
+/** Verified signature — shield with a check (047-signing-verification). */
+export function SignatureVerifiedIcon({ className, style }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} style={style} aria-hidden>
+      <path d="M 6 1 L 10 2.5 V 6 C 10 8.5 8.2 10.3 6 11 C 3.8 10.3 2 8.5 2 6 V 2.5 Z" fill="currentColor" fillOpacity={0.15} stroke="currentColor" strokeWidth={1} strokeLinejoin="round" />
+      <path d="M 4.2 6 L 5.5 7.3 L 7.9 4.4" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Bad signature — filled circle with an exclamation (047-signing-verification). */
+export function SignatureBadIcon({ className, style }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} style={style} aria-hidden>
+      <circle cx={6} cy={6} r={5} fill="currentColor" fillOpacity={0.15} stroke="currentColor" strokeWidth={1} />
+      <line x1={6} y1={3.2} x2={6} y2={6.8} stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" />
+      <circle cx={6} cy={8.5} r={0.7} fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Signed but cannot verify — shield with a question mark (047-signing-verification). */
+export function SignatureUnverifiedIcon({ className, style }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} style={style} aria-hidden>
+      <path d="M 6 1 L 10 2.5 V 6 C 10 8.5 8.2 10.3 6 11 C 3.8 10.3 2 8.5 2 6 V 2.5 Z" fill="currentColor" fillOpacity={0.12} stroke="currentColor" strokeWidth={1} strokeLinejoin="round" />
+      <path d="M 4.8 4.6 C 4.8 3.7 7.1 3.7 6.5 5.4 C 6.2 6 6 6 6 6.9" stroke="currentColor" strokeWidth={1.1} strokeLinecap="round" fill="none" />
+      <circle cx={6} cy={8.3} r={0.65} fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Info/help affordance — circled "i" (047-signing-verification). */
+export function InfoIcon({ className, style }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} style={style} aria-hidden>
+      <circle cx={6} cy={6} r={5} stroke="currentColor" strokeWidth={1.2} />
+      <circle cx={6} cy={3.6} r={0.7} fill="currentColor" />
+      <line x1={6} y1={5.4} x2={6} y2={8.6} stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" />
+    </svg>
+  );
+}

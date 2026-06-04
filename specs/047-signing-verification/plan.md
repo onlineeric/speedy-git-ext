@@ -99,7 +99,10 @@ webview-ui/src/
 ├── utils/
 │   ├── commitTableLayout.ts       # Auto-fit + min-width handling for 'signature' column
 │   └── signatureGlyph.ts          # NEW: SignatureStatus → grouped glyph/category + a11y label
-└── components/SignatureHelp.*     # NEW (P3): help doc surfaced via webview/markdown/external link
+└── hooks/useSignatureColumnLoader.ts # NEW (P2): viewport-first presence+verify scheduling
+                                   #   (research R6 superseded the earlier SignatureHelp.* React
+                                   #    component idea: help is an in-editor markdown doc opened via
+                                   #    an 'openSignatureHelp' RPC, not a webview component)
 
 docs/ (or media/)
 └── signing-verification.md        # NEW: SSH allowed-signers + GitHub GPG trust setup + state meanings

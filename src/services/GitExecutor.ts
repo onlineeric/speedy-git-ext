@@ -12,6 +12,10 @@ export interface GitExecOptions {
    *  already aborted at call time, the executor short-circuits without spawning.
    *  Added for 042-compare-refs (FR-025b). */
   abortSignal?: AbortSignal;
+  /** Optional data to write to the process's stdin (then closed). Used by
+   *  `git cat-file --batch`, which reads object names from stdin
+   *  (047-signing-verification). */
+  stdin?: string;
 }
 
 export interface GitExecResult {
@@ -19,11 +23,30 @@ export interface GitExecResult {
   stderr: string;
 }
 
+export interface GitExecRawResult {
+  /** Raw, undecoded stdout bytes — required for byte-accurate parsing of
+   *  `git cat-file --batch` output, whose object sizes are byte counts. */
+  stdout: Buffer;
+  stderr: string;
+}
+
 export class GitExecutor {
   constructor(private readonly log: LogOutputChannel) {}
 
   async execute(options: GitExecOptions): Promise<Result<GitExecResult>> {
-    const { args, cwd, timeout = 30000, env, abortSignal } = options;
+    const result = await this.run(options);
+    if (!result.success) return result;
+    return ok({ stdout: result.value.stdout.toString(), stderr: result.value.stderr });
+  }
+
+  /** Like {@link execute} but resolves with raw stdout bytes (no UTF-8 decode),
+   *  so callers can slice by byte offset (e.g. `git cat-file --batch`). */
+  async executeRaw(options: GitExecOptions): Promise<Result<GitExecRawResult>> {
+    return this.run(options);
+  }
+
+  private async run(options: GitExecOptions): Promise<Result<GitExecRawResult>> {
+    const { args, cwd, timeout = 30000, env, abortSignal, stdin } = options;
     const cmdString = `git ${args.join(' ')}`;
 
     if (abortSignal?.aborted) {
@@ -43,7 +66,7 @@ export class GitExecutor {
         env: spawnEnv,
       });
 
-      let stdout = '';
+      const stdoutChunks: Buffer[] = [];
       let stderr = '';
       let resolved = false;
 
@@ -52,7 +75,7 @@ export class GitExecutor {
         safeResolve(err(new GitError('Cancelled', 'CANCELLED', cmdString)));
       };
 
-      const safeResolve = (result: Result<GitExecResult>) => {
+      const safeResolve = (result: Result<GitExecRawResult>) => {
         if (resolved) return;
         resolved = true;
         clearTimeout(timeoutId);
@@ -77,7 +100,7 @@ export class GitExecutor {
       }, timeout);
 
       gitProcess.stdout?.on('data', (data: Buffer) => {
-        stdout += data.toString();
+        stdoutChunks.push(data);
       });
 
       gitProcess.stderr?.on('data', (data: Buffer) => {
@@ -86,9 +109,10 @@ export class GitExecutor {
 
       gitProcess.on('close',(code) => {
         const elapsed = Date.now() - startTime;
+        const stdout = Buffer.concat(stdoutChunks);
         if (code !== 0) {
           const stderrText = stderr.trim();
-          const stdoutText = stdout.trim();
+          const stdoutText = stdout.toString().trim();
           const outputText = stderrText || stdoutText;
           this.log.info(`Git command exited with non-zero code: ${cmdString} — output: ${outputText}`);
           if (outputText.includes('not a git repository')) {
@@ -132,6 +156,11 @@ export class GitExecutor {
           )
         );
       });
+
+      if (stdin !== undefined) {
+        gitProcess.stdin?.write(stdin);
+        gitProcess.stdin?.end();
+      }
     });
   }
 }

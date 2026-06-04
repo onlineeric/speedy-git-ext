@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { CommitTableColumnId, CommitTableLayout } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
+import { InfoIcon } from './icons';
 import {
   COMMIT_TABLE_MIN_WIDTHS,
   computeAutoFitWidth,
@@ -39,6 +40,7 @@ const COLUMN_LABELS: Record<CommitTableColumnId, string> = {
   message: 'Message',
   author: 'Author',
   date: 'Date',
+  signature: 'Sig',
 };
 
 export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
@@ -134,6 +136,22 @@ export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
             className={`relative flex h-8 items-center px-2 ${index < layout.columns.length - 1 ? 'border-r border-[var(--vscode-panel-border)]' : ''}`}
           >
             <span className="truncate">{COLUMN_LABELS[column.id]}</span>
+            {column.id === 'signature' && (
+              <button
+                type="button"
+                className="ml-1 flex flex-shrink-0 items-center text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)]"
+                title="How signature verification works"
+                aria-label="Signature verification help"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  rpcClient.openSignatureHelp();
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                <InfoIcon />
+              </button>
+            )}
             <button
               type="button"
               className="absolute inset-y-0 right-0 w-2 cursor-col-resize touch-none"

@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, CommitSignatureInfo, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult } from './types.js';
 
 /** Payload for the batched initial data message */
 export interface InitialDataPayload {
@@ -80,6 +80,10 @@ export type RequestMessage =
   | { type: 'abortRebase'; payload: Record<string, never> }
   | { type: 'continueRebase'; payload: Record<string, never> }
   | { type: 'getSignatureInfo'; payload: { hash: string } }
+  // Signature history column (047-signing-verification)
+  | { type: 'detectSignaturePresence'; payload: { hashes: string[] } }
+  | { type: 'verifySignatures'; payload: { hashes: string[] } }
+  | { type: 'openSignatureHelp'; payload: Record<string, never> }
   | { type: 'dropCommit'; payload: { hash: string } }
   | { type: 'isCommitPushed'; payload: { hash: string } }
   | { type: 'getCommitParents'; payload: { hashes: string[] } }
@@ -151,6 +155,9 @@ export type ResponseMessage =
   | { type: 'rebaseState'; payload: { state: RebaseState; conflictInfo?: RebaseConflictInfo } }
   | { type: 'rebaseCommits'; payload: { entries: RebaseEntry[] } }
   | { type: 'signatureInfo'; payload: { hash: string; signature: CommitSignatureInfo | null } }
+  // Signature history column (047-signing-verification)
+  | { type: 'signaturePresence'; payload: { presence: Record<string, SignaturePresence> } }
+  | { type: 'signaturesVerified'; payload: { results: Record<string, CommitSignatureInfo | null> } }
   | { type: 'commitPushedResult'; payload: { hash: string; pushed: boolean } }
   | { type: 'commitParents'; payload: { parents: CommitParentInfo[] } }
   | { type: 'commitsAppended'; payload: { commits: Commit[]; hasMore: boolean; generation: number; totalLoadedWithoutFilter?: number } }
@@ -194,7 +201,8 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   revert: true, continueRevert: true, abortRevert: true,
   rebase: true, interactiveRebase: true, getRebaseCommits: true,
   abortRebase: true, continueRebase: true,
-  getSignatureInfo: true, dropCommit: true, isCommitPushed: true, getCommitParents: true,
+  getSignatureInfo: true, detectSignaturePresence: true, verifySignatures: true, openSignatureHelp: true,
+  dropCommit: true, isCommitPushed: true, getCommitParents: true,
   loadMoreCommits: true, openSettings: true, switchRepo: true, displayRepo: true,
   getSettings: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
   updateSubmodule: true, initSubmodule: true,
@@ -212,7 +220,9 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commits: true, branches: true, commitDetails: true,
   error: true, loading: true, success: true,
   remotes: true, stashes: true, cherryPickState: true, revertState: true,
-  rebaseState: true, rebaseCommits: true, signatureInfo: true, commitPushedResult: true, commitParents: true,
+  rebaseState: true, rebaseCommits: true, signatureInfo: true,
+  signaturePresence: true, signaturesVerified: true,
+  commitPushedResult: true, commitParents: true,
   commitsAppended: true, prefetchError: true, repoList: true,
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,

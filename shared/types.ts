@@ -224,6 +224,7 @@ export const COMMIT_TABLE_COLUMN_IDS = [
   'message',
   'author',
   'date',
+  'signature',
 ] as const;
 
 export type CommitTableColumnId = (typeof COMMIT_TABLE_COLUMN_IDS)[number];
@@ -244,6 +245,7 @@ export const DEFAULT_COMMIT_TABLE_COLUMN_ORDER: CommitTableColumnId[] = [
   'message',
   'author',
   'date',
+  'signature',
 ];
 
 export const DEFAULT_COMMIT_TABLE_COLUMN_PREFERENCES: Record<CommitTableColumnId, CommitTableColumnPreference> = {
@@ -252,6 +254,8 @@ export const DEFAULT_COMMIT_TABLE_COLUMN_PREFERENCES: Record<CommitTableColumnId
   message: { visible: true, preferredWidth: 400 },
   author: { visible: true, preferredWidth: 160 },
   date: { visible: true, preferredWidth: 140 },
+  // Hidden by default (FR-006); glyph-sized so it stays narrow when enabled.
+  signature: { visible: false, preferredWidth: 40 },
 };
 
 // Per-column minimum widths — shared so the backend can heal oversized
@@ -264,6 +268,7 @@ export const COMMIT_TABLE_MIN_WIDTHS: Record<CommitTableColumnId, number> = {
   message: 160,
   author: 120,
   date: 64,
+  signature: 32,
 };
 
 export function createDefaultCommitTableLayout(): CommitTableLayout {
@@ -275,6 +280,7 @@ export function createDefaultCommitTableLayout(): CommitTableLayout {
       message: { ...DEFAULT_COMMIT_TABLE_COLUMN_PREFERENCES.message },
       author: { ...DEFAULT_COMMIT_TABLE_COLUMN_PREFERENCES.author },
       date: { ...DEFAULT_COMMIT_TABLE_COLUMN_PREFERENCES.date },
+      signature: { ...DEFAULT_COMMIT_TABLE_COLUMN_PREFERENCES.signature },
     },
   };
 }
@@ -288,6 +294,7 @@ export function cloneCommitTableLayout(layout: CommitTableLayout): CommitTableLa
       message: { ...layout.columns.message },
       author: { ...layout.columns.author },
       date: { ...layout.columns.date },
+      signature: { ...layout.columns.signature },
     },
   };
 }
@@ -342,9 +349,31 @@ export interface RevertOptions {
   message?: string;
 }
 
-export type SignatureStatus = 'good' | 'bad' | 'unknown' | 'none';
+/**
+ * Flat 7-state classification of a commit's signature/verification outcome
+ * (047-signing-verification). Replaces the legacy `'good' | 'bad' | 'unknown' | 'none'`
+ * enum **and** the separate `verificationUnavailable` boolean.
+ *
+ * `unavailable` vs `unsigned` is the FR-017 distinction: a present signature that
+ * git cannot verify locally (e.g. SSH with no `allowedSignersFile`) is `unavailable`,
+ * never `unsigned`. Presence is detected independently of the `%G?` verdict.
+ */
+export type SignatureStatus =
+  | 'verified'           // %G? = G : good, trusted
+  | 'bad'                // %G? = B : bad/tampered signature
+  | 'signed-not-trusted' // %G? = U : good sig, key present but untrusted
+  | 'signed-key-missing' // %G? = E : cannot check, key missing
+  | 'signed-not-good'    // %G? = X/Y/R : expired sig / expired key / revoked key
+  | 'unavailable'        // signature present but no verdict (e.g. SSH no allowed-signers)
+  | 'unsigned';          // no signature in the commit object (blank column cell)
 
 export type SignatureFormat = 'gpg' | 'ssh';
+
+/**
+ * Whether a commit object carries a signature, determined independently of
+ * verification/config (the source of truth for signed-vs-unsigned, FR-017).
+ */
+export type SignaturePresence = 'signed' | 'not-signed';
 
 export interface CommitSignatureInfo {
   status: SignatureStatus;
@@ -352,7 +381,6 @@ export interface CommitSignatureInfo {
   keyId: string;
   fingerprint: string;
   format: SignatureFormat;
-  verificationUnavailable?: boolean;
 }
 
 export interface CommitParentInfo {

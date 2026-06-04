@@ -134,16 +134,23 @@ already computed in `GraphContainer` — no new viewport tracking machinery.
 ## R5. Batch verification mechanism on the backend
 
 **Decision**: For a list of signed hashes, run verification per hash via the
-existing `%G?%x00%GS%x00%GK%x00%GP%x00%GG` format (`git log -1`), but **driven by a
-single backend method** that iterates and returns a `hash → CommitSignatureInfo`
-map, with the format (SSH/GPG) and `unavailable` resolution applied. Presence
-(R1) gates which hashes reach this expensive path.
+`%G?%x00%GS%x00%GK%x00%GP` format (`git log -1`) for the *verdict* + signer/key
+metadata, but **driven by a single backend method** that iterates and returns a
+`hash → CommitSignatureInfo` map, with `unavailable` resolution applied. The
+signature **format** (SSH vs GPG) is taken from the `gpgsig` header marker
+(`-----BEGIN SSH SIGNATURE-----` vs `-----BEGIN PGP SIGNATURE-----`) read in the
+same R1 `git cat-file --batch` pass — **not** from `%G?`/`%GG`, whose verification
+text carries no reliable format token (SSH output reads `Good "git" signature …
+with ED25519 key SHA256:…`). Presence (R1) gates which hashes reach this expensive
+verdict path.
 
 **Rationale**: `%G?` is the only portable way to get git's *verdict* + signer/key
 metadata in one shot, and it already works in `GitSignatureService`. The win comes
 from (a) never running it for unsigned commits, (b) running it lazily/viewport-first,
 and (c) caching — not from changing the per-commit command. Keeping the proven
-single-commit command avoids re-implementing git's multi-signature parsing.
+single-commit command avoids re-implementing git's multi-signature parsing. Format
+detection moves to the header because `%GG` under-reports SSH (and is empty for the
+`unavailable` case), while the `gpgsig` marker is authoritative and config-independent.
 
 **Note on cost**: This preserves the measured ~per-signed-commit cost but applies it
 only to *signed, on-screen, uncached* commits — which in a typical

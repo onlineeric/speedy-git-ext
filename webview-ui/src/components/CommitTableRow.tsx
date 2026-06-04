@@ -19,6 +19,7 @@ import { DateContextMenu } from './DateContextMenu';
 import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils';
 import { slotMatchesCommitRow } from '../utils/compareMarker';
 import type { ResolvedCommitTableLayout } from '../utils/commitTableLayout';
+import { SignatureColumnCell } from './SignatureColumnCell';
 
 /** Compare-refs A/B markers (042-compare-refs FR-026/027/028) — table-row variant. */
 function CompareABMarker({ commit, isUncommitted }: { commit: Commit; isUncommitted: boolean }) {
@@ -320,6 +321,10 @@ function renderColumn({
           </div>
         </DateContextMenu>
       );
+    case 'signature':
+      // Uncommitted/stash rows have no commit object to verify.
+      if (isUncommitted || isStash) return null;
+      return <SignatureColumnCell hash={commit.hash} />;
     default:
       return null;
   }

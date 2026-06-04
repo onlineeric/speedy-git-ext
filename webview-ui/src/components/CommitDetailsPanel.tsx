@@ -6,7 +6,7 @@ import { rpcClient } from '../rpc/rpcClient';
 import { formatRelativeDate } from '../utils/formatDate';
 import { renderInlineCode } from '../utils/inlineCodeRenderer';
 import { slotLabel } from '../utils/compareSlot';
-import { CloseIcon, MoveRightIcon, MoveBottomIcon, ChevronDownIcon, ChevronRightIcon } from './icons';
+import { CloseIcon, MoveRightIcon, MoveBottomIcon, ChevronDownIcon, ChevronRightIcon, InfoIcon } from './icons';
 import { FileChangesTreeView } from './FileChangesTreeView';
 import { FileChangeRow, ViewModeToggle } from './FileChangeShared';
 import { AuthorBadge } from './AuthorBadge';
@@ -561,47 +561,90 @@ function CommitSignatureSection({ hash }: { hash: string }) {
     );
   }
 
-  if (!signature) {
+  // Not yet requested/loaded — render nothing until a verdict arrives.
+  if (signature === undefined) {
     return null;
   }
 
-  const statusConfig = getSignatureStatusConfig(signature);
+  // Loaded but unsigned (null sentinel).
+  if (signature === null) {
+    return (
+      <div className="flex items-center gap-2 border-b border-[var(--vscode-panel-border)] px-3 py-2 text-xs">
+        <span className="text-[var(--vscode-descriptionForeground)]">No signature</span>
+        <SignatureHelpButton />
+      </div>
+    );
+  }
+
+  const statusConfig = getSignatureStatusConfig(signature.status, signature.format);
 
   return (
     <div className="space-y-1 border-b border-[var(--vscode-panel-border)] px-3 py-2 text-xs">
       <div className="flex items-center gap-2">
         <span className={statusConfig.className}>{statusConfig.label}</span>
-        <span className="uppercase text-[var(--vscode-descriptionForeground)]">
-          {signature.format}
-        </span>
+        {signature.format && (
+          <span className="uppercase text-[var(--vscode-descriptionForeground)]">
+            {signature.format}
+          </span>
+        )}
+        <SignatureHelpButton />
       </div>
-      {signature.verificationUnavailable ? (
-        <div className="text-[var(--vscode-descriptionForeground)]">Verification unavailable</div>
-      ) : (
-        <>
-          {signature.signer && <MetadataRow label="Signer" value={signature.signer} />}
-          {signature.keyId && <MetadataRow label="Key ID" value={signature.keyId} mono />}
-        </>
-      )}
+      {signature.signer && <MetadataRow label="Signer" value={signature.signer} />}
+      {signature.keyId && <MetadataRow label="Key ID" value={signature.keyId} mono />}
+      {signature.fingerprint && <MetadataRow label="Fingerprint" value={signature.fingerprint} mono />}
     </div>
   );
 }
 
-function getSignatureStatusConfig(signature: CommitSignatureInfo): { label: string; className: string } {
-  if (signature.verificationUnavailable) {
-    return {
-      label: 'Verification Unavailable',
-      className: 'font-medium text-[var(--vscode-editorWarning-foreground)]',
-    };
-  }
+function SignatureHelpButton() {
+  return (
+    <button
+      type="button"
+      onClick={() => rpcClient.openSignatureHelp()}
+      className="flex flex-shrink-0 items-center text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)]"
+      title="How signature verification works"
+      aria-label="Signature verification help"
+    >
+      <InfoIcon />
+    </button>
+  );
+}
 
-  switch (signature.status) {
-    case 'good':
+function getSignatureStatusConfig(
+  status: CommitSignatureInfo['status'],
+  format: CommitSignatureInfo['format']
+): { label: string; className: string } {
+  const warning = 'font-medium text-[var(--vscode-editorWarning-foreground)]';
+  // SSH and GPG fail verification for different, mechanism-specific reasons, so
+  // these "signed but can't verify" labels name the exact local fix: import the
+  // signer's GPG key into your keyring, vs. add the signer to your SSH
+  // allowedSignersFile (gpg.ssh.allowedSignersFile).
+  const isSsh = format === 'ssh';
+  switch (status) {
+    case 'verified':
       return { label: 'Verified', className: 'font-medium text-green-400' };
     case 'bad':
-      return { label: 'Invalid Signature', className: 'font-medium text-red-400' };
-    default:
-      return { label: 'Unverified', className: 'font-medium text-yellow-400' };
+      return { label: 'Bad Signature', className: 'font-medium text-red-400' };
+    case 'signed-not-trusted':
+      return {
+        label: isSsh
+          ? 'Signed, signer not in your allowedSignersFile'
+          : "Signed, signer's public key not trusted",
+        className: warning,
+      };
+    case 'signed-key-missing':
+      return {
+        label: isSsh
+          ? 'Signed, signer not in your allowedSignersFile'
+          : "Signed, signer's public key not in your keyring",
+        className: warning,
+      };
+    case 'signed-not-good':
+      return { label: 'Signed, expired or revoked', className: warning };
+    case 'unavailable':
+      return { label: 'Signed, not verified locally', className: warning };
+    case 'unsigned':
+      return { label: 'No signature', className: 'font-medium text-[var(--vscode-descriptionForeground)]' };
   }
 }
 

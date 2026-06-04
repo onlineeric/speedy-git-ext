@@ -35,6 +35,7 @@ const COLUMN_LABELS: Record<CommitTableColumnId, string> = {
   message: 'Message',
   author: 'Author',
   date: 'Date',
+  signature: 'Signature',
 };
 
 const buttonBaseClass =

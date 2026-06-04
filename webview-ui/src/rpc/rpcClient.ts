@@ -179,6 +179,12 @@ class RpcClient {
       case 'signatureInfo':
         store.setSignatureInfo(message.payload.hash, message.payload.signature);
         break;
+      case 'signaturePresence':
+        store.mergeSignaturePresence(message.payload.presence);
+        break;
+      case 'signaturesVerified':
+        store.mergeVerifiedSignatures(message.payload.results);
+        break;
       case 'commitPushedResult': {
         const pending = this.pendingPushedChecks.get(message.payload.hash);
         if (pending) {
@@ -494,6 +500,22 @@ class RpcClient {
   getSignatureInfo(hash: string) {
     useGraphStore.getState().setSignatureLoading(hash, true);
     this.send({ type: 'getSignatureInfo', payload: { hash } });
+  }
+
+  detectSignaturePresence(hashes: string[]) {
+    if (hashes.length === 0) return;
+    this.send({ type: 'detectSignaturePresence', payload: { hashes } });
+  }
+
+  verifySignatures(hashes: string[]) {
+    if (hashes.length === 0) return;
+    const store = useGraphStore.getState();
+    for (const hash of hashes) store.setSignatureLoading(hash, true);
+    this.send({ type: 'verifySignatures', payload: { hashes } });
+  }
+
+  openSignatureHelp() {
+    this.send({ type: 'openSignatureHelp', payload: {} });
   }
 
   dropCommit(hash: string) {
