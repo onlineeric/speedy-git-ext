@@ -105,6 +105,17 @@ function clonePersistedUIStateDefaults(): PersistedUIState {
   };
 }
 
+function emptyUncommittedSummary(): UncommittedSummary {
+  return {
+    stagedFiles: [],
+    unstagedFiles: [],
+    conflictFiles: [],
+    stagedCount: 0,
+    unstagedCount: 0,
+    untrackedCount: 0,
+  };
+}
+
 function isCommitListMode(value: unknown): value is CommitListMode {
   return value === 'classic' || value === 'table';
 }
@@ -651,28 +662,15 @@ export class WebviewProvider {
       const batchSize = this.getBatchSize();
       const errors: string[] = [];
 
-      // Fetch all data sources in parallel using Promise.allSettled for partial failure resilience.
-      // NOTE: getSubmodules is intentionally NOT included here — it can be slow (`git submodule status`
-      // spawns one process per submodule and suffers under process contention). It runs separately
-      // via sendSubmodulesData() after the initial payload is posted, so the graph renders fast.
-      const [
-        commitsSettled,
-        uncommittedSettled,
-        branchesSettled,
-        authorsSettled,
-        remotesSettled,
-        worktreesSettled,
-        stashesSettled,
-        revertStateSettled,
-      ] = await Promise.allSettled([
+      // Keep first paint narrow: commits and branches are the only git-backed data
+      // needed to render the graph and branch controls. Slower ancillary data hydrates
+      // afterward via individual messages.
+      // NOTE: getSubmodules is intentionally NOT included here. Even though it now reads
+      // `.gitmodules` cheaply, keeping it out of the critical path lets the graph render
+      // before any parent/submodule selector work runs.
+      const [commitsSettled, branchesSettled] = await Promise.allSettled([
         this.gitLogService.getCommits({ ...effectiveFilters, maxCount: batchSize }),
-        this.gitDiffService.getUncommittedSummary(),
         this.gitLogService.getBranches(),
-        this.gitLogService.getAuthors(),
-        this.gitRemoteService.getRemotes(),
-        this.gitWorktreeService.listWorktrees(),
-        this.gitStashService.getStashes(),
-        this.gitRevertService.getRevertState(),
       ]);
 
       // Extract commits with fingerprint optimization
@@ -696,37 +694,7 @@ export class WebviewProvider {
         hasMore = false;
       }
 
-      const defaultUncommitted: UncommittedSummary = {
-        stagedFiles: [], unstagedFiles: [], conflictFiles: [],
-        stagedCount: 0, unstagedCount: 0, untrackedCount: 0,
-      };
-      const uncommittedChanges = unwrapSettledResult(uncommittedSettled, 'uncommittedChanges', errors) ?? defaultUncommitted;
       const branches = unwrapSettledResult(branchesSettled, 'branches', errors) ?? [];
-      const authors = unwrapSettledResult(authorsSettled, 'authors', errors) ?? [];
-      const remotes = unwrapSettledResult(remotesSettled, 'remotes', errors) ?? [];
-      const worktrees = unwrapSettledResult(worktreesSettled, 'worktrees', errors) ?? [];
-      const stashes = unwrapSettledResult(stashesSettled, 'stashes', errors) ?? [];
-      const revertState = unwrapSettledResult(revertStateSettled, 'revertState', errors) ?? 'idle';
-
-      // Cherry-pick and rebase state checks are synchronous (fs.existsSync)
-      let cherryPickState: import('../shared/types.js').CherryPickState = 'idle';
-      const cherryPickStateResult = this.gitCherryPickService.getCherryPickState();
-      if (cherryPickStateResult.success) {
-        cherryPickState = cherryPickStateResult.value;
-      }
-
-      let rebaseState: import('../shared/types.js').RebaseState = 'idle';
-      let rebaseConflictInfo: import('../shared/types.js').RebaseConflictInfo | null = null;
-      const rebaseStateResult = this.gitRebaseService.getRebaseState();
-      if (rebaseStateResult.success) {
-        rebaseState = rebaseStateResult.value.state;
-        if (rebaseState === 'in-progress') {
-          const conflictResult = await this.gitRebaseService.getConflictInfo();
-          rebaseConflictInfo = conflictResult.success
-            ? conflictResult.value
-            : rebaseStateResult.value.conflictInfo ?? null;
-        }
-      }
 
       // Build and send the batched payload
       const payload: InitialDataPayload = {
@@ -734,15 +702,15 @@ export class WebviewProvider {
         totalLoadedWithoutFilter,
         hasMore,
         branches,
-        stashes,
-        uncommittedChanges,
-        remotes,
-        authors,
-        worktrees,
-        cherryPickState,
-        rebaseState,
-        rebaseConflictInfo,
-        revertState,
+        stashes: [],
+        uncommittedChanges: emptyUncommittedSummary(),
+        remotes: [],
+        authors: [],
+        worktrees: [],
+        cherryPickState: 'idle',
+        rebaseState: 'idle',
+        rebaseConflictInfo: null,
+        revertState: 'idle',
         errors,
       };
 
@@ -753,8 +721,10 @@ export class WebviewProvider {
         this.initialLoadSent = true;
       }
 
+      void this.sendDeferredRepoData(this.fetchGeneration);
+
       // Fetch submodules in the background (non-blocking) — decoupled from the initial
-      // payload so `git submodule status` can't block graph render on slow machines.
+      // payload so parent/submodule selector data can't block graph render.
       // Skipped while a submodule is the displayed repo (FR-017): the webview's
       // submodules state is keyed to the parent, and the displayed submodule's own
       // submodules are not relevant to the parent's selector.
@@ -772,6 +742,75 @@ export class WebviewProvider {
         this.pendingRefresh = false;
         void this.triggerAutoRefresh();
       }
+    }
+  }
+
+  private async sendDeferredRepoData(generation: number): Promise<void> {
+    const [
+      uncommittedSettled,
+      remotesSettled,
+      worktreesSettled,
+      stashesSettled,
+      revertStateSettled,
+    ] = await Promise.allSettled([
+      this.gitDiffService.getUncommittedSummary(),
+      this.gitRemoteService.getRemotes(),
+      this.gitWorktreeService.listWorktrees(),
+      this.gitStashService.getStashes(),
+      this.gitRevertService.getRevertState(),
+    ]);
+
+    if (generation !== this.fetchGeneration) return;
+
+    const errors: string[] = [];
+    const uncommittedChanges = unwrapSettledResult(uncommittedSettled, 'uncommittedChanges', errors);
+    const remotes = unwrapSettledResult(remotesSettled, 'remotes', errors);
+    const worktrees = unwrapSettledResult(worktreesSettled, 'worktrees', errors);
+    const stashes = unwrapSettledResult(stashesSettled, 'stashes', errors);
+    const revertState = unwrapSettledResult(revertStateSettled, 'revertState', errors);
+
+    if (uncommittedChanges) {
+      this.postMessage({ type: 'uncommittedChanges', payload: uncommittedChanges });
+    }
+    if (remotes) {
+      this.postMessage({ type: 'remotes', payload: { remotes } });
+    }
+    if (worktrees) {
+      this.postMessage({ type: 'worktreeList', payload: { worktrees } });
+    }
+    if (stashes) {
+      this.postMessage({ type: 'stashes', payload: { stashes } });
+    }
+    if (revertState) {
+      this.postMessage({ type: 'revertState', payload: { state: revertState } });
+    }
+
+    // Cherry-pick and rebase state checks are synchronous unless a rebase conflict
+    // detail lookup is required, so keep them out of first paint but send them once
+    // ancillary repo data has hydrated.
+    const cherryPickStateResult = this.gitCherryPickService.getCherryPickState();
+    if (generation !== this.fetchGeneration) return;
+    if (cherryPickStateResult.success) {
+      this.postMessage({ type: 'cherryPickState', payload: { state: cherryPickStateResult.value } });
+    }
+
+    const rebaseStateResult = this.gitRebaseService.getRebaseState();
+    if (generation !== this.fetchGeneration) return;
+    if (rebaseStateResult.success) {
+      let conflictInfo = rebaseStateResult.value.conflictInfo ?? undefined;
+      if (rebaseStateResult.value.state === 'in-progress') {
+        const conflictResult = await this.gitRebaseService.getConflictInfo();
+        if (generation !== this.fetchGeneration) return;
+        conflictInfo = conflictResult.success ? conflictResult.value : conflictInfo;
+      }
+      this.postMessage({
+        type: 'rebaseState',
+        payload: { state: rebaseStateResult.value.state, conflictInfo },
+      });
+    }
+
+    if (errors.length > 0) {
+      this.log.warn(`Deferred repo data failed: ${errors.join('; ')}`);
     }
   }
 
@@ -802,8 +841,8 @@ export class WebviewProvider {
   /** Fetch submodules and send to the webview.
    *
    * Used by both the initial-load background path (fired after `initialData` is posted
-   * so `git submodule status` cannot block graph render on slow machines) and the
-   * on-demand `getSubmodules` RPC path.
+   * so submodule selector work cannot block graph render) and the on-demand
+   * `getSubmodules` RPC path.
    *
    * Captures `fetchGeneration` at entry and drops the result if the generation changed
    * while the git call was in flight — this prevents a stale in-flight fetch bound to

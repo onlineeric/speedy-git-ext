@@ -161,9 +161,11 @@ export class GitDiffService {
     this.log.info('Getting uncommitted changes summary');
 
     // Perf: single `git status --porcelain=v2` replaces 3 separate diff/ls-files commands,
-    // numstat commands kept for per-file line counts, conflict detection runs in parallel
+    // numstat commands kept for per-file line counts, conflict detection runs in parallel.
+    // `--ignore-submodules=dirty` keeps parent-level gitlink changes visible while avoiding
+    // a status walk inside every submodule on large parent repos.
     const [statusResult, stagedNumstatResult, unstagedNumstatResult, conflictState] = await Promise.all([
-      this.executor.execute({ args: ['status', '--porcelain=v2', '-z'], cwd: this.workspacePath }),
+      this.executor.execute({ args: ['status', '--porcelain=v2', '-z', '--ignore-submodules=dirty'], cwd: this.workspacePath }),
       this.executor.execute({ args: ['diff', '--cached', '--numstat', '-z'], cwd: this.workspacePath }),
       this.executor.execute({ args: ['diff', '--numstat', '-z'], cwd: this.workspacePath }),
       this.detectConflictState(),

@@ -249,6 +249,9 @@ describe('GitDiffService.getUncommittedSummary', () => {
 
     const result = await service.getUncommittedSummary();
     expect(result.success).toBe(true);
+    expect(service['executor'].execute).toHaveBeenCalledWith(expect.objectContaining({
+      args: ['status', '--porcelain=v2', '-z', '--ignore-submodules=dirty'],
+    }));
     if (result.success) {
       expect(result.value.stagedFiles).toHaveLength(1);
       expect(result.value.stagedFiles[0]).toMatchObject({

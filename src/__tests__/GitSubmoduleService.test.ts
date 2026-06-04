@@ -27,7 +27,7 @@ describe('GitSubmoduleService.getSubmodules', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it('parses clean submodule lines', async () => {
+  it('reads submodule entries from .gitmodules without running submodule status', async () => {
     // .gitmodules exists, but submodule paths' .git do not (so initialized=false)
     vi.mocked(fs.existsSync).mockImplementation((p) =>
       String(p).endsWith('.gitmodules')
@@ -35,11 +35,6 @@ describe('GitSubmoduleService.getSubmodules', () => {
     const service = new GitSubmoduleService('/repo', mockLog);
 
     vi.spyOn(service['executor'], 'execute')
-      .mockResolvedValueOnce({
-        // submodule status
-        success: true,
-        value: { stdout: ' aaa111 vendor/lib (v1.0)\n', stderr: '' },
-      })
       .mockResolvedValueOnce({
         // path map
         success: true,
@@ -57,16 +52,20 @@ describe('GitSubmoduleService.getSubmodules', () => {
       expect(result.value).toHaveLength(1);
       expect(result.value[0]).toMatchObject({
         path: 'vendor/lib',
-        hash: 'aaa111',
-        status: 'clean',
-        describe: 'v1.0',
+        hash: '',
+        status: 'uninitialized',
+        describe: '',
         url: 'https://x.com/lib.git',
         initialized: false,
       });
     }
+    expect(service['executor'].execute).toHaveBeenCalledTimes(2);
+    expect(service['executor'].execute).not.toHaveBeenCalledWith(expect.objectContaining({
+      args: ['submodule', 'status'],
+    }));
   });
 
-  it('classifies prefixes - = uninitialized, + = dirty, U = dirty (conflict)', async () => {
+  it('sorts submodules by path', async () => {
     vi.mocked(fs.existsSync).mockImplementation((p) => String(p).endsWith('.gitmodules'));
     const service = new GitSubmoduleService('/repo', mockLog);
 
@@ -75,25 +74,21 @@ describe('GitSubmoduleService.getSubmodules', () => {
         success: true,
         value: {
           stdout: [
-            '-aaa111 mod-uninit',
-            '+bbb222 mod-dirty (v2)',
-            'Uccc333 mod-conflict',
+            'submodule.b.path vendor/b',
+            'submodule.a.path vendor/a',
           ].join('\n'),
           stderr: '',
         },
       })
-      .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
       .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } });
 
     const result = await service.getSubmodules();
     if (result.success) {
-      expect(result.value.find((s) => s.path === 'mod-uninit')!.status).toBe('uninitialized');
-      expect(result.value.find((s) => s.path === 'mod-dirty')!.status).toBe('dirty');
-      expect(result.value.find((s) => s.path === 'mod-conflict')!.status).toBe('dirty');
+      expect(result.value.map((s) => s.path)).toEqual(['vendor/a', 'vendor/b']);
     }
   });
 
-  it('marks submodule as initialized when its inner .git exists and status != uninitialized', async () => {
+  it('marks submodule as initialized when its inner .git exists', async () => {
     vi.mocked(fs.existsSync).mockImplementation((p) => {
       const pathStr = String(p);
       return pathStr.endsWith('.gitmodules') || pathStr.endsWith('vendor/lib/.git');
@@ -103,27 +98,26 @@ describe('GitSubmoduleService.getSubmodules', () => {
     vi.spyOn(service['executor'], 'execute')
       .mockResolvedValueOnce({
         success: true,
-        value: { stdout: ' aaa111 vendor/lib\n', stderr: '' },
+        value: { stdout: 'submodule.libname.path vendor/lib\n', stderr: '' },
       })
-      .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
       .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } });
 
     const result = await service.getSubmodules();
     if (result.success) {
       expect(result.value[0].initialized).toBe(true);
+      expect(result.value[0].status).toBe('clean');
     }
   });
 
-  it('skips lines that do not match the expected pattern', async () => {
+  it('skips malformed .gitmodules config lines', async () => {
     vi.mocked(fs.existsSync).mockImplementation((p) => String(p).endsWith('.gitmodules'));
     const service = new GitSubmoduleService('/repo', mockLog);
 
     vi.spyOn(service['executor'], 'execute')
       .mockResolvedValueOnce({
         success: true,
-        value: { stdout: 'garbage line\n aaa111 vendor/lib\n', stderr: '' },
+        value: { stdout: 'garbage line\nsubmodule.libname.path vendor/lib\n', stderr: '' },
       })
-      .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
       .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } });
 
     const result = await service.getSubmodules();
