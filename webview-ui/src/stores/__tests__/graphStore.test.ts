@@ -96,6 +96,8 @@ describe('graphStore — signature cache retention on refresh (FR-015)', () => {
       signatureCache: {},
       signatureLoading: {},
       signaturePresence: {},
+      signaturePresenceLoading: {},
+      signaturePresenceFailed: {},
     });
   });
 
@@ -133,6 +135,34 @@ describe('graphStore — signature cache retention on refresh (FR-015)', () => {
     expect(after.signatureCache['aaaaaaa']?.status).toBe('verified');
     expect(after.signaturePresence['aaaaaaa']).toBe('signed');
     expect('bbbbbbb' in after.signaturePresence).toBe(false); // pruned
+  });
+
+  it('clears presence loading/failed guards when presence results arrive', () => {
+    useGraphStore.setState({
+      signaturePresenceLoading: { aaaaaaa: true },
+      signaturePresenceFailed: { aaaaaaa: true },
+      signaturePresence: {},
+    });
+
+    useGraphStore.getState().mergeSignaturePresence({ aaaaaaa: 'signed' });
+
+    const after = useGraphStore.getState();
+    expect(after.signaturePresence['aaaaaaa']).toBe('signed');
+    expect(after.signaturePresenceLoading['aaaaaaa']).toBeUndefined();
+    expect(after.signaturePresenceFailed['aaaaaaa']).toBeUndefined();
+  });
+
+  it('marks failed presence requests without leaving them in flight', () => {
+    useGraphStore.setState({
+      signaturePresenceLoading: { aaaaaaa: true },
+      signaturePresenceFailed: {},
+    });
+
+    useGraphStore.getState().markSignaturePresenceFailed(['aaaaaaa']);
+
+    const after = useGraphStore.getState();
+    expect(after.signaturePresenceLoading['aaaaaaa']).toBeUndefined();
+    expect(after.signaturePresenceFailed['aaaaaaa']).toBe(true);
   });
 });
 

@@ -182,6 +182,9 @@ class RpcClient {
       case 'signaturePresence':
         store.mergeSignaturePresence(message.payload.presence);
         break;
+      case 'signaturePresenceFailed':
+        store.markSignaturePresenceFailed(message.payload.hashes);
+        break;
       case 'signaturesVerified':
         store.mergeVerifiedSignatures(message.payload.results);
         break;
@@ -504,6 +507,7 @@ class RpcClient {
 
   detectSignaturePresence(hashes: string[]) {
     if (hashes.length === 0) return;
+    useGraphStore.getState().setSignaturePresenceLoading(hashes, true);
     this.send({ type: 'detectSignaturePresence', payload: { hashes } });
   }
 

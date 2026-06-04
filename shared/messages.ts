@@ -157,6 +157,7 @@ export type ResponseMessage =
   | { type: 'signatureInfo'; payload: { hash: string; signature: CommitSignatureInfo | null } }
   // Signature history column (047-signing-verification)
   | { type: 'signaturePresence'; payload: { presence: Record<string, SignaturePresence> } }
+  | { type: 'signaturePresenceFailed'; payload: { hashes: string[] } }
   | { type: 'signaturesVerified'; payload: { results: Record<string, CommitSignatureInfo | null> } }
   | { type: 'commitPushedResult'; payload: { hash: string; pushed: boolean } }
   | { type: 'commitParents'; payload: { parents: CommitParentInfo[] } }
@@ -221,7 +222,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   error: true, loading: true, success: true,
   remotes: true, stashes: true, cherryPickState: true, revertState: true,
   rebaseState: true, rebaseCommits: true, signatureInfo: true,
-  signaturePresence: true, signaturesVerified: true,
+  signaturePresence: true, signaturePresenceFailed: true, signaturesVerified: true,
   commitPushedResult: true, commitParents: true,
   commitsAppended: true, prefetchError: true, repoList: true,
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,

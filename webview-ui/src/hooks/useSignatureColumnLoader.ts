@@ -43,17 +43,21 @@ export function useSignatureColumnLoader({
   rangeEnd,
 }: UseSignatureColumnLoaderParams): void {
   const signaturePresence = useGraphStore((state) => state.signaturePresence);
+  const signaturePresenceLoading = useGraphStore((state) => state.signaturePresenceLoading);
+  const signaturePresenceFailed = useGraphStore((state) => state.signaturePresenceFailed);
   const signatureCache = useGraphStore((state) => state.signatureCache);
   const signatureLoading = useGraphStore((state) => state.signatureLoading);
-  const fetchGeneration = useGraphStore((state) => state.fetchGeneration);
+  const clearSignaturePresenceFailures = useGraphStore((state) => state.clearSignaturePresenceFailures);
 
-  // Tracks presence requests already sent but not yet resolved, so a re-run
-  // (e.g. a verify response mutating the cache) can't re-request them before
-  // the presence response lands. Reset when the commit set is replaced.
-  const requestedPresence = useRef<Set<string>>(new Set());
+  const wasEnabled = useRef(enabled);
   useEffect(() => {
-    requestedPresence.current = new Set();
-  }, [fetchGeneration]);
+    if (enabled && !wasEnabled.current) {
+      clearSignaturePresenceFailures(
+        commits.filter(isVerifiableCommit).map((commit) => commit.hash)
+      );
+    }
+    wasEnabled.current = enabled;
+  }, [enabled, commits, clearSignaturePresenceFailures]);
 
   useEffect(() => {
     if (!enabled || commits.length === 0 || rangeEnd < rangeStart) return;
@@ -77,10 +81,11 @@ export function useSignatureColumnLoader({
 
     // ── Presence pass (cheap) — visible first, then the offscreen remainder ──
     const needsPresence = (hash: string) =>
-      signaturePresence[hash] === undefined && !requestedPresence.current.has(hash);
+      signaturePresence[hash] === undefined &&
+      !signaturePresenceLoading[hash] &&
+      !signaturePresenceFailed[hash];
     const sendPresence = (hashes: string[]) => {
       if (hashes.length === 0) return;
-      hashes.forEach((hash) => requestedPresence.current.add(hash));
       rpcClient.detectSignaturePresence(hashes);
     };
     sendPresence(visible.filter(needsPresence));
@@ -95,5 +100,15 @@ export function useSignatureColumnLoader({
     const offscreenVerify = offscreen.filter(needsVerify);
     if (visibleVerify.length > 0) rpcClient.verifySignatures(visibleVerify);
     if (offscreenVerify.length > 0) rpcClient.verifySignatures(offscreenVerify);
-  }, [enabled, commits, rangeStart, rangeEnd, signaturePresence, signatureCache, signatureLoading]);
+  }, [
+    enabled,
+    commits,
+    rangeStart,
+    rangeEnd,
+    signaturePresence,
+    signaturePresenceLoading,
+    signaturePresenceFailed,
+    signatureCache,
+    signatureLoading,
+  ]);
 }

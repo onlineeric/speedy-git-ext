@@ -35,6 +35,7 @@ The existing single-commit request/response is **kept** for the details panel; n
 
 // ResponseMessage
 | { type: 'signaturePresence'; payload: { presence: Record<string, SignaturePresence> } }
+| { type: 'signaturePresenceFailed'; payload: { hashes: string[] } }
 ```
 
 **Semantics**:
@@ -43,6 +44,11 @@ The existing single-commit request/response is **kept** for the details panel; n
 - `presence[hash]` is `'signed'` or `'not-signed'` for every requested hash.
 - Webview caches results; `not-signed` ⇒ render blank cell, never request verification.
 - Only sent when the `signature` column is **visible** (FR-013).
+- On lookup failure, the backend also emits the standard `error` response and then
+  `signaturePresenceFailed` for the requested hashes. The webview clears the
+  in-flight guard and suppresses immediate retry loops for the current visible
+  column session; toggling the column or refreshing can retry without pretending
+  the commits are unsigned.
 
 ---
 

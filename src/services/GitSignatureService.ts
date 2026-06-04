@@ -29,6 +29,12 @@ interface ObjectSignature {
 
 /** git log placeholders for the verification verdict (status, signer, key, fingerprint). */
 const VERDICT_FORMAT = '%G?%x00%GS%x00%GK%x00%GP';
+const EMPTY_VERDICT: SignatureVerdict = {
+  statusCode: 'N',
+  signer: '',
+  keyId: '',
+  fingerprint: '',
+};
 
 export class GitSignatureService {
   private executor: GitExecutor;
@@ -138,22 +144,32 @@ export class GitSignatureService {
     // One batch pass yields the authoritative format for every hash (and validates
     // them up front); the per-hash `git log` below only provides the verdict.
     const objectResult = await this.inspectObjects(hashes);
-    if (!objectResult.success) return objectResult;
+    const objects = objectResult.success ? objectResult.value : {};
+    if (!objectResult.success) {
+      this.log.warn(`Signature object inspection failed; falling back to verdict-only verification: ${objectResult.error.message}`);
+    }
 
     for (const hash of hashes) {
       // Skip non-object ids defensively; one bad hash must not abort the batch.
-      if (!validateHash(hash).success) continue;
+      if (!validateHash(hash).success) {
+        results[hash] = null;
+        continue;
+      }
 
       const verdictResult = await this.fetchVerdict(hash);
       if (!verdictResult.success) {
-        // A single unverifiable commit shouldn't blank every other glyph — log
-        // and move on, leaving this hash absent from the result map.
-        this.log.warn(`Skip signature verdict for ${hash.slice(0, 7)}: ${verdictResult.error.message}`);
+        // The caller only sends hashes whose presence pass already proved a
+        // signature exists. If one verdict lookup fails, return a terminal
+        // `unavailable` state so the webview can clear loading and avoid a stuck
+        // details panel.
+        this.log.warn(`Signature verdict unavailable for ${hash.slice(0, 7)}: ${verdictResult.error.message}`);
+        const format = objects[hash]?.format ?? 'gpg';
+        results[hash] = this.buildInfo('unavailable', EMPTY_VERDICT, format);
         continue;
       }
 
       const { verdict, definiteStatus } = verdictResult.value;
-      const format = objectResult.value[hash]?.format ?? 'gpg';
+      const format = objects[hash]?.format ?? 'gpg';
       // These hashes are known signed, so any non-verdict resolves to `unavailable`.
       results[hash] = this.buildInfo(definiteStatus ?? 'unavailable', verdict, format);
     }

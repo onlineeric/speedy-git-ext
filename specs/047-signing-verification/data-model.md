@@ -131,6 +131,8 @@ signatureLoading: Record<string, boolean>;                   // per-hash in-flig
 
 // NEW
 signaturePresence: Record<string, SignaturePresence>;        // cheap presence results
+signaturePresenceLoading: Record<string, boolean>;           // per-hash in-flight presence
+signaturePresenceFailed: Record<string, boolean>;            // failed presence in current visible column session
 ```
 
 **Lifecycle**:

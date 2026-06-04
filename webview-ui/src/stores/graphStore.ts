@@ -80,6 +80,10 @@ interface GraphStore {
   signatureLoading: Record<string, boolean>;
   /** Cheap presence results for the signature column, keyed by hash (047). */
   signaturePresence: Record<string, SignaturePresence>;
+  /** Presence requests currently in flight, keyed by hash (047). */
+  signaturePresenceLoading: Record<string, boolean>;
+  /** Presence lookups that failed in the current visible column session (047). */
+  signaturePresenceFailed: Record<string, boolean>;
   pendingRebaseEntries: RebaseEntry[] | undefined;
   selectedCommits: string[];
   lastClickedHash: string | undefined;
@@ -185,6 +189,9 @@ interface GraphStore {
   setSignatureLoading: (hash: string, loading: boolean) => void;
   /** Merge a batch of presence results into the signature-column presence map (047). */
   mergeSignaturePresence: (presence: Record<string, SignaturePresence>) => void;
+  setSignaturePresenceLoading: (hashes: string[], loading: boolean) => void;
+  markSignaturePresenceFailed: (hashes: string[]) => void;
+  clearSignaturePresenceFailures: (hashes: string[]) => void;
   /** Merge a batch of verification verdicts into the cache and clear their loading flags (047). */
   mergeVerifiedSignatures: (results: Record<string, CommitSignatureInfo | null>) => void;
   setPendingRebaseEntries: (entries: RebaseEntry[] | undefined) => void;
@@ -297,6 +304,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   signatureCache: {},
   signatureLoading: {},
   signaturePresence: {},
+  signaturePresenceLoading: {},
+  signaturePresenceFailed: {},
   pendingRebaseEntries: undefined,
   selectedCommits: [],
   lastClickedHash: undefined,
@@ -417,6 +426,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       signatureCache: retainByHash(get().signatureCache, newHashSet),
       signatureLoading: retainByHash(get().signatureLoading, newHashSet),
       signaturePresence: retainByHash(get().signaturePresence, newHashSet),
+      signaturePresenceLoading: {},
+      signaturePresenceFailed: {},
       containingBranchesCache: new Map(),
       hoveredCommitHash: null,
       tooltipAnchorRect: null,
@@ -562,13 +573,58 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     signatureCache: { ...state.signatureCache, [hash]: info },
     signatureLoading: { ...state.signatureLoading, [hash]: false },
   })),
-  clearSignatureCache: () => set({ signatureCache: {}, signatureLoading: {}, signaturePresence: {} }),
+  clearSignatureCache: () => set({
+    signatureCache: {},
+    signatureLoading: {},
+    signaturePresence: {},
+    signaturePresenceLoading: {},
+    signaturePresenceFailed: {},
+  }),
   setSignatureLoading: (hash, loading) => set((state) => ({
     signatureLoading: { ...state.signatureLoading, [hash]: loading },
   })),
-  mergeSignaturePresence: (presence) => set((state) => ({
-    signaturePresence: { ...state.signaturePresence, ...presence },
-  })),
+  mergeSignaturePresence: (presence) => set((state) => {
+    const signaturePresenceLoading = { ...state.signaturePresenceLoading };
+    const signaturePresenceFailed = { ...state.signaturePresenceFailed };
+    for (const hash of Object.keys(presence)) {
+      delete signaturePresenceLoading[hash];
+      delete signaturePresenceFailed[hash];
+    }
+    return {
+      signaturePresence: { ...state.signaturePresence, ...presence },
+      signaturePresenceLoading,
+      signaturePresenceFailed,
+    };
+  }),
+  setSignaturePresenceLoading: (hashes, loading) => set((state) => {
+    const signaturePresenceLoading = { ...state.signaturePresenceLoading };
+    const signaturePresenceFailed = { ...state.signaturePresenceFailed };
+    for (const hash of hashes) {
+      if (loading) {
+        signaturePresenceLoading[hash] = true;
+        delete signaturePresenceFailed[hash];
+      } else {
+        delete signaturePresenceLoading[hash];
+      }
+    }
+    return { signaturePresenceLoading, signaturePresenceFailed };
+  }),
+  markSignaturePresenceFailed: (hashes) => set((state) => {
+    const signaturePresenceLoading = { ...state.signaturePresenceLoading };
+    const signaturePresenceFailed = { ...state.signaturePresenceFailed };
+    for (const hash of hashes) {
+      delete signaturePresenceLoading[hash];
+      signaturePresenceFailed[hash] = true;
+    }
+    return { signaturePresenceLoading, signaturePresenceFailed };
+  }),
+  clearSignaturePresenceFailures: (hashes) => set((state) => {
+    const signaturePresenceFailed = { ...state.signaturePresenceFailed };
+    for (const hash of hashes) {
+      delete signaturePresenceFailed[hash];
+    }
+    return { signaturePresenceFailed };
+  }),
   mergeVerifiedSignatures: (results) => set((state) => {
     const signatureLoading = { ...state.signatureLoading };
     for (const hash of Object.keys(results)) {
@@ -967,6 +1023,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         signatureCache: retainByHash(state.signatureCache, newHashSet),
         signatureLoading: retainByHash(state.signatureLoading, newHashSet),
         signaturePresence: retainByHash(state.signaturePresence, newHashSet),
+        signaturePresenceLoading: {},
+        signaturePresenceFailed: {},
         containingBranchesCache: new Map(),
         hoveredCommitHash: null,
         tooltipAnchorRect: null,

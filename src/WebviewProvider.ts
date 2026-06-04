@@ -1632,6 +1632,10 @@ export class WebviewProvider {
           this.postMessage({ type: 'signaturePresence', payload: { presence: result.value } });
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
+          this.postMessage({
+            type: 'signaturePresenceFailed',
+            payload: { hashes: message.payload.hashes },
+          });
         }
         break;
       }

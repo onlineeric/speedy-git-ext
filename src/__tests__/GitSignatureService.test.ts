@@ -308,11 +308,11 @@ describe('GitSignatureService.verifySignatures', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.value['aaaaaaa']?.status).toBe('verified');
-      expect(result.value['UNCOMMITTED']).toBeUndefined();
+      expect(result.value['UNCOMMITTED']).toBeNull();
     }
   });
 
-  it('skips a commit whose verdict lookup fails, keeping the rest of the batch', async () => {
+  it('returns unavailable for a signed commit whose verdict lookup fails, keeping the rest of the batch', async () => {
     const service = new GitSignatureService('/repo', mockLog);
     vi.spyOn(service['executor'], 'execute').mockImplementation(async (opts) => {
       const hash = opts.args[opts.args.length - 1];
@@ -336,7 +336,26 @@ describe('GitSignatureService.verifySignatures', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.value['aaaaaaa']?.status).toBe('verified');
-      expect(result.value['bbbbbbb']).toBeUndefined();
+      expect(result.value['bbbbbbb']?.status).toBe('unavailable');
+    }
+  });
+
+  it('falls back to verdict-only verification when batch object inspection fails', async () => {
+    const service = new GitSignatureService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: { stdout: buildSigOutput(['G', 'Eric', 'KEYID', 'FP']), stderr: '' },
+    });
+    vi.spyOn(service['executor'], 'executeRaw').mockResolvedValue({
+      success: false,
+      error: new GitError('cat-file boom', 'COMMAND_FAILED'),
+    });
+
+    const result = await service.verifySignatures(['aaaaaaa']);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value['aaaaaaa']?.status).toBe('verified');
+      expect(result.value['aaaaaaa']?.format).toBe('gpg');
     }
   });
 });
