@@ -99,6 +99,11 @@ class RpcClient {
         const errorMessage = message.payload.error.message;
         store.setError(errorMessage);
         store.setIsRefreshing(false);
+        // Clear the author-fetch guard so a failed getAuthors() can be retried.
+        // Author fetch failures arrive here (not as an `authorList` message), so
+        // without this the FilterWidget's `authorListLoading` guard stays true and
+        // blocks every retry for the rest of the session.
+        store.setAuthorListLoading(false);
         this.rejectPendingLookups(errorMessage);
         if (this.pendingDialogAction) {
           const { reject } = this.pendingDialogAction;

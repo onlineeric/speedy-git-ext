@@ -1051,10 +1051,13 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       remotes,
       worktreeList: worktrees,
       worktreeByHead,
-      cherryPickInProgress: payload.cherryPickState === 'in-progress',
-      rebaseInProgress: payload.rebaseState === 'in-progress',
-      rebaseConflictInfo: payload.rebaseConflictInfo ?? undefined,
-      revertInProgress: payload.revertState === 'in-progress',
+      // NOTE: cherry-pick / rebase / revert in-progress flags are intentionally NOT
+      // set here. The `initialData` payload always carries synthetic `'idle'` values
+      // (the backend resolves the real state asynchronously in `sendDeferredRepoData`).
+      // Applying them here would flip an active operation's banner to "idle" on every
+      // watcher-triggered refresh until the deferred `cherryPickState`/`rebaseState`/
+      // `revertState` messages restore it — a visible flicker. Those dedicated messages
+      // are the single source of truth; store defaults cover the first load.
       mergedCommits,
       topology,
       hiddenCommitHashes,
