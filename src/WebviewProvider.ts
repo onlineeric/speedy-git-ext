@@ -652,9 +652,9 @@ export class WebviewProvider {
       const errors: string[] = [];
 
       // Fetch all data sources in parallel using Promise.allSettled for partial failure resilience.
-      // NOTE: getSubmodules is intentionally NOT included here — it can be slow (`git submodule status`
-      // spawns one process per submodule and suffers under process contention). It runs separately
-      // via sendSubmodulesData() after the initial payload is posted, so the graph renders fast.
+      // NOTE: getSubmodules is intentionally NOT included here. Even though it now reads
+      // `.gitmodules` cheaply, keeping it out of the critical path lets the graph render
+      // before any parent/submodule selector work runs.
       const [
         commitsSettled,
         uncommittedSettled,
@@ -754,7 +754,7 @@ export class WebviewProvider {
       }
 
       // Fetch submodules in the background (non-blocking) — decoupled from the initial
-      // payload so `git submodule status` can't block graph render on slow machines.
+      // payload so parent/submodule selector data can't block graph render.
       // Skipped while a submodule is the displayed repo (FR-017): the webview's
       // submodules state is keyed to the parent, and the displayed submodule's own
       // submodules are not relevant to the parent's selector.

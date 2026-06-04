@@ -3,9 +3,8 @@ import * as path from 'path';
 import { existsSync } from 'fs';
 import { GitExecutor } from './GitExecutor.js';
 import { type Result, ok } from '../../shared/errors.js';
-import type { Submodule, SubmoduleStatus } from '../../shared/types.js';
+import type { Submodule } from '../../shared/types.js';
 
-const SUBMODULE_LINE_PATTERN = /^([ +\-U])([0-9a-f]+)\s+([^\s]+)(?:\s+\((.+)\))?$/i;
 const GITMODULES_PATH_KEY = /^submodule\.(.+)\.path$/;
 const GITMODULES_URL_KEY = /^submodule\.(.+)\.url$/;
 
@@ -29,34 +28,27 @@ export class GitSubmoduleService {
       return ok([]);
     }
 
-    this.log.info('Get submodules');
-    const [statusResult, pathMap, urlMap] = await Promise.all([
-      this.executor.execute({
-        args: ['submodule', 'status'],
-        cwd: this.workspacePath,
-      }),
+    this.log.info('Get submodules from .gitmodules');
+    const [pathMap, urlMap] = await Promise.all([
       this.readGitmodulesMap('path'),
       this.readGitmodulesMap('url'),
     ]);
 
-    if (!statusResult.success) {
-      const stderr = statusResult.error.stderr ?? '';
-      if (statusResult.error.code === 'COMMAND_FAILED' && stderr.includes('No such file or directory')) {
-        return ok([]);
-      }
-      return statusResult;
-    }
+    const submodules = Array.from(pathMap.entries())
+      .map(([name, submodulePath]): Submodule => {
+        const initialized = existsSync(path.join(this.workspacePath, submodulePath, '.git'));
+        return {
+          path: submodulePath,
+          hash: '',
+          status: initialized ? 'clean' : 'uninitialized',
+          describe: '',
+          url: urlMap.get(name),
+          initialized,
+        };
+      })
+      .sort((a, b) => a.path.localeCompare(b.path));
 
-    const lines = statusResult.value.stdout
-      .split('\n')
-      .map((line) => line.trimEnd())
-      .filter(Boolean);
-
-    return ok(
-      lines
-        .map((line) => this.parseSubmoduleLine(line, pathMap, urlMap))
-        .filter((submodule): submodule is Submodule => submodule !== null)
-    );
+    return ok(submodules);
   }
 
   async updateSubmodule(submodulePath: string): Promise<Result<string>> {
@@ -117,53 +109,4 @@ export class GitSubmoduleService {
     return map;
   }
 
-  private parseSubmoduleLine(
-    line: string,
-    pathMap: Map<string, string>,
-    urlMap: Map<string, string>
-  ): Submodule | null {
-    const match = line.match(SUBMODULE_LINE_PATTERN);
-    if (!match) return null;
-
-    const [, prefix, hash, submodulePath, describe = ''] = match;
-    const status = this.getStatus(prefix);
-    const url = this.findUrlForPath(submodulePath, pathMap, urlMap);
-    const initialized =
-      status !== 'uninitialized' &&
-      existsSync(path.join(this.workspacePath, submodulePath, '.git'));
-
-    return {
-      path: submodulePath,
-      hash,
-      status,
-      describe,
-      url,
-      initialized,
-    };
-  }
-
-  private getStatus(prefix: string): SubmoduleStatus {
-    switch (prefix) {
-      case '-':
-        return 'uninitialized';
-      case '+':
-      case 'U':
-        return 'dirty';
-      default:
-        return 'clean';
-    }
-  }
-
-  private findUrlForPath(
-    submodulePath: string,
-    pathMap: Map<string, string>,
-    urlMap: Map<string, string>
-  ): string | undefined {
-    for (const [name, mappedPath] of pathMap.entries()) {
-      if (mappedPath === submodulePath) {
-        return urlMap.get(name);
-      }
-    }
-    return undefined;
-  }
 }
