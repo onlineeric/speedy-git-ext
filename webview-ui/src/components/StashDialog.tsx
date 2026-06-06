@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { buildStashWithMessageCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
+import { dialogContentStyle } from './dialogStyles';
 
 interface StashDialogProps {
   open: boolean;
@@ -36,7 +37,10 @@ export function StashDialog({
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[90vw] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] p-6 shadow-xl">
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] p-6 shadow-xl"
+          style={dialogContentStyle}
+        >
           <Dialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">
             {title}
           </Dialog.Title>
