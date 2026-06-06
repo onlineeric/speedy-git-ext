@@ -546,6 +546,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         <CreateWorktreeDialog
           open
           source={worktreeSource}
+          existingWorktree={branchWorktree}
           onClose={() => setCreateWorktreeOpen(false)}
         />
       )}

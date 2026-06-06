@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
-import type { WorktreeBranchMode } from '@shared/types';
+import type { WorktreeBranchMode, WorktreeInfo } from '@shared/types';
 import { buildAddWorktreeCommand } from '../utils/gitCommandBuilder';
 import { rpcClient } from '../rpc/rpcClient';
 import { CommandPreview } from './CommandPreview';
@@ -19,6 +19,7 @@ export interface WorktreeSource {
 interface CreateWorktreeDialogProps {
   open: boolean;
   source: WorktreeSource;
+  existingWorktree?: WorktreeInfo;
   onClose: () => void;
 }
 
@@ -44,9 +45,15 @@ function defaultNewBranchName(source: WorktreeSource): string {
   return '';
 }
 
-export function CreateWorktreeDialog({ open, source, onClose }: CreateWorktreeDialogProps) {
+function initialBranchMode(defaultMode: WorktreeBranchMode, existingBranchDisabled: boolean): WorktreeBranchMode {
+  if (existingBranchDisabled && defaultMode === 'existing') return 'new';
+  return defaultMode;
+}
+
+export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }: CreateWorktreeDialogProps) {
   const { modes, defaultMode } = useMemo(() => modesForKind(source.kind), [source.kind]);
-  const [branchMode, setBranchMode] = useState<WorktreeBranchMode>(defaultMode);
+  const existingBranchDisabled = source.kind === 'local-branch' && existingWorktree !== undefined;
+  const [branchMode, setBranchMode] = useState<WorktreeBranchMode>(() => initialBranchMode(defaultMode, existingBranchDisabled));
   const [newBranchName, setNewBranchName] = useState(() => defaultNewBranchName(source));
   const [path, setPath] = useState('');
   const [busy, setBusy] = useState(false);
@@ -109,6 +116,12 @@ export function CreateWorktreeDialog({ open, source, onClose }: CreateWorktreeDi
     onClose();
   }, [onClose]);
 
+  const handleOpenExistingWorktree = useCallback(() => {
+    if (!existingWorktree || existingWorktree.isPrunable) return;
+    rpcClient.openWorktree(existingWorktree.path);
+    handleCancel();
+  }, [existingWorktree, handleCancel]);
+
   const modeLabel: Record<WorktreeBranchMode, string> = {
     existing: `Use existing branch "${source.ref}"`,
     new: 'Create a new branch',
@@ -133,18 +146,43 @@ export function CreateWorktreeDialog({ open, source, onClose }: CreateWorktreeDi
           </AlertDialog.Description>
 
           <div className="mt-4 space-y-2">
-            {modes.map((mode) => (
-              <label key={mode} className="flex items-start gap-2 cursor-pointer select-none">
-                <input
-                  type="radio"
-                  name="worktree-branch-mode"
-                  checked={branchMode === mode}
-                  onChange={() => setBranchMode(mode)}
-                  className="mt-0.5 accent-[var(--vscode-button-background)]"
-                />
-                <span className="text-sm text-[var(--vscode-foreground)]">{modeLabel[mode]}</span>
-              </label>
-            ))}
+            {modes.map((mode) => {
+              const modeDisabled = mode === 'existing' && existingBranchDisabled;
+              return (
+                <div key={mode} className="flex min-h-7 flex-wrap items-start gap-x-1.5 gap-y-1">
+                  <label
+                    className={`flex min-w-0 items-start gap-2 select-none ${modeDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                    title={modeDisabled ? `Branch "${source.ref}" is already checked out in a worktree.` : undefined}
+                  >
+                    <input
+                      type="radio"
+                      name="worktree-branch-mode"
+                      checked={branchMode === mode}
+                      disabled={modeDisabled}
+                      onChange={() => setBranchMode(mode)}
+                      className="mt-0.5 accent-[var(--vscode-button-background)] disabled:cursor-not-allowed"
+                    />
+                    <span className={`text-sm ${modeDisabled ? 'text-[var(--vscode-disabledForeground)]' : 'text-[var(--vscode-foreground)]'}`}>
+                      {modeLabel[mode]}
+                    </span>
+                  </label>
+                  {modeDisabled && existingWorktree && (
+                    <span className="text-sm text-[var(--vscode-descriptionForeground)]">
+                      ; Worktree for this branch exists,{' '}
+                      <button
+                        type="button"
+                        disabled={existingWorktree.isPrunable}
+                        onClick={handleOpenExistingWorktree}
+                        title={existingWorktree.isPrunable ? 'This worktree folder is missing.' : existingWorktree.path}
+                        className="rounded px-1 py-0.5 text-xs text-[var(--vscode-textLink-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Open the worktree in new window
+                      </button>
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {branchMode === 'new' && (
