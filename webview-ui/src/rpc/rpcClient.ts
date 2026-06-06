@@ -105,6 +105,7 @@ class RpcClient {
         const errorMessage = message.payload.error.message;
         store.setError(errorMessage);
         store.setIsRefreshing(false);
+        store.setWorktreeListLoading(false);
         // Clear the author-fetch guard so a failed getAuthors() can be retried.
         // Author fetch failures arrive here (not as an `authorList` message), so
         // without this the FilterWidget's `authorListLoading` guard stays true and
@@ -608,6 +609,7 @@ class RpcClient {
 
   // Worktree ops
   getWorktreeList() {
+    useGraphStore.getState().setWorktreeListLoading(true);
     this.send({ type: 'getWorktreeList', payload: {} });
   }
 
@@ -636,6 +638,7 @@ class RpcClient {
   }
 
   pruneWorktree() {
+    useGraphStore.getState().setWorktreeListLoading(true);
     this.send({ type: 'pruneWorktree', payload: {} });
   }
 
