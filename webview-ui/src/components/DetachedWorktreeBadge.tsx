@@ -2,6 +2,7 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { CSSProperties } from 'react';
 import type { WorktreeInfo } from '@shared/types';
 import { detachedWorktreeBadgeText } from '../utils/worktreeDisplay';
+import { worktreeBadgeBorderColor } from '../utils/worktreeBadgeStyle';
 import { WorktreeIcon } from './icons';
 import { useRemoveWorktreeDialog, WorktreeMenuGroup } from './WorktreeMenuItems';
 
@@ -18,6 +19,10 @@ export function DetachedWorktreeBadge({ worktrees, laneColorStyle }: DetachedWor
   const label = detachedWorktreeBadgeText(worktrees);
   const title = worktrees.map((worktree) => worktree.path).join('\n');
   const fallbackColor = !laneColorStyle ? ' border-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]' : '';
+  const badgeStyle = {
+    ...laneColorStyle,
+    borderColor: worktreeBadgeBorderColor(laneColorStyle?.borderColor),
+  };
 
   return (
     <>
@@ -27,7 +32,7 @@ export function DetachedWorktreeBadge({ worktrees, laneColorStyle }: DetachedWor
             <span
               className={`inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-xs${fallbackColor}`}
               title={title}
-              style={laneColorStyle}
+              style={badgeStyle}
             >
               <WorktreeIcon className="h-3 w-3 shrink-0" />
               <span>{label}</span>

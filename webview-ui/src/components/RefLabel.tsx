@@ -2,6 +2,7 @@ import { forwardRef, type ReactNode } from 'react';
 import type { WorktreeInfo } from '@shared/types';
 import type { DisplayRef } from '../types/displayRefs';
 import { getRefStyle } from '../utils/refStyle';
+import { worktreeBadgeBorderColor } from '../utils/worktreeBadgeStyle';
 import { BranchIcon, TagIcon, WorktreeIcon } from './icons';
 
 interface RefLabelProps extends React.HTMLAttributes<HTMLSpanElement> {
@@ -20,14 +21,19 @@ export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
     const showWorktreeIcon = !!worktree && (displayRef.type === 'local-branch' || displayRef.type === 'merged-branch');
 
     const fallbackColor = !laneColorStyle ? ' border-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]' : '';
+    const badgeStyle = laneColorStyle ? { ...style, ...laneColorStyle } : style;
+    const worktreeBadgeStyle = showWorktreeIcon
+      ? { ...badgeStyle, borderColor: worktreeBadgeBorderColor(badgeStyle?.borderColor) }
+      : badgeStyle;
+    const borderClass = showWorktreeIcon ? 'border' : layoutStyle;
 
     return (
       <span
         ref={ref}
-        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded ${layoutStyle}${fallbackColor}${className ? ` ${className}` : ''}`}
+        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded ${borderClass}${fallbackColor}${className ? ` ${className}` : ''}`}
         title={title}
         {...rest}
-        style={laneColorStyle ? { ...style, ...laneColorStyle } : style}
+        style={worktreeBadgeStyle}
       >
         {icon}
         {label}
