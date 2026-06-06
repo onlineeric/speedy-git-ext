@@ -118,7 +118,10 @@ export function CreateWorktreeDialog({ open, source, onClose }: CreateWorktreeDi
     <AlertDialog.Root open={open} onOpenChange={(isOpen) => !isOpen && handleCancel()}>
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-        <AlertDialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-md p-6 rounded-lg shadow-xl bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] z-50">
+        <AlertDialog.Content
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 rounded-lg shadow-xl bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] z-50"
+          style={{ resize: 'horizontal', overflow: 'auto', width: '56rem', minWidth: '400px', maxWidth: '90vw' }}
+        >
           <AlertDialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">
             Create Worktree
           </AlertDialog.Title>

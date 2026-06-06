@@ -124,13 +124,15 @@ describe('graphStore — setInitialData', () => {
       branch: 'feature',
       isMain: false,
       isDetached: false,
+      isCurrent: false,
+      isPrunable: false,
     };
 
     useGraphStore.setState({
       remotes: [remote],
       stashes: [stash],
       worktreeList: [worktree],
-      worktreeByHead: new Map([[worktree.head, worktree]]),
+      worktreeByHead: new Map([[worktree.head, [worktree]]]),
       uncommittedStagedFiles: [stagedFile],
       uncommittedCounts: { stagedCount: 1, unstagedCount: 0, untrackedCount: 0 },
       hasUncommittedChanges: true,
@@ -142,7 +144,7 @@ describe('graphStore — setInitialData', () => {
     expect(after.remotes).toEqual([remote]);
     expect(after.stashes).toEqual([stash]);
     expect(after.worktreeList).toEqual([worktree]);
-    expect(after.worktreeByHead.get('abc1234')).toEqual(worktree);
+    expect(after.worktreeByHead.get('abc1234')).toEqual([worktree]);
     expect(after.uncommittedStagedFiles).toEqual([stagedFile]);
     expect(after.uncommittedCounts.stagedCount).toBe(1);
     expect(after.hasUncommittedChanges).toBe(true);
@@ -163,8 +165,8 @@ describe('graphStore — setInitialData', () => {
         author: 'Test User',
         authorEmail: 'test@example.com',
       }],
-      worktreeList: [{ path: '/old-wt', head: 'abc1234', branch: 'main', isMain: false, isDetached: false }],
-      worktreeByHead: new Map([['abc1234', { path: '/old-wt', head: 'abc1234', branch: 'main', isMain: false, isDetached: false }]]),
+      worktreeList: [{ path: '/old-wt', head: 'abc1234', branch: 'main', isMain: false, isDetached: false, isCurrent: false, isPrunable: false }],
+      worktreeByHead: new Map([['abc1234', [{ path: '/old-wt', head: 'abc1234', branch: 'main', isMain: false, isDetached: false, isCurrent: false, isPrunable: false }]]]),
       uncommittedStagedFiles: [{ path: 'src/file.ts', status: 'modified', stageState: 'staged' }],
       uncommittedCounts: { stagedCount: 1, unstagedCount: 0, untrackedCount: 0 },
       hasUncommittedChanges: true,
