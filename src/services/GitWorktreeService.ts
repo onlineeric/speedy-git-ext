@@ -28,6 +28,10 @@ function normalizePath(p: string): string {
   return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
+function looksLikeSubmoduleGitDir(p: string): boolean {
+  return p.replace(/\\/g, '/').includes('/.git/modules/');
+}
+
 /**
  * Sanitize a ref/branch name into a filesystem-safe leaf folder name.
  * Replaces path separators and unsafe characters with '-', collapses repeats,
@@ -72,6 +76,38 @@ function mapAddWorktreeError(error: GitError): GitError {
   return error;
 }
 
+async function resolveCurrentWorktreePath(
+  executor: GitExecutor,
+  cwd: string
+): Promise<string> {
+  const result = await executor.execute({
+    args: ['rev-parse', '--show-toplevel'],
+    cwd,
+  });
+  if (!result.success) return cwd;
+
+  const topLevel = result.value.stdout.trim();
+  return topLevel.length > 0 ? topLevel : cwd;
+}
+
+async function resolveCurrentWorktreeBranch(
+  executor: GitExecutor,
+  cwd: string
+): Promise<string> {
+  const result = await executor.execute({
+    args: ['for-each-ref', '--format=%(refname)', 'refs/heads', '--points-at', 'HEAD'],
+    cwd,
+  });
+  if (!result.success) return '';
+
+  const branches = result.value.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  return branches.find((branchName) => branchName !== 'refs/heads/main') ?? branches[0] ?? '';
+}
+
 export class GitWorktreeService {
   private executor: GitExecutor;
 
@@ -97,10 +133,12 @@ export class GitWorktreeService {
     const stdout = result.value.stdout.trim();
     if (!stdout) return ok([]);
 
-    const currentPath = normalizePath(this.workspacePath);
+    let currentPath = normalizePath(this.workspacePath);
     const worktrees: WorktreeInfo[] = [];
     const blocks = stdout.split('\n\n');
     let isFirst = true;
+    let resolvedCurrentWorktreePath: string | undefined;
+    let resolvedCurrentWorktreeBranch: string | undefined;
 
     for (const block of blocks) {
       const lines = block.trim().split('\n');
@@ -125,6 +163,26 @@ export class GitWorktreeService {
       }
 
       if (worktreePath && head) {
+        if (isFirst && looksLikeSubmoduleGitDir(worktreePath)) {
+          resolvedCurrentWorktreePath ??= await resolveCurrentWorktreePath(
+            this.executor,
+            this.workspacePath
+          );
+          worktreePath = resolvedCurrentWorktreePath;
+          currentPath = normalizePath(resolvedCurrentWorktreePath);
+
+          if (isDetached || !branch) {
+            resolvedCurrentWorktreeBranch ??= await resolveCurrentWorktreeBranch(
+              this.executor,
+              this.workspacePath
+            );
+            if (resolvedCurrentWorktreeBranch) {
+              branch = resolvedCurrentWorktreeBranch;
+              isDetached = false;
+            }
+          }
+        }
+
         worktrees.push({
           path: worktreePath,
           head,
