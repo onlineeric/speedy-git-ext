@@ -116,7 +116,7 @@ export type RequestMessage =
   | { type: 'stashAndCheckoutCommit'; payload: { hash: string } }
   // Worktree ops
   | { type: 'getWorktreeList'; payload: Record<string, never> }
-  | { type: 'resolveWorktreePath'; payload: { ref: string; branchMode: WorktreeBranchMode; newBranchName?: string } }
+  | { type: 'resolveWorktreePath'; payload: { ref: string; branchMode: WorktreeBranchMode; newBranchName?: string; requestId: number } }
   | { type: 'addWorktree'; payload: { path: string; ref: string; branchMode: WorktreeBranchMode; newBranchName?: string; force?: boolean } }
   | { type: 'removeWorktree'; payload: { path: string; force?: boolean } }
   | { type: 'pruneWorktree'; payload: Record<string, never> }
@@ -180,7 +180,7 @@ export type ResponseMessage =
   | { type: 'pushResult'; payload: { success: boolean; message: string } }
   | { type: 'avatarUrls'; payload: { urls: AvatarUrlMap } }
   | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[] } }
-  | { type: 'worktreePathResolved'; payload: { path: string; leafName: string } }
+  | { type: 'worktreePathResolved'; payload: { path: string; leafName: string; requestId: number } }
   | { type: 'containingBranches'; payload: { hash: string; branches: string[]; status: 'loaded' | 'error' } }
   | { type: 'persistedUIState'; payload: { uiState: PersistedUIState } }
   | { type: 'authorList'; payload: { authors: Author[] } }

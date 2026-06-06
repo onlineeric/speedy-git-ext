@@ -17,7 +17,7 @@ class RpcClient {
   private parentRequestIdByHash = new Map<string, number>();
   private pendingPush: { resolve: (message: string) => void; reject: (error: Error) => void } | null = null;
   /** One-shot slot for a `resolveWorktreePath` request awaiting its `worktreePathResolved` response. */
-  private pendingWorktreePath: { resolve: (value: { path: string; leafName: string }) => void; reject: (error: Error) => void } | null = null;
+  private pendingWorktreePath: { requestId: number; resolve: (value: { path: string; leafName: string }) => void; reject: (error: Error) => void } | null = null;
   /**
    * Promise slot for correlating a dialog-initiated git action with its
    * backend response. Used by FilePickerDialog to lift its `isRunning` busy
@@ -222,8 +222,10 @@ class RpcClient {
         store.setWorktreeList(message.payload.worktrees);
         break;
       case 'worktreePathResolved':
-        if (this.pendingWorktreePath) {
-          this.pendingWorktreePath.resolve(message.payload);
+        // Latest-wins: ignore stale responses whose requestId no longer matches
+        // the pending request (a slower earlier response must not resolve a newer one).
+        if (this.pendingWorktreePath && this.pendingWorktreePath.requestId === message.payload.requestId) {
+          this.pendingWorktreePath.resolve({ path: message.payload.path, leafName: message.payload.leafName });
           this.pendingWorktreePath = null;
         }
         break;
@@ -623,9 +625,10 @@ class RpcClient {
       this.pendingWorktreePath.reject(new Error('superseded'));
       this.pendingWorktreePath = null;
     }
+    const requestId = this.nextRequestId++;
     return new Promise((resolve, reject) => {
-      this.pendingWorktreePath = { resolve, reject };
-      this.send({ type: 'resolveWorktreePath', payload });
+      this.pendingWorktreePath = { requestId, resolve, reject };
+      this.send({ type: 'resolveWorktreePath', payload: { ...payload, requestId } });
     });
   }
 

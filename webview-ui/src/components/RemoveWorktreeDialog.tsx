@@ -31,11 +31,11 @@ type BranchDeleteOutcome = 'ok' | 'needs-force' | { error: string };
 function runBranchDelete(name: string, force: boolean): Promise<BranchDeleteOutcome> {
   const done = rpcClient.awaitNextDialogAction();
 
+  let unsub: (() => void) | undefined;
   const needsForce = new Promise<'needs-force'>((resolve) => {
-    const unsub = useGraphStore.subscribe((state) => {
+    unsub = useGraphStore.subscribe((state) => {
       if (state.pendingForceDeleteBranch && state.pendingForceDeleteBranch.name === name) {
         useGraphStore.getState().setPendingForceDeleteBranch(null);
-        unsub();
         resolve('needs-force');
       }
     });
@@ -53,7 +53,10 @@ function runBranchDelete(name: string, force: boolean): Promise<BranchDeleteOutc
       rpcClient.clearPendingDialogAction();
       return v;
     }),
-  ]);
+    // Always tear down the store subscription once the race settles, regardless
+    // of which branch wins — otherwise a `done`-first outcome leaves the
+    // subscriber alive to later consume an unrelated `pendingForceDeleteBranch`.
+  ]).finally(() => unsub?.());
 }
 
 export function RemoveWorktreeDialog({ open, worktree, onClose }: RemoveWorktreeDialogProps) {
@@ -84,8 +87,9 @@ export function RemoveWorktreeDialog({ open, worktree, onClose }: RemoveWorktree
     const outcome = await runBranchDelete(name, forceDeleteBranch);
     if (outcome === 'ok') return true;
     if (outcome === 'needs-force') {
+      // Surface the failure but leave force-delete unchecked: the user must
+      // explicitly opt in to discarding unmerged commits before retrying.
       setError(`Branch "${name}" is not fully merged. Enable "force delete" to remove it anyway.`);
-      setForceDeleteBranch(true);
       return false;
     }
     setError(outcome.error);

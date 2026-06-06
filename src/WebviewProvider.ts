@@ -1142,7 +1142,10 @@ export class WebviewProvider {
           basePath
         );
         if (result.success) {
-          this.postMessage({ type: 'worktreePathResolved', payload: result.value });
+          this.postMessage({
+            type: 'worktreePathResolved',
+            payload: { ...result.value, requestId: message.payload.requestId },
+          });
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
         }
