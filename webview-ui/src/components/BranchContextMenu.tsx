@@ -20,6 +20,7 @@ import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 import { MergeDialog } from './MergeDialog';
 import { PushDialog } from './PushDialog';
 import { CheckoutWithPullDialog } from './CheckoutWithPullDialog';
+import { CreateWorktreeDialog, type WorktreeSource } from './CreateWorktreeDialog';
 
 
 interface BranchContextMenuProps {
@@ -60,6 +61,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
   const [checkoutWithPullOpen, setCheckoutWithPullOpen] = useState(false);
   const [rebaseConfirmOpen, setRebaseConfirmOpen] = useState(false);
   const [fastForwardOpen, setFastForwardOpen] = useState(false);
+  const [createWorktreeOpen, setCreateWorktreeOpen] = useState(false);
   const loading = useGraphStore((s) => s.loading);
   const branches = useGraphStore((s) => s.branches);
 
@@ -203,6 +205,22 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
     return remote ? { remote: remote.remote!, name: remote.name } : undefined;
   }, [isLocalBranch, branches, refInfo.name]);
 
+  // Worktree source for "Create worktree…": local branches use the branch name (existing-branch
+  // default); remote-only badges base a new tracking branch on `<remote>/<name>` (research R4).
+  const worktreeSource = useMemo<WorktreeSource | null>(() => {
+    if (isLocalBranch) {
+      return { ref: refInfo.name, label: refInfo.name, kind: 'local-branch' };
+    }
+    if (isRemoteBranch && refInfo.remote && checkoutState === 'remote-only') {
+      const full = `${refInfo.remote}/${refInfo.name}`;
+      return { ref: full, label: full, kind: 'remote-branch' };
+    }
+    if (isTag) {
+      return { ref: refInfo.name, label: refInfo.name, kind: 'tag' };
+    }
+    return null;
+  }, [isLocalBranch, isRemoteBranch, isTag, refInfo.remote, refInfo.name, checkoutState]);
+
   // pendingCheckout is for this branch (from checkoutNeedsStash response)
   const stashConfirmOpen = pendingCheckout !== null && pendingCheckout.name === refInfo.name;
   const forceDeleteConfirmOpen = pendingForceDeleteBranch !== null && pendingForceDeleteBranch.name === refInfo.name;
@@ -281,6 +299,9 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                     Pull Branch
                   </ContextMenu.Item>
                 )}
+                <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
+                  Create worktree…
+                </ContextMenu.Item>
                 {!isCurrentBranch && (
                   <>
                     <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
@@ -303,6 +324,11 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                     Fast-forward Local Branch from Remote
                   </ContextMenu.Item>
                 )}
+                {worktreeSource && (
+                  <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
+                    Create worktree…
+                  </ContextMenu.Item>
+                )}
                 <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
                 <ContextMenu.Item className={dangerItemClass} onSelect={() => setDeleteConfirmOpen(true)}>
                   Delete Remote Branch
@@ -314,6 +340,9 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
               <>
                 <ContextMenu.Item className={menuItemClass} onSelect={() => rpcClient.pushTag(refInfo.name)}>
                   Push Tag
+                </ContextMenu.Item>
+                <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
+                  Create worktree…
                 </ContextMenu.Item>
                 <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
                 <ContextMenu.Item className={dangerItemClass} onSelect={() => setDeleteConfirmOpen(true)}>
@@ -485,6 +514,15 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         description={`Rebase the current branch onto '${displayName}'? This will rewrite commit history. Pushed commits will require a force-push.`}
         targetRef={displayName}
       />
+
+      {/* Create worktree dialog (local branch, remote-only badge, or tag) */}
+      {createWorktreeOpen && worktreeSource && (
+        <CreateWorktreeDialog
+          open
+          source={worktreeSource}
+          onClose={() => setCreateWorktreeOpen(false)}
+        />
+      )}
     </>
   );
 }

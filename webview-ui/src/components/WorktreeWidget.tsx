@@ -1,0 +1,137 @@
+import { useEffect, useMemo, useState } from 'react';
+import type { WorktreeInfo } from '@shared/types';
+import { useGraphStore } from '../stores/graphStore';
+import { rpcClient } from '../rpc/rpcClient';
+import { buildPruneWorktreeCommand } from '../utils/gitCommandBuilder';
+import { ConfirmDialog } from './ConfirmDialog';
+import { RemoveWorktreeDialog } from './RemoveWorktreeDialog';
+
+/** Branch ref (`refs/heads/feature`) → display name (`feature`); "detached" when no branch. */
+function branchLabel(wt: WorktreeInfo): string {
+  if (wt.isDetached || !wt.branch) return 'detached';
+  return wt.branch.startsWith('refs/heads/') ? wt.branch.slice('refs/heads/'.length) : wt.branch;
+}
+
+export function WorktreeWidget() {
+  const worktrees = useGraphStore((s) => s.worktreeList);
+  const [removeTarget, setRemoveTarget] = useState<WorktreeInfo | null>(null);
+  const [pruneOpen, setPruneOpen] = useState(false);
+
+  // Refresh the list whenever the panel opens.
+  useEffect(() => {
+    rpcClient.getWorktreeList();
+  }, []);
+
+  const prunable = useMemo(() => worktrees.filter((w) => w.isPrunable), [worktrees]);
+
+  const pruneDescription =
+    prunable.length > 0
+      ? `These worktree folders are missing and will have their records removed:\n${prunable.map((w) => w.path).join('\n')}`
+      : 'No stale worktrees detected. Pruning removes administrative records for worktrees whose folders have been deleted.';
+
+  return (
+    <div className="rounded-md border border-[var(--vscode-panel-border)] bg-[var(--vscode-editorWidget-background)] px-3 py-2 shadow-sm">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-semibold text-[var(--vscode-foreground)]">Worktrees</span>
+        <button
+          type="button"
+          onClick={() => setPruneOpen(true)}
+          className="px-2 py-1 text-xs rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+          title="Prune worktrees whose folders are missing"
+        >
+          Prune
+        </button>
+      </div>
+
+      {worktrees.length === 0 ? (
+        <p className="text-sm text-[var(--vscode-descriptionForeground)]">No worktrees.</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {worktrees.map((wt) => {
+            const removable = !wt.isMain && !wt.isCurrent;
+            return (
+              <li
+                key={wt.path}
+                className="flex items-center gap-2 rounded px-2 py-1 hover:bg-[var(--vscode-list-hoverBackground)]"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-[var(--vscode-foreground)] truncate">{branchLabel(wt)}</span>
+                    <span className="font-mono text-xs text-[var(--vscode-descriptionForeground)]">
+                      {wt.head.slice(0, 7)}
+                    </span>
+                    {wt.isMain && <Badge>main</Badge>}
+                    {wt.isCurrent && <Badge>you are here</Badge>}
+                    {wt.isPrunable && <Badge tone="warning">stale</Badge>}
+                  </div>
+                  <div className="font-mono text-xs text-[var(--vscode-descriptionForeground)] truncate" title={wt.path}>
+                    {wt.path}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <RowButton onClick={() => rpcClient.openWorktree(wt.path)}>Open</RowButton>
+                  <RowButton onClick={() => rpcClient.revealWorktree(wt.path)}>Reveal</RowButton>
+                  {removable && (
+                    <RowButton tone="danger" onClick={() => setRemoveTarget(wt)}>
+                      Remove
+                    </RowButton>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <ConfirmDialog
+        open={pruneOpen}
+        onConfirm={() => {
+          setPruneOpen(false);
+          rpcClient.pruneWorktree();
+        }}
+        onCancel={() => setPruneOpen(false)}
+        title="Prune Worktrees"
+        description={pruneDescription}
+        confirmLabel="Prune"
+        variant="warning"
+        commandPreview={buildPruneWorktreeCommand()}
+      />
+
+      {removeTarget && (
+        <RemoveWorktreeDialog
+          open={removeTarget !== null}
+          worktree={removeTarget}
+          onClose={() => setRemoveTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function Badge({ children, tone = 'default' }: { children: React.ReactNode; tone?: 'default' | 'warning' }) {
+  const cls =
+    tone === 'warning'
+      ? 'bg-[var(--vscode-inputValidation-warningBackground)] text-[var(--vscode-foreground)]'
+      : 'bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]';
+  return <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide ${cls}`}>{children}</span>;
+}
+
+function RowButton({
+  children,
+  onClick,
+  tone = 'default',
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  tone?: 'default' | 'danger';
+}) {
+  const cls =
+    tone === 'danger'
+      ? 'text-[var(--vscode-errorForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)]'
+      : 'text-[var(--vscode-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)]';
+  return (
+    <button type="button" onClick={onClick} className={`px-2 py-0.5 text-xs rounded ${cls}`}>
+      {children}
+    </button>
+  );
+}

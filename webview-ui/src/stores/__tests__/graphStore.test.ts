@@ -3,6 +3,17 @@ import { useGraphStore } from '../graphStore';
 import type { Commit, FileChange, RemoteInfo, StashEntry, WorktreeInfo } from '@shared/types';
 import type { InitialDataPayload } from '@shared/messages';
 
+const makeWorktree = (path: string, head: string, overrides: Partial<WorktreeInfo> = {}): WorktreeInfo => ({
+  path,
+  head,
+  branch: `refs/heads/${path.split('/').pop()}`,
+  isMain: false,
+  isDetached: false,
+  isCurrent: false,
+  isPrunable: false,
+  ...overrides,
+});
+
 const makeCommit = (hash: string): Commit => ({
   hash,
   abbreviatedHash: hash.slice(0, 7),
@@ -113,13 +124,15 @@ describe('graphStore — setInitialData', () => {
       branch: 'feature',
       isMain: false,
       isDetached: false,
+      isCurrent: false,
+      isPrunable: false,
     };
 
     useGraphStore.setState({
       remotes: [remote],
       stashes: [stash],
       worktreeList: [worktree],
-      worktreeByHead: new Map([[worktree.head, worktree]]),
+      worktreeByHead: new Map([[worktree.head, [worktree]]]),
       uncommittedStagedFiles: [stagedFile],
       uncommittedCounts: { stagedCount: 1, unstagedCount: 0, untrackedCount: 0 },
       hasUncommittedChanges: true,
@@ -131,7 +144,7 @@ describe('graphStore — setInitialData', () => {
     expect(after.remotes).toEqual([remote]);
     expect(after.stashes).toEqual([stash]);
     expect(after.worktreeList).toEqual([worktree]);
-    expect(after.worktreeByHead.get('abc1234')).toEqual(worktree);
+    expect(after.worktreeByHead.get('abc1234')).toEqual([worktree]);
     expect(after.uncommittedStagedFiles).toEqual([stagedFile]);
     expect(after.uncommittedCounts.stagedCount).toBe(1);
     expect(after.hasUncommittedChanges).toBe(true);
@@ -152,8 +165,8 @@ describe('graphStore — setInitialData', () => {
         author: 'Test User',
         authorEmail: 'test@example.com',
       }],
-      worktreeList: [{ path: '/old-wt', head: 'abc1234', branch: 'main', isMain: false, isDetached: false }],
-      worktreeByHead: new Map([['abc1234', { path: '/old-wt', head: 'abc1234', branch: 'main', isMain: false, isDetached: false }]]),
+      worktreeList: [{ path: '/old-wt', head: 'abc1234', branch: 'main', isMain: false, isDetached: false, isCurrent: false, isPrunable: false }],
+      worktreeByHead: new Map([['abc1234', [{ path: '/old-wt', head: 'abc1234', branch: 'main', isMain: false, isDetached: false, isCurrent: false, isPrunable: false }]]]),
       uncommittedStagedFiles: [{ path: 'src/file.ts', status: 'modified', stageState: 'staged' }],
       uncommittedCounts: { stagedCount: 1, unstagedCount: 0, untrackedCount: 0 },
       hasUncommittedChanges: true,
@@ -253,6 +266,30 @@ describe('graphStore — signature cache retention on refresh (FR-015)', () => {
     const after = useGraphStore.getState();
     expect(after.signaturePresenceLoading['aaaaaaa']).toBeUndefined();
     expect(after.signaturePresenceFailed['aaaaaaa']).toBe(true);
+  });
+});
+
+describe('graphStore — setWorktreeList (array-valued worktreeByHead)', () => {
+  it('keeps both worktrees that share the same HEAD commit', () => {
+    const head = 'aaaa1111';
+    useGraphStore.getState().setWorktreeList([
+      makeWorktree('/wt/feature-a', head, { branch: 'refs/heads/feature-a' }),
+      makeWorktree('/wt/feature-b', head, { branch: 'refs/heads/feature-b' }),
+    ]);
+
+    const entries = useGraphStore.getState().worktreeByHead.get(head);
+    expect(entries).toHaveLength(2);
+    expect(entries?.map((w) => w.path)).toEqual(['/wt/feature-a', '/wt/feature-b']);
+  });
+
+  it('groups worktrees by distinct HEAD', () => {
+    useGraphStore.getState().setWorktreeList([
+      makeWorktree('/wt/one', 'hash1'),
+      makeWorktree('/wt/two', 'hash2'),
+    ]);
+    const byHead = useGraphStore.getState().worktreeByHead;
+    expect(byHead.get('hash1')).toHaveLength(1);
+    expect(byHead.get('hash2')).toHaveLength(1);
   });
 });
 

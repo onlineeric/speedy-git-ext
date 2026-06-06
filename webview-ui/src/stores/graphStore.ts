@@ -53,6 +53,24 @@ import { computeHiddenCommitHashes } from '../utils/commitVisibility';
 import { computeMergedTopology, type UncommittedContext } from '../utils/mergedCommits';
 import { joinRepoPath } from '../utils/repoPath';
 
+/**
+ * Group worktrees by their HEAD commit. Array-valued because two worktrees may
+ * point at the same commit (e.g. a new-branch worktree from a commit another
+ * branch already points at) — a scalar map would silently drop the second.
+ */
+function buildWorktreeByHead(list: WorktreeInfo[]): Map<string, WorktreeInfo[]> {
+  const byHead = new Map<string, WorktreeInfo[]>();
+  for (const wt of list) {
+    const existing = byHead.get(wt.head);
+    if (existing) {
+      existing.push(wt);
+    } else {
+      byHead.set(wt.head, [wt]);
+    }
+  }
+  return byHead;
+}
+
 interface GraphStore {
   commits: Commit[];
   branches: Branch[];
@@ -133,7 +151,7 @@ interface GraphStore {
   worktreeList: WorktreeInfo[];
   authorList: Author[];
   authorListLoading: boolean;
-  worktreeByHead: Map<string, WorktreeInfo>;
+  worktreeByHead: Map<string, WorktreeInfo[]>;
   containingBranchesCache: Map<string, ContainingBranchesResult>;
   uncommittedStagedFiles: FileChange[];
   uncommittedUnstagedFiles: FileChange[];
@@ -357,11 +375,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   comparePanelUI: { ...EMPTY_COMPARE_PANEL_UI_STATE },
   setHoveredCommit: (hash, anchorRect) => set({ hoveredCommitHash: hash, tooltipAnchorRect: anchorRect }),
   setWorktreeList: (list) => {
-    const byHead = new Map<string, WorktreeInfo>();
-    for (const wt of list) {
-      byHead.set(wt.head, wt);
-    }
-    set({ worktreeList: list, worktreeByHead: byHead });
+    set({ worktreeList: list, worktreeByHead: buildWorktreeByHead(list) });
   },
   setContainingBranches: (hash, result) => set((state) => {
     const next = new Map(state.containingBranchesCache);
@@ -1032,11 +1046,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
       : -1;
 
-    // Build worktree lookup map
-    const worktreeByHead = new Map<string, WorktreeInfo>();
-    for (const wt of worktrees) {
-      worktreeByHead.set(wt.head, wt);
-    }
+    // Build worktree lookup map (array-valued — many worktrees may share a HEAD)
+    const worktreeByHead = buildWorktreeByHead(worktrees);
 
     set({
       commits,

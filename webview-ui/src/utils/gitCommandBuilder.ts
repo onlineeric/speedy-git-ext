@@ -1,4 +1,4 @@
-import type { PushForceMode, ResetMode, RevertMode } from '@shared/types';
+import type { PushForceMode, ResetMode, RevertMode, WorktreeBranchMode } from '@shared/types';
 
 export interface PushCommandOptions {
   remote: string;
@@ -315,4 +315,41 @@ export function buildSelectiveStashCommand(options: SelectiveStashCommandOptions
     return `git add -- ${pathsStr} && ${stashCmd}`;
   }
   return stashCmd;
+}
+
+export interface AddWorktreeCommandOptions {
+  path: string;
+  ref: string;
+  branchMode: WorktreeBranchMode;
+  newBranchName?: string;
+  force?: boolean;
+}
+
+export function buildAddWorktreeCommand(options: AddWorktreeCommandOptions): string {
+  const parts = ['git worktree add'];
+  if (options.force) parts.push('--force');
+  if (options.branchMode === 'new') {
+    parts.push('-b', options.newBranchName ?? '', quotePath(options.path), options.ref);
+  } else if (options.branchMode === 'detached') {
+    parts.push('--detach', quotePath(options.path), options.ref);
+  } else {
+    parts.push(quotePath(options.path), options.ref);
+  }
+  return parts.join(' ');
+}
+
+export interface RemoveWorktreeCommandOptions {
+  path: string;
+  force?: boolean;
+}
+
+export function buildRemoveWorktreeCommand(options: RemoveWorktreeCommandOptions): string {
+  const parts = ['git worktree remove'];
+  if (options.force) parts.push('--force');
+  parts.push(quotePath(options.path));
+  return parts.join(' ');
+}
+
+export function buildPruneWorktreeCommand(): string {
+  return 'git worktree prune';
 }
