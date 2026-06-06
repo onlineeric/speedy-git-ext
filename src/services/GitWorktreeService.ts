@@ -41,6 +41,19 @@ function sanitizeLeafName(ref: string): string {
   return cleaned || 'worktree';
 }
 
+async function resolveDetachedLeafName(
+  executor: GitExecutor,
+  cwd: string,
+  ref: string
+): Promise<Result<string>> {
+  const result = await executor.execute({
+    args: ['rev-parse', '--short=10', '--verify', `${ref}^{commit}`],
+    cwd,
+  });
+  if (!result.success) return result;
+  return ok(result.value.stdout.trim());
+}
+
 /**
  * Detect git's "branch already checked out elsewhere" refusal and rewrite it as
  * a readable message naming the conflicting worktree (FR-024 / T042).
@@ -150,10 +163,16 @@ export class GitWorktreeService {
     // Anchor relative base paths (including a leading `..`) to the main worktree.
     const baseDir = path.resolve(mainPath, expandedBase);
 
-    const desiredLeaf =
-      opts.branchMode === 'new' && opts.newBranchName
-        ? opts.newBranchName
-        : opts.ref;
+    let desiredLeaf: string;
+    if (opts.branchMode === 'new' && opts.newBranchName) {
+      desiredLeaf = opts.newBranchName;
+    } else if (opts.branchMode === 'detached') {
+      const detachedLeaf = await resolveDetachedLeafName(this.executor, this.workspacePath, opts.ref);
+      if (!detachedLeaf.success) return detachedLeaf;
+      desiredLeaf = detachedLeaf.value;
+    } else {
+      desiredLeaf = opts.ref;
+    }
     const leaf = sanitizeLeafName(desiredLeaf);
 
     const existingPaths = new Set(listResult.value.map((w) => normalizePath(w.path)));

@@ -147,14 +147,14 @@ A user is working in a window opened on a linked worktree (not the main repo). T
 - **FR-001a**: When the source is a remote-only branch, the dialog MUST default to "new branch" mode, pre-filling the new branch name from the remote branch and setting it to track that remote.
 - **FR-002**: The create dialog MUST pre-fill the source ref from the clicked item and offer three branch modes: (a) check out an existing local branch that is not checked out elsewhere, (b) create a new branch from the source ref, (c) create a detached worktree at the source ref.
 - **FR-003**: When the source branch is already checked out in another worktree, or when the source is a bare commit/tag/remote branch, the dialog MUST default to "new branch" mode.
-- **FR-004**: The create dialog MUST show a suggested target folder path (derived from the configured base path plus a sanitized ref name) in a plain editable text field, with no native folder picker.
+- **FR-004**: The create dialog MUST show a suggested target folder path (derived from the configured base path plus a sanitized ref/branch name, or a 10-character short commit hash for detached worktrees) in a plain editable text field, with no native folder picker.
 - **FR-005**: After creation, the worktree MUST always open in a new IDE window. The dialog offers no "open in current window" option, avoiding workspace-replacement and unsaved-file edge cases.
 - **FR-006**: The create dialog MUST display a live preview of the exact git command that will run, with paths containing spaces quoted correctly.
 - **FR-007**: After a successful create, the extension MUST open the worktree in a new IDE window and MUST explicitly refresh the worktree list and graph.
 
 #### Path composition & settings
 
-- **FR-008**: The target path MUST be composed as `<basePath>/<sanitized-ref>`, where `basePath` is a parent directory and the sanitized ref is always appended as the leaf folder.
+- **FR-008**: The target path MUST be composed as `<basePath>/<leaf>`, where `basePath` is a parent directory and the leaf folder is always appended. For existing-branch mode, the leaf is the sanitized ref. For new-branch mode, the leaf is the sanitized new branch name. For detached mode, the leaf is the 10-character short commit hash resolved from the source ref.
 - **FR-009**: The base path MUST be configurable via the existing `speedyGit.worktree.basePath` setting (default `../${repoName}.worktrees`), supporting a `${repoName}` token and resolving relative paths against the main worktree. There is no `${branch}` token.
 - **FR-010**: Ref sanitization MUST convert path separators and unsafe characters into a filesystem-safe leaf name (e.g. `feature/foo` → `feature-foo`) and resolve collisions by appending a numeric suffix.
 - **FR-011**: Path composition (both the leading `..` and the `${repoName}` token) MUST resolve against the **main** worktree's path, never the currently-open worktree's path, so worktrees created from inside a linked worktree are placed beside the main repo.

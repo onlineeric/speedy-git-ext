@@ -270,6 +270,31 @@ describe('GitWorktreeService.resolveWorktreePath', () => {
     if (result.success) expect(result.value.leafName).toBe('hotfix');
   });
 
+  it('uses a 10-character short commit hash as the leaf in detached mode', async () => {
+    const service = new GitWorktreeService('/home/user/repo', mockLog);
+    stubExecutor(service, (args) => {
+      if (args[0] === 'worktree' && args[1] === 'list') {
+        return listOutput(['worktree /home/user/repo', 'HEAD aaaa1111', 'branch refs/heads/main']);
+      }
+      if (args[0] === 'rev-parse') {
+        expect(args).toEqual(['rev-parse', '--short=10', '--verify', '19eae44a9d6c2b1a^{commit}']);
+        return ok({ stdout: '19eae44a9d\n', stderr: '' });
+      }
+      return ok({ stdout: '', stderr: '' });
+    });
+
+    const result = await service.resolveWorktreePath(
+      { ref: '19eae44a9d6c2b1a', branchMode: 'detached' },
+      '../${repoName}.worktrees'
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.leafName).toBe('19eae44a9d');
+      expect(result.value.path).toBe('/home/user/repo.worktrees/19eae44a9d');
+    }
+  });
+
   it('appends a numeric suffix when the target collides with an existing worktree', async () => {
     const service = new GitWorktreeService('/home/user/repo', mockLog);
     withMainWorktree(service, '/home/user/repo', ['/home/user/repo.worktrees/feature']);
@@ -280,6 +305,38 @@ describe('GitWorktreeService.resolveWorktreePath', () => {
     if (result.success) {
       expect(result.value.leafName).toBe('feature-2');
       expect(result.value.path).toBe('/home/user/repo.worktrees/feature-2');
+    }
+  });
+
+  it('appends a numeric suffix to detached short-hash leaves when the target collides', async () => {
+    const service = new GitWorktreeService('/home/user/repo', mockLog);
+    stubExecutor(service, (args) => {
+      if (args[0] === 'worktree' && args[1] === 'list') {
+        return listOutput([
+          'worktree /home/user/repo',
+          'HEAD aaaa1111',
+          'branch refs/heads/main',
+          '',
+          'worktree /home/user/repo.worktrees/19eae44a9d',
+          'HEAD 19eae44a9d6c2b1a',
+          'detached',
+        ]);
+      }
+      if (args[0] === 'rev-parse') {
+        return ok({ stdout: '19eae44a9d\n', stderr: '' });
+      }
+      return ok({ stdout: '', stderr: '' });
+    });
+
+    const result = await service.resolveWorktreePath(
+      { ref: 'HEAD', branchMode: 'detached' },
+      '../${repoName}.worktrees'
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.leafName).toBe('19eae44a9d-2');
+      expect(result.value.path).toBe('/home/user/repo.worktrees/19eae44a9d-2');
     }
   });
 });
