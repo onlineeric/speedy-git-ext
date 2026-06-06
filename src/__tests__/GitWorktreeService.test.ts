@@ -58,9 +58,9 @@ describe('GitWorktreeService.listWorktrees', () => {
   it('normalizes submodule main worktree paths reported as .git/modules gitdirs', async () => {
     const service = new GitWorktreeService('/repo/submodules/repo-b', mockLog);
     stubExecutor(service, (args) => {
-      if (args[0] === 'rev-parse') {
-        expect(args).toEqual(['rev-parse', '--show-toplevel']);
-        return ok({ stdout: '/repo/submodules/repo-b\n', stderr: '' });
+      if (args[0] === 'config') {
+        expect(args).toEqual(['config', '--path', '--get', 'core.worktree']);
+        return ok({ stdout: '../../../../submodules/repo-b\n', stderr: '' });
       }
       if (args[0] === 'for-each-ref') {
         expect(args).toEqual(['for-each-ref', '--format=%(refname)', 'refs/heads', '--points-at', 'HEAD']);
@@ -92,6 +92,47 @@ describe('GitWorktreeService.listWorktrees', () => {
         path: '/repo/.git/modules/submodules/repo-b.worktrees/bbbb2222',
         isMain: false,
         isCurrent: false,
+      });
+    }
+  });
+
+  it('keeps the real submodule main row when listed from a linked worktree window', async () => {
+    const service = new GitWorktreeService('/repo/submodules/repo-b.worktrees/feature-api', mockLog);
+    stubExecutor(service, (args, opts) => {
+      if (args[0] === 'config') {
+        expect(opts.cwd).toBe('/repo/submodules/repo-b.worktrees/feature-api');
+        return ok({ stdout: '../../../../submodules/repo-b\n', stderr: '' });
+      }
+      if (args[0] === 'for-each-ref') {
+        expect(opts.cwd).toBe('/repo/submodules/repo-b');
+        return ok({ stdout: 'refs/heads/dev\n', stderr: '' });
+      }
+      return listOutput([
+        'worktree /repo/.git/modules/submodules/repo-b',
+        'HEAD aaaa1111',
+        'detached',
+        '',
+        'worktree /repo/submodules/repo-b.worktrees/feature-api',
+        'HEAD bbbb2222',
+        'branch refs/heads/feature-api',
+      ]);
+    });
+
+    const result = await service.listWorktrees();
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value[0]).toMatchObject({
+        path: '/repo/submodules/repo-b',
+        branch: 'refs/heads/dev',
+        isMain: true,
+        isCurrent: false,
+      });
+      expect(result.value[1]).toMatchObject({
+        path: '/repo/submodules/repo-b.worktrees/feature-api',
+        branch: 'refs/heads/feature-api',
+        isMain: false,
+        isCurrent: true,
       });
     }
   });
@@ -391,8 +432,8 @@ describe('GitWorktreeService.resolveWorktreePath', () => {
           'detached',
         ]);
       }
-      if (args[0] === 'rev-parse' && args[1] === '--show-toplevel') {
-        return ok({ stdout: '/repo/submodules/repo-b\n', stderr: '' });
+      if (args[0] === 'config') {
+        return ok({ stdout: '../../../../submodules/repo-b\n', stderr: '' });
       }
       if (args[0] === 'for-each-ref') {
         return ok({ stdout: 'refs/heads/dev\n', stderr: '' });

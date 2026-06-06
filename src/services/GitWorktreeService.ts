@@ -78,8 +78,22 @@ function mapAddWorktreeError(error: GitError): GitError {
 
 async function resolveCurrentWorktreePath(
   executor: GitExecutor,
-  cwd: string
+  cwd: string,
+  reportedGitDir: string
 ): Promise<string> {
+  const worktreeConfig = await executor.execute({
+    args: ['config', '--path', '--get', 'core.worktree'],
+    cwd,
+  });
+  if (worktreeConfig.success) {
+    const configuredPath = worktreeConfig.value.stdout.trim();
+    if (configuredPath) {
+      return path.isAbsolute(configuredPath)
+        ? configuredPath
+        : path.resolve(reportedGitDir, configuredPath);
+    }
+  }
+
   const result = await executor.execute({
     args: ['rev-parse', '--show-toplevel'],
     cwd,
@@ -133,7 +147,7 @@ export class GitWorktreeService {
     const stdout = result.value.stdout.trim();
     if (!stdout) return ok([]);
 
-    let currentPath = normalizePath(this.workspacePath);
+    const currentPath = normalizePath(this.workspacePath);
     const worktrees: WorktreeInfo[] = [];
     const blocks = stdout.split('\n\n');
     let isFirst = true;
@@ -166,15 +180,15 @@ export class GitWorktreeService {
         if (isFirst && looksLikeSubmoduleGitDir(worktreePath)) {
           resolvedCurrentWorktreePath ??= await resolveCurrentWorktreePath(
             this.executor,
-            this.workspacePath
+            this.workspacePath,
+            worktreePath
           );
           worktreePath = resolvedCurrentWorktreePath;
-          currentPath = normalizePath(resolvedCurrentWorktreePath);
 
           if (isDetached || !branch) {
             resolvedCurrentWorktreeBranch ??= await resolveCurrentWorktreeBranch(
               this.executor,
-              this.workspacePath
+              resolvedCurrentWorktreePath
             );
             if (resolvedCurrentWorktreeBranch) {
               branch = resolvedCurrentWorktreeBranch;
