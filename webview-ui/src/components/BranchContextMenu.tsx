@@ -21,6 +21,7 @@ import { MergeDialog } from './MergeDialog';
 import { PushDialog } from './PushDialog';
 import { CheckoutWithPullDialog } from './CheckoutWithPullDialog';
 import { CreateWorktreeDialog, type WorktreeSource } from './CreateWorktreeDialog';
+import { useRemoveWorktreeDialog, WorktreeMenuItems } from './WorktreeMenuItems';
 
 
 interface BranchContextMenuProps {
@@ -64,6 +65,8 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
   const [createWorktreeOpen, setCreateWorktreeOpen] = useState(false);
   const loading = useGraphStore((s) => s.loading);
   const branches = useGraphStore((s) => s.branches);
+  const branchWorktree = useGraphStore((s) => refInfo.type === 'branch' ? s.worktreeByBranch.get(refInfo.name) : undefined);
+  const { openRemoveWorktreeDialog, removeWorktreeDialog } = useRemoveWorktreeDialog();
 
   const rebaseInProgress = useGraphStore((s) => s.rebaseInProgress);
   const cherryPickInProgress = useGraphStore((s) => s.cherryPickInProgress);
@@ -220,6 +223,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
     }
     return null;
   }, [isLocalBranch, isRemoteBranch, isTag, refInfo.remote, refInfo.name, checkoutState]);
+  const showWorktreeGroup = worktreeSource !== null || branchWorktree !== undefined;
 
   // pendingCheckout is for this branch (from checkoutNeedsStash response)
   const stashConfirmOpen = pendingCheckout !== null && pendingCheckout.name === refInfo.name;
@@ -299,9 +303,19 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                     Pull Branch
                   </ContextMenu.Item>
                 )}
-                <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
-                  Create worktree…
-                </ContextMenu.Item>
+                {showWorktreeGroup && (
+                  <>
+                    <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                    {worktreeSource && (
+                      <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
+                        Create worktree…
+                      </ContextMenu.Item>
+                    )}
+                    {branchWorktree && (
+                      <WorktreeMenuItems worktree={branchWorktree} onRemove={openRemoveWorktreeDialog} />
+                    )}
+                  </>
+                )}
                 {!isCurrentBranch && (
                   <>
                     <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
@@ -324,10 +338,15 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                     Fast-forward Local Branch from Remote
                   </ContextMenu.Item>
                 )}
-                {worktreeSource && (
-                  <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
-                    Create worktree…
-                  </ContextMenu.Item>
+                {showWorktreeGroup && (
+                  <>
+                    <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                    {worktreeSource && (
+                      <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
+                        Create worktree…
+                      </ContextMenu.Item>
+                    )}
+                  </>
                 )}
                 <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
                 <ContextMenu.Item className={dangerItemClass} onSelect={() => setDeleteConfirmOpen(true)}>
@@ -341,9 +360,16 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                 <ContextMenu.Item className={menuItemClass} onSelect={() => rpcClient.pushTag(refInfo.name)}>
                   Push Tag
                 </ContextMenu.Item>
-                <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
-                  Create worktree…
-                </ContextMenu.Item>
+                {showWorktreeGroup && (
+                  <>
+                    <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                    {worktreeSource && (
+                      <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
+                        Create worktree…
+                      </ContextMenu.Item>
+                    )}
+                  </>
+                )}
                 <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
                 <ContextMenu.Item className={dangerItemClass} onSelect={() => setDeleteConfirmOpen(true)}>
                   Delete Tag
@@ -520,9 +546,11 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
         <CreateWorktreeDialog
           open
           source={worktreeSource}
+          existingWorktree={branchWorktree}
           onClose={() => setCreateWorktreeOpen(false)}
         />
       )}
+      {removeWorktreeDialog}
     </>
   );
 }

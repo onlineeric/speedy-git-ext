@@ -52,23 +52,47 @@ import { type GraphTopology } from '../utils/graphTopology';
 import { computeHiddenCommitHashes } from '../utils/commitVisibility';
 import { computeMergedTopology, type UncommittedContext } from '../utils/mergedCommits';
 import { joinRepoPath } from '../utils/repoPath';
+import { stripLocalBranchPrefix } from '../utils/worktreeDisplay';
+
+interface WorktreeLookups {
+  worktreeByHead: Map<string, WorktreeInfo[]>;
+  worktreeByBranch: Map<string, WorktreeInfo>;
+  detachedWorktreesByHead: Map<string, WorktreeInfo[]>;
+}
 
 /**
- * Group worktrees by their HEAD commit. Array-valued because two worktrees may
- * point at the same commit (e.g. a new-branch worktree from a commit another
- * branch already points at) — a scalar map would silently drop the second.
+ * Build worktree lookup maps for tooltip and row rendering. `worktreeByHead`
+ * intentionally includes the main worktree for tooltip/status surfaces; the
+ * rendering maps skip only `isMain` so linked current worktrees still show.
  */
-function buildWorktreeByHead(list: WorktreeInfo[]): Map<string, WorktreeInfo[]> {
-  const byHead = new Map<string, WorktreeInfo[]>();
+function buildWorktreeLookups(list: WorktreeInfo[]): WorktreeLookups {
+  const worktreeByHead = new Map<string, WorktreeInfo[]>();
+  const worktreeByBranch = new Map<string, WorktreeInfo>();
+  const detachedWorktreesByHead = new Map<string, WorktreeInfo[]>();
+
   for (const wt of list) {
-    const existing = byHead.get(wt.head);
+    const existing = worktreeByHead.get(wt.head);
     if (existing) {
       existing.push(wt);
     } else {
-      byHead.set(wt.head, [wt]);
+      worktreeByHead.set(wt.head, [wt]);
+    }
+
+    if (wt.isMain) continue;
+
+    if (wt.isDetached || !wt.branch) {
+      const detached = detachedWorktreesByHead.get(wt.head);
+      if (detached) {
+        detached.push(wt);
+      } else {
+        detachedWorktreesByHead.set(wt.head, [wt]);
+      }
+    } else {
+      worktreeByBranch.set(stripLocalBranchPrefix(wt.branch), wt);
     }
   }
-  return byHead;
+
+  return { worktreeByHead, worktreeByBranch, detachedWorktreesByHead };
 }
 
 interface GraphStore {
@@ -149,9 +173,12 @@ interface GraphStore {
   hoveredCommitHash: string | null;
   tooltipAnchorRect: DOMRect | null;
   worktreeList: WorktreeInfo[];
+  worktreeListLoading: boolean;
   authorList: Author[];
   authorListLoading: boolean;
   worktreeByHead: Map<string, WorktreeInfo[]>;
+  worktreeByBranch: Map<string, WorktreeInfo>;
+  detachedWorktreesByHead: Map<string, WorktreeInfo[]>;
   containingBranchesCache: Map<string, ContainingBranchesResult>;
   uncommittedStagedFiles: FileChange[];
   uncommittedUnstagedFiles: FileChange[];
@@ -170,6 +197,7 @@ interface GraphStore {
   comparePanelUI: ComparePanelUIState;
   setHoveredCommit: (hash: string | null, anchorRect: DOMRect | null) => void;
   setWorktreeList: (list: WorktreeInfo[]) => void;
+  setWorktreeListLoading: (loading: boolean) => void;
   setContainingBranches: (hash: string, result: ContainingBranchesResult) => void;
   clearTooltipCaches: () => void;
   setFileViewMode: (mode: FileViewMode) => void;
@@ -357,7 +385,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   authorList: [],
   authorListLoading: false,
   worktreeList: [],
+  worktreeListLoading: false,
   worktreeByHead: new Map(),
+  worktreeByBranch: new Map(),
+  detachedWorktreesByHead: new Map(),
   containingBranchesCache: new Map(),
   uncommittedStagedFiles: [],
   uncommittedUnstagedFiles: [],
@@ -375,8 +406,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   comparePanelUI: { ...EMPTY_COMPARE_PANEL_UI_STATE },
   setHoveredCommit: (hash, anchorRect) => set({ hoveredCommitHash: hash, tooltipAnchorRect: anchorRect }),
   setWorktreeList: (list) => {
-    set({ worktreeList: list, worktreeByHead: buildWorktreeByHead(list) });
+    set({ worktreeList: list, worktreeListLoading: false, ...buildWorktreeLookups(list) });
   },
+  setWorktreeListLoading: (worktreeListLoading) => set({ worktreeListLoading }),
   setContainingBranches: (hash, result) => set((state) => {
     const next = new Map(state.containingBranchesCache);
     next.set(hash, result);
@@ -722,7 +754,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
             remotes: [],
             stashes: [],
             worktreeList: [],
+            worktreeListLoading: false,
             worktreeByHead: new Map(),
+            worktreeByBranch: new Map(),
+            detachedWorktreesByHead: new Map(),
             uncommittedStagedFiles: [],
             uncommittedUnstagedFiles: [],
             uncommittedConflictFiles: [],
@@ -762,7 +797,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       remotes: [],
       stashes: [],
       worktreeList: [],
+      worktreeListLoading: false,
       worktreeByHead: new Map(),
+      worktreeByBranch: new Map(),
+      detachedWorktreesByHead: new Map(),
       uncommittedStagedFiles: [],
       uncommittedUnstagedFiles: [],
       uncommittedConflictFiles: [],
@@ -804,7 +842,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       remotes: [],
       stashes: [],
       worktreeList: [],
+      worktreeListLoading: false,
       worktreeByHead: new Map(),
+      worktreeByBranch: new Map(),
+      detachedWorktreesByHead: new Map(),
       uncommittedStagedFiles: [],
       uncommittedUnstagedFiles: [],
       uncommittedConflictFiles: [],
@@ -1046,8 +1087,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
       : -1;
 
-    // Build worktree lookup map (array-valued — many worktrees may share a HEAD)
-    const worktreeByHead = buildWorktreeByHead(worktrees);
+    const worktreeLookups = buildWorktreeLookups(worktrees);
 
     set({
       commits,
@@ -1061,7 +1101,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       hasUncommittedChanges: hasChanges,
       remotes,
       worktreeList: worktrees,
-      worktreeByHead,
+      worktreeListLoading: false,
+      ...worktreeLookups,
       // NOTE: cherry-pick / rebase / revert in-progress flags are intentionally NOT
       // set here. The `initialData` payload always carries synthetic `'idle'` values
       // (the backend resolves the real state asynchronously in `sendDeferredRepoData`).

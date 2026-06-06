@@ -55,6 +55,88 @@ describe('GitWorktreeService.listWorktrees', () => {
     }
   });
 
+  it('normalizes submodule main worktree paths reported as .git/modules gitdirs', async () => {
+    const service = new GitWorktreeService('/repo/submodules/repo-b', mockLog);
+    stubExecutor(service, (args) => {
+      if (args[0] === 'config') {
+        expect(args).toEqual(['config', '--path', '--get', 'core.worktree']);
+        return ok({ stdout: '../../../../submodules/repo-b\n', stderr: '' });
+      }
+      if (args[0] === 'for-each-ref') {
+        expect(args).toEqual(['for-each-ref', '--format=%(refname)', 'refs/heads', '--points-at', 'HEAD']);
+        return ok({ stdout: 'refs/heads/dev\n', stderr: '' });
+      }
+      return listOutput([
+        'worktree /repo/.git/modules/submodules/repo-b',
+        'HEAD aaaa1111',
+        'detached',
+        '',
+        'worktree /repo/.git/modules/submodules/repo-b.worktrees/bbbb2222',
+        'HEAD bbbb2222',
+        'detached',
+      ]);
+    });
+
+    const result = await service.listWorktrees();
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value[0]).toMatchObject({
+        path: '/repo/submodules/repo-b',
+        branch: 'refs/heads/dev',
+        isMain: true,
+        isDetached: false,
+        isCurrent: true,
+      });
+      expect(result.value[1]).toMatchObject({
+        path: '/repo/.git/modules/submodules/repo-b.worktrees/bbbb2222',
+        isMain: false,
+        isCurrent: false,
+      });
+    }
+  });
+
+  it('keeps the real submodule main row when listed from a linked worktree window', async () => {
+    const service = new GitWorktreeService('/repo/submodules/repo-b.worktrees/feature-api', mockLog);
+    stubExecutor(service, (args, opts) => {
+      if (args[0] === 'config') {
+        expect(opts.cwd).toBe('/repo/submodules/repo-b.worktrees/feature-api');
+        return ok({ stdout: '../../../../submodules/repo-b\n', stderr: '' });
+      }
+      if (args[0] === 'for-each-ref') {
+        expect(opts.cwd).toBe('/repo/submodules/repo-b');
+        return ok({ stdout: 'refs/heads/dev\n', stderr: '' });
+      }
+      return listOutput([
+        'worktree /repo/.git/modules/submodules/repo-b',
+        'HEAD aaaa1111',
+        'detached',
+        '',
+        'worktree /repo/submodules/repo-b.worktrees/feature-api',
+        'HEAD bbbb2222',
+        'branch refs/heads/feature-api',
+      ]);
+    });
+
+    const result = await service.listWorktrees();
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value[0]).toMatchObject({
+        path: '/repo/submodules/repo-b',
+        branch: 'refs/heads/dev',
+        isMain: true,
+        isCurrent: false,
+      });
+      expect(result.value[1]).toMatchObject({
+        path: '/repo/submodules/repo-b.worktrees/feature-api',
+        branch: 'refs/heads/feature-api',
+        isMain: false,
+        isCurrent: true,
+      });
+    }
+  });
+
   it('marks detached worktrees', async () => {
     const service = new GitWorktreeService('/repo', mockLog);
     stubExecutor(service, () => listOutput(['worktree /repo', 'HEAD aaaa1111', 'detached']));
@@ -337,6 +419,37 @@ describe('GitWorktreeService.resolveWorktreePath', () => {
     if (result.success) {
       expect(result.value.leafName).toBe('19eae44a9d-2');
       expect(result.value.path).toBe('/home/user/repo.worktrees/19eae44a9d-2');
+    }
+  });
+
+  it('anchors default paths to a submodule worktree when git reports the main path as a gitdir', async () => {
+    const service = new GitWorktreeService('/repo/submodules/repo-b', mockLog);
+    stubExecutor(service, (args) => {
+      if (args[0] === 'worktree' && args[1] === 'list') {
+        return listOutput([
+          'worktree /repo/.git/modules/submodules/repo-b',
+          'HEAD aaaa1111',
+          'detached',
+        ]);
+      }
+      if (args[0] === 'config') {
+        return ok({ stdout: '../../../../submodules/repo-b\n', stderr: '' });
+      }
+      if (args[0] === 'for-each-ref') {
+        return ok({ stdout: 'refs/heads/dev\n', stderr: '' });
+      }
+      return ok({ stdout: '', stderr: '' });
+    });
+
+    const result = await service.resolveWorktreePath(
+      { ref: 'feature/submodule', branchMode: 'existing' },
+      '../${repoName}.worktrees'
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.path).toBe('/repo/submodules/repo-b.worktrees/feature-submodule');
+      expect(result.value.leafName).toBe('feature-submodule');
     }
   });
 });

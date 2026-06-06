@@ -3,17 +3,14 @@ import type { WorktreeInfo } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { buildPruneWorktreeCommand } from '../utils/gitCommandBuilder';
+import { worktreeBranchLabel } from '../utils/worktreeDisplay';
 import { ConfirmDialog } from './ConfirmDialog';
 import { RemoveWorktreeDialog } from './RemoveWorktreeDialog';
-
-/** Branch ref (`refs/heads/feature`) → display name (`feature`); "detached" when no branch. */
-function branchLabel(wt: WorktreeInfo): string {
-  if (wt.isDetached || !wt.branch) return 'detached';
-  return wt.branch.startsWith('refs/heads/') ? wt.branch.slice('refs/heads/'.length) : wt.branch;
-}
+import { RefreshIcon } from './icons';
 
 export function WorktreeWidget() {
   const worktrees = useGraphStore((s) => s.worktreeList);
+  const worktreeListLoading = useGraphStore((s) => s.worktreeListLoading);
   const [removeTarget, setRemoveTarget] = useState<WorktreeInfo | null>(null);
   const [pruneOpen, setPruneOpen] = useState(false);
 
@@ -33,35 +30,53 @@ export function WorktreeWidget() {
     <div className="rounded-md border border-[var(--vscode-panel-border)] bg-[var(--vscode-editorWidget-background)] px-3 py-2 shadow-sm">
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-semibold text-[var(--vscode-foreground)]">Worktrees</span>
-        <button
-          type="button"
-          onClick={() => setPruneOpen(true)}
-          className="px-2 py-1 text-xs rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
-          title="Prune worktrees whose folders are missing"
-        >
-          Prune
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => rpcClient.getWorktreeList()}
+            disabled={worktreeListLoading}
+            className="inline-flex h-6 w-6 items-center justify-center rounded text-[var(--vscode-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] disabled:cursor-not-allowed disabled:opacity-50"
+            title="Refresh worktrees"
+            aria-label="Refresh worktrees"
+          >
+            <RefreshIcon className={worktreeListLoading ? 'animate-spin' : undefined} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setPruneOpen(true)}
+            disabled={worktreeListLoading}
+            className="px-2 py-1 text-xs rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] disabled:cursor-not-allowed disabled:opacity-50"
+            title="Prune worktrees whose folders are missing"
+          >
+            Prune
+          </button>
+        </div>
       </div>
 
       {worktrees.length === 0 ? (
         <p className="text-sm text-[var(--vscode-descriptionForeground)]">No worktrees.</p>
       ) : (
-        <ul className="flex flex-col gap-1">
-          {worktrees.map((wt) => {
+        <ul className="max-h-[230px] overflow-y-auto rounded border border-[var(--vscode-panel-border)]">
+          {worktrees.map((wt, index) => {
             const removable = !wt.isMain && !wt.isCurrent;
+            const rowTone = wt.isPrunable
+              ? 'bg-[var(--vscode-inputValidation-warningBackground)]'
+              : index % 2 === 0
+                ? 'bg-transparent'
+                : 'bg-[color-mix(in_srgb,var(--vscode-list-hoverBackground)_80%,transparent)]';
             return (
               <li
                 key={wt.path}
-                className="flex items-center gap-2 rounded px-2 py-1 hover:bg-[var(--vscode-list-hoverBackground)]"
+                className={`flex min-h-[44px] items-center gap-2 border-b border-[var(--vscode-panel-border)] px-2 py-1 last:border-b-0 hover:!bg-[var(--vscode-list-hoverBackground)] ${rowTone}`}
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-[var(--vscode-foreground)] truncate">{branchLabel(wt)}</span>
+                    <span className="text-sm text-[var(--vscode-foreground)] truncate">{worktreeBranchLabel(wt)}</span>
                     <span className="font-mono text-xs text-[var(--vscode-descriptionForeground)]">
                       {wt.head.slice(0, 7)}
                     </span>
                     {wt.isMain && <Badge>main</Badge>}
-                    {wt.isCurrent && <Badge>you are here</Badge>}
+                    {wt.isCurrent && <Badge tone="current">YOU ARE HERE</Badge>}
                     {wt.isPrunable && <Badge tone="warning">stale</Badge>}
                   </div>
                   <div className="font-mono text-xs text-[var(--vscode-descriptionForeground)] truncate" title={wt.path}>
@@ -69,7 +84,7 @@ export function WorktreeWidget() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <RowButton onClick={() => rpcClient.openWorktree(wt.path)}>Open</RowButton>
+                  <RowButton onClick={() => rpcClient.openWorktree(wt.path)} disabled={wt.isPrunable}>Open</RowButton>
                   <RowButton onClick={() => rpcClient.revealWorktree(wt.path)}>Reveal</RowButton>
                   {removable && (
                     <RowButton tone="danger" onClick={() => setRemoveTarget(wt)}>
@@ -87,6 +102,7 @@ export function WorktreeWidget() {
         open={pruneOpen}
         onConfirm={() => {
           setPruneOpen(false);
+          if (worktreeListLoading) return;
           rpcClient.pruneWorktree();
         }}
         onCancel={() => setPruneOpen(false)}
@@ -108,10 +124,12 @@ export function WorktreeWidget() {
   );
 }
 
-function Badge({ children, tone = 'default' }: { children: React.ReactNode; tone?: 'default' | 'warning' }) {
+function Badge({ children, tone = 'default' }: { children: React.ReactNode; tone?: 'default' | 'current' | 'warning' }) {
   const cls =
     tone === 'warning'
       ? 'bg-[var(--vscode-inputValidation-warningBackground)] text-[var(--vscode-foreground)]'
+      : tone === 'current'
+        ? 'bg-yellow-400/10 text-yellow-400'
       : 'bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]';
   return <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide ${cls}`}>{children}</span>;
 }
@@ -120,17 +138,24 @@ function RowButton({
   children,
   onClick,
   tone = 'default',
+  disabled = false,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   tone?: 'default' | 'danger';
+  disabled?: boolean;
 }) {
   const cls =
     tone === 'danger'
       ? 'text-[var(--vscode-errorForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)]'
       : 'text-[var(--vscode-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)]';
   return (
-    <button type="button" onClick={onClick} className={`px-2 py-0.5 text-xs rounded ${cls}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`px-2 py-0.5 text-xs rounded disabled:cursor-not-allowed disabled:opacity-50 ${cls}`}
+    >
       {children}
     </button>
   );

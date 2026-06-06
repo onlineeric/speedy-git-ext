@@ -286,6 +286,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
             <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateTagOpen(true)}>
               Create Tag Here...
             </ContextMenu.Item>
+            <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
             <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
               Create worktree…
             </ContextMenu.Item>

@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import type { Commit, UserSettings } from '@shared/types';
+import type { Commit, UserSettings, WorktreeInfo } from '@shared/types';
 import type { GraphTopology } from '../utils/graphTopology';
 import { useGraphStore } from '../stores/graphStore';
 import { GraphCell } from './GraphCell';
@@ -16,15 +16,10 @@ import { getDateFormatter } from '../utils/formatDate';
 import { AuthorAvatar } from './AuthorAvatar';
 import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils';
 import { slotMatchesCommitRow } from '../utils/compareMarker';
-import { WorktreeBadgeMenu } from './WorktreeBadgeMenu';
+import { DetachedWorktreeBadge } from './DetachedWorktreeBadge';
+import { prioritizeWorktreeDisplayRefs, worktreeForDisplayRef } from '../utils/worktreeDisplay';
 
-/** Worktree badge for rows whose HEAD is a worktree checkout. Subscribes to its own
- *  slice of `worktreeByHead` so it re-renders independently of the memoized CommitRow. */
-function WorktreeRowBadge({ hash }: { hash: string }) {
-  const worktrees = useGraphStore((s) => s.worktreeByHead.get(hash));
-  if (!worktrees || worktrees.length === 0) return null;
-  return <WorktreeBadgeMenu worktrees={worktrees} />;
-}
+const EMPTY_WORKTREES: WorktreeInfo[] = [];
 
 /** Compare-refs A/B markers (042-compare-refs FR-026/027/028). Marker appears
  *  immediately on slot fill for deterministic kinds (commit/branch/tag/head);
@@ -103,6 +98,8 @@ export const CommitRow = memo(function CommitRow({
   const isStash = commit.refs.some((r) => r.type === 'stash');
   const isUncommitted = commit.refs.some((r) => r.type === 'uncommitted');
   const stashIndex = isStash ? parseStashIndex(commit.refs) : -1;
+  const worktreeByBranch = useGraphStore((s) => s.worktreeByBranch);
+  const detachedWorktrees = useGraphStore((s) => s.detachedWorktreesByHead.get(commit.hash) ?? EMPTY_WORKTREES);
 
   const node = topology.nodes.get(commit.hash);
   const palette = resolvePalette(graphColors);
@@ -140,8 +137,13 @@ export const CommitRow = memo(function CommitRow({
     ? 'bg-transparent'
     : 'bg-[var(--vscode-list-hoverBackground)]/30';
 
-  const visibleRefs = displayRefs.slice(0, maxVisibleRefs);
-  const overflowRefs = displayRefs.slice(maxVisibleRefs);
+  const prioritizedDisplayRefs = useMemo(
+    () => prioritizeWorktreeDisplayRefs(displayRefs, worktreeByBranch),
+    [displayRefs, worktreeByBranch],
+  );
+  const visibleRefs = prioritizedDisplayRefs.slice(0, maxVisibleRefs);
+  const overflowRefs = prioritizedDisplayRefs.slice(maxVisibleRefs);
+  const showDetachedWorktrees = !isStash && !isUncommitted && detachedWorktrees.length > 0;
 
   const row = (
     <div
@@ -171,7 +173,7 @@ export const CommitRow = memo(function CommitRow({
 
       <CompareABMarker commit={commit} isUncommitted={isUncommitted} />
 
-      {(isHead || displayRefs.length > 0) && (
+      {(isHead || prioritizedDisplayRefs.length > 0 || showDetachedWorktrees) && (
         <div className="flex items-center gap-1 flex-shrink-0">
           {isHead && (
             <HeadIcon
@@ -186,15 +188,18 @@ export const CommitRow = memo(function CommitRow({
               </StashContextMenu>
             ) : (
               <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)}>
-                <RefLabel displayRef={displayRef} laneColorStyle={laneColorStyle} />
+                <RefLabel
+                  displayRef={displayRef}
+                  laneColorStyle={laneColorStyle}
+                  worktree={worktreeForDisplayRef(displayRef, worktreeByBranch)}
+                />
               </BranchContextMenu>
             )
           )}
-          <OverflowRefsBadge hiddenRefs={overflowRefs} laneColorStyle={laneColorStyle} />
+          <OverflowRefsBadge hiddenRefs={overflowRefs} laneColorStyle={laneColorStyle} worktreeByBranch={worktreeByBranch} />
+          {showDetachedWorktrees && <DetachedWorktreeBadge worktrees={detachedWorktrees} laneColorStyle={laneColorStyle} />}
         </div>
       )}
-
-      {!isStash && !isUncommitted && <WorktreeRowBadge hash={commit.hash} />}
 
       <span
         className={`flex-1 truncate text-sm ${isStash ? 'italic text-[var(--vscode-descriptionForeground)]' : isUncommitted ? 'italic text-[#E8A317]' : ''}`}
