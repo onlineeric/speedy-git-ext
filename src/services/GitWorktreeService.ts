@@ -6,6 +6,7 @@ import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { WorktreeInfo, WorktreeBranchMode } from '../../shared/types.js';
 import { isDirtyWorkingTree } from '../utils/gitQueries.js';
 import { validateRefName, validateWorktreePath } from '../utils/gitValidation.js';
+import { mapWorktreeConflictError } from '../utils/worktreeErrors.js';
 
 export interface AddWorktreeOptions {
   path: string;
@@ -63,17 +64,11 @@ async function resolveDetachedLeafName(
  * a readable message naming the conflicting worktree (FR-024 / T042).
  */
 function mapAddWorktreeError(error: GitError): GitError {
-  const text = error.stderr ?? error.message;
-  const match = text.match(/is already (?:checked out|used by worktree) at '([^']+)'/);
-  if (match) {
-    return new GitError(
-      `That branch is already checked out in another worktree at "${match[1]}". Create a new branch instead, or remove that worktree first.`,
-      'COMMAND_FAILED',
-      error.command,
-      error.stderr
-    );
-  }
-  return error;
+  return mapWorktreeConflictError(
+    error,
+    (conflictingPath) =>
+      `That branch is already checked out in another worktree at "${conflictingPath}". Create a new branch instead, or remove that worktree first.`
+  );
 }
 
 async function resolveCurrentWorktreePath(

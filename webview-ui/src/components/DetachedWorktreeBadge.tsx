@@ -18,7 +18,8 @@ export function DetachedWorktreeBadge({ worktrees, laneColorStyle }: DetachedWor
 
   const label = detachedWorktreeBadgeText(worktrees);
   const title = worktrees.map((worktree) => worktree.path).join('\n');
-  const fallbackColor = !laneColorStyle ? ' border-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]' : '';
+  // borderColor is always set inline below, so only the text color needs a fallback.
+  const fallbackColor = !laneColorStyle ? ' text-[var(--vscode-badge-foreground)]' : '';
   const badgeStyle = {
     ...laneColorStyle,
     borderColor: worktreeBadgeBorderColor(laneColorStyle?.borderColor),

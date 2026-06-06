@@ -3,6 +3,7 @@ import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, err, ok } from '../../shared/errors.js';
 import { validateLocalBranchName, validateRefName } from '../utils/gitValidation.js';
 import { isDirtyWorkingTree } from '../utils/gitQueries.js';
+import { mapWorktreeConflictError } from '../utils/worktreeErrors.js';
 
 function isBranchNotFullyMerged(stderr: string | undefined): boolean {
   return stderr?.includes('is not fully merged') ?? false;
@@ -18,17 +19,11 @@ export function isCheckoutConflict(error: GitError): boolean {
  * conflicting worktree (FR-024 / T042). Returns the original error otherwise.
  */
 export function mapWorktreeCheckoutError(error: GitError): GitError {
-  const text = error.stderr ?? error.message;
-  const match = text.match(/is already (?:checked out|used by worktree) at '([^']+)'/);
-  if (match) {
-    return new GitError(
-      `That branch is checked out in another worktree at "${match[1]}". Open that worktree's window to work on it, or remove the worktree first.`,
-      'COMMAND_FAILED',
-      error.command,
-      error.stderr
-    );
-  }
-  return error;
+  return mapWorktreeConflictError(
+    error,
+    (conflictingPath) =>
+      `That branch is checked out in another worktree at "${conflictingPath}". Open that worktree's window to work on it, or remove the worktree first.`
+  );
 }
 
 export class GitBranchService {

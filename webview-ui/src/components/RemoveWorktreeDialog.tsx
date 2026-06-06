@@ -4,6 +4,7 @@ import type { WorktreeInfo } from '@shared/types';
 import { buildRemoveWorktreeCommand, buildDeleteBranchCommand } from '../utils/gitCommandBuilder';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
+import { stripLocalBranchPrefix } from '../utils/worktreeDisplay';
 import { CommandPreview } from './CommandPreview';
 import { dialogContentStyle } from './dialogStyles';
 
@@ -15,7 +16,7 @@ interface RemoveWorktreeDialogProps {
 
 function branchName(wt: WorktreeInfo): string | null {
   if (wt.isDetached || !wt.branch) return null;
-  return wt.branch.startsWith('refs/heads/') ? wt.branch.slice('refs/heads/'.length) : wt.branch;
+  return stripLocalBranchPrefix(wt.branch);
 }
 
 type BranchDeleteOutcome = 'ok' | 'needs-force' | { error: string };

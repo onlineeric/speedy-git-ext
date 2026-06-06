@@ -1158,7 +1158,6 @@ export class WebviewProvider {
         });
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: 'Worktree created' } });
-          await this.postWorktreeList();
           await this.sendInitialData();
           await this.openWorktreeFolder(message.payload.path);
         } else {
@@ -1177,7 +1176,6 @@ export class WebviewProvider {
         });
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: 'Worktree removed' } });
-          await this.postWorktreeList();
           await this.sendInitialData();
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
@@ -1188,7 +1186,6 @@ export class WebviewProvider {
         const result = await this.gitWorktreeService.pruneWorktrees();
         if (result.success) {
           this.postMessage({ type: 'success', payload: { message: 'Worktrees pruned' } });
-          await this.postWorktreeList();
           await this.sendInitialData();
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
