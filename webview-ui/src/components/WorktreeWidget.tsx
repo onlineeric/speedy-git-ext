@@ -76,7 +76,7 @@ export function WorktreeWidget() {
                       {wt.head.slice(0, 7)}
                     </span>
                     {wt.isMain && <Badge>main</Badge>}
-                    {wt.isCurrent && <Badge>you are here</Badge>}
+                    {wt.isCurrent && <Badge tone="current">YOU ARE HERE</Badge>}
                     {wt.isPrunable && <Badge tone="warning">stale</Badge>}
                   </div>
                   <div className="font-mono text-xs text-[var(--vscode-descriptionForeground)] truncate" title={wt.path}>
@@ -124,10 +124,12 @@ export function WorktreeWidget() {
   );
 }
 
-function Badge({ children, tone = 'default' }: { children: React.ReactNode; tone?: 'default' | 'warning' }) {
+function Badge({ children, tone = 'default' }: { children: React.ReactNode; tone?: 'default' | 'current' | 'warning' }) {
   const cls =
     tone === 'warning'
       ? 'bg-[var(--vscode-inputValidation-warningBackground)] text-[var(--vscode-foreground)]'
+      : tone === 'current'
+        ? 'bg-yellow-400/10 text-yellow-400'
       : 'bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]';
   return <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide ${cls}`}>{children}</span>;
 }
