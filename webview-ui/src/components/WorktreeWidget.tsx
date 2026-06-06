@@ -56,18 +56,18 @@ export function WorktreeWidget() {
       {worktrees.length === 0 ? (
         <p className="text-sm text-[var(--vscode-descriptionForeground)]">No worktrees.</p>
       ) : (
-        <ul className="flex flex-col gap-1">
+        <ul className="max-h-[230px] overflow-y-auto rounded border border-[var(--vscode-panel-border)]">
           {worktrees.map((wt, index) => {
             const removable = !wt.isMain && !wt.isCurrent;
             const rowTone = wt.isPrunable
               ? 'bg-[var(--vscode-inputValidation-warningBackground)]'
               : index % 2 === 0
                 ? 'bg-transparent'
-                : 'bg-[var(--vscode-list-hoverBackground)]/25';
+                : 'bg-[color-mix(in_srgb,var(--vscode-list-hoverBackground)_80%,transparent)]';
             return (
               <li
                 key={wt.path}
-                className={`flex items-center gap-2 rounded px-2 py-1 hover:bg-[var(--vscode-list-hoverBackground)] ${rowTone}`}
+                className={`flex min-h-[44px] items-center gap-2 border-b border-[var(--vscode-panel-border)] px-2 py-1 last:border-b-0 hover:!bg-[var(--vscode-list-hoverBackground)] ${rowTone}`}
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">

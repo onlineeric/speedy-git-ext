@@ -197,7 +197,7 @@ export const CommitRow = memo(function CommitRow({
             )
           )}
           <OverflowRefsBadge hiddenRefs={overflowRefs} laneColorStyle={laneColorStyle} worktreeByBranch={worktreeByBranch} />
-          {showDetachedWorktrees && <DetachedWorktreeBadge worktrees={detachedWorktrees} />}
+          {showDetachedWorktrees && <DetachedWorktreeBadge worktrees={detachedWorktrees} laneColorStyle={laneColorStyle} />}
         </div>
       )}
 

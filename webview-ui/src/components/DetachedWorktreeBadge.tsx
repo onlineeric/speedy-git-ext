@@ -1,16 +1,23 @@
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import type { CSSProperties } from 'react';
 import type { WorktreeInfo } from '@shared/types';
 import { detachedWorktreeBadgeText } from '../utils/worktreeDisplay';
 import { WorktreeIcon } from './icons';
 import { useRemoveWorktreeDialog, WorktreeMenuGroup } from './WorktreeMenuItems';
 
-export function DetachedWorktreeBadge({ worktrees }: { worktrees: WorktreeInfo[] }) {
+interface DetachedWorktreeBadgeProps {
+  worktrees: WorktreeInfo[];
+  laneColorStyle?: CSSProperties;
+}
+
+export function DetachedWorktreeBadge({ worktrees, laneColorStyle }: DetachedWorktreeBadgeProps) {
   const { openRemoveWorktreeDialog, removeWorktreeDialog } = useRemoveWorktreeDialog();
 
   if (worktrees.length === 0) return null;
 
   const label = detachedWorktreeBadgeText(worktrees);
   const title = worktrees.map((worktree) => worktree.path).join('\n');
+  const fallbackColor = !laneColorStyle ? ' border-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]' : '';
 
   return (
     <>
@@ -18,8 +25,9 @@ export function DetachedWorktreeBadge({ worktrees }: { worktrees: WorktreeInfo[]
         <ContextMenu.Root>
           <ContextMenu.Trigger asChild>
             <span
-              className="inline-flex items-center gap-0.5 rounded border border-[var(--vscode-badge-background)] px-1.5 py-0.5 text-xs text-[var(--vscode-badge-foreground)]"
+              className={`inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-xs${fallbackColor}`}
               title={title}
+              style={laneColorStyle}
             >
               <WorktreeIcon className="h-3 w-3 shrink-0" />
               <span>{label}</span>
