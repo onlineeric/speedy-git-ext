@@ -23,6 +23,8 @@ export interface UserSettings {
   showTags: boolean;
   batchCommitSize: number;
   overScan: number;
+  /** Parent dir for new worktrees; default '../${repoName}.worktrees'. Ref appended as leaf. */
+  worktreeBasePath: string;
 }
 
 export interface SearchState {
@@ -81,6 +83,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   showTags: true,
   batchCommitSize: 500,
   overScan: 20,
+  worktreeBasePath: '../${repoName}.worktrees',
 };
 
 export interface Commit {
@@ -418,7 +421,20 @@ export interface WorktreeInfo {
   branch: string;
   isMain: boolean;
   isDetached: boolean;
+  /** True when this worktree's path matches the active repo cwd ("you are here"). */
+  isCurrent: boolean;
+  /** True when git reports the worktree as prunable (its folder is missing/stale). */
+  isPrunable: boolean;
 }
+
+/**
+ * Branch-mode for creating a worktree (research R4). Single source of truth for
+ * the RPC payloads, the command builder, and the create dialog.
+ * - `existing`  → `git worktree add <path> <ref>`
+ * - `new`       → `git worktree add -b <newBranchName> <path> <ref>`
+ * - `detached`  → `git worktree add --detach <path> <ref>`
+ */
+export type WorktreeBranchMode = 'existing' | 'new' | 'detached';
 
 export interface ExternalRef {
   label: string;
@@ -457,7 +473,7 @@ export const DEFAULT_PERSISTED_UI_STATE: PersistedUIState = {
 
 export type RebaseState = 'idle' | 'in-progress';
 
-export type ActiveToggleWidget = 'search' | 'filter' | 'compare' | null;
+export type ActiveToggleWidget = 'search' | 'filter' | 'compare' | 'worktree' | null;
 
 /** Well-known constant: the SHA of Git's empty tree object. Used as the synthetic
  *  parent for root commits in compare ranges (FR-016, 042-compare-refs). */

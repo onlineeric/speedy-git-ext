@@ -5,6 +5,7 @@ import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { DiscardAllDialog } from './DiscardAllDialog';
 import { CommandPreview } from './CommandPreview';
+import { dialogContentStyle } from './dialogStyles';
 import { FileChangeRow, ViewModeToggle } from './FileChangeShared';
 import { FileChangesTreeView } from './FileChangesTreeView';
 import {
@@ -370,7 +371,10 @@ function FilePickerDialogInner({
       <Dialog.Root open={open} onOpenChange={handleOpenChange}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-[90vw] max-w-2xl -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] p-6 shadow-xl">
+          <Dialog.Content
+            className="fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] p-6 shadow-xl"
+            style={dialogContentStyle}
+          >
             <Dialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">
               Select files for…
             </Dialog.Title>

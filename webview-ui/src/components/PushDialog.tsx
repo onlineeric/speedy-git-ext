@@ -5,6 +5,7 @@ import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { buildPushCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
+import { dialogContentStyle } from './dialogStyles';
 
 interface PushDialogProps {
   open: boolean;
@@ -68,7 +69,7 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <Dialog.Content
           className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 rounded-lg shadow-xl bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] z-50"
-          style={{ resize: 'horizontal', overflow: 'auto', width: '45rem', minWidth: '400px', maxWidth: '90vw' }}
+          style={dialogContentStyle}
         >
           <Dialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">
             Push Branch: <code className="font-mono">{branchName}</code>

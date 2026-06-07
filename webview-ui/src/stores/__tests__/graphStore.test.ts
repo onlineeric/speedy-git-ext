@@ -3,6 +3,17 @@ import { useGraphStore } from '../graphStore';
 import type { Commit, FileChange, RemoteInfo, StashEntry, WorktreeInfo } from '@shared/types';
 import type { InitialDataPayload } from '@shared/messages';
 
+const makeWorktree = (path: string, head: string, overrides: Partial<WorktreeInfo> = {}): WorktreeInfo => ({
+  path,
+  head,
+  branch: `refs/heads/${path.split('/').pop()}`,
+  isMain: false,
+  isDetached: false,
+  isCurrent: false,
+  isPrunable: false,
+  ...overrides,
+});
+
 const makeCommit = (hash: string): Commit => ({
   hash,
   abbreviatedHash: hash.slice(0, 7),
@@ -77,7 +88,10 @@ describe('graphStore — setInitialData', () => {
       remotes: [],
       stashes: [],
       worktreeList: [],
+      worktreeListLoading: false,
       worktreeByHead: new Map(),
+      worktreeByBranch: new Map(),
+      detachedWorktreesByHead: new Map(),
       uncommittedStagedFiles: [],
       uncommittedUnstagedFiles: [],
       uncommittedConflictFiles: [],
@@ -113,13 +127,18 @@ describe('graphStore — setInitialData', () => {
       branch: 'feature',
       isMain: false,
       isDetached: false,
+      isCurrent: false,
+      isPrunable: false,
     };
 
     useGraphStore.setState({
       remotes: [remote],
       stashes: [stash],
       worktreeList: [worktree],
-      worktreeByHead: new Map([[worktree.head, worktree]]),
+      worktreeListLoading: false,
+      worktreeByHead: new Map([[worktree.head, [worktree]]]),
+      worktreeByBranch: new Map([['feature', worktree]]),
+      detachedWorktreesByHead: new Map(),
       uncommittedStagedFiles: [stagedFile],
       uncommittedCounts: { stagedCount: 1, unstagedCount: 0, untrackedCount: 0 },
       hasUncommittedChanges: true,
@@ -131,7 +150,9 @@ describe('graphStore — setInitialData', () => {
     expect(after.remotes).toEqual([remote]);
     expect(after.stashes).toEqual([stash]);
     expect(after.worktreeList).toEqual([worktree]);
-    expect(after.worktreeByHead.get('abc1234')).toEqual(worktree);
+    expect(after.worktreeByHead.get('abc1234')).toEqual([worktree]);
+    expect(after.worktreeByBranch.get('feature')).toEqual(worktree);
+    expect(after.detachedWorktreesByHead.size).toBe(0);
     expect(after.uncommittedStagedFiles).toEqual([stagedFile]);
     expect(after.uncommittedCounts.stagedCount).toBe(1);
     expect(after.hasUncommittedChanges).toBe(true);
@@ -152,8 +173,11 @@ describe('graphStore — setInitialData', () => {
         author: 'Test User',
         authorEmail: 'test@example.com',
       }],
-      worktreeList: [{ path: '/old-wt', head: 'abc1234', branch: 'main', isMain: false, isDetached: false }],
-      worktreeByHead: new Map([['abc1234', { path: '/old-wt', head: 'abc1234', branch: 'main', isMain: false, isDetached: false }]]),
+      worktreeList: [{ path: '/old-wt', head: 'abc1234', branch: 'main', isMain: false, isDetached: false, isCurrent: false, isPrunable: false }],
+      worktreeByHead: new Map([['abc1234', [{ path: '/old-wt', head: 'abc1234', branch: 'main', isMain: false, isDetached: false, isCurrent: false, isPrunable: false }]]]),
+      worktreeByBranch: new Map([['main', { path: '/old-wt', head: 'abc1234', branch: 'main', isMain: false, isDetached: false, isCurrent: false, isPrunable: false }]]),
+      detachedWorktreesByHead: new Map([['abc1234', [{ path: '/old-detached', head: 'abc1234', branch: '', isMain: false, isDetached: true, isCurrent: false, isPrunable: false }]]]),
+      worktreeListLoading: true,
       uncommittedStagedFiles: [{ path: 'src/file.ts', status: 'modified', stageState: 'staged' }],
       uncommittedCounts: { stagedCount: 1, unstagedCount: 0, untrackedCount: 0 },
       hasUncommittedChanges: true,
@@ -170,7 +194,10 @@ describe('graphStore — setInitialData', () => {
     expect(after.remotes).toEqual([]);
     expect(after.stashes).toEqual([]);
     expect(after.worktreeList).toEqual([]);
+    expect(after.worktreeListLoading).toBe(false);
     expect(after.worktreeByHead.size).toBe(0);
+    expect(after.worktreeByBranch.size).toBe(0);
+    expect(after.detachedWorktreesByHead.size).toBe(0);
     expect(after.uncommittedStagedFiles).toEqual([]);
     expect(after.uncommittedCounts.stagedCount).toBe(0);
     expect(after.hasUncommittedChanges).toBe(false);
@@ -253,6 +280,90 @@ describe('graphStore — signature cache retention on refresh (FR-015)', () => {
     const after = useGraphStore.getState();
     expect(after.signaturePresenceLoading['aaaaaaa']).toBeUndefined();
     expect(after.signaturePresenceFailed['aaaaaaa']).toBe(true);
+  });
+});
+
+describe('graphStore — setWorktreeList (array-valued worktreeByHead)', () => {
+  beforeEach(() => {
+    useGraphStore.setState({
+      worktreeList: [],
+      worktreeListLoading: false,
+      worktreeByHead: new Map(),
+      worktreeByBranch: new Map(),
+      detachedWorktreesByHead: new Map(),
+    });
+  });
+
+  it('keeps both worktrees that share the same HEAD commit', () => {
+    const head = 'aaaa1111';
+    useGraphStore.getState().setWorktreeList([
+      makeWorktree('/wt/feature-a', head, { branch: 'refs/heads/feature-a' }),
+      makeWorktree('/wt/feature-b', head, { branch: 'refs/heads/feature-b' }),
+    ]);
+
+    const entries = useGraphStore.getState().worktreeByHead.get(head);
+    expect(entries).toHaveLength(2);
+    expect(entries?.map((w) => w.path)).toEqual(['/wt/feature-a', '/wt/feature-b']);
+  });
+
+  it('groups worktrees by distinct HEAD', () => {
+    useGraphStore.getState().setWorktreeList([
+      makeWorktree('/wt/one', 'hash1'),
+      makeWorktree('/wt/two', 'hash2'),
+    ]);
+    const byHead = useGraphStore.getState().worktreeByHead;
+    expect(byHead.get('hash1')).toHaveLength(1);
+    expect(byHead.get('hash2')).toHaveLength(1);
+  });
+
+  it('keeps main worktrees in worktreeByHead but excludes them from rendering lookups', () => {
+    const main = makeWorktree('/repo', 'hash1', {
+      branch: 'refs/heads/main',
+      isMain: true,
+      isCurrent: true,
+    });
+    const linked = makeWorktree('/wt/feature', 'hash2', {
+      branch: 'refs/heads/feature',
+      isCurrent: true,
+    });
+
+    useGraphStore.getState().setWorktreeList([main, linked]);
+
+    const after = useGraphStore.getState();
+    expect(after.worktreeByHead.get('hash1')).toEqual([main]);
+    expect(after.worktreeByHead.get('hash2')).toEqual([linked]);
+    expect(after.worktreeByBranch.has('main')).toBe(false);
+    expect(after.worktreeByBranch.get('feature')).toEqual(linked);
+  });
+
+  it('groups detached linked worktrees by HEAD and leaves them out of branch lookup', () => {
+    const first = makeWorktree('/wt/aaaa1111', 'aaaa1111', {
+      branch: '',
+      isDetached: true,
+    });
+    const second = makeWorktree('/wt/aaaa1111-2', 'aaaa1111', {
+      branch: '',
+      isDetached: true,
+      isPrunable: true,
+    });
+    const branch = makeWorktree('/wt/topic', 'bbbb2222', {
+      branch: 'refs/heads/topic',
+    });
+
+    useGraphStore.getState().setWorktreeList([first, second, branch]);
+
+    const after = useGraphStore.getState();
+    expect(after.detachedWorktreesByHead.get('aaaa1111')).toEqual([first, second]);
+    expect(after.worktreeByBranch.get('topic')).toEqual(branch);
+    expect(after.worktreeByBranch.has('detached')).toBe(false);
+  });
+
+  it('clears the explicit loading flag when a worktree list response is applied', () => {
+    useGraphStore.setState({ worktreeListLoading: true });
+
+    useGraphStore.getState().setWorktreeList([makeWorktree('/wt/topic', 'hash1')]);
+
+    expect(useGraphStore.getState().worktreeListLoading).toBe(false);
   });
 });
 

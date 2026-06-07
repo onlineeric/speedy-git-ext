@@ -4,6 +4,20 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.0.0] - 2026-06-07
+
+### Added
+- **Git worktrees** — keep several branches checked out side-by-side, each in its own folder and IDE window, without disturbing your main working tree.
+  - **Create worktree…** from the right-click menu of any branch, commit, or tag. The dialog pre-fills the source ref and a suggested target folder, shows a live preview of the exact `git worktree add …` command, and opens the new worktree in a new IDE window. Branches already checked out elsewhere default to "create a new branch" mode (git forbids one branch in two worktrees), and remote-only branch badges create a local tracking branch named after the remote branch.
+  - **Worktree panel** lists every worktree for the repository — folder path, branch (or detached), short HEAD, and which is the main worktree — with **Open in new window** and **Remove worktree…** actions. The main worktree is marked and cannot be removed.
+  - **Prune** button removes stale worktree records, showing a confirmation that lists the entries to be pruned before running.
+  - **Remove worktree…** optionally deletes the worktree's branch alongside the worktree folder.
+- **At-a-glance worktree indicators in the graph** (Phase 2): branch-linked worktrees now show a worktree icon **inside the branch badge** (with the worktree path in its tooltip), and branchless worktrees render a dedicated **`detached {folder}`** badge — collapsing to `detached ×N` when several share the same commit. Branches with a linked worktree are prioritized into the visible ref slots so the indicator never hides behind the overflow badge. All worktree actions live in the right-click menu, grouped together and separated from unrelated actions.
+
+### Changed
+- The old low-contrast worktree popover badge (the unlabeled icon wedged between the branch badge and commit message) has been **removed** in favor of the new in-badge icon and `detached` badges. Worktree actions moved entirely to the established right-click model used by every other ref.
+- The Worktree panel gained a **manual refresh** button next to Prune (reloads records without a full graph reload) and **zebra-striped rows** for easier scanning of multi-worktree lists. Refresh and Prune are disabled while a worktree-list request is in flight.
+
 ## [4.4.1] - 2026-06-04
 
 ### Performance

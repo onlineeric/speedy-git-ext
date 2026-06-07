@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult } from './types.js';
 
 /** Payload for the batched initial data message */
 export interface InitialDataPayload {
@@ -116,6 +116,12 @@ export type RequestMessage =
   | { type: 'stashAndCheckoutCommit'; payload: { hash: string } }
   // Worktree ops
   | { type: 'getWorktreeList'; payload: Record<string, never> }
+  | { type: 'resolveWorktreePath'; payload: { ref: string; branchMode: WorktreeBranchMode; newBranchName?: string; requestId: number } }
+  | { type: 'addWorktree'; payload: { path: string; ref: string; branchMode: WorktreeBranchMode; newBranchName?: string; force?: boolean } }
+  | { type: 'removeWorktree'; payload: { path: string; force?: boolean } }
+  | { type: 'pruneWorktree'; payload: Record<string, never> }
+  | { type: 'openWorktree'; payload: { path: string } }
+  | { type: 'revealWorktree'; payload: { path: string } }
   // Containing branches
   | { type: 'getContainingBranches'; payload: { hash: string } }
   // External browser
@@ -174,6 +180,7 @@ export type ResponseMessage =
   | { type: 'pushResult'; payload: { success: boolean; message: string } }
   | { type: 'avatarUrls'; payload: { urls: AvatarUrlMap } }
   | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[] } }
+  | { type: 'worktreePathResolved'; payload: { path: string; leafName: string; requestId: number } }
   | { type: 'containingBranches'; payload: { hash: string; branches: string[]; status: 'loaded' | 'error' } }
   | { type: 'persistedUIState'; payload: { uiState: PersistedUIState } }
   | { type: 'authorList'; payload: { authors: Author[] } }
@@ -208,7 +215,9 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   getSettings: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
   updateSubmodule: true, initSubmodule: true,
   stashAndCheckout: true, stashAndCheckoutCommit: true,
-  getWorktreeList: true, getContainingBranches: true, openExternal: true,
+  getWorktreeList: true, resolveWorktreePath: true, addWorktree: true,
+  removeWorktree: true, pruneWorktree: true, openWorktree: true, revealWorktree: true,
+  getContainingBranches: true, openExternal: true,
   openCurrentFile: true, updatePersistedUIState: true, getAuthors: true,
   getUncommittedChanges: true,
   stageFiles: true, unstageFiles: true, stageAll: true, unstageAll: true,
@@ -227,7 +236,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commitsAppended: true, prefetchError: true, repoList: true,
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
-  pushResult: true, avatarUrls: true, worktreeList: true, containingBranches: true,
+  pushResult: true, avatarUrls: true, worktreeList: true, worktreePathResolved: true, containingBranches: true,
   persistedUIState: true, authorList: true, uncommittedChanges: true, conflictState: true,
   initialData: true,
   compareResult: true, compareError: true,

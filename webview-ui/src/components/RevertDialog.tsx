@@ -4,6 +4,7 @@ import type { Commit, CommitParentInfo, RevertMode, RevertOptions } from '@share
 import { useGraphStore } from '../stores/graphStore';
 import { buildRevertCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
+import { dialogContentStyle } from './dialogStyles';
 
 interface RevertDialogProps {
   open: boolean;
@@ -129,7 +130,10 @@ export function RevertDialog({ open, commit, parents, onConfirm, onCancel }: Rev
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && !submitting && onCancel()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-md p-6 rounded-lg shadow-xl bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] z-50">
+        <Dialog.Content
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 rounded-lg shadow-xl bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] z-50"
+          style={dialogContentStyle}
+        >
           <Dialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">
             {title}
           </Dialog.Title>

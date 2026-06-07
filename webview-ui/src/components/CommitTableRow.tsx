@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import type { Commit, CommitTableColumnId, UserSettings } from '@shared/types';
+import type { Commit, CommitTableColumnId, UserSettings, WorktreeInfo } from '@shared/types';
 import type { GraphTopology } from '../utils/graphTopology';
 import { useGraphStore } from '../stores/graphStore';
 import { GraphCell } from './GraphCell';
@@ -20,6 +20,10 @@ import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils
 import { slotMatchesCommitRow } from '../utils/compareMarker';
 import type { ResolvedCommitTableLayout } from '../utils/commitTableLayout';
 import { SignatureColumnCell } from './SignatureColumnCell';
+import { DetachedWorktreeBadge } from './DetachedWorktreeBadge';
+import { prioritizeWorktreeDisplayRefs, worktreeForDisplayRef } from '../utils/worktreeDisplay';
+
+const EMPTY_WORKTREES: WorktreeInfo[] = [];
 
 /** Compare-refs A/B markers (042-compare-refs FR-026/027/028) — table-row variant. */
 function CompareABMarker({ commit, isUncommitted }: { commit: Commit; isUncommitted: boolean }) {
@@ -82,6 +86,8 @@ export const CommitTableRow = memo(function CommitTableRow({
   const isUncommitted = commit.refs.some((ref) => ref.type === 'uncommitted');
   const stashIndex = isStash ? parseStashIndex(commit.refs) : -1;
   const graphColumn = layout.columns.find((column) => column.id === 'graph');
+  const worktreeByBranch = useGraphStore((s) => s.worktreeByBranch);
+  const detachedWorktrees = useGraphStore((s) => s.detachedWorktreesByHead.get(commit.hash) ?? EMPTY_WORKTREES);
 
   const node = topology.nodes.get(commit.hash);
   const palette = resolvePalette(graphColors);
@@ -107,8 +113,13 @@ export const CommitTableRow = memo(function CommitTableRow({
     };
   }, [commit.refs, showRemoteBranches, showTags]);
 
-  const visibleRefs = displayRefs.slice(0, maxVisibleRefs);
-  const overflowRefs = displayRefs.slice(maxVisibleRefs);
+  const prioritizedDisplayRefs = useMemo(
+    () => prioritizeWorktreeDisplayRefs(displayRefs, worktreeByBranch),
+    [displayRefs, worktreeByBranch],
+  );
+  const visibleRefs = prioritizedDisplayRefs.slice(0, maxVisibleRefs);
+  const overflowRefs = prioritizedDisplayRefs.slice(maxVisibleRefs);
+  const showDetachedWorktrees = !isStash && !isUncommitted && detachedWorktrees.length > 0;
 
   const bgClass = isSelected
     ? 'bg-[var(--vscode-list-activeSelectionBackground)]'
@@ -153,6 +164,9 @@ export const CommitTableRow = memo(function CommitTableRow({
             dateFormatter,
             laneColor,
             laneColorStyle,
+            worktreeByBranch,
+            detachedWorktrees,
+            showDetachedWorktrees,
             isStash,
             isUncommitted,
             stashIndex,
@@ -203,6 +217,9 @@ function renderColumn({
   dateFormatter,
   laneColor,
   laneColorStyle,
+  worktreeByBranch,
+  detachedWorktrees,
+  showDetachedWorktrees,
   isStash,
   isUncommitted,
   stashIndex,
@@ -224,6 +241,9 @@ function renderColumn({
   dateFormatter: DateFormatter;
   laneColor: string | undefined;
   laneColorStyle: React.CSSProperties | undefined;
+  worktreeByBranch: Map<string, WorktreeInfo>;
+  detachedWorktrees: WorktreeInfo[];
+  showDetachedWorktrees: boolean;
   isStash: boolean;
   isUncommitted: boolean;
   stashIndex: number;
@@ -263,7 +283,7 @@ function renderColumn({
     case 'message':
       return (
         <div className="flex h-full items-center gap-1 overflow-hidden">
-          {(isHead || visibleRefs.length > 0) && (
+          {(isHead || visibleRefs.length > 0 || showDetachedWorktrees) && (
             <div className="flex shrink-0 items-center gap-1">
               {isHead && (
                 <HeadIcon
@@ -278,11 +298,17 @@ function renderColumn({
                   </StashContextMenu>
                 ) : (
                   <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)}>
-                    <RefLabel displayRef={displayRef} laneColorStyle={laneColorStyle} className="whitespace-nowrap" />
+                    <RefLabel
+                      displayRef={displayRef}
+                      laneColorStyle={laneColorStyle}
+                      worktree={worktreeForDisplayRef(displayRef, worktreeByBranch)}
+                      className="whitespace-nowrap"
+                    />
                   </BranchContextMenu>
                 )
               )}
-              <OverflowRefsBadge hiddenRefs={overflowRefs} laneColorStyle={laneColorStyle} />
+              <OverflowRefsBadge hiddenRefs={overflowRefs} laneColorStyle={laneColorStyle} worktreeByBranch={worktreeByBranch} />
+              {showDetachedWorktrees && <DetachedWorktreeBadge worktrees={detachedWorktrees} laneColorStyle={laneColorStyle} />}
             </div>
           )}
           <span

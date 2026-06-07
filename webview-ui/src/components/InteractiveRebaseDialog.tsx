@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
+import { dialogContentStyle } from './dialogStyles';
 import {
   DndContext,
   closestCenter,
@@ -156,7 +157,10 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, onClos
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-2xl max-h-[80vh] flex flex-col p-6 rounded-lg shadow-xl bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] z-50">
+        <Dialog.Content
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 max-h-[80vh] flex flex-col p-6 rounded-lg shadow-xl bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] z-50"
+          style={dialogContentStyle}
+        >
           <Dialog.Title className="text-base font-semibold text-[var(--vscode-foreground)] mb-1">
             Interactive Rebase
           </Dialog.Title>

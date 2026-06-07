@@ -4,6 +4,7 @@ import type { Commit } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { buildCreateBranchCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
+import { dialogContentStyle } from './dialogStyles';
 
 interface CreateBranchDialogProps {
   open: boolean;
@@ -55,7 +56,10 @@ export function CreateBranchDialog({ open, commit, onClose }: CreateBranchDialog
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-md p-6 rounded-lg shadow-xl bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] z-50">
+        <Dialog.Content
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 rounded-lg shadow-xl bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] z-50"
+          style={dialogContentStyle}
+        >
           <Dialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">
             Create Branch
           </Dialog.Title>

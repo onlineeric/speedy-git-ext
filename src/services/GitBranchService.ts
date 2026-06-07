@@ -3,6 +3,7 @@ import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, err, ok } from '../../shared/errors.js';
 import { validateLocalBranchName, validateRefName } from '../utils/gitValidation.js';
 import { isDirtyWorkingTree } from '../utils/gitQueries.js';
+import { mapWorktreeConflictError } from '../utils/worktreeErrors.js';
 
 function isBranchNotFullyMerged(stderr: string | undefined): boolean {
   return stderr?.includes('is not fully merged') ?? false;
@@ -10,6 +11,19 @@ function isBranchNotFullyMerged(stderr: string | undefined): boolean {
 
 export function isCheckoutConflict(error: GitError): boolean {
   return error.message.includes('would be overwritten by checkout');
+}
+
+/**
+ * Map git's "branch is already checked out at <path>" refusal (raised when the
+ * target branch is held by another worktree) to a readable message naming the
+ * conflicting worktree (FR-024 / T042). Returns the original error otherwise.
+ */
+export function mapWorktreeCheckoutError(error: GitError): GitError {
+  return mapWorktreeConflictError(
+    error,
+    (conflictingPath) =>
+      `That branch is checked out in another worktree at "${conflictingPath}". Open that worktree's window to work on it, or remove the worktree first.`
+  );
 }
 
 export class GitBranchService {
@@ -54,10 +68,10 @@ export class GitBranchService {
         return ok(`Checked out '${name}' tracking ${remote}/${name}`);
       }
 
-      return trackResult;
+      return err(mapWorktreeCheckoutError(trackResult.error));
     }
 
-    return result;
+    return err(mapWorktreeCheckoutError(result.error));
   }
 
   async checkoutCommit(hash: string): Promise<Result<string, GitError>> {

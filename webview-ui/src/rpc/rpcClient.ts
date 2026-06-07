@@ -1,5 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, CompareMode, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus } from '@shared/types';
+import type { CherryPickOptions, CompareMode, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 
 declare const acquireVsCodeApi: () => {
@@ -16,6 +16,8 @@ class RpcClient {
   private pendingParentLookups = new Map<number, { resolve: (parents: CommitParentInfo[]) => void; reject: (error: Error) => void }>();
   private parentRequestIdByHash = new Map<string, number>();
   private pendingPush: { resolve: (message: string) => void; reject: (error: Error) => void } | null = null;
+  /** One-shot slot for a `resolveWorktreePath` request awaiting its `worktreePathResolved` response. */
+  private pendingWorktreePath: { requestId: number; resolve: (value: { path: string; leafName: string }) => void; reject: (error: Error) => void } | null = null;
   /**
    * Promise slot for correlating a dialog-initiated git action with its
    * backend response. Used by FilePickerDialog to lift its `isRunning` busy
@@ -44,6 +46,10 @@ class RpcClient {
     window.removeEventListener('message', this.messageHandler);
     this.initialized = false;
     this.rejectPendingLookups('RPC client disposed');
+    if (this.pendingWorktreePath) {
+      this.pendingWorktreePath.reject(new Error('RPC client disposed'));
+      this.pendingWorktreePath = null;
+    }
     this.clearPendingDialogAction();
   }
 
@@ -99,12 +105,17 @@ class RpcClient {
         const errorMessage = message.payload.error.message;
         store.setError(errorMessage);
         store.setIsRefreshing(false);
+        store.setWorktreeListLoading(false);
         // Clear the author-fetch guard so a failed getAuthors() can be retried.
         // Author fetch failures arrive here (not as an `authorList` message), so
         // without this the FilterWidget's `authorListLoading` guard stays true and
         // blocks every retry for the rest of the session.
         store.setAuthorListLoading(false);
         this.rejectPendingLookups(errorMessage);
+        if (this.pendingWorktreePath) {
+          this.pendingWorktreePath.reject(new Error(errorMessage));
+          this.pendingWorktreePath = null;
+        }
         if (this.pendingDialogAction) {
           const { reject } = this.pendingDialogAction;
           this.pendingDialogAction = null;
@@ -209,6 +220,14 @@ class RpcClient {
         break;
       case 'worktreeList':
         store.setWorktreeList(message.payload.worktrees);
+        break;
+      case 'worktreePathResolved':
+        // Latest-wins: ignore stale responses whose requestId no longer matches
+        // the pending request (a slower earlier response must not resolve a newer one).
+        if (this.pendingWorktreePath && this.pendingWorktreePath.requestId === message.payload.requestId) {
+          this.pendingWorktreePath.resolve({ path: message.payload.path, leafName: message.payload.leafName });
+          this.pendingWorktreePath = null;
+        }
         break;
       case 'commitParents': {
         const lookupKey = message.payload.parents.map((parent) => parent.hash).join(',');
@@ -592,7 +611,46 @@ class RpcClient {
 
   // Worktree ops
   getWorktreeList() {
+    useGraphStore.getState().setWorktreeListLoading(true);
     this.send({ type: 'getWorktreeList', payload: {} });
+  }
+
+  /**
+   * Ask the backend to compose a target path for a new worktree. Resolves with
+   * the absolute path + leaf name; rejects if a previous request is superseded
+   * or the backend returns an error. Non-blocking — used to seed the dialog field.
+   */
+  resolveWorktreePath(payload: { ref: string; branchMode: WorktreeBranchMode; newBranchName?: string }): Promise<{ path: string; leafName: string }> {
+    if (this.pendingWorktreePath) {
+      this.pendingWorktreePath.reject(new Error('superseded'));
+      this.pendingWorktreePath = null;
+    }
+    const requestId = this.nextRequestId++;
+    return new Promise((resolve, reject) => {
+      this.pendingWorktreePath = { requestId, resolve, reject };
+      this.send({ type: 'resolveWorktreePath', payload: { ...payload, requestId } });
+    });
+  }
+
+  addWorktree(payload: { path: string; ref: string; branchMode: WorktreeBranchMode; newBranchName?: string; force?: boolean }) {
+    this.send({ type: 'addWorktree', payload });
+  }
+
+  removeWorktree(path: string, force?: boolean) {
+    this.send({ type: 'removeWorktree', payload: { path, force } });
+  }
+
+  pruneWorktree() {
+    useGraphStore.getState().setWorktreeListLoading(true);
+    this.send({ type: 'pruneWorktree', payload: {} });
+  }
+
+  openWorktree(path: string) {
+    this.send({ type: 'openWorktree', payload: { path } });
+  }
+
+  revealWorktree(path: string) {
+    this.send({ type: 'revealWorktree', payload: { path } });
   }
 
   // Containing branches

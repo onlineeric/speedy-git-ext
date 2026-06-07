@@ -45,3 +45,12 @@ export function validateFilePath(filePath: string): Result<string> {
   }
   return { success: true, value: filePath };
 }
+
+/** Validates a worktree target path — rejects empty/whitespace and flag-like values. */
+export function validateWorktreePath(worktreePath: string): Result<string> {
+  const trimmed = worktreePath?.trim() ?? '';
+  if (!trimmed || trimmed.startsWith('-')) {
+    return err(new GitError(`Invalid worktree path: ${worktreePath}`, 'VALIDATION_ERROR'));
+  }
+  return { success: true, value: trimmed };
+}

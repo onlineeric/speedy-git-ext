@@ -1,15 +1,18 @@
 import * as Popover from '@radix-ui/react-popover';
+import type { WorktreeInfo } from '@shared/types';
 import type { DisplayRef } from '../types/displayRefs';
 import { BranchContextMenu } from './BranchContextMenu';
 import { RefLabel } from './RefLabel';
 import { displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
+import { worktreeForDisplayRef } from '../utils/worktreeDisplay';
 
 interface OverflowRefsBadgeProps {
   hiddenRefs: DisplayRef[];
   laneColorStyle?: React.CSSProperties;
+  worktreeByBranch?: Map<string, WorktreeInfo>;
 }
 
-export function OverflowRefsBadge({ hiddenRefs, laneColorStyle }: OverflowRefsBadgeProps) {
+export function OverflowRefsBadge({ hiddenRefs, laneColorStyle, worktreeByBranch }: OverflowRefsBadgeProps) {
   if (hiddenRefs.length === 0) return null;
 
   return (
@@ -43,7 +46,11 @@ export function OverflowRefsBadge({ hiddenRefs, laneColorStyle }: OverflowRefsBa
         >
           {hiddenRefs.map((displayRef) => (
             <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)}>
-              <RefLabel displayRef={displayRef} laneColorStyle={laneColorStyle} />
+              <RefLabel
+                displayRef={displayRef}
+                laneColorStyle={laneColorStyle}
+                worktree={worktreeByBranch ? worktreeForDisplayRef(displayRef, worktreeByBranch) : undefined}
+              />
             </BranchContextMenu>
           ))}
           <Popover.Arrow className="fill-[var(--vscode-menu-border)]" />
