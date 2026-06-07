@@ -1,4 +1,3 @@
-import * as crypto from 'crypto';
 import { describe, expect, it, vi } from 'vitest';
 import type { Commit } from '../../shared/types.js';
 import {
@@ -7,12 +6,25 @@ import {
   DEFAULT_PERSISTED_UI_STATE,
   DEFAULT_USER_SETTINGS,
 } from '../../shared/types.js';
-import { WebviewProvider } from '../WebviewProvider.js';
+import { GitServiceRegistry } from '../webview/GitServiceRegistry.js';
+import { PersistedUIStateStore, repoLayoutKey } from '../webview/PersistedUIStateStore.js';
+import { RefreshCoordinator } from '../webview/RefreshCoordinator.js';
+import { RepoDataLoader, computeCommitFingerprint } from '../webview/RepoDataLoader.js';
+import { WebviewMessageRouter } from '../webview/WebviewMessageRouter.js';
+import { WebviewRuntime } from '../webview/WebviewRuntime.js';
+import { submoduleHandlers } from '../webview/handlers/submoduleHandlers.js';
+import type { WebviewRequestContext } from '../webview/WebviewRequestContext.js';
 
 vi.mock('vscode', () => ({
   window: {},
   workspace: {
     workspaceFolders: [],
+    getConfiguration: vi.fn(() => ({
+      get: vi.fn((_key: string, fallback: unknown) => fallback),
+    })),
+  },
+  extensions: {
+    getExtension: vi.fn(),
   },
   env: {},
   commands: {},
@@ -23,12 +35,7 @@ vi.mock('vscode', () => ({
   },
 }));
 
-function repoLayoutKey(repoPath: string): string {
-  const hash = crypto.createHash('sha256').update(repoPath).digest('hex').slice(0, 16);
-  return `speedyGit.repoTableLayout.${hash}`;
-}
-
-function createProvider(
+function createUIStateStore(
   globalStateStore: Record<string, unknown> = {},
   currentRepoPath = '/repo-a',
 ) {
@@ -41,44 +48,14 @@ function createProvider(
       }),
     },
     extensionUri: {},
-  } as unknown as ConstructorParameters<typeof WebviewProvider>[0];
-  const emptyDependency = {} as unknown;
-  const log = {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  } as unknown as ConstructorParameters<typeof WebviewProvider>[15];
-  const repoDiscovery = {
-    getRepos: () => [
-      { path: '/repo-a', name: 'repo-a', displayName: 'repo-a' },
-      { path: '/repo-b', name: 'repo-b', displayName: 'repo-b' },
-    ],
-    getActiveRepoPath: () => currentRepoPath,
-  } as unknown as ConstructorParameters<typeof WebviewProvider>[16];
+  } as unknown as { globalState: { get: (key: string) => unknown; update: ReturnType<typeof vi.fn> } };
 
-  const provider = new WebviewProvider(
-    extensionContext,
-    emptyDependency as ConstructorParameters<typeof WebviewProvider>[1],
-    emptyDependency as ConstructorParameters<typeof WebviewProvider>[2],
-    emptyDependency as ConstructorParameters<typeof WebviewProvider>[3],
-    emptyDependency as ConstructorParameters<typeof WebviewProvider>[4],
-    emptyDependency as ConstructorParameters<typeof WebviewProvider>[5],
-    emptyDependency as ConstructorParameters<typeof WebviewProvider>[6],
-    emptyDependency as ConstructorParameters<typeof WebviewProvider>[7],
-    emptyDependency as ConstructorParameters<typeof WebviewProvider>[8],
-    emptyDependency as ConstructorParameters<typeof WebviewProvider>[9],
-    emptyDependency as ConstructorParameters<typeof WebviewProvider>[10],
-    emptyDependency as ConstructorParameters<typeof WebviewProvider>[11],
-    emptyDependency as ConstructorParameters<typeof WebviewProvider>[12],
-    emptyDependency as ConstructorParameters<typeof WebviewProvider>[13],
-    emptyDependency as ConstructorParameters<typeof WebviewProvider>[14],
-    log,
-    repoDiscovery,
-    currentRepoPath,
+  const store = new PersistedUIStateStore(
+    extensionContext as never,
+    () => currentRepoPath,
   );
 
-  return { provider, extensionContext, globalStateStore };
+  return { store, extensionContext, globalStateStore };
 }
 
 function makeTestCommit(hash: string): Commit {
@@ -94,11 +71,67 @@ function makeTestCommit(hash: string): Commit {
   };
 }
 
+function createRepoDataLoaderFixture(options: {
+  commits?: Commit[];
+  branches?: Array<{ name: string; remote?: string; current: boolean; hash: string }>;
+  runtime?: WebviewRuntime;
+} = {}) {
+  const runtime = options.runtime ?? new WebviewRuntime('/repo-a');
+  const commits = options.commits ?? [makeTestCommit('aaa1111')];
+  const branches = options.branches ?? [];
+  const postMessage = vi.fn();
+  const gitLogService = {
+    getCommits: vi.fn().mockResolvedValue({
+      success: true,
+      value: { commits, totalLoadedWithoutFilter: commits.length },
+    }),
+    getBranches: vi.fn().mockResolvedValue({ success: true, value: branches }),
+    getAuthors: vi.fn().mockResolvedValue({ success: true, value: [] }),
+  };
+  const services = new GitServiceRegistry({
+    gitLogService,
+    gitDiffService: { getUncommittedSummary: vi.fn().mockResolvedValue({ success: true, value: {
+      stagedFiles: [],
+      unstagedFiles: [],
+      conflictFiles: [],
+      stagedCount: 0,
+      unstagedCount: 0,
+      untrackedCount: 0,
+    } }) },
+    gitRemoteService: { getRemotes: vi.fn().mockResolvedValue({ success: true, value: [] }) },
+    gitWorktreeService: { listWorktrees: vi.fn().mockResolvedValue({ success: true, value: [] }) },
+    gitStashService: { getStashes: vi.fn().mockResolvedValue({ success: true, value: [] }) },
+    gitRevertService: { getRevertState: vi.fn().mockResolvedValue({ success: true, value: 'idle' }) },
+    gitCherryPickService: { getCherryPickState: vi.fn(() => ({ success: true, value: 'idle' })) },
+    gitRebaseService: {
+      getRebaseState: vi.fn(() => ({ success: true, value: { state: 'idle' } })),
+      getConflictInfo: vi.fn(),
+    },
+    gitSubmoduleService: {
+      getSubmodules: vi.fn().mockResolvedValue({ success: true, value: [] }),
+    },
+  } as never);
+  const { store } = createUIStateStore();
+  const dataLoader = new RepoDataLoader({
+    log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as never,
+    runtime,
+    services,
+    uiStateStore: store,
+    postMessage,
+    getSettings: () => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }),
+    getBatchSize: () => 500,
+    getSubmoduleHandlers: () => undefined,
+  });
+
+  return { dataLoader, runtime, services, postMessage, gitLogService, commits };
+}
+
 describe('WebviewProvider initial load performance', () => {
   it('posts initialData without waiting for deferred repo data or authors', async () => {
-    const { provider } = createProvider();
     const deferredUncommitted = new Promise<never>(() => undefined);
     const commit = makeTestCommit('aaa1111');
+    const runtime = new WebviewRuntime('/repo-a');
+    const postMessage = vi.fn();
 
     const gitLogService = {
       getCommits: vi.fn().mockResolvedValue({
@@ -109,40 +142,39 @@ describe('WebviewProvider initial load performance', () => {
       getAuthors: vi.fn().mockResolvedValue({ success: true, value: [] }),
     };
 
-    const testable = provider as unknown as {
-      postMessage: ReturnType<typeof vi.fn>;
-      sendInitialData: () => Promise<void>;
-      sendSubmodulesData: ReturnType<typeof vi.fn>;
-      gitLogService: typeof gitLogService;
-      gitDiffService: { getUncommittedSummary: ReturnType<typeof vi.fn> };
-      gitRemoteService: { getRemotes: ReturnType<typeof vi.fn> };
-      gitWorktreeService: { listWorktrees: ReturnType<typeof vi.fn> };
-      gitStashService: { getStashes: ReturnType<typeof vi.fn> };
-      gitRevertService: { getRevertState: ReturnType<typeof vi.fn> };
-      gitCherryPickService: { getCherryPickState: ReturnType<typeof vi.fn> };
-      gitRebaseService: { getRebaseState: ReturnType<typeof vi.fn>; getConflictInfo: ReturnType<typeof vi.fn> };
-    };
+    const services = new GitServiceRegistry({
+      gitLogService,
+      gitDiffService: { getUncommittedSummary: vi.fn(() => deferredUncommitted) },
+      gitRemoteService: { getRemotes: vi.fn().mockResolvedValue({ success: true, value: [] }) },
+      gitWorktreeService: { listWorktrees: vi.fn().mockResolvedValue({ success: true, value: [] }) },
+      gitStashService: { getStashes: vi.fn().mockResolvedValue({ success: true, value: [] }) },
+      gitRevertService: { getRevertState: vi.fn().mockResolvedValue({ success: true, value: 'idle' }) },
+      gitCherryPickService: { getCherryPickState: vi.fn(() => ({ success: true, value: 'idle' })) },
+      gitRebaseService: {
+        getRebaseState: vi.fn(() => ({ success: true, value: { state: 'idle' } })),
+        getConflictInfo: vi.fn(),
+      },
+      gitSubmoduleService: {
+        getSubmodules: vi.fn().mockResolvedValue({ success: true, value: [] }),
+      },
+    } as never);
+    const { store } = createUIStateStore();
+    const dataLoader = new RepoDataLoader({
+      log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as never,
+      runtime,
+      services,
+      uiStateStore: store,
+      postMessage,
+      getSettings: () => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }),
+      getBatchSize: () => 500,
+      getSubmoduleHandlers: () => undefined,
+    });
 
-    testable.postMessage = vi.fn();
-    testable.sendSubmodulesData = vi.fn();
-    testable.gitLogService = gitLogService;
-    testable.gitDiffService = { getUncommittedSummary: vi.fn(() => deferredUncommitted) };
-    testable.gitRemoteService = { getRemotes: vi.fn().mockResolvedValue({ success: true, value: [] }) };
-    testable.gitWorktreeService = { listWorktrees: vi.fn().mockResolvedValue({ success: true, value: [] }) };
-    testable.gitStashService = { getStashes: vi.fn().mockResolvedValue({ success: true, value: [] }) };
-    testable.gitRevertService = { getRevertState: vi.fn().mockResolvedValue({ success: true, value: 'idle' }) };
-    testable.gitCherryPickService = { getCherryPickState: vi.fn(() => ({ success: true, value: 'idle' })) };
-    testable.gitRebaseService = {
-      getRebaseState: vi.fn(() => ({ success: true, value: { state: 'idle' } })),
-      getConflictInfo: vi.fn(),
-    };
-    provider.setSettingsProvider(() => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }));
+    await dataLoader.sendInitialData();
 
-    await testable.sendInitialData();
-
-    expect(testable.gitLogService.getAuthors).not.toHaveBeenCalled();
-    expect(testable.gitDiffService.getUncommittedSummary).toHaveBeenCalledTimes(1);
-    expect(testable.postMessage).toHaveBeenCalledWith(expect.objectContaining({
+    expect(gitLogService.getAuthors).not.toHaveBeenCalled();
+    expect(services.current().gitDiffService.getUncommittedSummary).toHaveBeenCalledTimes(1);
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
       type: 'initialData',
       payload: expect.objectContaining({
         commits: [commit],
@@ -156,42 +188,153 @@ describe('WebviewProvider initial load performance', () => {
   });
 });
 
-describe('WebviewProvider switchRepo', () => {
-  it('clears remembered branch filters before reloading the new repository', async () => {
-    const { provider } = createProvider();
-
-    const testableProvider = provider as unknown as {
-      sendInitialData: ReturnType<typeof vi.fn>;
-      sendRepoList: ReturnType<typeof vi.fn>;
-      currentFilters: { branches?: string[]; author?: string; maxCount: number };
-      handleMessage: (message: { type: 'switchRepo'; payload: { repoPath: string } }) => Promise<void>;
-    };
-
-    provider.setSwitchRepoHandler(vi.fn());
-    testableProvider.sendInitialData = vi.fn().mockResolvedValue(undefined);
-    testableProvider.sendRepoList = vi.fn();
-    testableProvider.currentFilters = { branches: ['feature/test'], author: 'Alice', maxCount: 250 };
-
-    await testableProvider.handleMessage({
-      type: 'switchRepo',
-      payload: { repoPath: '/repo-b' },
+describe('RepoDataLoader refresh behavior', () => {
+  it('uses commits=null on auto-refresh when the commit fingerprint is unchanged', async () => {
+    const commit = makeTestCommit('aaa1111');
+    const runtime = new WebviewRuntime('/repo-a');
+    runtime.initialLoadSent = true;
+    runtime.lastCommitFingerprint = computeCommitFingerprint([commit]);
+    runtime.isDisplayingSubmodule = true;
+    const { dataLoader, postMessage } = createRepoDataLoaderFixture({
+      commits: [commit],
+      runtime,
     });
 
-    expect(testableProvider.currentFilters).toEqual({ maxCount: 250 });
-    expect(testableProvider.sendInitialData).toHaveBeenCalledTimes(1);
-    expect(testableProvider.sendInitialData).toHaveBeenCalledWith();
+    await dataLoader.sendInitialData(undefined, true);
+
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'initialData',
+      payload: expect.objectContaining({ commits: null }),
+    }));
+  });
+
+  it('removes missing branch filters before fetching commits', async () => {
+    const runtime = new WebviewRuntime('/repo-a');
+    runtime.currentFilters = { branches: ['main', 'missing'], maxCount: 250 };
+    runtime.isDisplayingSubmodule = true;
+    const { dataLoader, gitLogService } = createRepoDataLoaderFixture({
+      runtime,
+      branches: [{ name: 'main', current: true, hash: 'aaa1111' }],
+    });
+
+    await dataLoader.sendInitialData();
+
+    expect(gitLogService.getCommits).toHaveBeenCalledWith(expect.objectContaining({
+      branches: ['main'],
+      maxCount: 500,
+    }));
+    expect(runtime.currentFilters.branches).toEqual(['main']);
+  });
+});
+
+describe('RefreshCoordinator', () => {
+  it('defers auto-refresh while hidden and runs it when visible', async () => {
+    const dataLoader = {
+      sendInitialData: vi.fn().mockResolvedValue(undefined),
+    };
+    const coordinator = new RefreshCoordinator(
+      { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as never,
+      dataLoader as never,
+    );
+
+    await coordinator.triggerAutoRefresh();
+    expect(dataLoader.sendInitialData).not.toHaveBeenCalled();
+
+    coordinator.setPanelVisible(true);
+    await vi.waitFor(() => {
+      expect(dataLoader.sendInitialData).toHaveBeenCalledWith(undefined, true);
+    });
+  });
+});
+
+describe('WebviewMessageRouter', () => {
+  it('dispatches through the current service registry entry at request time', async () => {
+    const oldGetAuthors = vi.fn().mockResolvedValue({ success: true, value: [] });
+    const newGetAuthors = vi.fn().mockResolvedValue({ success: true, value: [{ name: 'Alice', email: 'a@example.com' }] });
+    const services = new GitServiceRegistry({
+      gitLogService: { getAuthors: oldGetAuthors },
+    } as never);
+    const postMessage = vi.fn();
+    const router = new WebviewMessageRouter(
+      { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+      { services, postMessage, log: {} } as never,
+    );
+
+    services.update({
+      gitLogService: { getAuthors: newGetAuthors },
+    } as never);
+
+    await router.dispatch({ type: 'getAuthors', payload: {} });
+
+    expect(oldGetAuthors).not.toHaveBeenCalled();
+    expect(newGetAuthors).toHaveBeenCalledTimes(1);
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'authorList',
+      payload: { authors: [{ name: 'Alice', email: 'a@example.com' }] },
+    });
+  });
+});
+
+describe('WebviewProvider switchRepo', () => {
+  it('clears remembered branch filters before reloading the new repository', async () => {
+    const runtime = new WebviewRuntime('/repo-a');
+    runtime.currentFilters = { branches: ['feature/test'], author: 'Alice', maxCount: 250 };
+    const reload = vi.fn().mockResolvedValue(undefined);
+    const context = {
+      runtime,
+      refreshCoordinator: { reload },
+      getRepoDiscovery: () => ({
+        getRepos: () => [
+          { path: '/repo-a', name: 'repo-a', displayName: 'repo-a' },
+          { path: '/repo-b', name: 'repo-b', displayName: 'repo-b' },
+        ],
+        getActiveRepoPath: () => '/repo-b',
+      }),
+      onSwitchRepo: vi.fn(),
+      sendRepoList: vi.fn(),
+      postMessage: vi.fn(),
+    } as unknown as WebviewRequestContext;
+
+    await submoduleHandlers.switchRepo({
+      type: 'switchRepo',
+      payload: { repoPath: '/repo-b' },
+    }, context);
+
+    expect(runtime.currentFilters).toEqual({ maxCount: 250 });
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('displayRepo marks submodule display without changing the active repo list', async () => {
+    const runtime = new WebviewRuntime('/repo-a');
+    runtime.currentFilters = { branches: ['feature/test'], maxCount: 250 };
+    const reload = vi.fn().mockResolvedValue(undefined);
+    const context = {
+      runtime,
+      refreshCoordinator: { reload },
+      getRepoDiscovery: () => ({
+        getActiveRepoPath: () => '/repo-a',
+      }),
+      onDisplayRepo: vi.fn(),
+      postMessage: vi.fn(),
+    } as unknown as WebviewRequestContext;
+
+    await submoduleHandlers.displayRepo({
+      type: 'displayRepo',
+      payload: { repoPath: '/repo-a/submodule' },
+    }, context);
+
+    expect(runtime.isDisplayingSubmodule).toBe(true);
+    expect(runtime.currentFilters).toEqual({ maxCount: 250 });
+    expect(context.onDisplayRepo).toHaveBeenCalledWith('/repo-a/submodule');
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('WebviewProvider per-repo column layout', () => {
   it('loads default layout when no per-repo layout is saved', () => {
-    const { provider } = createProvider();
+    const { store } = createUIStateStore();
 
-    const testable = provider as unknown as {
-      loadPersistedUIState: () => typeof DEFAULT_PERSISTED_UI_STATE;
-    };
-
-    const state = testable.loadPersistedUIState();
+    const state = store.loadPersistedUIState();
     expect(state.commitTableLayout).toEqual(createDefaultCommitTableLayout());
   });
 
@@ -203,29 +346,21 @@ describe('WebviewProvider per-repo column layout', () => {
     const store: Record<string, unknown> = {
       [repoLayoutKey('/repo-a')]: customLayout,
     };
-    const { provider } = createProvider(store, '/repo-a');
+    const { store: uiStateStore } = createUIStateStore(store, '/repo-a');
 
-    const testable = provider as unknown as {
-      loadPersistedUIState: () => typeof DEFAULT_PERSISTED_UI_STATE;
-    };
-
-    const state = testable.loadPersistedUIState();
+    const state = uiStateStore.loadPersistedUIState();
     expect(state.commitTableLayout.columns.message.preferredWidth).toBe(600);
     expect(state.commitTableLayout.columns.hash.visible).toBe(false);
   });
 
   it('saves commitTableLayout to per-repo key, not global state', () => {
     const store: Record<string, unknown> = {};
-    const { provider, extensionContext } = createProvider(store, '/repo-a');
-
-    const testable = provider as unknown as {
-      savePersistedUIState: (partial: Partial<Record<string, unknown>>) => void;
-    };
+    const { store: uiStateStore, extensionContext } = createUIStateStore(store, '/repo-a');
 
     const updatedLayout = createDefaultCommitTableLayout();
     updatedLayout.columns.author.preferredWidth = 200;
 
-    testable.savePersistedUIState({ commitTableLayout: updatedLayout });
+    uiStateStore.savePersistedUIState({ commitTableLayout: updatedLayout });
 
     // Per-repo key should have the layout
     const repoKey = repoLayoutKey('/repo-a');
@@ -241,13 +376,9 @@ describe('WebviewProvider per-repo column layout', () => {
 
   it('saves commitListMode to global state (not per-repo)', () => {
     const store: Record<string, unknown> = {};
-    const { provider, extensionContext } = createProvider(store, '/repo-a');
+    const { store: uiStateStore, extensionContext } = createUIStateStore(store, '/repo-a');
 
-    const testable = provider as unknown as {
-      savePersistedUIState: (partial: Partial<Record<string, unknown>>) => void;
-    };
-
-    testable.savePersistedUIState({ commitListMode: 'classic' });
+    uiStateStore.savePersistedUIState({ commitListMode: 'classic' });
 
     // Global state key should be updated with commitListMode
     expect(extensionContext.globalState.update).toHaveBeenCalledWith(
@@ -274,36 +405,36 @@ describe('WebviewProvider per-repo column layout', () => {
       [repoLayoutKey('/repo-a')]: layoutA,
       [repoLayoutKey('/repo-b')]: layoutB,
     };
-    const { provider } = createProvider(store, '/repo-a');
-
-    const testable = provider as unknown as {
-      loadPersistedUIState: () => typeof DEFAULT_PERSISTED_UI_STATE;
-      reinitializeServices: (...args: unknown[]) => void;
-      currentRepoPath: string;
-      uiStateCache: unknown;
-    };
+    let currentRepoPath = '/repo-a';
+    const { store: uiStateStore } = createUIStateStore(store, currentRepoPath);
+    const repoAwareStore = new PersistedUIStateStore(
+      {
+        globalState: {
+          get: vi.fn((key: string) => store[key]),
+          update: vi.fn(),
+        },
+      } as never,
+      () => currentRepoPath,
+    );
 
     // Load repo-a layout
-    const stateA = testable.loadPersistedUIState();
+    const stateA = repoAwareStore.loadPersistedUIState();
     expect(stateA.commitTableLayout.columns.message.preferredWidth).toBe(500);
 
     // Switch to repo-b by simulating reinitializeServices cache clearing
-    testable.currentRepoPath = '/repo-b';
-    testable.uiStateCache = undefined;
+    currentRepoPath = '/repo-b';
+    repoAwareStore.invalidateCache();
 
     // Load repo-b layout
-    const stateB = testable.loadPersistedUIState();
+    const stateB = repoAwareStore.loadPersistedUIState();
     expect(stateB.commitTableLayout.columns.message.preferredWidth).toBe(300);
+    expect(uiStateStore).toBeDefined();
   });
 
   it('defaults commitListMode to table for new users', () => {
-    const { provider } = createProvider();
+    const { store } = createUIStateStore();
 
-    const testable = provider as unknown as {
-      loadPersistedUIState: () => typeof DEFAULT_PERSISTED_UI_STATE;
-    };
-
-    const state = testable.loadPersistedUIState();
+    const state = store.loadPersistedUIState();
     expect(state.commitListMode).toBe('table');
   });
 });
@@ -326,12 +457,9 @@ describe('WebviewProvider validateCommitTableLayout healing', () => {
     const store: Record<string, unknown> = {
       [repoLayoutKey('/repo-a')]: layout,
     };
-    const { provider } = createProvider(store, '/repo-a');
-    const testable = provider as unknown as {
-      loadPersistedUIState: () => typeof DEFAULT_PERSISTED_UI_STATE;
-    };
+    const { store: uiStateStore } = createUIStateStore(store, '/repo-a');
 
-    const state = testable.loadPersistedUIState();
+    const state = uiStateStore.loadPersistedUIState();
     const healed = state.commitTableLayout.columns.message.preferredWidth;
     const expectedCeiling =
       HEALING_ASSUMED_CONTAINER_WIDTH
@@ -346,12 +474,9 @@ describe('WebviewProvider validateCommitTableLayout healing', () => {
     const store: Record<string, unknown> = {
       [repoLayoutKey('/repo-a')]: layout,
     };
-    const { provider } = createProvider(store, '/repo-a');
-    const testable = provider as unknown as {
-      loadPersistedUIState: () => typeof DEFAULT_PERSISTED_UI_STATE;
-    };
+    const { store: uiStateStore } = createUIStateStore(store, '/repo-a');
 
-    const state = testable.loadPersistedUIState();
+    const state = uiStateStore.loadPersistedUIState();
     expect(state.commitTableLayout.columns.author.preferredWidth).toBe(
       COMMIT_TABLE_MIN_WIDTHS.author,
     );
@@ -364,12 +489,9 @@ describe('WebviewProvider validateCommitTableLayout healing', () => {
     const store: Record<string, unknown> = {
       [repoLayoutKey('/repo-a')]: layout,
     };
-    const { provider } = createProvider(store, '/repo-a');
-    const testable = provider as unknown as {
-      loadPersistedUIState: () => typeof DEFAULT_PERSISTED_UI_STATE;
-    };
+    const { store: uiStateStore } = createUIStateStore(store, '/repo-a');
 
-    const state = testable.loadPersistedUIState();
+    const state = uiStateStore.loadPersistedUIState();
     expect(state.commitTableLayout.columns.hash.preferredWidth).toBe(124);
   });
 
@@ -380,12 +502,9 @@ describe('WebviewProvider validateCommitTableLayout healing', () => {
     const store: Record<string, unknown> = {
       [repoLayoutKey('/repo-a')]: layout,
     };
-    const { provider } = createProvider(store, '/repo-a');
-    const testable = provider as unknown as {
-      loadPersistedUIState: () => typeof DEFAULT_PERSISTED_UI_STATE;
-    };
+    const { store: uiStateStore } = createUIStateStore(store, '/repo-a');
 
-    const state = testable.loadPersistedUIState();
+    const state = uiStateStore.loadPersistedUIState();
     expect(state.commitTableLayout.columns.message.preferredWidth).toBe(600);
   });
 
@@ -402,12 +521,9 @@ describe('WebviewProvider validateCommitTableLayout healing', () => {
     const store: Record<string, unknown> = {
       [repoLayoutKey('/repo-a')]: malformed,
     };
-    const { provider } = createProvider(store, '/repo-a');
-    const testable = provider as unknown as {
-      loadPersistedUIState: () => typeof DEFAULT_PERSISTED_UI_STATE;
-    };
+    const { store: uiStateStore } = createUIStateStore(store, '/repo-a');
 
-    const state = testable.loadPersistedUIState();
+    const state = uiStateStore.loadPersistedUIState();
     expect(state.commitTableLayout.columns.date.preferredWidth).toBe(
       DEFAULT_PERSISTED_UI_STATE.commitTableLayout.columns.date.preferredWidth,
     );
@@ -429,11 +545,7 @@ describe('WebviewProvider computeCommitFingerprint', () => {
   }
 
   function fingerprint(commits: Commit[]): string {
-    const { provider } = createProvider();
-    const testable = provider as unknown as {
-      computeCommitFingerprint: (commits: Commit[]) => string;
-    };
-    return testable.computeCommitFingerprint(commits);
+    return computeCommitFingerprint(commits);
   }
 
   it('returns empty string for empty commit list', () => {

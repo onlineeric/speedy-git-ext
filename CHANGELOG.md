@@ -4,7 +4,7 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [5.0.0] - 2026-06-07
+## [5.0.0] - pre-release - 2026-06-07
 
 ### Added
 - **Git worktrees** — keep several branches checked out side-by-side, each in its own folder and IDE window, without disturbing your main working tree.
@@ -17,6 +17,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 - The old low-contrast worktree popover badge (the unlabeled icon wedged between the branch badge and commit message) has been **removed** in favor of the new in-badge icon and `detached` badges. Worktree actions moved entirely to the established right-click model used by every other ref.
 - The Worktree panel gained a **manual refresh** button next to Prune (reloads records without a full graph reload) and **zebra-striped rows** for easier scanning of multi-worktree lists. Refresh and Prune are disabled while a worktree-list request is in flight.
+
+### Internal
+- Refactored the backend webview host: `WebviewProvider` is now a thin compatibility facade, with panel lifecycle, runtime state, repo-bound git service registry, persisted UI state, repo data loading, refresh coordination, VS Code editor commands, operation guards, and typed RPC routing split into focused `src/webview/` modules.
+- RPC handling is now registered through an exhaustive typed handler map grouped by feature area, so adding a new request type fails TypeScript until a handler is wired. Handlers resolve repo-bound git services from `GitServiceRegistry` at request time to avoid stale service references after repo and submodule navigation.
+- Added focused unit coverage for the extracted webview modules, including persistence healing, auto-refresh deferral, initial/deferred data loading, stale branch-filter cleanup, commit fingerprint optimization, panel/editor command wiring, operation-in-progress checks, router dispatch, and selected handler behavior.
 
 ## [4.4.1] - 2026-06-04
 

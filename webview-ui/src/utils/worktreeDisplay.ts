@@ -7,9 +7,17 @@ export function stripLocalBranchPrefix(branch: string): string {
   return branch.startsWith(LOCAL_BRANCH_PREFIX) ? branch.slice(LOCAL_BRANCH_PREFIX.length) : branch;
 }
 
-export function worktreeBranchLabel(worktree: WorktreeInfo): string {
-  if (worktree.isDetached || !worktree.branch) return 'detached';
+/** Tooltip shown on actions disabled because a worktree's folder is missing (prunable). */
+export const WORKTREE_FOLDER_MISSING_TOOLTIP = 'This worktree folder is missing.';
+
+/** The worktree's local branch name (prefix stripped), or null when detached / unborn. */
+export function worktreeLocalBranch(worktree: WorktreeInfo): string | null {
+  if (worktree.isDetached || !worktree.branch) return null;
   return stripLocalBranchPrefix(worktree.branch);
+}
+
+export function worktreeBranchLabel(worktree: WorktreeInfo): string {
+  return worktreeLocalBranch(worktree) ?? 'detached';
 }
 
 export function worktreeFolderName(worktreePath: string): string {

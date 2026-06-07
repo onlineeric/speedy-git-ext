@@ -2,15 +2,9 @@ import { useCallback, useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { WorktreeInfo } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
-import { worktreeFolderName } from '../utils/worktreeDisplay';
+import { WORKTREE_FOLDER_MISSING_TOOLTIP, worktreeFolderName } from '../utils/worktreeDisplay';
 import { RemoveWorktreeDialog } from './RemoveWorktreeDialog';
-
-const menuItemClass =
-  'px-3 py-1.5 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
-const menuItemDisabledClass =
-  'px-3 py-1.5 text-sm text-[var(--vscode-disabledForeground)] cursor-not-allowed outline-none';
-const dangerItemClass =
-  'px-3 py-1.5 text-sm text-[var(--vscode-errorForeground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
+import { dangerItemClass, menuItemClass, menuItemDisabledClass, menuSeparatorClass } from './menuStyles';
 
 export function useRemoveWorktreeDialog() {
   const [removeTarget, setRemoveTarget] = useState<WorktreeInfo | null>(null);
@@ -44,7 +38,7 @@ export function WorktreeMenuItems({
       <ContextMenu.Item
         className={openDisabled ? menuItemDisabledClass : menuItemClass}
         disabled={openDisabled}
-        title={openDisabled ? 'This worktree folder is missing.' : worktree.path}
+        title={openDisabled ? WORKTREE_FOLDER_MISSING_TOOLTIP : worktree.path}
         onSelect={() => rpcClient.openWorktree(worktree.path)}
       >
         Open Worktree in New Window
@@ -76,7 +70,7 @@ export function WorktreeMenuGroup({
     <>
       {worktrees.map((worktree, index) => (
         <div key={worktree.path}>
-          {index > 0 && <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />}
+          {index > 0 && <ContextMenu.Separator className={menuSeparatorClass} />}
           <ContextMenu.Label className="px-3 py-1 text-xs text-[var(--vscode-descriptionForeground)]">
             <span className="font-mono">{worktreeFolderName(worktree.path)}</span>
             <span className="block max-w-64 truncate" title={worktree.path}>{worktree.path}</span>

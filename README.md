@@ -1,6 +1,6 @@
 # Speedy Git — Fast Git Graph & History UI for VS Code and Cursor
 
-A performance-first Git graph, Git history viewer, and history-editing tool built for developers who want speed, clarity, and real Git workflow power — without the bloat.
+A performance-first Git graph, history viewer, history-editing tool, and worktrees manager built for developers who want speed, clarity, and real Git workflow power — without the bloat.
 
 ![Speedy Git Extension screenshot](./resources/speedy-git-screenshot.png)
 
@@ -15,27 +15,22 @@ A performance-first Git graph, Git history viewer, and history-editing tool buil
 | **Instant graph rendering** | Virtual scrolling + batch prefetch keeps large repos responsive — no loading spinners, no lag |
 | **Real Git operations** | Merge, rebase, cherry-pick, revert, reset, drop commit, push, pull, fetch — all from context menus with live command preview |
 | **Compare anything to anything** | Two-click A vs B diff for any commit, branch, tag, or your working tree — with PR-style three-dot mode |
+| **Search and filter** | Quickly find commits by message, hash, or author, then narrow history with branch, author, and date filters |
+| **Worktrees** | Run AI coding sessions on different branches at the same time without constantly switching your main checkout |
 | **Clean, scannable UI** | Color-coded branch lanes, merged local/remote labels, avatars, and clear HEAD indicators |
 | **History editing workflow** | Interactive rebase with drag-and-drop reordering (pick, squash, fixup, reword, drop) |
 | **Works in VS Code and Cursor** | Published on both VS Code Marketplace and Open VSX |
 
-## Features
+## What's New in v5
 
-### Recent New UI and features
-We have a new UI, with a new control bar and toggle panel for Filter, Search, and Compare. The commit list is now a table-style view with resizable columns, column reordering, and column visibility controls.
+### Worktrees for multi-session AI coding
+Create, open, reveal, and remove Git worktrees so different AI agents or editor sessions can work on different branches at the same time without switching your main checkout.
+![Speedy Git Worktrees screenshot](./resources/047-worktrees.png)
 
-### Advanced Filter
-In additonal to branch filter, we have a new advanced filter panel with
-- Authors filter
-- Date range filter
+### GPG and SSH signing verification
+Verify signed commits on demand with a dedicated Signature column, clear trust states, and bundled help for local signing setup.
 
-![Speedy Git Advanced Filter screenshot](./resources/speedy-git-screenshot-filter.png)
-
-### Table View Commit List
-We have a new table-style commit list view with resizable columns, column reordering, and column visibility controls.
-![Speedy Git Table View Commit List screenshot](./resources/speedy-git-screenshot-table-view.png)
-
-### Compare Refs — A vs B, Anything to Anything (new in v4 pre-release)
+### Compare Refs — A vs B, Anything to Anything (new in v4)
 
 ![Speedy Git Compare screenshot](./resources/042-compare.png)
 
@@ -51,62 +46,31 @@ Stop dropping into the terminal to figure out what changed between two points in
 - **Cancel any in-flight compare** mid-run; swap (⇄) Base and Target with one click; **Reset** clears everything in a single action.
 - **Pending-state toolbar button** turns light yellow when slots are filled but the panel is closed, so you never lose your place.
 
-### Git Graph & Commit History
+## Core Feature Summary
+>Right-click menu — there are even more features in other menus and panels!  
+>
+>![Speedy Git Right-click menu screenshot](./resources/right-click-menu.png)
 
-- Fast, interactive commit graph with color-coded branch lanes and virtual scrolling for repositories of any size.
-- Table-style commit list view with resizable columns, column reordering, and column visibility controls — customize which commit metadata (graph, hash, message, author, date) is shown and how wide each column appears. Double-click a column boundary to auto-fit width.
-- Commit details panel (bottom or right, resizable) with file change list, per-file addition/deletion counts, and inline diff viewer. Automatically switches to side-by-side layout when the bottom panel is wide enough.
-- List and tree view toggle for file changes — tree view groups by directory with automatic folder compaction.
-- Hover tooltip on commit nodes showing branches, tags, stashes, worktree status, and clickable GitHub PR/issue links.
-- Inline code styling for backtick-delimited text in commit messages (e.g., `functionName` renders with code background).
-- Client-side search and filter by commit message, hash, or author name with match counter and auto-scroll navigation.
-- Branch filter dropdown with multi-select support, real-time text search, and keyboard-first selection — view commits from multiple branches at once.
+- Fast commit graph and history browsing with virtual scrolling, color-coded branch lanes, table-style rows, resizable columns, avatars, and clear HEAD/ref labels.
+- Powerful search and filtering by commit message, hash, author, branch, and date, with match navigation for large histories.
+- Commit details with resizable bottom/right layout, file tree/list views, per-file stats, and inline diffs.
+- Branch, tag, stash, remote, submodule, and multi-repo workflows from one panel, including fetch, pull, push, checkout, merge, and remote management.
+- History editing tools for interactive rebase, cherry-pick, revert, reset, and drop commit, with conflict-aware continue/abort flows.
+- Live Git command previews in major dialogs, plus personalization for graph colors, date format, ref visibility, avatars, and persisted panel layout.
 
+## How Speedy Git Compares
 
-### Branch, Tag & Stash Operations
-
-- Create, rename, delete, and checkout branches (local and remote tracking).
-- Merge with strategy controls: fast-forward, no-ff, no-commit, and squash merge options.
-- Tag creation (lightweight and annotated), deletion, and push to remote.
-- Stash entries displayed inline in the graph with apply, pop, and drop actions.
-- Smart checkout: detects conflicts, offers stash-and-checkout, handles remote tracking branches automatically.
-
-### History Editing — Rebase, Cherry-Pick, Revert & More
-
-- **Interactive rebase**: drag-and-drop commit reordering with pick, squash, fixup, reword, and drop actions.
-- **Cherry-pick**: single or multi-commit selection with `-x` and `--no-commit` options.
-- **Revert**: undo any commit (including merge commits with parent selection) without rewriting history.
-- **Reset**: soft, mixed, or hard reset to any commit.
-- **Drop commit**: remove non-merge commits from the current branch with conflict handling.
-- Full conflict detection and resolution flow for rebase, cherry-pick, merge, and revert — with continue/abort actions.
-
-### Live Git Command Preview
-
-Every major dialog (merge, cherry-pick, rebase, reset, push, tag, delete, drop) shows a live preview of the exact `git` command that will run — updating in real time as you toggle options. One-click copy to clipboard for terminal use.
-
-### Multi-Repo & Submodule Support
-
-- In-panel repo switcher for multi-root workspaces — switch repositories without closing the panel.
-- Submodule status display with parent-to-submodule navigation and "Back to parent" breadcrumb.
-- Initialize and update submodules from context menu.
-
-### Remote Operations
-
-- Push dialog with upstream config, force-push modes (`--force-with-lease`, `--force`), and multi-remote support.
-- Fetch, pull, and remote management (add, remove, edit remotes) without leaving the extension.
-- Git operations automatically notify VS Code's Source Control panel to refresh, keeping it in sync immediately.
-
-### Personalization
-
-- Customizable graph line colors via settings (default Material Design palette, applies instantly).
-- Relative or absolute date format toggle.
-- GitHub and Gravatar avatars with automatic fallback to generated initials.
-- Toggle remote branch labels and tag visibility.
-- Commit details panel remembers its position, view mode, and size across sessions.
-
-### Trust & Verification
-
-- On-demand GPG and SSH commit signature verification with clear status indicators (Verified, Invalid, Unverified).
+| | Speedy Git | Heavy all-in-one Git extensions | Basic Git graph viewers |
+|---|---|---|---|
+| Large repo performance | Virtual scrolling, batch prefetch | Can lag on large histories | Often loads everything at once |
+| AI-ready worktrees | Parallel branch worktrees for multi-session AI coding | Varies or requires separate tools | Rare |
+| Search, filter, and compare | Built-in search, advanced filters, and A vs B compare | Usually available, often spread across views | Limited |
+| History editing | Rebase, cherry-pick, revert, drop, reset — all in-panel | Varies | View-only or minimal |
+| Commit signature verification | On-demand GPG and SSH verification | Varies | Rare |
+| Live command preview | Every dialog shows the exact git command | Rare | No |
+| UI clarity | Merged branch labels, color-coded lanes, avatars | Feature-dense, complex UI | Basic |
+| Repo support | Multi-repo switching, submodule navigation, worktree visibility | Varies | Rare |
+| Startup overhead | Lightweight, single-panel | Extension suite, multiple views | Lightweight |
 
 ## Quick Start
 
@@ -120,36 +84,7 @@ Open Speedy Git from the Source Control panel:
 Open Speedy Git from the status bar:
 ![Speedy Git Status Bar](resources/status-bar-screenshot.png)
 
-## Requirements
-
-- VS Code 1.85+ or Cursor IDE
-- Git available in PATH
-
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|---|---|
-| `Ctrl+Shift+G` / `Cmd+Shift+G` | Open Speedy Git |
-| `Ctrl+F` / `Cmd+F` | Search commits |
-| `Arrow keys` | Navigate commits |
-| `Enter` | Open commit details |
-| `Escape` | Close panel / search |
-| `R` | Refresh graph |
-
-All shortcuts are customizable in VS Code's Keyboard Shortcuts editor.
-
-## How Speedy Git Compares
-
-| | Speedy Git | Heavy all-in-one Git extensions | Basic Git graph viewers |
-|---|---|---|---|
-| Large repo performance | Virtual scrolling, batch prefetch | Can lag on large histories | Often loads everything at once |
-| History editing | Rebase, cherry-pick, revert, drop, reset — all in-panel | Varies | View-only or minimal |
-| Live command preview | Every dialog shows the exact git command | Rare | No |
-| UI clarity | Merged branch labels, color-coded lanes, avatars | Feature-dense, complex UI | Basic |
-| Submodule support | Status, navigation, init, update | Varies | Rarely |
-| Startup overhead | Lightweight, single-panel | Extension suite, multiple views | Lightweight |
-
-## Issues, feature requests & Feedback
+## Issues, Feature Requests & Feedback
 
 - Issues and feature requests: [GitHub Issues](https://github.com/onlineeric/speedy-git-ext/issues)
 - Source code: [github.com/onlineeric/speedy-git-ext](https://github.com/onlineeric/speedy-git-ext)

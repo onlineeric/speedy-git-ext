@@ -1217,10 +1217,12 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   beginCompare: (requestId) => set({
     comparePanelUI: { loading: true, inlineError: null, activeRequestId: requestId },
     compareResult: null,
+    detailsPanelOpen: true,
   }),
   endCompareSuccess: (result) => set((state) => ({
     compareResult: result,
     comparePanelUI: { loading: false, inlineError: null, activeRequestId: null },
+    detailsPanelOpen: true,
     compareSelection: {
       ...state.compareSelection,
       aResolvedHash: result.aResolvedHash,

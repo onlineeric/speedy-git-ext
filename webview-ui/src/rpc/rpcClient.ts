@@ -17,7 +17,7 @@ class RpcClient {
   private parentRequestIdByHash = new Map<string, number>();
   private pendingPush: { resolve: (message: string) => void; reject: (error: Error) => void } | null = null;
   /** One-shot slot for a `resolveWorktreePath` request awaiting its `worktreePathResolved` response. */
-  private pendingWorktreePath: { requestId: number; resolve: (value: { path: string; leafName: string }) => void; reject: (error: Error) => void } | null = null;
+  private pendingWorktreePath: { requestId: number; resolve: (value: { path: string }) => void; reject: (error: Error) => void } | null = null;
   /**
    * Promise slot for correlating a dialog-initiated git action with its
    * backend response. Used by FilePickerDialog to lift its `isRunning` busy
@@ -225,7 +225,7 @@ class RpcClient {
         // Latest-wins: ignore stale responses whose requestId no longer matches
         // the pending request (a slower earlier response must not resolve a newer one).
         if (this.pendingWorktreePath && this.pendingWorktreePath.requestId === message.payload.requestId) {
-          this.pendingWorktreePath.resolve({ path: message.payload.path, leafName: message.payload.leafName });
+          this.pendingWorktreePath.resolve({ path: message.payload.path });
           this.pendingWorktreePath = null;
         }
         break;
@@ -617,10 +617,10 @@ class RpcClient {
 
   /**
    * Ask the backend to compose a target path for a new worktree. Resolves with
-   * the absolute path + leaf name; rejects if a previous request is superseded
-   * or the backend returns an error. Non-blocking — used to seed the dialog field.
+   * the absolute path; rejects if a previous request is superseded or the backend
+   * returns an error. Non-blocking — used to seed the dialog field.
    */
-  resolveWorktreePath(payload: { ref: string; branchMode: WorktreeBranchMode; newBranchName?: string }): Promise<{ path: string; leafName: string }> {
+  resolveWorktreePath(payload: { ref: string; branchMode: WorktreeBranchMode; newBranchName?: string }): Promise<{ path: string }> {
     if (this.pendingWorktreePath) {
       this.pendingWorktreePath.reject(new Error('superseded'));
       this.pendingWorktreePath = null;

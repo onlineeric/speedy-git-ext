@@ -18,7 +18,7 @@ export function isCheckoutConflict(error: GitError): boolean {
  * target branch is held by another worktree) to a readable message naming the
  * conflicting worktree (FR-024 / T042). Returns the original error otherwise.
  */
-export function mapWorktreeCheckoutError(error: GitError): GitError {
+function mapWorktreeCheckoutError(error: GitError): GitError {
   return mapWorktreeConflictError(
     error,
     (conflictingPath) =>

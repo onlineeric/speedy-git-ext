@@ -4,17 +4,13 @@ import type { Commit } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { buildDropStashCommand } from '../utils/gitCommandBuilder';
 import { ConfirmDialog } from './ConfirmDialog';
+import { dangerItemClass, menuItemClass, menuSeparatorClass } from './menuStyles';
 
 interface StashContextMenuProps {
   commit: Commit;
   stashIndex: number;
   children: React.ReactNode;
 }
-
-const menuItemClass =
-  'px-3 py-1.5 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
-const dangerItemClass =
-  'px-3 py-1.5 text-sm text-[var(--vscode-errorForeground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
 
 // FR-017 (042-compare-refs): stash compare is intentionally out of scope for v1.
 // Do NOT add "Set as Compare Base" / "Compare with Base" / "Compare these commits" items here.
@@ -53,11 +49,11 @@ export function StashContextMenu({ commit, stashIndex, children }: StashContextM
             <ContextMenu.Item className={menuItemClass} onSelect={handlePop} disabled={!isValidIndex}>
               Pop Stash
             </ContextMenu.Item>
-            <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+            <ContextMenu.Separator className={menuSeparatorClass} />
             <ContextMenu.Item className={dangerItemClass} onSelect={handleDrop} disabled={!isValidIndex}>
               Drop Stash
             </ContextMenu.Item>
-            <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+            <ContextMenu.Separator className={menuSeparatorClass} />
             <ContextMenu.Item className={menuItemClass} onSelect={handleCopyHash}>
               Copy Commit Hash
             </ContextMenu.Item>
