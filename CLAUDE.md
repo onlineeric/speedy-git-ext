@@ -12,12 +12,21 @@ pnpm build:prod         # Production build (minified, no sourcemaps)
 pnpm build:ext          # Build extension only (esbuild)
 pnpm build:webview      # Build webview only (Vite)
 pnpm watch              # Watch mode for both (uses concurrently)
-pnpm lint               # ESLint on src/
-pnpm typecheck          # TypeScript type checking
-pnpm test               # Run unit tests (Vitest)
+pnpm lint               # ESLint (flat config) over the whole repo
+pnpm typecheck          # TypeScript type checking (tsc --noEmit)
+pnpm test               # Run unit tests (Vitest, run mode)
 pnpm generate-test-repo # Generate deterministic test repo at test-repo/
+pnpm generate-submodule-repos # Generate test repos with submodules
 pnpm ext:package        # Create .vsix package
-pnpm ext:publish        # Publish to VS Code Marketplace & Open VSX
+pnpm ext:publish        # Publish to VS Code Marketplace (vsce) + Open VSX (ovsx)
+```
+
+Run a single test file or pattern with Vitest directly:
+
+```bash
+pnpm vitest run path/to/file.test.ts   # one file
+pnpm vitest run -t "test name substring" # filter by test name
+pnpm vitest                              # watch mode
 ```
 
 To debug: use VS Code launch configs "Run Extension" or "Run Extension (Watch)" in `.vscode/launch.json`.
@@ -30,7 +39,7 @@ VS Code extension with **backend** (Node.js extension host) and **frontend** (Re
 src/                              # Backend — esbuild → dist/extension.js (CJS, node18)
 ├── extension.ts                  # Entry point, registers speedyGit.showGraph command
 ├── ExtensionController.ts        # Orchestrates services, repo discovery, settings
-├── WebviewProvider.ts            # Webview panel lifecycle, RPC dispatch (~2200 lines)
+├── WebviewProvider.ts            # Webview panel lifecycle, RPC dispatch (~2400 lines)
 ├── GitShowContentProvider.ts     # git-show:// URI protocol for diffs
 ├── services/
 │   ├── index.ts                  # Barrel export for all services
@@ -56,7 +65,8 @@ src/                              # Backend — esbuild → dist/extension.js (C
 └── utils/
     ├── gitParsers.ts             # Parse git log lines, refs (%D), branch list
     ├── gitQueries.ts             # Shared read-only git queries (e.g., isDirtyWorkingTree)
-    └── gitValidation.ts          # Input validation for git operations
+    ├── gitValidation.ts          # Input validation for git operations
+    └── worktreeErrors.ts         # Map raw git worktree failures → friendly messages
 
 webview-ui/src/                   # Frontend — Vite + React → dist/webview/
 ├── App.tsx                       # Root: ControlBar + TogglePanel + GraphContainer + CommitDetailsPanel
@@ -72,15 +82,19 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
 │   ├── FilterWidget.tsx          # Author/date filter panel (react-datepicker)
 │   ├── SearchWidget.tsx          # Text search across commits
 │   ├── CompareWidget.tsx         # Branch comparison
-│   ├── *Dialog.tsx               # ~12 operation dialogs (Merge, Push, Rebase, CherryPick, etc.)
-│   ├── *ContextMenu.tsx          # Context menus (Commit, Branch, Stash, Author) via Radix UI
+│   ├── WorktreeWidget.tsx        # Worktree list + create/remove (046-git-worktrees)
+│   ├── *Worktree*.tsx            # CreateWorktreeDialog, RemoveWorktreeDialog, WorktreeMenuItems, DetachedWorktreeBadge
+│   ├── SignatureColumnCell.tsx   # Renders grouped signature glyphs in the optional "Signature" column (047)
+│   ├── *Dialog.tsx               # ~20 operation dialogs (Merge, Push, Rebase, CherryPick, Revert, Worktree, etc.)
+│   ├── *ContextMenu.tsx          # Context menus (Commit, Branch, Stash, Author, Date, Uncommitted) via Radix UI
 │   └── CommandPreview.tsx        # Live git command preview shown in dialogs
 ├── stores/
-│   └── graphStore.ts             # Zustand store: commits, branches, topology, filters, UI state (~1050 lines, being split by domain in 044-code-refactor)
+│   └── graphStore.ts             # Zustand store: commits, branches, topology, filters, UI state (~1250 lines). 044-code-refactor replaced whole-store subscriptions with selectors rather than splitting the file
 ├── rpc/
 │   └── rpcClient.ts              # Singleton RPC client, webview↔extension via acquireVsCodeApi()
 ├── hooks/
-│   └── useTooltipHover.ts        # Tooltip positioning logic
+│   ├── useTooltipHover.ts        # Tooltip positioning logic
+│   └── useSignatureColumnLoader.ts # Async viewport-first signature verification loader (047)
 ├── types/
 │   └── displayRefs.ts            # Discriminated union for ref-label rendering (local-branch/remote-branch/tag/HEAD/…)
 └── utils/
@@ -108,7 +122,10 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
     ├── formatDate.ts             # Commit-date formatting
     ├── gravatar.ts               # Gravatar URL builder
     ├── inlineCodeRenderer.tsx    # Renders inline-code spans in commit messages
-    └── mergeRefs.ts              # Merges local/remote refs into DisplayRef[] for display
+    ├── mergeRefs.ts              # Merges local/remote refs into DisplayRef[] for display
+    ├── signatureGlyph.ts         # Maps SignatureStatus enum → glyph/color for the signature column (047)
+    ├── worktreeBadgeStyle.ts     # Styling for worktree badges on graph rows (046)
+    └── worktreeDisplay.ts        # Worktree list formatting/derivation helpers (046)
 
 shared/                           # Shared types between backend & frontend
 ├── types.ts                      # Domain types: Commit, Branch, RefInfo, GraphFilters, CommitDetails, etc.
@@ -186,7 +203,8 @@ shared/                           # Shared types between backend & frontend
 ## Recent Changes
 - 047-signing-verification: 7-state flat `SignatureStatus` enum (drops `verificationUnavailable`); presence detection via raw `gpgsig` header (`git cat-file --batch`, no crypto) so SSH-signed commits without `allowedSignersFile` read as `unavailable` not `unsigned` (FR-017); opt-in hidden-by-default "Signature" history column with 3 grouped glyphs, async viewport-first + cached-by-hash (zero cost when hidden); bundled offline help doc (`docs/signing-verification.md`) opened via `openSignatureHelp` RPC
 - 045-revert-mode-dialog: Three-mode Revert Commit dialog (Commit now / Stage only / Edit message) with inline mainline-parent picker, replacing the direct-action menu item and the standalone RevertParentDialog
-- 044-code-refactor: Split `graphStore.ts` (1,200+ lines) by domain; replace whole-store subscriptions with selectors (notably `CommitContextMenu`, `CompareABMarker`) to cut per-row re-render work
+- 046-git-worktrees: Worktree list/add/remove via `GitWorktreeService`; "Worktree" toggle panel + create/remove dialogs + graph-row badges; persistent `speedyGit.worktree.basePath` setting
+- 044-code-refactor: Replaced whole-store Zustand subscriptions with fine-grained selectors (notably `CommitContextMenu`, `CompareABMarker`) to cut per-row re-render work (`graphStore.ts` remains a single ~1,250-line file)
 - 043-fast-forward-branch: Fast-forward a non-checked-out local branch from its remote without checkout; extended to remote-only badges (auto-creates local branch + sets upstream)
 - 042-compare-refs: New "Compare" toggle panel + right-click "Set as Compare Base" / "Compare with Base" for A-vs-B diffs across commits, branches, tags, `HEAD`, working-tree, and typed `rev-parse` expressions
 
@@ -194,5 +212,5 @@ shared/                           # Shared types between backend & frontend
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/046-git-worktrees/plan.md
+specs/047-signing-verification/plan.md
 <!-- SPECKIT END -->
