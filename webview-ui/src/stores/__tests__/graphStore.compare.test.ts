@@ -73,6 +73,7 @@ describe('slotLabel', () => {
 describe('graphStore compare actions', () => {
   beforeEach(() => {
     useGraphStore.getState().clearCompareState();
+    useGraphStore.setState({ detailsPanelOpen: false });
   });
 
   it('setSlotA stores the value, clears resolved hash, and pushes to recents', () => {
@@ -148,12 +149,23 @@ describe('graphStore compare actions', () => {
     useGraphStore.getState().beginCompare('req1');
     expect(useGraphStore.getState().comparePanelUI.loading).toBe(true);
     expect(useGraphStore.getState().comparePanelUI.activeRequestId).toBe('req1');
+    expect(useGraphStore.getState().detailsPanelOpen).toBe(true);
     useGraphStore.getState().endCompareSuccess(FAKE_RESULT);
     const sel = useGraphStore.getState().compareSelection;
     expect(useGraphStore.getState().comparePanelUI.loading).toBe(false);
     expect(useGraphStore.getState().compareResult).toEqual(FAKE_RESULT);
+    expect(useGraphStore.getState().detailsPanelOpen).toBe(true);
     expect(sel.aResolvedHash).toBe(FAKE_RESULT.aResolvedHash);
     expect(sel.bResolvedHash).toBe(FAKE_RESULT.bResolvedHash);
+  });
+
+  it('beginCompare reopens the shared details panel after the user closed it', () => {
+    useGraphStore.setState({ compareResult: FAKE_RESULT, detailsPanelOpen: false });
+
+    useGraphStore.getState().beginCompare('req-reopen');
+
+    expect(useGraphStore.getState().detailsPanelOpen).toBe(true);
+    expect(useGraphStore.getState().compareResult).toBeNull();
   });
 
   it('endCompareCancelled does NOT clear slots (FR-025b)', () => {
