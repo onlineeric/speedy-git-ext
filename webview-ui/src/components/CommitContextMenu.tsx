@@ -16,17 +16,12 @@ import { RevertDialog } from './RevertDialog';
 import { DropCommitDialog } from './DropCommitDialog';
 import { CreateWorktreeDialog } from './CreateWorktreeDialog';
 import { createReachabilityChecker } from '../utils/commitReachability';
+import { menuItemClass, menuItemDisabledClass, menuSeparatorClass } from './menuStyles';
 
 interface CommitContextMenuProps {
   commit: Commit;
   children: React.ReactNode;
 }
-
-const menuItemClass =
-  'px-3 py-1.5 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
-
-const menuItemDisabledClass =
-  'px-3 py-1.5 text-sm text-[var(--vscode-disabledForeground)] cursor-not-allowed outline-none';
 
 function isStashPseudoCommit(commit: Commit): boolean {
   return commit.refs.some((ref) => ref.type === 'stash');
@@ -269,7 +264,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
                 )}
               </>
             )}
-            <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+            <ContextMenu.Separator className={menuSeparatorClass} />
 
             <ContextMenu.Item
               className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
@@ -278,7 +273,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
             >
               Checkout this commit
             </ContextMenu.Item>
-            <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+            <ContextMenu.Separator className={menuSeparatorClass} />
 
             <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateBranchOpen(true)}>
               Create Branch Here...
@@ -286,11 +281,11 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
             <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateTagOpen(true)}>
               Create Tag Here...
             </ContextMenu.Item>
-            <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+            <ContextMenu.Separator className={menuSeparatorClass} />
             <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
               Create worktree…
             </ContextMenu.Item>
-            <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+            <ContextMenu.Separator className={menuSeparatorClass} />
 
             {!isHeadCommit && (
               <>
@@ -331,7 +326,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
                     Cherry-Pick Commit
                   </ContextMenu.Item>
                 )}
-                <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                <ContextMenu.Separator className={menuSeparatorClass} />
               </>
             )}
 
@@ -351,7 +346,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
                 >
                   Start Interactive Rebase from Here
                 </ContextMenu.Item>
-                <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                <ContextMenu.Separator className={menuSeparatorClass} />
               </>
             )}
 
@@ -364,7 +359,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
                 >
                   Revert Commit
                 </ContextMenu.Item>
-                <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                <ContextMenu.Separator className={menuSeparatorClass} />
               </>
             )}
 
@@ -376,7 +371,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
                 <ContextMenu.Item className={menuItemClass} onSelect={() => rpcClient.abortRevert()}>
                   Abort Revert
                 </ContextMenu.Item>
-                <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                <ContextMenu.Separator className={menuSeparatorClass} />
               </>
             )}
 
@@ -389,7 +384,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
                 >
                   Drop Commit
                 </ContextMenu.Item>
-                <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                <ContextMenu.Separator className={menuSeparatorClass} />
               </>
             )}
 
@@ -399,14 +394,14 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
             <ContextMenu.Item className={menuItemClass} onSelect={() => rpcClient.copyToClipboard(commit.abbreviatedHash)}>
               Copy Short Hash
             </ContextMenu.Item>
-            <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+            <ContextMenu.Separator className={menuSeparatorClass} />
             <ContextMenu.Item className={menuItemClass} onSelect={() => rpcClient.copyToClipboard(commit.subject)}>
               Copy Commit Message
             </ContextMenu.Item>
 
             {showReset && (
               <>
-                <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                <ContextMenu.Separator className={menuSeparatorClass} />
                 <ContextMenu.Sub>
                   <ContextMenu.SubTrigger className={menuItemClass}>
                     Reset Current Branch to Here

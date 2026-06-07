@@ -19,3 +19,13 @@ export const dialogContentStyle: CSSProperties = {
   minWidth: '400px',
   maxWidth: '90vw',
 };
+
+/**
+ * Shared chrome (positioning, padding, border, surface) for dialog / popup
+ * content, paired with `dialogContentStyle` for sizing. Centralized so a change
+ * to dialog appearance is made once rather than across every dialog. Dialogs that
+ * need extra layout (scrolling lists) append utilities, e.g.
+ * `${dialogContentClassName} flex max-h-[80vh] flex-col`.
+ */
+export const dialogContentClassName =
+  'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 rounded-lg shadow-xl bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] z-50';

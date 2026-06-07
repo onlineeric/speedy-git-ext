@@ -8,13 +8,11 @@ import { DiscardAllDialog } from './DiscardAllDialog';
 import { FilePickerDialog } from './FilePickerDialog';
 import { ensureComparePanelOpen, setSlotsAndCompare } from '../utils/compareDispatch';
 import { slotsEqual } from '../utils/compareSlot';
+import { menuItemClass } from './menuStyles';
 
 interface UncommittedContextMenuProps {
   children: React.ReactNode;
 }
-
-const menuItemClass =
-  'px-3 py-1.5 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
 
 const separatorClass = 'my-1 h-px bg-[var(--vscode-menu-separatorBackground)]';
 

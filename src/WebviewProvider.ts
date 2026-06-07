@@ -1144,7 +1144,7 @@ export class WebviewProvider {
         if (result.success) {
           this.postMessage({
             type: 'worktreePathResolved',
-            payload: { ...result.value, requestId: message.payload.requestId },
+            payload: { path: result.value.path, requestId: message.payload.requestId },
           });
         } else {
           this.postMessage({ type: 'error', payload: { error: result.error } });
@@ -2246,7 +2246,7 @@ export class WebviewProvider {
     return folders?.[0]?.uri.fsPath;
   }
 
-  /** Re-fetch the worktree list and push it to the webview (explicit refresh after mutations). */
+  /** Re-fetch the worktree list and push it to the webview (used by the getWorktreeList handler). */
   private async postWorktreeList(): Promise<void> {
     const result = await this.gitWorktreeService.listWorktrees();
     this.postMessage({

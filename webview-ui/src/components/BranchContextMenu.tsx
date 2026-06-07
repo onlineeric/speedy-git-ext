@@ -22,19 +22,13 @@ import { PushDialog } from './PushDialog';
 import { CheckoutWithPullDialog } from './CheckoutWithPullDialog';
 import { CreateWorktreeDialog, type WorktreeSource } from './CreateWorktreeDialog';
 import { useRemoveWorktreeDialog, WorktreeMenuItems } from './WorktreeMenuItems';
+import { dangerItemClass, menuItemClass, menuItemDisabledClass, menuSeparatorClass } from './menuStyles';
 
 
 interface BranchContextMenuProps {
   refInfo: RefInfo;
   children: React.ReactNode;
 }
-
-const menuItemClass =
-  'px-3 py-1.5 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
-const menuItemDisabledClass =
-  'px-3 py-1.5 text-sm text-[var(--vscode-disabledForeground)] cursor-not-allowed outline-none';
-const dangerItemClass =
-  'px-3 py-1.5 text-sm text-[var(--vscode-errorForeground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
 
 /** Determines whether a branch has local, remote, or both counterparts */
 type BranchCheckoutState = 'local-only' | 'remote-only' | 'dual';
@@ -224,6 +218,12 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
     return null;
   }, [isLocalBranch, isRemoteBranch, isTag, refInfo.remote, refInfo.name, checkoutState]);
   const showWorktreeGroup = worktreeSource !== null || branchWorktree !== undefined;
+  // A single "Create worktree…" item, reused across the local / remote / tag arms.
+  const createWorktreeItem = worktreeSource ? (
+    <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
+      Create worktree…
+    </ContextMenu.Item>
+  ) : null;
 
   // pendingCheckout is for this branch (from checkoutNeedsStash response)
   const stashConfirmOpen = pendingCheckout !== null && pendingCheckout.name === refInfo.name;
@@ -252,7 +252,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                     Compare with Base
                   </ContextMenu.Item>
                 )}
-                <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                <ContextMenu.Separator className={menuSeparatorClass} />
               </>
             )}
 
@@ -305,12 +305,8 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                 )}
                 {showWorktreeGroup && (
                   <>
-                    <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
-                    {worktreeSource && (
-                      <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
-                        Create worktree…
-                      </ContextMenu.Item>
-                    )}
+                    <ContextMenu.Separator className={menuSeparatorClass} />
+                    {createWorktreeItem}
                     {branchWorktree && (
                       <WorktreeMenuItems worktree={branchWorktree} onRemove={openRemoveWorktreeDialog} />
                     )}
@@ -318,7 +314,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                 )}
                 {!isCurrentBranch && (
                   <>
-                    <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                    <ContextMenu.Separator className={menuSeparatorClass} />
                     <ContextMenu.Item className={dangerItemClass} onSelect={() => setDeleteConfirmOpen(true)}>
                       Delete Branch
                     </ContextMenu.Item>
@@ -340,15 +336,11 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                 )}
                 {showWorktreeGroup && (
                   <>
-                    <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
-                    {worktreeSource && (
-                      <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
-                        Create worktree…
-                      </ContextMenu.Item>
-                    )}
+                    <ContextMenu.Separator className={menuSeparatorClass} />
+                    {createWorktreeItem}
                   </>
                 )}
-                <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                <ContextMenu.Separator className={menuSeparatorClass} />
                 <ContextMenu.Item className={dangerItemClass} onSelect={() => setDeleteConfirmOpen(true)}>
                   Delete Remote Branch
                 </ContextMenu.Item>
@@ -362,15 +354,11 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                 </ContextMenu.Item>
                 {showWorktreeGroup && (
                   <>
-                    <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
-                    {worktreeSource && (
-                      <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
-                        Create worktree…
-                      </ContextMenu.Item>
-                    )}
+                    <ContextMenu.Separator className={menuSeparatorClass} />
+                    {createWorktreeItem}
                   </>
                 )}
-                <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                <ContextMenu.Separator className={menuSeparatorClass} />
                 <ContextMenu.Item className={dangerItemClass} onSelect={() => setDeleteConfirmOpen(true)}>
                   Delete Tag
                 </ContextMenu.Item>
@@ -379,7 +367,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
 
             {!isStash && (
               <>
-                <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                <ContextMenu.Separator className={menuSeparatorClass} />
                 <ContextMenu.Item className={menuItemClass} onSelect={handleCopyName}>
                   Copy {isTag ? 'Tag' : 'Branch'} Name
                 </ContextMenu.Item>
@@ -388,7 +376,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
 
             {isBranch && (
               <>
-                <ContextMenu.Separator className="h-px my-1 bg-[var(--vscode-menu-separatorBackground)]" />
+                <ContextMenu.Separator className={menuSeparatorClass} />
                 <BranchFilterMenuItem refInfo={refInfo} />
               </>
             )}

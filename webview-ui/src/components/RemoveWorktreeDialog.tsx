@@ -4,19 +4,14 @@ import type { WorktreeInfo } from '@shared/types';
 import { buildRemoveWorktreeCommand, buildDeleteBranchCommand } from '../utils/gitCommandBuilder';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
-import { stripLocalBranchPrefix } from '../utils/worktreeDisplay';
+import { worktreeLocalBranch } from '../utils/worktreeDisplay';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentStyle } from './dialogStyles';
+import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
 
 interface RemoveWorktreeDialogProps {
   open: boolean;
   worktree: WorktreeInfo;
   onClose: () => void;
-}
-
-function branchName(wt: WorktreeInfo): string | null {
-  if (wt.isDetached || !wt.branch) return null;
-  return stripLocalBranchPrefix(wt.branch);
 }
 
 type BranchDeleteOutcome = 'ok' | 'needs-force' | { error: string };
@@ -60,7 +55,7 @@ function runBranchDelete(name: string, force: boolean): Promise<BranchDeleteOutc
 }
 
 export function RemoveWorktreeDialog({ open, worktree, onClose }: RemoveWorktreeDialogProps) {
-  const name = branchName(worktree);
+  const name = worktreeLocalBranch(worktree);
   const [force, setForce] = useState(false);
   const [alsoDeleteBranch, setAlsoDeleteBranch] = useState(false);
   const [forceDeleteBranch, setForceDeleteBranch] = useState(false);
@@ -141,7 +136,7 @@ export function RemoveWorktreeDialog({ open, worktree, onClose }: RemoveWorktree
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <AlertDialog.Content
-          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 rounded-lg shadow-xl bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] z-50"
+          className={dialogContentClassName}
           style={dialogContentStyle}
         >
           <AlertDialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">

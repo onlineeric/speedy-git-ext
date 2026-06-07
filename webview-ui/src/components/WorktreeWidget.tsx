@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { WorktreeInfo } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { buildPruneWorktreeCommand } from '../utils/gitCommandBuilder';
 import { worktreeBranchLabel } from '../utils/worktreeDisplay';
 import { ConfirmDialog } from './ConfirmDialog';
-import { RemoveWorktreeDialog } from './RemoveWorktreeDialog';
+import { useRemoveWorktreeDialog } from './WorktreeMenuItems';
 import { RefreshIcon } from './icons';
 
 export function WorktreeWidget() {
   const worktrees = useGraphStore((s) => s.worktreeList);
   const worktreeListLoading = useGraphStore((s) => s.worktreeListLoading);
-  const [removeTarget, setRemoveTarget] = useState<WorktreeInfo | null>(null);
+  const { openRemoveWorktreeDialog, removeWorktreeDialog } = useRemoveWorktreeDialog();
   const [pruneOpen, setPruneOpen] = useState(false);
 
   // Refresh the list whenever the panel opens.
@@ -87,7 +86,7 @@ export function WorktreeWidget() {
                   <RowButton onClick={() => rpcClient.openWorktree(wt.path)} disabled={wt.isPrunable}>Open</RowButton>
                   <RowButton onClick={() => rpcClient.revealWorktree(wt.path)}>Reveal</RowButton>
                   {removable && (
-                    <RowButton tone="danger" onClick={() => setRemoveTarget(wt)}>
+                    <RowButton tone="danger" onClick={() => openRemoveWorktreeDialog(wt)}>
                       Remove
                     </RowButton>
                   )}
@@ -113,13 +112,7 @@ export function WorktreeWidget() {
         commandPreview={buildPruneWorktreeCommand()}
       />
 
-      {removeTarget && (
-        <RemoveWorktreeDialog
-          open={removeTarget !== null}
-          worktree={removeTarget}
-          onClose={() => setRemoveTarget(null)}
-        />
-      )}
+      {removeWorktreeDialog}
     </div>
   );
 }

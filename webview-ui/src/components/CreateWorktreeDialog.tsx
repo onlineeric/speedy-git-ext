@@ -2,9 +2,10 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import type { WorktreeBranchMode, WorktreeInfo } from '@shared/types';
 import { buildAddWorktreeCommand } from '../utils/gitCommandBuilder';
+import { WORKTREE_FOLDER_MISSING_TOOLTIP } from '../utils/worktreeDisplay';
 import { rpcClient } from '../rpc/rpcClient';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentStyle } from './dialogStyles';
+import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
 
 export type WorktreeSourceKind = 'local-branch' | 'remote-branch' | 'commit' | 'tag';
 
@@ -135,7 +136,7 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <AlertDialog.Content
-          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 rounded-lg shadow-xl bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] z-50"
+          className={dialogContentClassName}
           style={customDialogContentStyle}
         >
           <AlertDialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">
@@ -173,7 +174,7 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
                         type="button"
                         disabled={existingWorktree.isPrunable}
                         onClick={handleOpenExistingWorktree}
-                        title={existingWorktree.isPrunable ? 'This worktree folder is missing.' : existingWorktree.path}
+                        title={existingWorktree.isPrunable ? WORKTREE_FOLDER_MISSING_TOOLTIP : existingWorktree.path}
                         className="rounded px-1 py-0.5 text-xs text-[var(--vscode-textLink-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Open the worktree in new window

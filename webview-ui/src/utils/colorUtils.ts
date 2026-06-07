@@ -65,16 +65,30 @@ function normalizeHex(hex: string): string {
   return hex;
 }
 
-/** Return inline style for a badge using the given lane hex color. */
-export function getLaneColorStyle(hexColor: string): {
+interface LaneColorStyle {
   backgroundColor: string;
   color: string;
   borderColor: string;
-} {
+}
+
+/**
+ * Cache lane-color styles by hex. The palette is tiny (a handful of colors) but
+ * every visible graph row recomputes this on each render, so memoizing skips the
+ * repeated hex parsing + luminance math and returns a stable object reference.
+ */
+const laneColorStyleCache = new Map<string, LaneColorStyle>();
+
+/** Return inline style for a badge using the given lane hex color. */
+export function getLaneColorStyle(hexColor: string): LaneColorStyle {
+  const cached = laneColorStyleCache.get(hexColor);
+  if (cached) return cached;
+
   const normalized = normalizeHex(hexColor);
-  return {
+  const style: LaneColorStyle = {
     backgroundColor: normalized + '99', // 60% opacity
     color: getContrastTextColor(normalized),
     borderColor: normalized,
   };
+  laneColorStyleCache.set(hexColor, style);
+  return style;
 }

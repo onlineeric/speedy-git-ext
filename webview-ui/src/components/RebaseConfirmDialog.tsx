@@ -2,7 +2,7 @@ import { useState } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { buildRebaseCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentStyle } from './dialogStyles';
+import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
 
 interface RebaseConfirmDialogProps {
   open: boolean;
@@ -38,7 +38,7 @@ export function RebaseConfirmDialog({
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <AlertDialog.Content
-          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 rounded-lg shadow-xl bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] z-50"
+          className={dialogContentClassName}
           style={dialogContentStyle}
         >
           <AlertDialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">

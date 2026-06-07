@@ -180,7 +180,7 @@ export type ResponseMessage =
   | { type: 'pushResult'; payload: { success: boolean; message: string } }
   | { type: 'avatarUrls'; payload: { urls: AvatarUrlMap } }
   | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[] } }
-  | { type: 'worktreePathResolved'; payload: { path: string; leafName: string; requestId: number } }
+  | { type: 'worktreePathResolved'; payload: { path: string; requestId: number } }
   | { type: 'containingBranches'; payload: { hash: string; branches: string[]; status: 'loaded' | 'error' } }
   | { type: 'persistedUIState'; payload: { uiState: PersistedUIState } }
   | { type: 'authorList'; payload: { authors: Author[] } }

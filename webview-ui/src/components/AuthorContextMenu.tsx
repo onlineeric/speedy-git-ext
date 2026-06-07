@@ -1,14 +1,12 @@
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
+import { menuItemClass } from './menuStyles';
 
 interface AuthorContextMenuProps {
   authorEmail: string;
   children: React.ReactNode;
 }
-
-const menuItemClass =
-  'px-3 py-1.5 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
 
 /**
  * Context menu for author cells in the commit table.
