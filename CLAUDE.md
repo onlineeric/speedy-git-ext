@@ -236,11 +236,6 @@ shared/                           # Shared types between backend & frontend
 ## Recent Changes
 - refactor_webViewProvider: Split the ~2400-line `WebviewProvider` god object into the composed `src/webview/` subsystem (facade + PanelHost/Runtime/ServiceRegistry/MessageRouter/RequestContext/PersistedUIStateStore/RepoDataLoader/RefreshCoordinator/EditorCommandService/OperationGuard + per-domain `handlers/`). `src/WebviewProvider.ts` is now a compatibility re-export; RPC dispatch is an exhaustive typed handler map; handlers resolve services from `GitServiceRegistry` at request time to avoid stale references after repo switch
 - 047-signing-verification: 7-state flat `SignatureStatus` enum (drops `verificationUnavailable`); presence detection via raw `gpgsig` header (`git cat-file --batch`, no crypto) so SSH-signed commits without `allowedSignersFile` read as `unavailable` not `unsigned` (FR-017); opt-in hidden-by-default "Signature" history column with 3 grouped glyphs, async viewport-first + cached-by-hash (zero cost when hidden); bundled offline help doc (`docs/signing-verification.md`) opened via `openSignatureHelp` RPC
-- 045-revert-mode-dialog: Three-mode Revert Commit dialog (Commit now / Stage only / Edit message) with inline mainline-parent picker, replacing the direct-action menu item and the standalone RevertParentDialog
-- 046-git-worktrees: Worktree list/add/remove via `GitWorktreeService`; "Worktree" toggle panel + create/remove dialogs + graph-row badges; persistent `speedyGit.worktree.basePath` setting
-- 044-code-refactor: Replaced whole-store Zustand subscriptions with fine-grained selectors (notably `CommitContextMenu`, `CompareABMarker`) to cut per-row re-render work (`graphStore.ts` remains a single ~1,250-line file)
-- 043-fast-forward-branch: Fast-forward a non-checked-out local branch from its remote without checkout; extended to remote-only badges (auto-creates local branch + sets upstream)
-- 042-compare-refs: New "Compare" toggle panel + right-click "Set as Compare Base" / "Compare with Base" for A-vs-B diffs across commits, branches, tags, `HEAD`, working-tree, and typed `rev-parse` expressions
 
 
 <!-- SPECKIT START -->
