@@ -4,6 +4,9 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.0.1] - 2026-06-08
+- Put v5.0.0 to release
+
 ## [5.0.0] - pre-release - 2026-06-07
 
 ### Added
