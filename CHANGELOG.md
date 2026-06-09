@@ -4,6 +4,19 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.0.2] - 2026-06-09
+
+### Fixed
+- **GitHub author avatars now load far more reliably.** Avatars no longer get stuck blank with no way to recover. Several issues were addressed:
+  - Avatars for commits authored with a GitHub no-reply email now resolve instantly and offline, with no API call and no rate-limit cost.
+  - Failed avatar lookups are now cached briefly, so a refresh, fetch, or pull no longer keeps re-spending the GitHub rate limit on the same unresolved authors — which previously left avatars stuck blank until the hourly reset.
+  - When signed in to GitHub in VS Code, avatar lookups now use your session automatically, raising the rate limit from 60 to 5000 requests/hour.
+  - The Output log now reports how many avatars resolved and warns, with guidance, when the unauthenticated rate limit is the reason avatars are missing.
+
+### Internal
+- Reworked `GitHubAvatarService`: optional authenticated requests, offline no-reply-email resolution, positive/negative TTL caching, and a single rate-limit policy shared by the fetch gate and the user-facing warning.
+- Avatar-service initialization in `RepoDataLoader` now coalesces concurrent loads onto one attempt and retries after a transient or early failure (e.g. once `origin` is added), instead of latching off for the session.
+
 ## [5.0.1] - 2026-06-08
 - Put v5.0.0 to release
 
