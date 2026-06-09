@@ -63,13 +63,15 @@ export function computeCommitFingerprint(commits: Commit[]): string {
 
 export class RepoDataLoader {
   private gitHubAvatarService: GitHubAvatarService | null = null;
-  private gitHubAvatarInitialized = false;
+  // In-flight init, so concurrent loads coalesce onto one attempt. Cleared once
+  // settled; a failed attempt (null service) is retried on the next load.
+  private gitHubAvatarInit: Promise<GitHubAvatarService | null> | null = null;
 
   constructor(private readonly deps: RepoDataLoaderDependencies) {}
 
   resetRepoScopedState(): void {
     this.gitHubAvatarService = null;
-    this.gitHubAvatarInitialized = false;
+    this.gitHubAvatarInit = null;
   }
 
   async sendInitialData(filters?: Partial<GraphFilters>, isAutoRefresh = false): Promise<void> {
@@ -273,25 +275,73 @@ export class RepoDataLoader {
   }
 
   private async fetchAndSendGitHubAvatars(commits: Commit[]): Promise<void> {
-    if (!this.gitHubAvatarInitialized) {
-      this.gitHubAvatarInitialized = true;
-      const remotesResult = await this.deps.services.current().gitRemoteService.getRemotes();
-      if (remotesResult.success) {
-        const origin = remotesResult.value.find((remote) => remote.name === 'origin');
-        if (origin) {
-          const parsed = GitHubAvatarService.parseGitHubRemote(origin.fetchUrl);
-          if (parsed) {
-            this.gitHubAvatarService = new GitHubAvatarService(parsed.owner, parsed.repo);
-          }
-        }
-      }
+    const service = await this.ensureGitHubAvatarService();
+    if (!service) return;
+
+    const avatarResult = await service.fetchAvatarUrls(commits);
+    if (!avatarResult.success) return;
+
+    const resolved = Object.keys(avatarResult.value).length;
+    this.deps.log.debug(`GitHub avatars: resolved ${resolved} email(s)`);
+
+    const rateLimitWarning = service.getRateLimitWarning();
+    if (rateLimitWarning) {
+      this.deps.log.warn(rateLimitWarning);
     }
 
-    if (!this.gitHubAvatarService) return;
-
-    const avatarResult = await this.gitHubAvatarService.fetchAvatarUrls(commits);
-    if (avatarResult.success && Object.keys(avatarResult.value).length > 0) {
+    if (resolved > 0) {
       this.deps.postMessage({ type: 'avatarUrls', payload: { urls: avatarResult.value } });
+    }
+  }
+
+  /**
+   * Resolve the avatar service for the current repo, building it once and
+   * coalescing concurrent callers onto a single init. A failed attempt leaves
+   * the service null and clears the latch, so a later load retries it (e.g.
+   * once `origin` is added or a transient `getRemotes` failure clears).
+   */
+  private ensureGitHubAvatarService(): Promise<GitHubAvatarService | null> {
+    if (this.gitHubAvatarService) return Promise.resolve(this.gitHubAvatarService);
+    if (!this.gitHubAvatarInit) {
+      this.gitHubAvatarInit = this.createGitHubAvatarService().then((service) => {
+        this.gitHubAvatarService = service;
+        this.gitHubAvatarInit = null;
+        return service;
+      });
+    }
+    return this.gitHubAvatarInit;
+  }
+
+  /** Build the avatar service from the `origin` GitHub remote, or null if unavailable. */
+  private async createGitHubAvatarService(): Promise<GitHubAvatarService | null> {
+    const remotesResult = await this.deps.services.current().gitRemoteService.getRemotes();
+    if (!remotesResult.success) return null;
+
+    const origin = remotesResult.value.find((remote) => remote.name === 'origin');
+    if (!origin) return null;
+
+    const parsed = GitHubAvatarService.parseGitHubRemote(origin.fetchUrl);
+    if (!parsed) return null;
+
+    const token = await this.getGitHubToken();
+    this.deps.log.info(
+      `GitHub avatars enabled for ${parsed.owner}/${parsed.repo} (${token ? 'authenticated' : 'unauthenticated'})`,
+    );
+    return new GitHubAvatarService(parsed.owner, parsed.repo, token);
+  }
+
+  /**
+   * Best-effort silent GitHub session token from VS Code's built-in auth.
+   * Never prompts: when the user isn't signed in we fall back to unauthenticated
+   * requests. Failures are non-fatal and only reduce the API rate limit.
+   */
+  private async getGitHubToken(): Promise<string | null> {
+    try {
+      const session = await vscode.authentication.getSession('github', [], { silent: true });
+      return session?.accessToken ?? null;
+    } catch (error) {
+      this.deps.log.debug(`GitHub auth session unavailable: ${String(error)}`);
+      return null;
     }
   }
 
