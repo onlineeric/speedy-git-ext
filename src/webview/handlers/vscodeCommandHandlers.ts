@@ -2,8 +2,9 @@ import * as vscode from 'vscode';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 
 export const vscodeCommandHandlers = {
-  openSettings: async () => {
-    await vscode.commands.executeCommand('workbench.action.openSettings', 'speedyGit');
+  openSettings: async (message) => {
+    const query = message.payload.query ?? 'speedyGit';
+    await vscode.commands.executeCommand('workbench.action.openSettings', query);
   },
 
   getSettings: async (_message, context) => {

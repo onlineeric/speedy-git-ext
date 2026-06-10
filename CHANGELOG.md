@@ -4,6 +4,14 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.0.3] - 2026-06-10
+
+### Added
+- **Date format shortcut in the commit table.** The Date column header now has a small gear icon — clicking it opens VS Code settings filtered directly to the **Speedy Git: Date Format** and **Date Format Custom** settings, so you can adjust how commit dates display without hunting through the full settings list.
+
+### Internal
+- Extended the `openSettings` RPC with an optional `query` so settings can be deep-linked to specific settings; extracted a shared `HeaderIconButton` for the commit table header's icon buttons.
+
 ## [5.0.2] - 2026-06-09
 
 ### Fixed

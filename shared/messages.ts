@@ -91,7 +91,7 @@ export type RequestMessage =
   | { type: 'getAuthors'; payload: Record<string, never> }
   // Pagination & settings
   | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string } } }
-  | { type: 'openSettings'; payload: Record<string, never> }
+  | { type: 'openSettings'; payload: { query?: string } }
   | { type: 'switchRepo'; payload: { repoPath: string } }
   /**
    * Show a different repository in the graph WITHOUT changing the workspace's

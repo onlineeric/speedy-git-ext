@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { CommitTableColumnId, CommitTableLayout } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
-import { InfoIcon } from './icons';
+import { InfoIcon, SettingsIcon } from './icons';
 import {
   COMMIT_TABLE_MIN_WIDTHS,
   computeAutoFitWidth,
@@ -42,6 +42,39 @@ const COLUMN_LABELS: Record<CommitTableColumnId, string> = {
   date: 'Date',
   signature: 'Sig',
 };
+
+/** Deep-links VS Code settings to the Speedy Git date-format settings. */
+const DATE_FORMAT_SETTINGS_QUERY = '@id:speedyGit.dateFormat,speedyGit.dateFormatCustom';
+
+/** Small icon button shown next to a column label in the table header. */
+function HeaderIconButton({
+  title,
+  ariaLabel,
+  onActivate,
+  children,
+}: {
+  title: string;
+  ariaLabel?: string;
+  onActivate: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className="ml-1 flex flex-shrink-0 items-center text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)]"
+      title={title}
+      aria-label={ariaLabel ?? title}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onActivate();
+      }}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      {children}
+    </button>
+  );
+}
 
 export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
   const [resizeSession, setResizeSession] = useState<ResizeSession | null>(null);
@@ -137,20 +170,21 @@ export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
           >
             <span className="truncate">{COLUMN_LABELS[column.id]}</span>
             {column.id === 'signature' && (
-              <button
-                type="button"
-                className="ml-1 flex flex-shrink-0 items-center text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)]"
+              <HeaderIconButton
                 title="How signature verification works"
-                aria-label="Signature verification help"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  rpcClient.openSignatureHelp();
-                }}
-                onPointerDown={(event) => event.stopPropagation()}
+                ariaLabel="Signature verification help"
+                onActivate={() => rpcClient.openSignatureHelp()}
               >
                 <InfoIcon />
-              </button>
+              </HeaderIconButton>
+            )}
+            {column.id === 'date' && (
+              <HeaderIconButton
+                title="Configure date format"
+                onActivate={() => rpcClient.openSettings(DATE_FORMAT_SETTINGS_QUERY)}
+              >
+                <SettingsIcon />
+              </HeaderIconButton>
             )}
             <button
               type="button"
