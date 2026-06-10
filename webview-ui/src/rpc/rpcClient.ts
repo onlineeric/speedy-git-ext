@@ -589,8 +589,8 @@ class RpcClient {
   }
 
   // Settings
-  openSettings() {
-    this.send({ type: 'openSettings', payload: {} });
+  openSettings(query?: string) {
+    this.send({ type: 'openSettings', payload: { query } });
   }
 
   getSettings() {
