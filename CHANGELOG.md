@@ -4,6 +4,21 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.1.0] - 2026-06-11
+
+### Added
+- **Copy `.env` files into a new worktree.** The Create Worktree dialog has a new opt-in checkbox, **"Copy .env files into the new worktree"**. Because `git worktree add` only checks out tracked files, gitignored secrets like `.env` and `.env.local` never appear in a new worktree and normally have to be copied by hand — this does it for you. The checkbox is unchecked by default and only enabled when gitignored `.env*` files actually exist, listing the files that will be copied; otherwise it's disabled with a hint (`no .env* file found` / `no .env* file is git-ignored`).
+  - **Detection uses `git check-ignore`** (not `.gitignore` text parsing), so it correctly respects patterns, negations, nested `.gitignore` files, and global excludes.
+  - **Security guard:** files are re-validated against the *new* worktree's branch before copying — any `.env*` file the target branch does **not** git-ignore is skipped (so a copied secret can never land as an untracked, commit-eligible file), and the dialog reports which files were left out and why.
+
+### Documentation
+- **Clearer signature-verification help.** Rewrote `docs/signing-verification.md` for readability: split the per-state and glyph reference into clean tables, reorganized SSH/GPG setup into numbered steps with `Bash`/`PowerShell` variants, and added a note that local verification requires `gpg` or OpenSSH 8.1+ (`ssh-keygen`) on your `PATH`.
+
+## [5.0.4] - 2026-06-11
+
+### Changed
+- **Clearer worktree panel badge.** The badge marking the main worktree in the Worktree panel now reads **`main worktree`** instead of just `main`, making it less likely to be mistaken for the `main` branch.
+
 ## [5.0.3] - 2026-06-10
 
 ### Added

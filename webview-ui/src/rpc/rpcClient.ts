@@ -18,6 +18,12 @@ class RpcClient {
   private pendingPush: { resolve: (message: string) => void; reject: (error: Error) => void } | null = null;
   /** One-shot slot for a `resolveWorktreePath` request awaiting its `worktreePathResolved` response. */
   private pendingWorktreePath: { requestId: number; resolve: (value: { path: string }) => void; reject: (error: Error) => void } | null = null;
+  /** One-shot slot for a `getWorktreeEnvFiles` request awaiting its `worktreeEnvFiles` response. */
+  private pendingWorktreeEnvFiles: {
+    requestId: number;
+    resolve: (value: { ignoredEnvFiles: string[]; envFilesPresent: boolean }) => void;
+    reject: (error: Error) => void;
+  } | null = null;
   /**
    * Promise slot for correlating a dialog-initiated git action with its
    * backend response. Used by FilePickerDialog to lift its `isRunning` busy
@@ -49,6 +55,10 @@ class RpcClient {
     if (this.pendingWorktreePath) {
       this.pendingWorktreePath.reject(new Error('RPC client disposed'));
       this.pendingWorktreePath = null;
+    }
+    if (this.pendingWorktreeEnvFiles) {
+      this.pendingWorktreeEnvFiles.reject(new Error('RPC client disposed'));
+      this.pendingWorktreeEnvFiles = null;
     }
     this.clearPendingDialogAction();
   }
@@ -115,6 +125,10 @@ class RpcClient {
         if (this.pendingWorktreePath) {
           this.pendingWorktreePath.reject(new Error(errorMessage));
           this.pendingWorktreePath = null;
+        }
+        if (this.pendingWorktreeEnvFiles) {
+          this.pendingWorktreeEnvFiles.reject(new Error(errorMessage));
+          this.pendingWorktreeEnvFiles = null;
         }
         if (this.pendingDialogAction) {
           const { reject } = this.pendingDialogAction;
@@ -227,6 +241,15 @@ class RpcClient {
         if (this.pendingWorktreePath && this.pendingWorktreePath.requestId === message.payload.requestId) {
           this.pendingWorktreePath.resolve({ path: message.payload.path });
           this.pendingWorktreePath = null;
+        }
+        break;
+      case 'worktreeEnvFiles':
+        if (this.pendingWorktreeEnvFiles && this.pendingWorktreeEnvFiles.requestId === message.payload.requestId) {
+          this.pendingWorktreeEnvFiles.resolve({
+            ignoredEnvFiles: message.payload.ignoredEnvFiles,
+            envFilesPresent: message.payload.envFilesPresent,
+          });
+          this.pendingWorktreeEnvFiles = null;
         }
         break;
       case 'commitParents': {
@@ -632,7 +655,24 @@ class RpcClient {
     });
   }
 
-  addWorktree(payload: { path: string; ref: string; branchMode: WorktreeBranchMode; newBranchName?: string; force?: boolean }) {
+  /**
+   * Ask the backend which gitignored `.env*` files could be copied into a new worktree.
+   * Resolves with the ignored file names plus whether any `.env*` exists at all (to drive
+   * an accurate disabled-checkbox hint). Rejects if superseded or the backend errors.
+   */
+  getWorktreeEnvFiles(): Promise<{ ignoredEnvFiles: string[]; envFilesPresent: boolean }> {
+    if (this.pendingWorktreeEnvFiles) {
+      this.pendingWorktreeEnvFiles.reject(new Error('superseded'));
+      this.pendingWorktreeEnvFiles = null;
+    }
+    const requestId = this.nextRequestId++;
+    return new Promise((resolve, reject) => {
+      this.pendingWorktreeEnvFiles = { requestId, resolve, reject };
+      this.send({ type: 'getWorktreeEnvFiles', payload: { requestId } });
+    });
+  }
+
+  addWorktree(payload: { path: string; ref: string; branchMode: WorktreeBranchMode; newBranchName?: string; force?: boolean; copyEnvFiles?: boolean }) {
     this.send({ type: 'addWorktree', payload });
   }
 

@@ -74,7 +74,7 @@ export function WorktreeWidget() {
                     <span className="font-mono text-xs text-[var(--vscode-descriptionForeground)]">
                       {wt.head.slice(0, 7)}
                     </span>
-                    {wt.isMain && <Badge>main</Badge>}
+                    {wt.isMain && <Badge>main worktree</Badge>}
                     {wt.isCurrent && <Badge tone="current">YOU ARE HERE</Badge>}
                     {wt.isPrunable && <Badge tone="warning">stale</Badge>}
                   </div>

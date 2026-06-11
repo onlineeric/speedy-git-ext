@@ -117,7 +117,9 @@ export type RequestMessage =
   // Worktree ops
   | { type: 'getWorktreeList'; payload: Record<string, never> }
   | { type: 'resolveWorktreePath'; payload: { ref: string; branchMode: WorktreeBranchMode; newBranchName?: string; requestId: number } }
-  | { type: 'addWorktree'; payload: { path: string; ref: string; branchMode: WorktreeBranchMode; newBranchName?: string; force?: boolean } }
+  /** Detect gitignored `.env*` files in the current repo to drive the "copy env files" checkbox. */
+  | { type: 'getWorktreeEnvFiles'; payload: { requestId: number } }
+  | { type: 'addWorktree'; payload: { path: string; ref: string; branchMode: WorktreeBranchMode; newBranchName?: string; force?: boolean; copyEnvFiles?: boolean } }
   | { type: 'removeWorktree'; payload: { path: string; force?: boolean } }
   | { type: 'pruneWorktree'; payload: Record<string, never> }
   | { type: 'openWorktree'; payload: { path: string } }
@@ -181,6 +183,7 @@ export type ResponseMessage =
   | { type: 'avatarUrls'; payload: { urls: AvatarUrlMap } }
   | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[] } }
   | { type: 'worktreePathResolved'; payload: { path: string; requestId: number } }
+  | { type: 'worktreeEnvFiles'; payload: { requestId: number; ignoredEnvFiles: string[]; envFilesPresent: boolean } }
   | { type: 'containingBranches'; payload: { hash: string; branches: string[]; status: 'loaded' | 'error' } }
   | { type: 'persistedUIState'; payload: { uiState: PersistedUIState } }
   | { type: 'authorList'; payload: { authors: Author[] } }
@@ -215,7 +218,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   getSettings: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
   updateSubmodule: true, initSubmodule: true,
   stashAndCheckout: true, stashAndCheckoutCommit: true,
-  getWorktreeList: true, resolveWorktreePath: true, addWorktree: true,
+  getWorktreeList: true, resolveWorktreePath: true, getWorktreeEnvFiles: true, addWorktree: true,
   removeWorktree: true, pruneWorktree: true, openWorktree: true, revealWorktree: true,
   getContainingBranches: true, openExternal: true,
   openCurrentFile: true, updatePersistedUIState: true, getAuthors: true,
@@ -236,7 +239,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commitsAppended: true, prefetchError: true, repoList: true,
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
-  pushResult: true, avatarUrls: true, worktreeList: true, worktreePathResolved: true, containingBranches: true,
+  pushResult: true, avatarUrls: true, worktreeList: true, worktreePathResolved: true, worktreeEnvFiles: true, containingBranches: true,
   persistedUIState: true, authorList: true, uncommittedChanges: true, conflictState: true,
   initialData: true,
   compareResult: true, compareError: true,

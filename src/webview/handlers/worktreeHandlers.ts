@@ -26,8 +26,21 @@ export const worktreeHandlers = {
     }
   },
 
+  getWorktreeEnvFiles: async (message, context) => {
+    const result = await context.services.current().gitWorktreeService.detectCopyableEnvFiles();
+    context.postMessage({
+      type: 'worktreeEnvFiles',
+      payload: {
+        requestId: message.payload.requestId,
+        ignoredEnvFiles: result.success ? result.value.ignoredEnvFiles : [],
+        envFilesPresent: result.success ? result.value.envFilesPresent : false,
+      },
+    });
+  },
+
   addWorktree: async (message, context) => {
-    const result = await context.services.current().gitWorktreeService.addWorktree({
+    const worktreeService = context.services.current().gitWorktreeService;
+    const result = await worktreeService.addWorktree({
       path: message.payload.path,
       ref: message.payload.ref,
       branchMode: message.payload.branchMode,
@@ -35,7 +48,18 @@ export const worktreeHandlers = {
       force: message.payload.force,
     });
     if (result.success) {
-      context.postMessage({ type: 'success', payload: { message: 'Worktree created' } });
+      // Copy gitignored .env* files into the new worktree if requested. Non-fatal:
+      // a copy failure must not turn a successful worktree creation into an error.
+      let successMessage = 'Worktree created';
+      if (message.payload.copyEnvFiles) {
+        const copyResult = await worktreeService.copyIgnoredEnvFilesTo(message.payload.path);
+        if (copyResult.success && copyResult.value.skippedNotIgnored.length > 0) {
+          // Security note: these files are NOT ignored by the new branch, so copying
+          // them would expose secrets as untracked, commit-eligible files. Tell the user.
+          successMessage = `Worktree created. Skipped ${copyResult.value.skippedNotIgnored.join(', ')} — the new branch does not git-ignore these, so they were left out to avoid exposing secrets.`;
+        }
+      }
+      context.postMessage({ type: 'success', payload: { message: successMessage } });
       await context.refreshCoordinator.reload();
       await context.editorCommands.openWorktreeFolder(message.payload.path);
     } else {
@@ -79,7 +103,7 @@ export const worktreeHandlers = {
   },
 } satisfies Pick<
   RequestHandlerMap,
-  'getWorktreeList' | 'resolveWorktreePath' | 'addWorktree' | 'removeWorktree' | 'pruneWorktree' | 'openWorktree' | 'revealWorktree'
+  'getWorktreeList' | 'resolveWorktreePath' | 'getWorktreeEnvFiles' | 'addWorktree' | 'removeWorktree' | 'pruneWorktree' | 'openWorktree' | 'revealWorktree'
 >;
 
 async function postWorktreeList(context: Parameters<typeof worktreeHandlers.getWorktreeList>[1]): Promise<void> {
