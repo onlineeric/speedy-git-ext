@@ -59,6 +59,10 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
   const [path, setPath] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Gitignored `.env*` files that could be copied into the new worktree, plus the
+  // user's opt-in choice. `null` while the backend probe is in flight.
+  const [envInfo, setEnvInfo] = useState<{ ignoredEnvFiles: string[]; envFilesPresent: boolean } | null>(null);
+  const [copyEnvFiles, setCopyEnvFiles] = useState(false);
 
   // This dialog is mounted only while open (see call sites), so the initial
   // useState values above already seed fresh state per open — no reset effect needed.
@@ -82,6 +86,35 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
     };
   }, [open, source.ref, branchMode, newBranchName]);
 
+  // Probe once per open for gitignored `.env*` files. The dialog is mounted only while
+  // open, so this runs on mount; superseded/disposed probes reject and are ignored.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    rpcClient
+      .getWorktreeEnvFiles()
+      .then((info) => {
+        if (!cancelled) setEnvInfo(info);
+      })
+      .catch(() => {
+        /* superseded / disposed — ignore */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const envCopyEnabled = (envInfo?.ignoredEnvFiles.length ?? 0) > 0;
+  // Light-grey hint shown after the checkbox label. Names the files that will be copied,
+  // or explains why the checkbox is disabled. `null` while the probe is in flight.
+  const envHint = !envInfo
+    ? null
+    : envCopyEnabled
+      ? `(${envInfo.ignoredEnvFiles.join(', ')})`
+      : envInfo.envFilesPresent
+        ? ' - (no .env* file is git-ignored)'
+        : ' - (no .env* file found)';
+
   const trimmedName = newBranchName.trim();
   const nameInvalid = branchMode === 'new' && (trimmedName.length === 0 || trimmedName.startsWith('-'));
   const canConfirm = path.trim().length > 0 && !nameInvalid && !busy;
@@ -101,6 +134,7 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
       ref: source.ref,
       branchMode,
       newBranchName: branchMode === 'new' ? trimmedName : undefined,
+      copyEnvFiles: envCopyEnabled && copyEnvFiles,
     });
     try {
       await done;
@@ -110,7 +144,7 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
       setError(typeof e === 'string' ? e : (e as Error).message);
       setBusy(false);
     }
-  }, [canConfirm, path, source.ref, branchMode, trimmedName, onClose]);
+  }, [canConfirm, path, source.ref, branchMode, trimmedName, envCopyEnabled, copyEnvFiles, onClose]);
 
   const handleCancel = useCallback(() => {
     rpcClient.clearPendingDialogAction();
@@ -213,7 +247,27 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
             <CommandPreview command={commandPreview} />
           </div>
 
-          <p className="mt-3 text-xs text-[var(--vscode-descriptionForeground)]">
+          <div className="mt-5 flex min-h-7 flex-wrap items-start gap-x-1.5 gap-y-1">
+            <label
+              className={`flex min-w-0 items-start gap-2 select-none ${envCopyEnabled ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+            >
+              <input
+                type="checkbox"
+                checked={envCopyEnabled && copyEnvFiles}
+                disabled={!envCopyEnabled}
+                onChange={(e) => setCopyEnvFiles(e.target.checked)}
+                className="mt-0.5 accent-[var(--vscode-button-background)] disabled:cursor-not-allowed"
+              />
+              <span className={`text-sm ${envCopyEnabled ? 'text-[var(--vscode-foreground)]' : 'text-[var(--vscode-disabledForeground)]'}`}>
+                Copy git ignored .env* files into the new worktree
+              </span>
+            </label>
+            {envHint && (
+              <span className="text-sm text-[var(--vscode-descriptionForeground)]">{envHint}</span>
+            )}
+          </div>
+
+          <p className="mt-2 text-xs text-[var(--vscode-descriptionForeground)]">
             The worktree will open in a new window.
           </p>
 

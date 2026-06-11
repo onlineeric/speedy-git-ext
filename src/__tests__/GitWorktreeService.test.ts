@@ -1,9 +1,25 @@
 import type { LogOutputChannel } from 'vscode';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { existsSync } from 'node:fs';
+import { readdir, copyFile } from 'node:fs/promises';
 import { GitWorktreeService } from '../services/GitWorktreeService.js';
-import { GitError, ok } from '../../shared/errors.js';
+import { GitError, err, ok } from '../../shared/errors.js';
 import type { GitExecOptions, GitExecResult } from '../services/GitExecutor.js';
 import type { Result } from '../../shared/errors.js';
+
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn(() => false),
+}));
+
+vi.mock('node:fs/promises', () => ({
+  readdir: vi.fn(),
+  copyFile: vi.fn(),
+}));
+
+/** Minimal Dirent stub for stubbing `readdir(..., { withFileTypes: true })`. */
+function dirent(name: string, isFile = true) {
+  return { name, isFile: () => isFile, isDirectory: () => !isFile };
+}
 
 const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as LogOutputChannel;
 
@@ -451,5 +467,153 @@ describe('GitWorktreeService.resolveWorktreePath', () => {
       expect(result.value.path).toBe('/repo/submodules/repo-b.worktrees/feature-submodule');
       expect(result.value.leafName).toBe('feature-submodule');
     }
+  });
+});
+
+describe('GitWorktreeService.detectCopyableEnvFiles', () => {
+  const readdirMock = vi.mocked(readdir);
+
+  it('reports no env files when none exist (and skips git check-ignore)', async () => {
+    readdirMock.mockResolvedValue([dirent('package.json'), dirent('src', false)] as never);
+    const service = new GitWorktreeService('/repo', mockLog);
+    const checkIgnore = stubExecutor(service, () => ok({ stdout: '', stderr: '' }));
+
+    const result = await service.detectCopyableEnvFiles();
+
+    expect(result.success && result.value).toEqual({ ignoredEnvFiles: [], envFilesPresent: false });
+    expect(checkIgnore).not.toHaveBeenCalled();
+  });
+
+  it('recognizes .env and .env.* but not unrelated dotfiles like .environment', async () => {
+    readdirMock.mockResolvedValue(
+      [dirent('.env'), dirent('.env.local'), dirent('.environment')] as never
+    );
+    const service = new GitWorktreeService('/repo', mockLog);
+    const checkIgnore = stubExecutor(service, (args) => {
+      expect(args).toEqual(['check-ignore', '--', '.env', '.env.local']);
+      return ok({ stdout: '.env\n.env.local\n', stderr: '' });
+    });
+
+    const result = await service.detectCopyableEnvFiles();
+
+    expect(checkIgnore).toHaveBeenCalledTimes(1);
+    expect(result.success && result.value).toEqual({
+      ignoredEnvFiles: ['.env', '.env.local'],
+      envFilesPresent: true,
+    });
+  });
+
+  it('treats a non-zero check-ignore (nothing ignored) as no copyable files', async () => {
+    readdirMock.mockResolvedValue([dirent('.env'), dirent('.env.example')] as never);
+    const service = new GitWorktreeService('/repo', mockLog);
+    stubExecutor(service, () => err(new GitError('', 'COMMAND_FAILED')));
+
+    const result = await service.detectCopyableEnvFiles();
+
+    expect(result.success && result.value).toEqual({ ignoredEnvFiles: [], envFilesPresent: true });
+  });
+
+  it('returns only the ignored subset when some env files are tracked', async () => {
+    readdirMock.mockResolvedValue([dirent('.env'), dirent('.env.example')] as never);
+    const service = new GitWorktreeService('/repo', mockLog);
+    stubExecutor(service, () => ok({ stdout: '.env\n', stderr: '' }));
+
+    const result = await service.detectCopyableEnvFiles();
+
+    expect(result.success && result.value).toEqual({
+      ignoredEnvFiles: ['.env'],
+      envFilesPresent: true,
+    });
+  });
+});
+
+describe('GitWorktreeService.copyIgnoredEnvFilesTo', () => {
+  const readdirMock = vi.mocked(readdir);
+  const copyFileMock = vi.mocked(copyFile);
+  const existsSyncMock = vi.mocked(existsSync);
+
+  beforeEach(() => {
+    readdirMock.mockReset();
+    copyFileMock.mockReset();
+    existsSyncMock.mockReset();
+  });
+
+  /** Dispatch check-ignore on its cwd: source worktree vs target worktree. */
+  function stubCheckIgnore(
+    service: GitWorktreeService,
+    sourceIgnored: string[],
+    targetIgnored: string[]
+  ) {
+    return stubExecutor(service, (args, opts) => {
+      if (args[0] !== 'check-ignore') return ok({ stdout: '', stderr: '' });
+      const ignored = opts.cwd === '/repo' ? sourceIgnored : targetIgnored;
+      return ignored.length > 0
+        ? ok({ stdout: `${ignored.join('\n')}\n`, stderr: '' })
+        : err(new GitError('', 'COMMAND_FAILED'));
+    });
+  }
+
+  it('copies files that the target branch also git-ignores', async () => {
+    readdirMock.mockResolvedValue([dirent('.env'), dirent('.env.dev')] as never);
+    existsSyncMock.mockImplementation((p) => p === '/repo/.env' || p === '/repo/.env.dev');
+    copyFileMock.mockResolvedValue();
+    const service = new GitWorktreeService('/repo', mockLog);
+    stubCheckIgnore(service, ['.env', '.env.dev'], ['.env', '.env.dev']);
+
+    const result = await service.copyIgnoredEnvFilesTo('/repo.worktrees/feature');
+
+    expect(result.success && result.value).toEqual({
+      copied: ['.env', '.env.dev'],
+      skippedNotIgnored: [],
+    });
+    expect(copyFileMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips a file the target branch does not ignore (e.g. !.env.dev negation)', async () => {
+    readdirMock.mockResolvedValue([dirent('.env'), dirent('.env.dev')] as never);
+    existsSyncMock.mockImplementation((p) => p === '/repo/.env' || p === '/repo/.env.dev');
+    copyFileMock.mockResolvedValue();
+    const service = new GitWorktreeService('/repo', mockLog);
+    // Source ignores both; target ignores only `.env` (its branch un-ignores `.env.dev`).
+    stubCheckIgnore(service, ['.env', '.env.dev'], ['.env']);
+
+    const result = await service.copyIgnoredEnvFilesTo('/repo.worktrees/feature');
+
+    expect(result.success && result.value).toEqual({
+      copied: ['.env'],
+      skippedNotIgnored: ['.env.dev'],
+    });
+    expect(copyFileMock).toHaveBeenCalledTimes(1);
+    expect(copyFileMock).toHaveBeenCalledWith('/repo/.env', '/repo.worktrees/feature/.env');
+  });
+
+  it('copies nothing when the target branch ignores none of the files', async () => {
+    readdirMock.mockResolvedValue([dirent('.env'), dirent('.env.dev')] as never);
+    existsSyncMock.mockImplementation((p) => p === '/repo/.env' || p === '/repo/.env.dev');
+    copyFileMock.mockResolvedValue();
+    const service = new GitWorktreeService('/repo', mockLog);
+    stubCheckIgnore(service, ['.env', '.env.dev'], []);
+
+    const result = await service.copyIgnoredEnvFilesTo('/repo.worktrees/feature');
+
+    expect(result.success && result.value).toEqual({
+      copied: [],
+      skippedNotIgnored: ['.env', '.env.dev'],
+    });
+    expect(copyFileMock).not.toHaveBeenCalled();
+  });
+
+  it('does not overwrite a file that already exists in the target worktree', async () => {
+    readdirMock.mockResolvedValue([dirent('.env')] as never);
+    // Source `.env` exists AND target `.env` already exists → skip copy.
+    existsSyncMock.mockImplementation((p) => p === '/repo/.env' || p === '/repo.worktrees/feature/.env');
+    copyFileMock.mockResolvedValue();
+    const service = new GitWorktreeService('/repo', mockLog);
+    stubCheckIgnore(service, ['.env'], ['.env']);
+
+    const result = await service.copyIgnoredEnvFilesTo('/repo.worktrees/feature');
+
+    expect(result.success && result.value).toEqual({ copied: [], skippedNotIgnored: [] });
+    expect(copyFileMock).not.toHaveBeenCalled();
   });
 });
