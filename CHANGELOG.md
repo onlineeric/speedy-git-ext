@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.0.4] - 2026-06-11
+
+### Changed
+- **Clearer worktree panel badge.** The badge marking the main worktree in the Worktree panel now reads **`main worktree`** instead of just `main`, making it less likely to be mistaken for the `main` branch.
+
 ## [5.0.3] - 2026-06-10
 
 ### Added

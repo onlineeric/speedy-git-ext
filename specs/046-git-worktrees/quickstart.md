@@ -14,7 +14,7 @@ Prereqs: `pnpm build`, then launch via "Run Extension" (or "Run Extension (Watch
 ## 2. Worktree panel (US2 / P2)
 
 1. Click the **Worktree** toggle in the toolbar → panel lists every worktree (path, branch/detached, short HEAD).
-2. Main worktree shows the `main` badge and has **no** Remove. Current window's worktree shows "you are here" and is non-removable.
+2. Main worktree shows the `main worktree` badge and has **no** Remove. Current window's worktree shows "you are here" and is non-removable.
 3. **Open** on another worktree → opens it in a new window. **Reveal in OS** → opens the folder in the file manager.
 
 ✅ Pass: list matches `git worktree list`; main + current non-removable; open/reveal work.
