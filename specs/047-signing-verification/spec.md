@@ -201,6 +201,9 @@ and an explanation of each status meaning.
 - **FR-014**: When the Signature column is enabled, signature verification MUST
   run asynchronously and MUST NOT block the graph render or the UI thread; the
   commit graph appears immediately and signature glyphs populate progressively.
+  While a commit known to be `signed` (by presence) is awaiting its async verdict,
+  its cell MAY show a transient "verifying" spinner so it is not mistaken for an
+  unsigned (blank) commit; the spinner resolves to a glyph once the verdict caches.
 - **FR-015**: Signature verification results MUST be cached per commit hash for
   at least the session (signatures are immutable). On refresh, only new/unseen
   commits are verified; scrolling MUST resolve from cache (no per-scroll
