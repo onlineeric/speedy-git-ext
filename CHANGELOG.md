@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.1.1] - 2026-06-23
+
+### Changed
+- **"Verifying" spinner in the Signature column.** A commit that is known to be signed but whose verification verdict hasn't returned yet now shows a brief spinner in its Signature column cell instead of a blank cell, so a signed-but-not-yet-verified commit is no longer momentarily mistaken for an unsigned one. The spinner resolves to the appropriate glyph as soon as the async verdict lands.
+
 ## [5.1.0] - 2026-06-11
 
 ### Added
