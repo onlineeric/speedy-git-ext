@@ -21,8 +21,8 @@
     "git",
     "git graph",
     "git history",
-    "git log",
-    "git ui"
+    "git ui",
+    "worktree"
   ],
   "activationEvents": ["onStartupFinished"],
   "main": "./dist/extension.js",
