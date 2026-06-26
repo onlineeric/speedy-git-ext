@@ -40,10 +40,16 @@ export const signatureHandlers = {
   },
 
   verifySignatures: async (message, context) => {
-    const result = await context.services.current().gitSignatureService.verifySignatures(message.payload.hashes);
-    if (result.success) {
-      context.postMessage({ type: 'signaturesVerified', payload: { results: result.value } });
-    } else {
+    // Stream verdicts as they resolve so the signature column fills in row-by-row
+    // (the store merges each partial map). The final aggregate is intentionally
+    // not re-posted — every verdict has already been streamed via onProgress.
+    const result = await context.services.current().gitSignatureService.verifySignatures(
+      message.payload.hashes,
+      (results) => {
+        context.postMessage({ type: 'signaturesVerified', payload: { results } });
+      }
+    );
+    if (!result.success) {
       context.postMessage({ type: 'error', payload: { error: result.error } });
     }
   },

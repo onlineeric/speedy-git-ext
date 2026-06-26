@@ -340,6 +340,45 @@ describe('GitSignatureService.verifySignatures', () => {
     }
   });
 
+  it('streams verdicts via onProgress as they resolve, covering every hash', async () => {
+    const service = new GitSignatureService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute').mockImplementation(async (opts) => {
+      const hash = opts.args[opts.args.length - 1];
+      return {
+        success: true,
+        value: { stdout: buildSigOutput([hash === 'bbbbbbb' ? 'B' : 'G', '', '', '']), stderr: '' },
+      };
+    });
+    vi.spyOn(service['executor'], 'executeRaw').mockResolvedValue({
+      success: true,
+      value: {
+        stdout: Buffer.concat([
+          batchRecord('aaaaaaa', GPG_SIGNED_COMMIT),
+          batchRecord('bbbbbbb', GPG_SIGNED_COMMIT),
+          batchRecord('ccccccc', GPG_SIGNED_COMMIT),
+        ]),
+        stderr: '',
+      },
+    });
+
+    // Aggregate every streamed partial map: collectively they must cover all hashes.
+    const streamed: Record<string, string> = {};
+    const result = await service.verifySignatures(
+      ['aaaaaaa', 'bbbbbbb', 'ccccccc'],
+      (partial) => {
+        for (const [hash, info] of Object.entries(partial)) streamed[hash] = info?.status ?? 'null';
+      }
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // Returned map still preserves input order despite out-of-order resolution.
+      expect(Object.keys(result.value)).toEqual(['aaaaaaa', 'bbbbbbb', 'ccccccc']);
+    }
+    expect(Object.keys(streamed).sort()).toEqual(['aaaaaaa', 'bbbbbbb', 'ccccccc']);
+    expect(streamed['bbbbbbb']).toBe('bad');
+  });
+
   it('falls back to verdict-only verification when batch object inspection fails', async () => {
     const service = new GitSignatureService('/repo', mockLog);
     vi.spyOn(service['executor'], 'execute').mockResolvedValue({
