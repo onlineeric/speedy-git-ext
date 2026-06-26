@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.1.3] - 2026-06-27
+
+### Performance
+- **Fast scrolling no longer leaves blank rows.** Flicking through history quickly — especially with a high-resolution, free-spinning mouse wheel (e.g. Logitech MX Master) — could outrun rendering and leave rows blank until scrolling stopped. The cause, present since the very first release, was that every visible commit row eagerly built its entire right-click context menu up front — including all of its dialogs and live store subscriptions — which made each row far too expensive to render fast enough to keep pace with a quick scroll. Context menus are now built lazily, only when you actually right-click a row, so rows render dramatically cheaper and the graph stays filled while scrolling at any speed. As a bonus, this also cuts re-render work on filtering and refresh, since visible rows no longer each carry their menu's store subscriptions.
+
 ## [5.1.2] - 2026-06-26
 
 ### Fixed

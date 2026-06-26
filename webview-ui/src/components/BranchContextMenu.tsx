@@ -23,6 +23,7 @@ import { CheckoutWithPullDialog } from './CheckoutWithPullDialog';
 import { CreateWorktreeDialog, type WorktreeSource } from './CreateWorktreeDialog';
 import { useRemoveWorktreeDialog, WorktreeMenuItems } from './WorktreeMenuItems';
 import { dangerItemClass, menuItemClass, menuItemDisabledClass, menuSeparatorClass } from './menuStyles';
+import { LazyContextMenu } from './LazyContextMenu';
 
 
 interface BranchContextMenuProps {
@@ -49,6 +50,14 @@ function getBranchCheckoutState(refInfo: RefInfo, branches: ReturnType<typeof us
 }
 
 export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps) {
+  return (
+    <LazyContextMenu stopPropagation body={<BranchContextMenuBody refInfo={refInfo} />}>
+      {children}
+    </LazyContextMenu>
+  );
+}
+
+function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
@@ -231,12 +240,8 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
 
   return (
     <>
-      {/* Wrapper stops contextmenu event from bubbling to parent CommitContextMenu */}
-      <span onContextMenu={(e) => e.stopPropagation()}>
-      <ContextMenu.Root>
-        <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
-        <ContextMenu.Portal>
-          <ContextMenu.Content className="min-w-[160px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+      <ContextMenu.Portal>
+        <ContextMenu.Content className="min-w-[160px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
             {/* Compare-refs (042-compare-refs) — branches and tags only; stashes excluded (FR-017) */}
             {compareItemsAvailable && (
               <>
@@ -382,8 +387,6 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
             )}
           </ContextMenu.Content>
         </ContextMenu.Portal>
-      </ContextMenu.Root>
-      </span>
 
       {/* Delete confirmation for tags and remote branches */}
       <ConfirmDialog

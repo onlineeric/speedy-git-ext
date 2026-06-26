@@ -17,6 +17,7 @@ import { DropCommitDialog } from './DropCommitDialog';
 import { CreateWorktreeDialog } from './CreateWorktreeDialog';
 import { createReachabilityChecker } from '../utils/commitReachability';
 import { menuItemClass, menuItemDisabledClass, menuSeparatorClass } from './menuStyles';
+import { LazyContextMenu } from './LazyContextMenu';
 
 interface CommitContextMenuProps {
   commit: Commit;
@@ -43,6 +44,14 @@ function buildResetDescription(
 }
 
 export function CommitContextMenu({ commit, children }: CommitContextMenuProps) {
+  return (
+    <LazyContextMenu body={<CommitContextMenuBody commit={commit} />}>
+      {children}
+    </LazyContextMenu>
+  );
+}
+
+function CommitContextMenuBody({ commit }: { commit: Commit }) {
   const [checkoutCommitConfirmOpen, setCheckoutCommitConfirmOpen] = useState(false);
   const [createBranchOpen, setCreateBranchOpen] = useState(false);
   const [createTagOpen, setCreateTagOpen] = useState(false);
@@ -236,10 +245,8 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
 
   return (
     <>
-      <ContextMenu.Root>
-        <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
-        <ContextMenu.Portal>
-          <ContextMenu.Content className="min-w-[180px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+      <ContextMenu.Portal>
+        <ContextMenu.Content className="min-w-[180px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
             {/* Compare refs (042-compare-refs) */}
             {isMultiSelectActive ? (
               <ContextMenu.Item
@@ -424,7 +431,6 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
             )}
           </ContextMenu.Content>
         </ContextMenu.Portal>
-      </ContextMenu.Root>
 
       <ConfirmDialog
         open={checkoutCommitConfirmOpen}

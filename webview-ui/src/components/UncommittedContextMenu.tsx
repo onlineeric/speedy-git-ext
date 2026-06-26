@@ -9,6 +9,7 @@ import { FilePickerDialog } from './FilePickerDialog';
 import { ensureComparePanelOpen, setSlotsAndCompare } from '../utils/compareDispatch';
 import { slotsEqual } from '../utils/compareSlot';
 import { menuItemClass } from './menuStyles';
+import { LazyContextMenu } from './LazyContextMenu';
 
 interface UncommittedContextMenuProps {
   children: React.ReactNode;
@@ -17,6 +18,10 @@ interface UncommittedContextMenuProps {
 const separatorClass = 'my-1 h-px bg-[var(--vscode-menu-separatorBackground)]';
 
 export function UncommittedContextMenu({ children }: UncommittedContextMenuProps) {
+  return <LazyContextMenu body={<UncommittedContextMenuBody />}>{children}</LazyContextMenu>;
+}
+
+function UncommittedContextMenuBody() {
   const [stashDialogOpen, setStashDialogOpen] = useState(false);
   const [discardAllDialogOpen, setDiscardAllDialogOpen] = useState(false);
   const [filePickerOpen, setFilePickerOpen] = useState(false);
@@ -61,10 +66,8 @@ export function UncommittedContextMenu({ children }: UncommittedContextMenuProps
 
   return (
     <>
-      <ContextMenu.Root>
-        <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
-        <ContextMenu.Portal>
-          <ContextMenu.Content className="min-w-[200px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+      <ContextMenu.Portal>
+        <ContextMenu.Content className="min-w-[200px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
             {/* Compare-refs (042-compare-refs) — Working Tree sentinel */}
             <ContextMenu.Item className={menuItemClass} onSelect={handleSetWorkingTreeAsBase}>
               Set as Compare Base
@@ -115,7 +118,6 @@ export function UncommittedContextMenu({ children }: UncommittedContextMenuProps
             </ContextMenu.Item>
           </ContextMenu.Content>
         </ContextMenu.Portal>
-      </ContextMenu.Root>
       <StashDialog
         open={stashDialogOpen}
         onOpenChange={setStashDialogOpen}
