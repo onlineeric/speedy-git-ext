@@ -4,6 +4,14 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.1.2] - 2026-06-26
+
+### Fixed
+- **Long toast notifications no longer overflow off-screen.** Error/success notifications that contained long, unbreakable tokens (e.g. file paths or URLs in a merge-conflict message) could blow past the notification box and run off the right edge of the view. The message now wraps within the box, preserves its line breaks, and scrolls vertically when very long.
+
+### Performance
+- **Signature column verifies much faster and fills in row-by-row.** On large repositories the Signature column previously verified commits one at a time and only revealed a whole batch (~50 rows) at once after a long pause, so on a slower machine the column could appear stuck for 10–30 seconds at a time and take minutes to finish. Verification now runs several commits in parallel (scaled to your CPU cores, visible rows first) and streams each verdict to the column as it resolves, so glyphs appear progressively, row-by-row, and the whole repository completes far sooner.
+
 ## [5.1.1] - 2026-06-23
 
 ### Changed

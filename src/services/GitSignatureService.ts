@@ -1,3 +1,4 @@
+import { cpus } from 'os';
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { type Result, ok } from '../../shared/errors.js';
@@ -35,6 +36,42 @@ const EMPTY_VERDICT: SignatureVerdict = {
   keyId: '',
   fingerprint: '',
 };
+
+/**
+ * Max verdict lookups in flight at once. The dominant cost of verification is the
+ * per-commit GPG/SSH crypto that `git log %G?` triggers; running several commits
+ * in parallel cuts a large batch's wall-clock time roughly proportionally on
+ * multi-core machines. Kept per-commit (rather than one batched `git log
+ * --no-walk` over many hashes) so the crypto actually runs in parallel across
+ * processes and no single process risks the executor's 30s timeout.
+ */
+const VERIFY_CONCURRENCY = Math.max(2, Math.min(8, cpus().length));
+
+/**
+ * Minimum gap between streamed progress callbacks. Verified rows are flushed to
+ * the webview as they resolve so the signature column fills in row-by-row, while
+ * this throttle coalesces bursts into at most ~10 updates/sec.
+ */
+const PROGRESS_FLUSH_MS = 100;
+
+/**
+ * Run `worker` over `items` with at most `limit` in flight at once. Workers pull
+ * the next item in array order, so the earliest items (the viewport rows the
+ * caller lists first) are scheduled first.
+ */
+async function runWithConcurrency<T>(
+  items: readonly T[],
+  limit: number,
+  worker: (item: T) => Promise<void>
+): Promise<void> {
+  let cursor = 0;
+  const runNext = async (): Promise<void> => {
+    while (cursor < items.length) {
+      await worker(items[cursor++]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runNext));
+}
 
 export class GitSignatureService {
   private executor: GitExecutor;
@@ -135,8 +172,16 @@ export class GitSignatureService {
    * Verify many commits already known to be signed (presence pass done by the
    * caller). Returns a hash→info map. A present-but-unverifiable signature maps
    * to `unavailable`, never `unsigned` (FR-017).
+   *
+   * Verdicts are looked up with bounded concurrency (the per-commit GPG/SSH
+   * crypto is the bottleneck) and, when `onProgress` is supplied, streamed to the
+   * caller as they resolve — coalesced by {@link PROGRESS_FLUSH_MS} — so the
+   * signature column fills in row-by-row instead of jumping a whole batch at once.
    */
-  async verifySignatures(hashes: string[]): Promise<Result<Record<string, CommitSignatureInfo | null>>> {
+  async verifySignatures(
+    hashes: string[],
+    onProgress?: (results: Record<string, CommitSignatureInfo | null>) => void
+  ): Promise<Result<Record<string, CommitSignatureInfo | null>>> {
     const results: Record<string, CommitSignatureInfo | null> = {};
     if (hashes.length === 0) return ok(results);
 
@@ -149,32 +194,61 @@ export class GitSignatureService {
       this.log.warn(`Signature object inspection failed; falling back to verdict-only verification: ${objectResult.error.message}`);
     }
 
-    for (const hash of hashes) {
-      // Skip non-object ids defensively; one bad hash must not abort the batch.
-      if (!validateHash(hash).success) {
-        results[hash] = null;
-        continue;
-      }
+    // Coalesce streamed results so a fast burst doesn't flood the webview with a
+    // message per commit; a fresh object is handed off on each flush so the
+    // caller can keep the reference safely.
+    let pending: Record<string, CommitSignatureInfo | null> = {};
+    let lastFlush = 0;
+    const flush = (force: boolean) => {
+      const now = Date.now();
+      if (Object.keys(pending).length === 0 || (!force && now - lastFlush < PROGRESS_FLUSH_MS)) return;
+      onProgress?.(pending);
+      pending = {};
+      lastFlush = now;
+    };
 
-      const verdictResult = await this.fetchVerdict(hash);
-      if (!verdictResult.success) {
-        // The caller only sends hashes whose presence pass already proved a
-        // signature exists. If one verdict lookup fails, return a terminal
-        // `unavailable` state so the webview can clear loading and avoid a stuck
-        // details panel.
-        this.log.warn(`Signature verdict unavailable for ${hash.slice(0, 7)}: ${verdictResult.error.message}`);
-        const format = objects[hash]?.format ?? 'gpg';
-        results[hash] = this.buildInfo('unavailable', EMPTY_VERDICT, format);
-        continue;
+    // Seed every hash up front so the returned map iterates in input order
+    // (documented contract; tests rely on it). Concurrency resolves verdicts out
+    // of order, but overwriting an existing key leaves its position unchanged.
+    for (const hash of hashes) results[hash] = null;
+    await runWithConcurrency(hashes, VERIFY_CONCURRENCY, async (hash) => {
+      const info = await this.verifyOne(hash, objects[hash]?.format ?? 'gpg');
+      results[hash] = info;
+      if (onProgress) {
+        pending[hash] = info;
+        flush(false);
       }
-
-      const { verdict, definiteStatus } = verdictResult.value;
-      const format = objects[hash]?.format ?? 'gpg';
-      // These hashes are known signed, so any non-verdict resolves to `unavailable`.
-      results[hash] = this.buildInfo(definiteStatus ?? 'unavailable', verdict, format);
-    }
+    });
+    flush(true);
 
     return ok(results);
+  }
+
+  /**
+   * Resolve a single signed commit's verdict. A non-object id (e.g. a synthetic
+   * row) yields `null`; a present signature whose verdict lookup fails or is
+   * absent resolves to `unavailable`, never `unsigned` (FR-017).
+   */
+  private async verifyOne(
+    hash: string,
+    format: SignatureFormat
+  ): Promise<CommitSignatureInfo | null> {
+    // Skip non-object ids defensively; one bad hash must not abort the batch.
+    if (!validateHash(hash).success) return null;
+
+    const verdictResult = await this.fetchVerdict(hash);
+    if (!verdictResult.success) {
+      // The caller only sends hashes whose presence pass already proved a
+      // signature exists. If one verdict lookup fails, return a terminal
+      // `unavailable` state so the webview can clear loading and avoid a stuck
+      // details panel.
+      this.log.warn(`Signature verdict unavailable for ${hash.slice(0, 7)}: ${verdictResult.error.message}`);
+      return this.buildInfo('unavailable', EMPTY_VERDICT, format);
+    }
+
+    const { verdict, definiteStatus } = verdictResult.value;
+    // These hashes are known signed, so any non-verdict resolves to `unavailable`.
+    return this.buildInfo(definiteStatus ?? 'unavailable', verdict, format);
   }
 
   // ── Parsing helpers ────────────────────────────────────────────────

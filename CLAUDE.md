@@ -54,7 +54,6 @@ src/                              # Backend — esbuild → dist/extension.js (C
 │   ├── EditorCommandService.ts   # VS Code diff/file/compare editors, worktree folder/reveal, signature help
 │   ├── OperationGuard.ts         # In-progress checks (rebase/cherry-pick/revert/merge) → GitError | null
 │   └── handlers/                 # Domain RPC handlers, grouped by feature; fetch services from registry at call time
-│       ├── handlerUtils.ts       # Shared handler helpers
 │       ├── graphDataHandlers.ts  # getCommits/loadMore/getBranches/getCommitDetails/getAuthors/refresh
 │       ├── branchHandlers.ts     # checkout/create/rename/delete/merge/fast-forward branch
 │       ├── remoteHandlers.ts     # fetch/push/pull, add/edit/remove remote
@@ -227,11 +226,9 @@ shared/                           # Shared types between backend & frontend
 - **Git**: NEVER commit or merge; only readonly operations (`git log`, `git status`, `git diff`) and create PR, create branch only if I ask you to do so, or if speckit workflow requires it.
 
 ## Active Technologies
-- TypeScript 5.x (strict) + React 18, Zustand, Radix UI, Tailwind CSS (webview); esbuild (extension host), Vite (frontend)
-- TypeScript 5.x strict (`noUnusedLocals`, `noUnusedParameters`, + VS Code Extension API 1.80+; React 18 + Zustand + Tailwind + (042-compare-refs)
-- None new. Compare state lives in Zustand store (transient, session-only). (042-compare-refs)
-- TypeScript 5.x (strict: `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) (046-git-worktrees)
-- N/A for app state. New persistent setting `speedyGit.worktree.basePath` (already registered in `package.json`) read via the existing settings provider. Worktree list is transient store state. (046-git-worktrees)
+- TypeScript 5.x (strict: `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) — both backend and frontend
+- React 18 + Zustand + Radix UI + Tailwind CSS (webview); esbuild (extension host), Vite (frontend); VS Code Extension API 1.80+
+- App state is transient (Zustand, session-only); persistent settings via VS Code config (e.g. `speedyGit.worktree.basePath`) and `context.globalState`
 
 ## Recent Changes
 - refactor_webViewProvider: Split the ~2400-line `WebviewProvider` god object into the composed `src/webview/` subsystem (facade + PanelHost/Runtime/ServiceRegistry/MessageRouter/RequestContext/PersistedUIStateStore/RepoDataLoader/RefreshCoordinator/EditorCommandService/OperationGuard + per-domain `handlers/`). `src/WebviewProvider.ts` is now a compatibility re-export; RPC dispatch is an exhaustive typed handler map; handlers resolve services from `GitServiceRegistry` at request time to avoid stale references after repo switch
