@@ -36,7 +36,7 @@ function Toast({
       }}
     >
       <span className="shrink-0 mt-0.5">{icon}</span>
-      <span className="flex-1 text-sm text-[var(--vscode-notifications-foreground)]">
+      <span className="flex-1 min-w-0 max-h-[50vh] overflow-y-auto whitespace-pre-wrap break-words text-sm text-[var(--vscode-notifications-foreground)]">
         {message}
       </span>
       <button

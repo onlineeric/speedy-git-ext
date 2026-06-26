@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.1.2] - 2026-06-26
+
+### Fixed
+- **Long toast notifications no longer overflow off-screen.** Error/success notifications that contained long, unbreakable tokens (e.g. file paths or URLs in a merge-conflict message) could blow past the notification box and run off the right edge of the view. The message now wraps within the box, preserves its line breaks, and scrolls vertically when very long.
+
 ## [5.1.1] - 2026-06-23
 
 ### Changed
