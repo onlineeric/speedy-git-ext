@@ -11,8 +11,7 @@ import {
   buildStashAndCheckoutCommand,
 } from '../utils/gitCommandBuilder';
 import { resolveDefaultRemote } from '../utils/resolveDefaultRemote';
-import { ensureComparePanelOpen, setSlotsAndCompare } from '../utils/compareDispatch';
-import { slotsEqual } from '../utils/compareSlot';
+import { CompareMenuItems } from './CompareMenuItems';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DeleteBranchDialog } from './DeleteBranchDialog';
 import { InputDialog } from './InputDialog';
@@ -22,7 +21,8 @@ import { PushDialog } from './PushDialog';
 import { CheckoutWithPullDialog } from './CheckoutWithPullDialog';
 import { CreateWorktreeDialog, type WorktreeSource } from './CreateWorktreeDialog';
 import { useRemoveWorktreeDialog, WorktreeMenuItems } from './WorktreeMenuItems';
-import { dangerItemClass, menuItemClass, menuItemDisabledClass, menuSeparatorClass } from './menuStyles';
+import { dangerItemClass, menuContentClass, menuItemClass, menuItemDisabledClass, menuSeparatorClass } from './menuStyles';
+import { LazyContextMenu } from './LazyContextMenu';
 
 
 interface BranchContextMenuProps {
@@ -49,6 +49,14 @@ function getBranchCheckoutState(refInfo: RefInfo, branches: ReturnType<typeof us
 }
 
 export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps) {
+  return (
+    <LazyContextMenu stopPropagation body={<BranchContextMenuBody refInfo={refInfo} />}>
+      {children}
+    </LazyContextMenu>
+  );
+}
+
+function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
@@ -81,27 +89,11 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
   const isStash = refInfo.type === 'stash';
 
   // Compare-refs (042-compare-refs). Stashes are excluded by FR-017.
-  const compareSelection = useGraphStore((s) => s.compareSelection);
-  const setSlotA = useGraphStore((s) => s.setSlotA);
   const compareSlotForThisRef: SlotValue | null = isBranch
     ? (refInfo.remote ? { kind: 'branch', name: refInfo.name, remote: refInfo.remote } : { kind: 'branch', name: refInfo.name })
     : isTag
       ? { kind: 'tag', name: refInfo.name }
       : null;
-  const compareItemsAvailable = !isStash && compareSlotForThisRef !== null;
-  const aSetForCompare = compareSelection.a !== null;
-  const sameAsACompare = aSetForCompare && compareSlotForThisRef !== null
-    && slotsEqual(compareSelection.a, compareSlotForThisRef);
-
-  const handleSetAsBaseRef = () => {
-    if (!compareSlotForThisRef) return;
-    setSlotA(compareSlotForThisRef);
-    ensureComparePanelOpen();
-  };
-  const handleCompareWithBaseRef = () => {
-    if (!compareSlotForThisRef || !compareSelection.a || sameAsACompare) return;
-    setSlotsAndCompare(compareSelection.a, compareSlotForThisRef);
-  };
 
   // Identify whether this ref is the currently checked-out local branch.
   // displayRefToRefInfo never emits type 'head', so we match by name against the store.
@@ -225,33 +217,30 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
     </ContextMenu.Item>
   ) : null;
 
+  // Same "Fast-forward Local Branch from Remote" item on the local-branch and
+  // remote-branch arms; the arms differ only in their surrounding guard.
+  const fastForwardItem = (
+    <ContextMenu.Item
+      className={menuItemClass}
+      onSelect={() => setFastForwardOpen(true)}
+      disabled={loading || rebaseInProgress}
+    >
+      Fast-forward Local Branch from Remote
+    </ContextMenu.Item>
+  );
+
   // pendingCheckout is for this branch (from checkoutNeedsStash response)
   const stashConfirmOpen = pendingCheckout !== null && pendingCheckout.name === refInfo.name;
   const forceDeleteConfirmOpen = pendingForceDeleteBranch !== null && pendingForceDeleteBranch.name === refInfo.name;
 
   return (
     <>
-      {/* Wrapper stops contextmenu event from bubbling to parent CommitContextMenu */}
-      <span onContextMenu={(e) => e.stopPropagation()}>
-      <ContextMenu.Root>
-        <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
-        <ContextMenu.Portal>
-          <ContextMenu.Content className="min-w-[160px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+      <ContextMenu.Portal>
+        <ContextMenu.Content className={`min-w-[160px] ${menuContentClass}`}>
             {/* Compare-refs (042-compare-refs) — branches and tags only; stashes excluded (FR-017) */}
-            {compareItemsAvailable && (
+            {!isStash && compareSlotForThisRef && (
               <>
-                <ContextMenu.Item className={menuItemClass} onSelect={handleSetAsBaseRef}>
-                  Set as Compare Base
-                </ContextMenu.Item>
-                {aSetForCompare && (
-                  <ContextMenu.Item
-                    className={sameAsACompare ? menuItemDisabledClass : menuItemClass}
-                    disabled={sameAsACompare}
-                    onSelect={handleCompareWithBaseRef}
-                  >
-                    Compare with Base
-                  </ContextMenu.Item>
-                )}
+                <CompareMenuItems slot={compareSlotForThisRef} />
                 <ContextMenu.Separator className={menuSeparatorClass} />
               </>
             )}
@@ -285,15 +274,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
                 <ContextMenu.Item className={menuItemClass} onSelect={() => setPushDialogOpen(true)}>
                   Push Branch
                 </ContextMenu.Item>
-                {!isCurrentBranch && !isMergedBadge && (
-                  <ContextMenu.Item
-                    className={menuItemClass}
-                    onSelect={() => setFastForwardOpen(true)}
-                    disabled={loading || rebaseInProgress}
-                  >
-                    Fast-forward Local Branch from Remote
-                  </ContextMenu.Item>
-                )}
+                {!isCurrentBranch && !isMergedBadge && fastForwardItem}
                 {isCurrentBranch && (
                   <ContextMenu.Item
                     className={menuItemClass}
@@ -325,15 +306,7 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
 
             {isRemoteBranch && refInfo.remote && (
               <>
-                {!isMergedBadge && (
-                  <ContextMenu.Item
-                    className={menuItemClass}
-                    onSelect={() => setFastForwardOpen(true)}
-                    disabled={loading || rebaseInProgress}
-                  >
-                    Fast-forward Local Branch from Remote
-                  </ContextMenu.Item>
-                )}
+                {!isMergedBadge && fastForwardItem}
                 {showWorktreeGroup && (
                   <>
                     <ContextMenu.Separator className={menuSeparatorClass} />
@@ -382,8 +355,6 @@ export function BranchContextMenu({ refInfo, children }: BranchContextMenuProps)
             )}
           </ContextMenu.Content>
         </ContextMenu.Portal>
-      </ContextMenu.Root>
-      </span>
 
       {/* Delete confirmation for tags and remote branches */}
       <ConfirmDialog

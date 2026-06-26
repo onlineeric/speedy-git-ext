@@ -4,7 +4,8 @@ import type { Commit } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { buildDropStashCommand } from '../utils/gitCommandBuilder';
 import { ConfirmDialog } from './ConfirmDialog';
-import { dangerItemClass, menuItemClass, menuSeparatorClass } from './menuStyles';
+import { dangerItemClass, menuContentClass, menuItemClass, menuSeparatorClass } from './menuStyles';
+import { LazyContextMenu } from './LazyContextMenu';
 
 interface StashContextMenuProps {
   commit: Commit;
@@ -18,6 +19,14 @@ interface StashContextMenuProps {
 // across all compare entry points.
 
 export function StashContextMenu({ commit, stashIndex, children }: StashContextMenuProps) {
+  return (
+    <LazyContextMenu body={<StashContextMenuBody commit={commit} stashIndex={stashIndex} />}>
+      {children}
+    </LazyContextMenu>
+  );
+}
+
+function StashContextMenuBody({ commit, stashIndex }: Omit<StashContextMenuProps, 'children'>) {
   const [dropConfirmOpen, setDropConfirmOpen] = useState(false);
   const isValidIndex = stashIndex >= 0;
 
@@ -39,10 +48,8 @@ export function StashContextMenu({ commit, stashIndex, children }: StashContextM
 
   return (
     <>
-      <ContextMenu.Root>
-        <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
-        <ContextMenu.Portal>
-          <ContextMenu.Content className="min-w-[160px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+      <ContextMenu.Portal>
+        <ContextMenu.Content className={`min-w-[160px] ${menuContentClass}`}>
             <ContextMenu.Item className={menuItemClass} onSelect={handleApply} disabled={!isValidIndex}>
               Apply Stash
             </ContextMenu.Item>
@@ -59,7 +66,6 @@ export function StashContextMenu({ commit, stashIndex, children }: StashContextM
             </ContextMenu.Item>
           </ContextMenu.Content>
         </ContextMenu.Portal>
-      </ContextMenu.Root>
 
       <ConfirmDialog
         open={dropConfirmOpen}

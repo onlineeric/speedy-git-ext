@@ -4,8 +4,8 @@ import type { Commit, CherryPickOptions, ResetMode, RebaseEntry, CommitParentInf
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { buildResetCommand, buildCheckoutCommand } from '../utils/gitCommandBuilder';
-import { ensureComparePanelOpen, setSlotsAndCompare } from '../utils/compareDispatch';
-import { slotsEqual } from '../utils/compareSlot';
+import { setSlotsAndCompare } from '../utils/compareDispatch';
+import { CompareMenuItems } from './CompareMenuItems';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CreateBranchDialog } from './CreateBranchDialog';
 import { TagCreationDialog } from './TagCreationDialog';
@@ -16,7 +16,8 @@ import { RevertDialog } from './RevertDialog';
 import { DropCommitDialog } from './DropCommitDialog';
 import { CreateWorktreeDialog } from './CreateWorktreeDialog';
 import { createReachabilityChecker } from '../utils/commitReachability';
-import { menuItemClass, menuItemDisabledClass, menuSeparatorClass } from './menuStyles';
+import { menuContentClass, menuItemClass, menuItemDisabledClass, menuSeparatorClass } from './menuStyles';
+import { LazyContextMenu } from './LazyContextMenu';
 
 interface CommitContextMenuProps {
   commit: Commit;
@@ -42,7 +43,137 @@ function buildResetDescription(
   return `This branch has a remote counterpart. After resetting, you will need to force-push to update the remote, which may affect collaborators. Proceed?`;
 }
 
+/**
+ * Interactive-rebase cluster: kick off a `getRebaseCommits` request, wait for the
+ * entries to arrive in the store, then open the dialog. Returns the trigger and
+ * the (lazily rendered) dialog so the menu body stays focused on its items.
+ */
+function useInteractiveRebase(baseHash: string) {
+  const [open, setOpen] = useState(false);
+  const [entries, setEntries] = useState<RebaseEntry[]>([]);
+  const [awaiting, setAwaiting] = useState(false);
+  const pendingRebaseEntries = useGraphStore((s) => s.pendingRebaseEntries);
+
+  useEffect(() => {
+    if (awaiting && pendingRebaseEntries !== undefined) {
+      const timeout = window.setTimeout(() => {
+        setEntries(pendingRebaseEntries);
+        useGraphStore.getState().setPendingRebaseEntries(undefined);
+        setAwaiting(false);
+        setOpen(true);
+      }, 0);
+      return () => window.clearTimeout(timeout);
+    }
+    return undefined;
+  }, [awaiting, pendingRebaseEntries]);
+
+  useEffect(() => {
+    return () => {
+      useGraphStore.getState().setPendingRebaseEntries(undefined);
+    };
+  }, []);
+
+  const start = () => {
+    setAwaiting(true);
+    rpcClient.getRebaseCommits(baseHash);
+  };
+
+  const dialog = open ? (
+    <InteractiveRebaseDialog
+      open
+      baseHash={baseHash}
+      initialEntries={entries}
+      onClose={() => {
+        setOpen(false);
+        setEntries([]);
+      }}
+    />
+  ) : null;
+
+  return { start, dialog };
+}
+
+/**
+ * Revert cluster. Merge commits need their parents fetched first so the dialog
+ * can render the mainline picker; non-merge commits open immediately.
+ */
+function useRevertCommit(commit: Commit) {
+  const [open, setOpen] = useState(false);
+  const [parents, setParents] = useState<CommitParentInfo[]>([]);
+  const isMergeCommit = commit.parents.length > 1;
+
+  const start = async () => {
+    if (isMergeCommit) {
+      try {
+        setParents(await rpcClient.getCommitParents(commit.parents));
+      } catch {
+        // Store error state is already set by the RPC client.
+        return;
+      }
+    } else {
+      setParents([]);
+    }
+    setOpen(true);
+  };
+
+  const confirm = (options: RevertOptions) => {
+    if (options.mode !== 'edit-message') setOpen(false);
+    rpcClient.revert(commit.hash, options);
+  };
+
+  const dialog = (
+    <RevertDialog
+      open={open}
+      commit={commit}
+      parents={parents}
+      onConfirm={confirm}
+      onCancel={() => setOpen(false)}
+    />
+  );
+
+  return { start, dialog };
+}
+
+/** Drop cluster: resolve whether the commit is pushed, then open the dialog. */
+function useDropCommit(commit: Commit) {
+  const [open, setOpen] = useState(false);
+  const [pushed, setPushed] = useState(false);
+
+  const start = async () => {
+    try {
+      setPushed(await rpcClient.isCommitPushed(commit.hash));
+      setOpen(true);
+    } catch {
+      // Store error state is already set by the RPC client.
+    }
+  };
+
+  const dialog = (
+    <DropCommitDialog
+      open={open}
+      onOpenChange={setOpen}
+      commitHash={commit.hash}
+      commitSubject={commit.subject}
+      isPushed={pushed}
+      onConfirm={() => {
+        setOpen(false);
+        rpcClient.dropCommit(commit.hash);
+      }}
+    />
+  );
+
+  return { start, dialog };
+}
+
 export function CommitContextMenu({ commit, children }: CommitContextMenuProps) {
+  return (
+    <LazyContextMenu body={<CommitContextMenuBody commit={commit} />}>
+      {children}
+    </LazyContextMenu>
+  );
+}
+
+function CommitContextMenuBody({ commit }: { commit: Commit }) {
   const [checkoutCommitConfirmOpen, setCheckoutCommitConfirmOpen] = useState(false);
   const [createBranchOpen, setCreateBranchOpen] = useState(false);
   const [createTagOpen, setCreateTagOpen] = useState(false);
@@ -52,45 +183,20 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
   const [pendingResetMode, setPendingResetMode] = useState<ResetMode | null>(null);
   const [cherryPickCommits, setCherryPickCommits] = useState<Commit[]>([]);
   const [rebaseOntoConfirmOpen, setRebaseOntoConfirmOpen] = useState(false);
-  const [interactiveRebaseOpen, setInteractiveRebaseOpen] = useState(false);
-  const [interactiveRebaseEntries, setInteractiveRebaseEntries] = useState<RebaseEntry[]>([]);
-  const [awaitingRebaseEntries, setAwaitingRebaseEntries] = useState(false);
-  const [revertDialogOpen, setRevertDialogOpen] = useState(false);
-  const [revertParents, setRevertParents] = useState<CommitParentInfo[]>([]);
-  const [dropDialogOpen, setDropDialogOpen] = useState(false);
-  const [dropCommitPushed, setDropCommitPushed] = useState(false);
 
   const branches = useGraphStore((s) => s.branches);
-  const commits = useGraphStore((s) => s.commits);
   const selectedCommits = useGraphStore((s) => s.selectedCommits);
   const mergedCommits = useGraphStore((s) => s.mergedCommits);
   const clearSelectedCommits = useGraphStore((s) => s.clearSelectedCommits);
   const rebaseInProgress = useGraphStore((s) => s.rebaseInProgress);
   const revertInProgress = useGraphStore((s) => s.revertInProgress);
   const cherryPickInProgress = useGraphStore((s) => s.cherryPickInProgress);
-  const pendingRebaseEntries = useGraphStore((s) => s.pendingRebaseEntries);
-  const compareSelection = useGraphStore((s) => s.compareSelection);
-  const setSlotA = useGraphStore((s) => s.setSlotA);
   const loading = useGraphStore((s) => s.loading);
 
-  useEffect(() => {
-    if (awaitingRebaseEntries && pendingRebaseEntries !== undefined) {
-      const timeout = window.setTimeout(() => {
-        setInteractiveRebaseEntries(pendingRebaseEntries);
-        useGraphStore.getState().setPendingRebaseEntries(undefined);
-        setAwaitingRebaseEntries(false);
-        setInteractiveRebaseOpen(true);
-      }, 0);
-      return () => window.clearTimeout(timeout);
-    }
-    return undefined;
-  }, [awaitingRebaseEntries, pendingRebaseEntries]);
-
-  useEffect(() => {
-    return () => {
-      useGraphStore.getState().setPendingRebaseEntries(undefined);
-    };
-  }, []);
+  // Self-contained dialog clusters (state + async handler + dialog) live in hooks.
+  const interactiveRebase = useInteractiveRebase(commit.hash);
+  const revert = useRevertCommit(commit);
+  const drop = useDropCommit(commit);
 
   const currentLocalBranch = branches.find((b) => b.current && !b.remote) ?? null;
   const hasRemoteUpstream =
@@ -123,39 +229,19 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
     rpcClient.rebase(commit.hash, ignoreDate);
   };
 
-  const handleStartInteractiveRebase = () => {
-    setAwaitingRebaseEntries(true);
-    rpcClient.getRebaseCommits(commit.hash);
-  };
-
   const isMultiSelectActive =
     selectedCommits.length > 1 && selectedCommits.includes(commit.hash);
 
   const hasSelectedMergeCommit = isMultiSelectActive &&
     mergedCommits.some((item) => selectedCommits.includes(item.hash) && item.parents.length > 1);
 
-  // Compare-refs (042-compare-refs)
-  const compareSlotForThisCommit: SlotValue = { kind: 'commit', hash: commit.hash };
-  const aSet = compareSelection.a !== null;
-  const sameAsA = aSet && (
-    slotsEqual(compareSelection.a, compareSlotForThisCommit) ||
-    (compareSelection.aResolvedHash !== null && compareSelection.aResolvedHash === commit.hash)
-  );
-
-  const handleSetAsBase = () => {
-    setSlotA(compareSlotForThisCommit);
-    ensureComparePanelOpen();
-  };
-
-  const handleCompareWithBase = () => {
-    if (!compareSelection.a || sameAsA) return;
-    setSlotsAndCompare(compareSelection.a, compareSlotForThisCommit);
-  };
-
   // FR-015 (Session 2026-05-09): "Compare these commits" sets Base = oldest selected,
   // Target = newest selected — direct mental model "compare the commits I selected."
   const handleCompareRange = () => {
     if (selectedCommits.length < 2) return;
+    // Read commits lazily here (not via a render subscription) so an open menu
+    // doesn't re-render on every refresh/loadMore — the list is only needed at click time.
+    const commits = useGraphStore.getState().commits;
     // Order by index in commits[] (committer-date-descending). Newest = lowest index, oldest = highest index.
     const selectedSet = new Set(selectedCommits);
     let oldest: Commit | null = null;
@@ -198,48 +284,10 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
     clearSelectedCommits();
   };
 
-  const handleRevertSelect = async () => {
-    if (!canRevert || isOperationInProgress) return;
-    // For merge commits, fetch parents so the inline picker can render names + subjects.
-    // For non-merge commits, parents is left empty; the dialog hides the picker.
-    if (isMergeCommit) {
-      try {
-        const parents = await rpcClient.getCommitParents(commit.parents);
-        setRevertParents(parents);
-      } catch {
-        // Store error state is already set by the RPC client.
-        return;
-      }
-    } else {
-      setRevertParents([]);
-    }
-    setRevertDialogOpen(true);
-  };
-
-  const handleRevertConfirm = (options: RevertOptions) => {
-    if (options.mode !== 'edit-message') {
-      setRevertDialogOpen(false);
-    }
-    rpcClient.revert(commit.hash, options);
-  };
-
-  const handleDropSelect = async () => {
-    if (!canDrop || isOperationInProgress) return;
-    try {
-      const pushed = await rpcClient.isCommitPushed(commit.hash);
-      setDropCommitPushed(pushed);
-      setDropDialogOpen(true);
-    } catch {
-      // Store error state is already set by the RPC client.
-    }
-  };
-
   return (
     <>
-      <ContextMenu.Root>
-        <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
-        <ContextMenu.Portal>
-          <ContextMenu.Content className="min-w-[180px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+      <ContextMenu.Portal>
+        <ContextMenu.Content className={`min-w-[180px] ${menuContentClass}`}>
             {/* Compare refs (042-compare-refs) */}
             {isMultiSelectActive ? (
               <ContextMenu.Item
@@ -249,20 +297,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
                 Compare these commits
               </ContextMenu.Item>
             ) : (
-              <>
-                <ContextMenu.Item className={menuItemClass} onSelect={handleSetAsBase}>
-                  Set as Compare Base
-                </ContextMenu.Item>
-                {aSet && (
-                  <ContextMenu.Item
-                    className={sameAsA ? menuItemDisabledClass : menuItemClass}
-                    disabled={sameAsA}
-                    onSelect={handleCompareWithBase}
-                  >
-                    Compare with Base
-                  </ContextMenu.Item>
-                )}
-              </>
+              <CompareMenuItems slot={{ kind: 'commit', hash: commit.hash }} resolvedHash={commit.hash} />
             )}
             <ContextMenu.Separator className={menuSeparatorClass} />
 
@@ -289,6 +324,9 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
 
             {!isHeadCommit && (
               <>
+                {/* Merge commits cherry-pick individually; a multi-select cherry-picks the
+                   whole selection (disabled if it contains a merge commit); otherwise the
+                   single commit, clearing any stale selection that doesn't include it. */}
                 {isMergeCommit ? (
                   <ContextMenu.Item
                     className={menuItemClass}
@@ -296,32 +334,19 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
                   >
                     Cherry-Pick Commit
                   </ContextMenu.Item>
-                ) : isMultiSelectActive && !hasSelectedMergeCommit ? (
+                ) : isMultiSelectActive ? (
                   <ContextMenu.Item
-                    className={menuItemClass}
+                    className={hasSelectedMergeCommit ? menuItemDisabledClass : menuItemClass}
+                    disabled={hasSelectedMergeCommit}
+                    title={hasSelectedMergeCommit ? 'Selection contains merge commits. Cherry-pick merge commits individually.' : undefined}
                     onSelect={() => openCherryPickDialog(mergedCommits.filter((item) => selectedCommits.includes(item.hash)))}
                   >
                     Cherry-Pick Selected Commits ({selectedCommits.length})
                   </ContextMenu.Item>
-                ) : isMultiSelectActive && hasSelectedMergeCommit ? (
-                  <ContextMenu.Item
-                    className={menuItemDisabledClass}
-                    disabled
-                    title="Selection contains merge commits. Cherry-pick merge commits individually."
-                  >
-                    Cherry-Pick Selected Commits ({selectedCommits.length})
-                  </ContextMenu.Item>
-                ) : selectedCommits.length > 1 ? (
-                  <ContextMenu.Item
-                    className={menuItemClass}
-                    onSelect={() => openCherryPickDialog([commit], true)}
-                  >
-                    Cherry-Pick Commit
-                  </ContextMenu.Item>
                 ) : (
                   <ContextMenu.Item
                     className={menuItemClass}
-                    onSelect={() => openCherryPickDialog([commit])}
+                    onSelect={() => openCherryPickDialog([commit], selectedCommits.length > 1)}
                   >
                     Cherry-Pick Commit
                   </ContextMenu.Item>
@@ -342,7 +367,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
                 <ContextMenu.Item
                   className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
                   disabled={isOperationInProgress}
-                  onSelect={handleStartInteractiveRebase}
+                  onSelect={interactiveRebase.start}
                 >
                   Start Interactive Rebase from Here
                 </ContextMenu.Item>
@@ -355,7 +380,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
                 <ContextMenu.Item
                   className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
                   disabled={isOperationInProgress}
-                  onSelect={handleRevertSelect}
+                  onSelect={revert.start}
                 >
                   Revert Commit
                 </ContextMenu.Item>
@@ -380,7 +405,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
                 <ContextMenu.Item
                   className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
                   disabled={isOperationInProgress}
-                  onSelect={handleDropSelect}
+                  onSelect={drop.start}
                 >
                   Drop Commit
                 </ContextMenu.Item>
@@ -407,7 +432,7 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
                     Reset Current Branch to Here
                   </ContextMenu.SubTrigger>
                   <ContextMenu.Portal>
-                    <ContextMenu.SubContent className="min-w-[160px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+                    <ContextMenu.SubContent className={`min-w-[160px] ${menuContentClass}`}>
                       <ContextMenu.Item className={menuItemClass} onSelect={() => handleResetSelect('soft')}>
                         Soft (keep staged)
                       </ContextMenu.Item>
@@ -424,7 +449,6 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
             )}
           </ContextMenu.Content>
         </ContextMenu.Portal>
-      </ContextMenu.Root>
 
       <ConfirmDialog
         open={checkoutCommitConfirmOpen}
@@ -492,37 +516,9 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
         targetRef={commit.hash}
       />
 
-      {interactiveRebaseOpen && (
-        <InteractiveRebaseDialog
-          open={interactiveRebaseOpen}
-          baseHash={commit.hash}
-          initialEntries={interactiveRebaseEntries}
-          onClose={() => {
-            setInteractiveRebaseOpen(false);
-            setInteractiveRebaseEntries([]);
-          }}
-        />
-      )}
-
-      <RevertDialog
-        open={revertDialogOpen}
-        commit={commit}
-        parents={revertParents}
-        onConfirm={handleRevertConfirm}
-        onCancel={() => setRevertDialogOpen(false)}
-      />
-
-      <DropCommitDialog
-        open={dropDialogOpen}
-        onOpenChange={setDropDialogOpen}
-        commitHash={commit.hash}
-        commitSubject={commit.subject}
-        isPushed={dropCommitPushed}
-        onConfirm={() => {
-          setDropDialogOpen(false);
-          rpcClient.dropCommit(commit.hash);
-        }}
-      />
+      {interactiveRebase.dialog}
+      {revert.dialog}
+      {drop.dialog}
     </>
   );
 }

@@ -1,22 +1,23 @@
 import { useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import type { SlotValue } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { StashDialog } from './StashDialog';
 import { DiscardAllDialog } from './DiscardAllDialog';
 import { FilePickerDialog } from './FilePickerDialog';
-import { ensureComparePanelOpen, setSlotsAndCompare } from '../utils/compareDispatch';
-import { slotsEqual } from '../utils/compareSlot';
-import { menuItemClass } from './menuStyles';
+import { CompareMenuItems } from './CompareMenuItems';
+import { menuContentClass, menuItemClass, menuSeparatorClass } from './menuStyles';
+import { LazyContextMenu } from './LazyContextMenu';
 
 interface UncommittedContextMenuProps {
   children: React.ReactNode;
 }
 
-const separatorClass = 'my-1 h-px bg-[var(--vscode-menu-separatorBackground)]';
-
 export function UncommittedContextMenu({ children }: UncommittedContextMenuProps) {
+  return <LazyContextMenu body={<UncommittedContextMenuBody />}>{children}</LazyContextMenu>;
+}
+
+function UncommittedContextMenuBody() {
   const [stashDialogOpen, setStashDialogOpen] = useState(false);
   const [discardAllDialogOpen, setDiscardAllDialogOpen] = useState(false);
   const [filePickerOpen, setFilePickerOpen] = useState(false);
@@ -43,44 +44,13 @@ export function UncommittedContextMenu({ children }: UncommittedContextMenuProps
     setDiscardAllDialogOpen(false);
   };
 
-  // Compare-refs (042-compare-refs): the uncommitted pseudo-row uses the workingTree sentinel.
-  const compareSelection = useGraphStore((state) => state.compareSelection);
-  const setSlotA = useGraphStore((state) => state.setSlotA);
-  const wtSlot: SlotValue = { kind: 'workingTree' };
-  const aSetForCompare = compareSelection.a !== null;
-  const sameAsACompare = aSetForCompare && slotsEqual(compareSelection.a, wtSlot);
-
-  const handleSetWorkingTreeAsBase = () => {
-    setSlotA(wtSlot);
-    ensureComparePanelOpen();
-  };
-  const handleCompareWorkingTreeWithBase = () => {
-    if (!compareSelection.a || sameAsACompare) return;
-    setSlotsAndCompare(compareSelection.a, wtSlot);
-  };
-
   return (
     <>
-      <ContextMenu.Root>
-        <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
-        <ContextMenu.Portal>
-          <ContextMenu.Content className="min-w-[200px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+      <ContextMenu.Portal>
+        <ContextMenu.Content className={`min-w-[200px] ${menuContentClass}`}>
             {/* Compare-refs (042-compare-refs) — Working Tree sentinel */}
-            <ContextMenu.Item className={menuItemClass} onSelect={handleSetWorkingTreeAsBase}>
-              Set as Compare Base
-            </ContextMenu.Item>
-            {aSetForCompare && (
-              <ContextMenu.Item
-                className={sameAsACompare
-                  ? 'px-3 py-1.5 text-sm text-[var(--vscode-disabledForeground)] cursor-not-allowed outline-none'
-                  : menuItemClass}
-                disabled={sameAsACompare}
-                onSelect={handleCompareWorkingTreeWithBase}
-              >
-                Compare with Base
-              </ContextMenu.Item>
-            )}
-            <ContextMenu.Separator className={separatorClass} />
+            <CompareMenuItems slot={{ kind: 'workingTree' }} />
+            <ContextMenu.Separator className={menuSeparatorClass} />
             {hasAnyChanges && (
               <ContextMenu.Item className={menuItemClass} onSelect={() => setStashDialogOpen(true)}>
                 Stash Everything…
@@ -103,19 +73,18 @@ export function UncommittedContextMenu({ children }: UncommittedContextMenuProps
             )}
             {hasAnyChanges && (
               <>
-                <ContextMenu.Separator className={separatorClass} />
+                <ContextMenu.Separator className={menuSeparatorClass} />
                 <ContextMenu.Item className={menuItemClass} onSelect={() => setFilePickerOpen(true)}>
                   Select files for...
                 </ContextMenu.Item>
               </>
             )}
-            <ContextMenu.Separator className={separatorClass} />
+            <ContextMenu.Separator className={menuSeparatorClass} />
             <ContextMenu.Item className={menuItemClass} onSelect={handleRefresh}>
               Refresh
             </ContextMenu.Item>
           </ContextMenu.Content>
         </ContextMenu.Portal>
-      </ContextMenu.Root>
       <StashDialog
         open={stashDialogOpen}
         onOpenChange={setStashDialogOpen}
