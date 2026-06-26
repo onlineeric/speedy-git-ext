@@ -4,7 +4,7 @@ import type { Commit } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { buildDropStashCommand } from '../utils/gitCommandBuilder';
 import { ConfirmDialog } from './ConfirmDialog';
-import { dangerItemClass, menuItemClass, menuSeparatorClass } from './menuStyles';
+import { dangerItemClass, menuContentClass, menuItemClass, menuSeparatorClass } from './menuStyles';
 import { LazyContextMenu } from './LazyContextMenu';
 
 interface StashContextMenuProps {
@@ -49,7 +49,7 @@ function StashContextMenuBody({ commit, stashIndex }: Omit<StashContextMenuProps
   return (
     <>
       <ContextMenu.Portal>
-        <ContextMenu.Content className="min-w-[160px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+        <ContextMenu.Content className={`min-w-[160px] ${menuContentClass}`}>
             <ContextMenu.Item className={menuItemClass} onSelect={handleApply} disabled={!isValidIndex}>
               Apply Stash
             </ContextMenu.Item>

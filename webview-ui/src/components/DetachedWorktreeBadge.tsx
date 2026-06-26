@@ -5,6 +5,7 @@ import { detachedWorktreeBadgeText } from '../utils/worktreeDisplay';
 import { worktreeBadgeBorderColor } from '../utils/worktreeBadgeStyle';
 import { WorktreeIcon } from './icons';
 import { useRemoveWorktreeDialog, WorktreeMenuGroup } from './WorktreeMenuItems';
+import { menuContentClass } from './menuStyles';
 import { LazyContextMenu } from './LazyContextMenu';
 
 interface DetachedWorktreeBadgeProps {
@@ -43,7 +44,7 @@ function DetachedWorktreeBadgeMenu({ worktrees }: { worktrees: WorktreeInfo[] })
   return (
     <>
       <ContextMenu.Portal>
-        <ContextMenu.Content className="min-w-[220px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+        <ContextMenu.Content className={`min-w-[220px] ${menuContentClass}`}>
           <WorktreeMenuGroup worktrees={worktrees} onRemove={openRemoveWorktreeDialog} />
         </ContextMenu.Content>
       </ContextMenu.Portal>
