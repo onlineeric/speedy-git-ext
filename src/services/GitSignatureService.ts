@@ -207,10 +207,13 @@ export class GitSignatureService {
       lastFlush = now;
     };
 
-    const verdicts = new Map<string, CommitSignatureInfo | null>();
+    // Seed every hash up front so the returned map iterates in input order
+    // (documented contract; tests rely on it). Concurrency resolves verdicts out
+    // of order, but overwriting an existing key leaves its position unchanged.
+    for (const hash of hashes) results[hash] = null;
     await runWithConcurrency(hashes, VERIFY_CONCURRENCY, async (hash) => {
       const info = await this.verifyOne(hash, objects[hash]?.format ?? 'gpg');
-      verdicts.set(hash, info);
+      results[hash] = info;
       if (onProgress) {
         pending[hash] = info;
         flush(false);
@@ -218,9 +221,6 @@ export class GitSignatureService {
     });
     flush(true);
 
-    // Assemble the returned map in input order (documented contract): concurrency
-    // resolves verdicts out of order, but callers/tests expect insertion order.
-    for (const hash of hashes) results[hash] = verdicts.get(hash) ?? null;
     return ok(results);
   }
 
