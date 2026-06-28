@@ -273,6 +273,17 @@ export function resolveCommitTableLayout({
     }
   }
 
+  // Last resort: the graph column normally keeps its full preferred width, but
+  // if every other column is already at its minimum and the table still
+  // overflows, shrink graph too (down to its own minimum). Without this an
+  // oversized graph width — e.g. dragged wider than the pane, then viewed in a
+  // narrower pane — pushes every other column past the table's clipped right
+  // edge. Table mode has no horizontal scrollbar, so those columns (and their
+  // headers) become unreachable, leaving only the graph column visible.
+  if (remainingDeficit > 0) {
+    remainingDeficit = shrinkColumn(visibleColumns, 'graph', remainingDeficit);
+  }
+
   // Surplus space: expand the message column so the table spans the panel.
   if (containerWidth > 0) {
     const surplus = availableWidth - preferredTableWidth;
