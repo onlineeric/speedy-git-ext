@@ -112,6 +112,9 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
 │   ├── SignatureColumnCell.tsx   # Renders grouped signature glyphs in the optional "Signature" column (047)
 │   ├── *Dialog.tsx               # ~20 operation dialogs (Merge, Push, Rebase, CherryPick, Revert, Worktree, etc.)
 │   ├── *ContextMenu.tsx          # Context menus (Commit, Branch, Stash, Author, Date, Uncommitted) via Radix UI
+│   ├── LazyContextMenu.tsx       # Wraps a Radix context menu so its heavy body (items/dialogs/store subscriptions) mounts only on first right-click — keeps virtualized rows cheap during fast scrolling
+│   ├── CompareMenuItems.tsx      # Shared "Set as Compare Base" / "Compare with Base" item pair (042), reused across Commit/Branch/Uncommitted menus
+│   ├── menuStyles.ts             # Shared Tailwind class strings for context-menu items (enabled/disabled/separator)
 │   └── CommandPreview.tsx        # Live git command preview shown in dialogs
 ├── stores/
 │   └── graphStore.ts             # Zustand store: commits, branches, topology, filters, UI state (~1250 lines). 044-code-refactor replaced whole-store subscriptions with selectors rather than splitting the file
