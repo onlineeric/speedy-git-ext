@@ -101,7 +101,7 @@ src/                             # Backend (extension host)
 │   └── gitParsers.ts            # ADD: parseTagMetadata(stdout) → TagMetadata[]
 └── webview/
     ├── handlers/tagHandlers.ts  # CHANGE: createTag chains push; deleteTag chains remote delete;
-    │                            #         pushTag honors force; ADD getTagMetadata handler (or via loader)
+    │                            #         pushTag honors force (tag metadata rides deferred data, not a new request)
     └── RepoDataLoader.ts        # CHANGE: read + post tag metadata in sendDeferredRepoData
 
 webview-ui/src/                  # Frontend (webview)

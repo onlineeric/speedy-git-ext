@@ -14,8 +14,9 @@ Format fields (one record per tag, fields separated by `%00`, records by `\n`):
 
 - `%(refname:short)` — tag name
 - `%(objecttype)` — `tag` for annotated, `commit` for lightweight
-- `%(contents:subject)` — first line of the annotation message (annotated only)
-- `%(contents:body)` — remaining annotation body (annotated only; optional in tooltip)
+- `%(contents:subject)` — the annotation message shown in the tooltip (annotated only).
+  Subject only (not `%(contents:body)`): a multi-line body would embed `\n` and break
+  the `\n` record split, so the body is intentionally excluded to keep one line per ref.
 - `%(taggername)` — tagger name (annotated only)
 - `%(taggerdate:unix)` — tag date as unix seconds (annotated only)
 

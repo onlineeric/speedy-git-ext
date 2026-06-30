@@ -37,8 +37,9 @@ dependency on the other stories.
    shows no annotation message (rather than showing stale or empty fields as if
    it were annotated).
 3. **Given** a graph with many tags, **When** the user hovers over tag badges
-   repeatedly, **Then** the tooltip appears instantly with no perceptible delay
-   and no network activity.
+   repeatedly, **Then** the tooltip is served from already-loaded local data with
+   no network activity and no per-hover git call or recomputation (the only delay
+   is the browser's built-in native-tooltip hover delay).
 4. **Given** the user refreshes the graph after a tag's annotation changes,
    **When** they hover over that tag again, **Then** the tooltip reflects the
    updated annotation metadata.
@@ -257,8 +258,10 @@ than locally, attempt a normal push and observe rejection, then retry with the
 - **SC-001**: For any annotated tag, a user can read its annotation message,
   tagger, and date directly from the graph (via the tag badge tooltip) without
   running any terminal command.
-- **SC-002**: Hovering over a tag badge surfaces its metadata with no perceptible
-  delay and with zero network activity, including on repeated hovers.
+- **SC-002**: Hovering over a tag badge surfaces its metadata from already-loaded
+  local data — zero network activity and no per-hover git call or recomputation,
+  including on repeated hovers (any wait is only the browser's native-tooltip hover
+  delay, not work this feature performs).
 - **SC-003**: A user can create a tag and have it pushed to the remote in a single
   dialog submission, and the dialog shows both commands before the user commits to
   the action.

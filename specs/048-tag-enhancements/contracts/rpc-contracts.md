@@ -80,8 +80,8 @@ exactly like the other deferred posts.
 | Method | Args (git) | Result | Notes |
 |--------|-----------|--------|-------|
 | `pushTag(name, remote?, force?)` | `push <remote\|origin> [--force] refs/tags/<name>` | `Result<string>` | 60 s timeout; validates name + remote. |
-| `deleteRemoteTag(remote, name)` | `push <remote> --delete <name>` | `Result<string>` | 60 s timeout; `remote ref does not exist` → `ok(...)`. |
-| `getTagMetadata()` | `for-each-ref --format=<…%00…> refs/tags` | `Result<TagMetadata[]>` | parsed by `parseTagMetadata`; no network. |
+| `deleteRemoteTag(remote, name)` | `push <remote> --delete <name>` | `Result<string>` | 60 s timeout; runs with `env: { LC_ALL: 'C' }`; `remote ref does not exist` → `ok(...)`. |
+| `getTagMetadata()` | `for-each-ref --format='%(refname:short)%00%(objecttype)%00%(contents:subject)%00%(taggername)%00%(taggerdate:unix)' refs/tags` | `Result<TagMetadata[]>` | parsed by `parseTagMetadata`; subject-only (single line/ref); no network. |
 
 All preserve the `Result<T, GitError>` pattern (Constitution III); none throw.
 

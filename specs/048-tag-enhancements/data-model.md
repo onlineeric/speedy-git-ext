@@ -15,7 +15,7 @@ export interface TagMetadata {
   name: string;
   /** true when the tag is an annotated/object tag; false for a lightweight tag. */
   annotated: boolean;
-  /** Annotation message (subject + optional body). Present only when annotated. */
+  /** Annotation subject line (`%(contents:subject)`). Present only when annotated. */
   message?: string;
   /** Tagger display name. Present only when annotated. */
   tagger?: string;
@@ -28,12 +28,16 @@ export interface TagMetadata {
 |-------|------|------------------------------|-------|
 | `name` | `string` | `%(refname:short)` | Always present; lookup key. |
 | `annotated` | `boolean` | `%(objecttype)` (`tag` → true) | Drives tooltip branch (FR-003). |
-| `message` | `string?` | `%(contents:subject)` + `%(contents:body)` | Omitted when lightweight. |
+| `message` | `string?` | `%(contents:subject)` | Subject line only — keeps each ref on one line so the `\n` record split is newline-safe; omitted when lightweight. |
 | `tagger` | `string?` | `%(taggername)` | Omitted when lightweight/empty. |
 | `date` | `number?` | `%(taggerdate:unix)` | Omitted when lightweight; formatted via existing `formatDate`. |
 
-**Validation / parsing rules** (`parseTagMetadata` in `src/utils/gitParsers.ts`):
-- Split output by record (`\n`), then by field (`%00`).
+**Validation / parsing rules** (`parseTagMetadata` in `src/utils/gitParsers.ts`,
+mirroring the existing `parseBranchLine` null-byte convention):
+- Split output by record (`\n`), then by field (`%00` / `\x00` `NULL_CHAR`) — never
+  by space, since tagger names and subjects contain spaces. Using
+  `%(contents:subject)` (not `:body`) guarantees each ref occupies a single line so
+  the `\n` record split is robust.
 - `annotated = objecttype === 'tag'`.
 - When not annotated, drop `message`/`tagger`/`date` (do not carry empty strings).
 - Trim a trailing empty `message` to `undefined`.
@@ -114,10 +118,13 @@ pushTag(name: string, remote?: string, force?: boolean): Promise<Result<string>>
 // NEW
 deleteRemoteTag(remote: string, name: string): Promise<Result<string>>;
 //   args: ['push', remote, '--delete', name]   (60 s timeout)
-//   benign no-op: stderr includes 'remote ref does not exist' ⇒ ok(...)
+//   env: { LC_ALL: 'C' } so git stderr is English and the match is locale-stable
+//   benign no-op: stderr.toLowerCase().includes('remote ref does not exist') ⇒ ok(...)
 
 getTagMetadata(): Promise<Result<TagMetadata[]>>;
-//   args: ['for-each-ref', '--format=<null-byte format>', 'refs/tags']
+//   args: ['for-each-ref',
+//          '--format=%(refname:short)%00%(objecttype)%00%(contents:subject)%00%(taggername)%00%(taggerdate:unix)',
+//          'refs/tags']
 //   parsed by parseTagMetadata()
 ```
 
