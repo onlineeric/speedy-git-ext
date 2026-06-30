@@ -4,6 +4,20 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.2.0] - 2026-07-01
+
+### Added
+- **Tag badges now show useful metadata in their tooltip.** Hovering a tag badge can now show whether it is annotated or lightweight, plus the annotated tag message, tagger, and tag date when available. The metadata is read locally from `refs/tags` in one deferred git call and cached in the webview, so hovering tags does not run git or touch the network.
+- **Create Tag can create and push in one flow.** The Create Tag dialog now has an **"Also push to remote"** checkbox, enabled by default when a remote exists, plus an opt-in **Force** checkbox for overwriting a diverged remote tag. The command preview shows the chained create-and-push command before confirmation.
+- **Tag deletion can also delete from the remote.** Deleting a tag now opens a dialog with an **"Also delete from remote"** checkbox, enabled by default when a remote exists, and a command preview for the local and remote delete commands. If the remote tag is already missing, the remote delete is treated as a benign no-op after the local tag is removed.
+- **Standalone Push Tag now supports force.** The Push Tag action now opens a confirmation dialog with an opt-in **Force** checkbox and command preview, so remote tag overwrite intent is explicit before running `git push --force refs/tags/<tag>`.
+
+### Changed
+- **Signature column settings now warn about CPU cost.** The column settings popover now warns that Signature checks run in the background and can use high CPU in large repositories, making the tradeoff clear before enabling the hidden-by-default Signature column.
+
+### Internal
+- Added stricter shared tag-name validation, extended tag RPC payloads for push/delete/force options, added tag metadata loading through deferred repo data, and covered the new service, parser, handler, and command-preview behavior with focused tests.
+
 ## [5.1.3] - 2026-06-27
 
 ### Performance
