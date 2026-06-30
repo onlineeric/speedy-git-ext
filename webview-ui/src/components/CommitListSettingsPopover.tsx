@@ -38,6 +38,11 @@ const COLUMN_LABELS: Record<CommitTableColumnId, string> = {
   signature: 'Signature',
 };
 
+const COLUMN_WARNINGS: Partial<Record<CommitTableColumnId, string>> = {
+  signature:
+    'Warning: signature checks run in the background and can use high CPU in large repositories. Keep this column hidden on slower machines.',
+};
+
 const buttonBaseClass =
   'rounded px-2.5 py-1 text-xs transition-colors focus:outline-none';
 
@@ -177,6 +182,7 @@ export function CommitListSettingsPopover() {
                         key={columnId}
                         columnId={columnId}
                         label={COLUMN_LABELS[columnId]}
+                        warning={COLUMN_WARNINGS[columnId]}
                         visible={commitTableLayout.columns[columnId].visible}
                         onVisibilityChange={handleVisibilityChange}
                         disabled={commitListMode === 'classic'}
@@ -234,12 +240,14 @@ function ModeButton({
 function SortableColumnRow({
   columnId,
   label,
+  warning,
   visible,
   onVisibilityChange,
   disabled,
 }: {
   columnId: CommitTableColumnId;
   label: string;
+  warning?: string;
   visible: boolean;
   onVisibilityChange: (columnId: CommitTableColumnId, visible: boolean) => void;
   disabled?: boolean;
@@ -271,7 +279,17 @@ function SortableColumnRow({
         ⠿
       </button>
 
-      <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
+      <div className="min-w-0 flex-1">
+        <span className="block truncate text-sm">{label}</span>
+        {warning && (
+          <span
+            role="note"
+            className="mt-1 block text-[11px] leading-4 text-[var(--vscode-editorWarning-foreground)]"
+          >
+            {warning}
+          </span>
+        )}
+      </div>
 
       <label className="flex items-center gap-2 text-xs text-[var(--vscode-descriptionForeground)]">
         <span>{visible ? 'Shown' : 'Hidden'}</span>
