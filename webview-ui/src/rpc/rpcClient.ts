@@ -280,6 +280,9 @@ class RpcClient {
       case 'avatarUrls':
         store.setGitHubAvatarUrls(message.payload.urls);
         break;
+      case 'tagMetadata':
+        store.setTagMetadata(message.payload.metadata);
+        break;
       case 'persistedUIState':
         store.hydratePersistedUIState(message.payload.uiState);
         break;
@@ -467,16 +470,16 @@ class RpcClient {
   }
 
   // Tag ops
-  createTag(name: string, hash: string, message?: string) {
-    this.send({ type: 'createTag', payload: { name, hash, message } });
+  createTag(name: string, hash: string, message?: string, push?: { remote: string; force?: boolean }) {
+    this.send({ type: 'createTag', payload: { name, hash, message, push } });
   }
 
-  deleteTag(name: string) {
-    this.send({ type: 'deleteTag', payload: { name } });
+  deleteTag(name: string, deleteRemote?: { remote: string }) {
+    this.send({ type: 'deleteTag', payload: { name, deleteRemote } });
   }
 
-  pushTag(name: string, remote?: string) {
-    this.send({ type: 'pushTag', payload: { name, remote } });
+  pushTag(name: string, remote?: string, force?: boolean) {
+    this.send({ type: 'pushTag', payload: { name, remote, force } });
   }
 
   // Stash ops

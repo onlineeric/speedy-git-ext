@@ -1,4 +1,5 @@
 import { GitError, type Result, err } from '../../shared/errors.js';
+import { validateGitTagName } from '../../shared/gitRefValidation.js';
 
 const HASH_WITH_PARENT_RE = /^[0-9a-f]{4,40}(~\d+)?$/i;
 
@@ -16,6 +17,15 @@ export function validateRefName(name: string): Result<string> {
     return err(new GitError(`Invalid ref name: ${name}`, 'VALIDATION_ERROR'));
   }
   return { success: true, value: name };
+}
+
+/** Validates a tag name using git refname rules plus flag-injection protection. */
+export function validateTagName(name: string): Result<string> {
+  const validation = validateGitTagName(name);
+  if (!validation.valid) {
+    return err(new GitError(validation.message ?? `Invalid tag name: ${name}`, 'VALIDATION_ERROR'));
+  }
+  return { success: true, value: name.trim() };
 }
 
 const RESERVED_LOCAL_BRANCH_NAMES = new Set(['HEAD']);

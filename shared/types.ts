@@ -105,6 +105,24 @@ export interface RefInfo {
 
 export type RefType = 'head' | 'branch' | 'remote' | 'tag' | 'stash' | 'uncommitted';
 
+/**
+ * Annotation metadata for a single tag, read once per load from
+ * `git for-each-ref refs/tags` and cached in the webview store keyed by `name`
+ * (048-tag-enhancements). Local-only; never fetched per-hover.
+ */
+export interface TagMetadata {
+  /** Short tag name (e.g. "v1.0.0"); the key used for lookup. */
+  name: string;
+  /** True when the tag is an annotated/object tag; false for a lightweight tag. */
+  annotated: boolean;
+  /** Full annotation message (`%(contents)`), preserving line breaks. Present only when annotated. */
+  message?: string;
+  /** Tagger display name. Present only when annotated. */
+  tagger?: string;
+  /** Tag date as unix seconds. Present only when annotated. */
+  date?: number;
+}
+
 export const UNCOMMITTED_HASH = 'UNCOMMITTED';
 
 export function buildUncommittedSubject(

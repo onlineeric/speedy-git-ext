@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata } from './types.js';
 
 /** Payload for the batched initial data message */
 export interface InitialDataPayload {
@@ -56,9 +56,9 @@ export type RequestMessage =
   | { type: 'removeRemote'; payload: { name: string } }
   | { type: 'editRemote'; payload: { name: string; newUrl: string } }
   // Tag ops
-  | { type: 'createTag'; payload: { name: string; hash: string; message?: string } }
-  | { type: 'deleteTag'; payload: { name: string } }
-  | { type: 'pushTag'; payload: { name: string; remote?: string } }
+  | { type: 'createTag'; payload: { name: string; hash: string; message?: string; push?: { remote: string; force?: boolean } } }
+  | { type: 'deleteTag'; payload: { name: string; deleteRemote?: { remote: string } } }
+  | { type: 'pushTag'; payload: { name: string; remote?: string; force?: boolean } }
   // Stash ops
   | { type: 'getStashes'; payload: Record<string, never> }
   | { type: 'applyStash'; payload: { index: number } }
@@ -181,6 +181,7 @@ export type ResponseMessage =
   | { type: 'submoduleOperationResult'; payload: { success: boolean; error?: string } }
   | { type: 'pushResult'; payload: { success: boolean; message: string } }
   | { type: 'avatarUrls'; payload: { urls: AvatarUrlMap } }
+  | { type: 'tagMetadata'; payload: { metadata: Record<string, TagMetadata> } }
   | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[] } }
   | { type: 'worktreePathResolved'; payload: { path: string; requestId: number } }
   | { type: 'worktreeEnvFiles'; payload: { requestId: number; ignoredEnvFiles: string[]; envFilesPresent: boolean } }
@@ -239,7 +240,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commitsAppended: true, prefetchError: true, repoList: true,
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
-  pushResult: true, avatarUrls: true, worktreeList: true, worktreePathResolved: true, worktreeEnvFiles: true, containingBranches: true,
+  pushResult: true, avatarUrls: true, tagMetadata: true, worktreeList: true, worktreePathResolved: true, worktreeEnvFiles: true, containingBranches: true,
   persistedUIState: true, authorList: true, uncommittedChanges: true, conflictState: true,
   initialData: true,
   compareResult: true, compareError: true,

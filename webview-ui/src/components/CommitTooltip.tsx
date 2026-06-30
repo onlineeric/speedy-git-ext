@@ -143,6 +143,7 @@ interface ReferencesSectionProps {
 function ReferencesSection({ hash, isHead }: ReferencesSectionProps) {
   const containingResult = useGraphStore((s) => s.containingBranchesCache.get(hash));
   const knownBranches = useGraphStore((s) => s.branches);
+  const tagMetadata = useGraphStore((s) => s.tagMetadata);
   const mergedCommits = useGraphStore((s) => s.mergedCommits);
   const topology = useGraphStore((s) => s.topology);
   const graphColors = useGraphStore((s) => s.userSettings.graphColors);
@@ -321,6 +322,7 @@ function ReferencesSection({ hash, isHead }: ReferencesSectionProps) {
                 key={displayRefKey(displayRef)}
                 displayRef={displayRef}
                 laneColorStyle={getDisplayRefStyle(displayRef)}
+                tagMeta={displayRef.type === 'tag' ? tagMetadata[displayRef.tagName] : undefined}
               />
             ))}
           </ReferenceSubsection>

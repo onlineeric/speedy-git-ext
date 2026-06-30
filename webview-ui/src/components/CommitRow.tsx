@@ -99,6 +99,7 @@ export const CommitRow = memo(function CommitRow({
   const isUncommitted = commit.refs.some((r) => r.type === 'uncommitted');
   const stashIndex = isStash ? parseStashIndex(commit.refs) : -1;
   const worktreeByBranch = useGraphStore((s) => s.worktreeByBranch);
+  const tagMetadata = useGraphStore((s) => s.tagMetadata);
   const detachedWorktrees = useGraphStore((s) => s.detachedWorktreesByHead.get(commit.hash) ?? EMPTY_WORKTREES);
 
   const node = topology.nodes.get(commit.hash);
@@ -192,11 +193,12 @@ export const CommitRow = memo(function CommitRow({
                   displayRef={displayRef}
                   laneColorStyle={laneColorStyle}
                   worktree={worktreeForDisplayRef(displayRef, worktreeByBranch)}
+                  tagMeta={displayRef.type === 'tag' ? tagMetadata[displayRef.tagName] : undefined}
                 />
               </BranchContextMenu>
             )
           )}
-          <OverflowRefsBadge hiddenRefs={overflowRefs} laneColorStyle={laneColorStyle} worktreeByBranch={worktreeByBranch} />
+          <OverflowRefsBadge hiddenRefs={overflowRefs} laneColorStyle={laneColorStyle} worktreeByBranch={worktreeByBranch} tagMetadata={tagMetadata} />
           {showDetachedWorktrees && <DetachedWorktreeBadge worktrees={detachedWorktrees} laneColorStyle={laneColorStyle} />}
         </div>
       )}

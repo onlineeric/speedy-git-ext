@@ -1,4 +1,4 @@
-import type { Commit, Branch, RefInfo } from '../../shared/types.js';
+import type { Commit, Branch, RefInfo, TagMetadata } from '../../shared/types.js';
 
 const NULL_CHAR = '\x00';
 
@@ -126,6 +126,48 @@ function parseQualifiedRef(refName: string): RefInfo | null {
   }
 
   return null;
+}
+
+/**
+ * Parse `git for-each-ref refs/tags` output using the null-byte field format:
+ *   `%(refname:short)%00%(objecttype)%00%(contents)%00%(taggername)%00%(taggerdate:unix)%00`
+ * `%(contents)` can contain newlines, so records are parsed as fixed-width NUL
+ * field groups instead of splitting on line breaks.
+ * Lightweight tags (`objecttype !== 'tag'`) carry no annotation fields.
+ */
+export function parseTagMetadata(stdout: string): TagMetadata[] {
+  const metadata: TagMetadata[] = [];
+  const fields = stdout.split(NULL_CHAR);
+
+  for (let index = 0; index + 4 < fields.length; index += 5) {
+    // Records are joined with '\n', so every field after the first record's name
+    // carries a leading newline; tag names contain no whitespace, so trim() is safe.
+    const name = fields[index].trim();
+    const objectType = fields[index + 1];
+    // Strip only trailing line breaks from %(contents) to preserve internal blank
+    // lines and any leading indentation in the annotation body.
+    const message = fields[index + 2].replace(/[\r\n]+$/, '');
+    const taggerName = fields[index + 3];
+    const taggerDate = fields[index + 4];
+    if (!name) continue;
+
+    const annotated = objectType === 'tag';
+    if (!annotated) {
+      metadata.push({ name, annotated: false });
+      continue;
+    }
+
+    const date = taggerDate ? parseInt(taggerDate, 10) : NaN;
+    metadata.push({
+      name,
+      annotated: true,
+      message: message ? message : undefined,
+      tagger: taggerName ? taggerName : undefined,
+      date: Number.isNaN(date) ? undefined : date,
+    });
+  }
+
+  return metadata;
 }
 
 export function parseBranchLine(line: string): Branch | null {
