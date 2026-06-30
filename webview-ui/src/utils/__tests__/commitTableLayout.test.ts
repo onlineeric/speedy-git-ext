@@ -214,6 +214,28 @@ describe('resolveCommitTableLayout', () => {
     expect(hash.effectiveWidth).toBe(hash.minWidth);
   });
 
+  it('shrinks an oversized graph column so the others never get hidden', () => {
+    // Regression: a graph preferredWidth wider than the pane must not push the
+    // other columns past table mode's clipped (non-scrollable) right edge.
+    const layout = setCommitTableColumnPreferredWidth(
+      createDefaultCommitTableLayout(),
+      'graph',
+      5000,
+    );
+    const containerWidth = 800; // comfortably above the sum of all min widths
+    const resolved = resolveCommitTableLayout({ layout, containerWidth });
+
+    const graph = resolved.columns.find((c) => c.id === 'graph')!;
+    expect(graph.effectiveWidth).toBeLessThan(5000);
+
+    // Every column still gets at least its minimum width, and the whole table
+    // fits within the pane — so nothing is clipped out of view.
+    for (const col of resolved.columns) {
+      expect(col.effectiveWidth).toBeGreaterThanOrEqual(col.minWidth);
+    }
+    expect(resolved.tableWidth).toBeLessThanOrEqual(containerWidth);
+  });
+
   it('builds gridTemplateColumns string from effective widths', () => {
     const layout = createDefaultCommitTableLayout();
     const resolved = resolveCommitTableLayout({ layout, containerWidth: 9999 });

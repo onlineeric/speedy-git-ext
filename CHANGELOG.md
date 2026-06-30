@@ -18,6 +18,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Internal
 - Added stricter shared tag-name validation, extended tag RPC payloads for push/delete/force options, added tag metadata loading through deferred repo data, and covered the new service, parser, handler, and command-preview behavior with focused tests.
 
+## [5.1.4] - 2026-06-28
+
+### Fixed
+- **The commit table can no longer collapse to a graph-only view.** In Table mode, if a repository's saved layout had a Graph column wider than the current pane, the Graph column filled the entire visible width and pushed every other column — Hash, Message, Author, Date, and their header labels — past the table's clipped right edge, where they couldn't be reached (Table mode has no horizontal scrollbar). The list appeared to show only the Graph column, even though clicking a commit still opened its details normally. Because column widths are stored per repository, a single affected repo showed this while every other repo looked fine. The Graph column now shrinks as a last resort — only when every other column is already at its minimum width and the table still overflows — so the other columns always stay visible. Existing layouts self-correct on load (no reset needed); previously the only workaround was **"Reset column widths to defaults"**.
+
 ## [5.1.3] - 2026-06-27
 
 ### Performance
