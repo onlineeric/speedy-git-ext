@@ -15,7 +15,7 @@ export interface TagMetadata {
   name: string;
   /** true when the tag is an annotated/object tag; false for a lightweight tag. */
   annotated: boolean;
-  /** Annotation subject line (`%(contents:subject)`). Present only when annotated. */
+  /** Full annotation message (`%(contents)`), preserving line breaks. Present only when annotated. */
   message?: string;
   /** Tagger display name. Present only when annotated. */
   tagger?: string;
@@ -28,19 +28,19 @@ export interface TagMetadata {
 |-------|------|------------------------------|-------|
 | `name` | `string` | `%(refname:short)` | Always present; lookup key. |
 | `annotated` | `boolean` | `%(objecttype)` (`tag` → true) | Drives tooltip branch (FR-003). |
-| `message` | `string?` | `%(contents:subject)` | Subject line only — keeps each ref on one line so the `\n` record split is newline-safe; omitted when lightweight. |
+| `message` | `string?` | `%(contents)` | Full annotation message with line breaks preserved; omitted when lightweight. |
 | `tagger` | `string?` | `%(taggername)` | Omitted when lightweight/empty. |
 | `date` | `number?` | `%(taggerdate:unix)` | Omitted when lightweight; formatted via existing `formatDate`. |
 
 **Validation / parsing rules** (`parseTagMetadata` in `src/utils/gitParsers.ts`,
-mirroring the existing `parseBranchLine` null-byte convention):
-- Split output by record (`\n`), then by field (`%00` / `\x00` `NULL_CHAR`) — never
-  by space, since tagger names and subjects contain spaces. Using
-  `%(contents:subject)` (not `:body`) guarantees each ref occupies a single line so
-  the `\n` record split is robust.
+mirroring the existing null-byte convention):
+- Split output into fixed-width field groups by `%00` / `\x00` `NULL_CHAR` — never
+  by space or newline, since tagger names can contain spaces and annotation
+  messages can contain line breaks. Each record is emitted with a trailing `%00`;
+  the parser strips git's inter-record newline from the next tag name.
 - `annotated = objecttype === 'tag'`.
 - When not annotated, drop `message`/`tagger`/`date` (do not carry empty strings).
-- Trim a trailing empty `message` to `undefined`.
+- Trim trailing line breaks from `message`; empty `message` becomes `undefined`.
 - Skip blank trailing records.
 
 **Lifecycle**: transient. Loaded with deferred data, replaced wholesale on each
@@ -123,7 +123,7 @@ deleteRemoteTag(remote: string, name: string): Promise<Result<string>>;
 
 getTagMetadata(): Promise<Result<TagMetadata[]>>;
 //   args: ['for-each-ref',
-//          '--format=%(refname:short)%00%(objecttype)%00%(contents:subject)%00%(taggername)%00%(taggerdate:unix)',
+//          '--format=%(refname:short)%00%(objecttype)%00%(contents)%00%(taggername)%00%(taggerdate:unix)%00',
 //          'refs/tags']
 //   parsed by parseTagMetadata()
 ```

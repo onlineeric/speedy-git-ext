@@ -65,6 +65,7 @@ function createLoaderFixture(options: {
     gitWorktreeService: { listWorktrees: vi.fn().mockResolvedValue({ success: true, value: [] }) },
     gitStashService: { getStashes: vi.fn().mockResolvedValue({ success: true, value: [] }) },
     gitRevertService: { getRevertState: vi.fn().mockResolvedValue({ success: true, value: 'idle' }) },
+    gitTagService: { getTagMetadata: vi.fn().mockResolvedValue({ success: true, value: [] }) },
     gitCherryPickService: { getCherryPickState: vi.fn(() => ({ success: true, value: 'idle' })) },
     gitRebaseService: {
       getRebaseState: vi.fn(() => ({ success: true, value: { state: 'idle' } })),

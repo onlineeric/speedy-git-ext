@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateFilePath, validateHash, validateRefName } from '../utils/gitValidation.js';
+import { validateFilePath, validateHash, validateRefName, validateTagName } from '../utils/gitValidation.js';
 
 describe('validateHash', () => {
   it('accepts a 40-char SHA1 hash', () => {
@@ -70,6 +70,37 @@ describe('validateRefName', () => {
     const result = validateRefName('-x');
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+describe('validateTagName', () => {
+  it('accepts ordinary and slash-containing tag names', () => {
+    expect(validateTagName('v1.0.0').success).toBe(true);
+    expect(validateTagName('release/2026.06.30').success).toBe(true);
+  });
+
+  it('trims surrounding whitespace before returning the tag name', () => {
+    const result = validateTagName('  v1.0.0  ');
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.value).toBe('v1.0.0');
+  });
+
+  it('rejects spaces inside tag names', () => {
+    const result = validateTagName('release candidate');
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.message).toBe('Tag name cannot contain spaces or control characters');
+  });
+
+  it('rejects git-invalid refname patterns', () => {
+    expect(validateTagName('release..candidate').success).toBe(false);
+    expect(validateTagName('release/@{candidate').success).toBe(false);
+    expect(validateTagName('release/.candidate').success).toBe(false);
+    expect(validateTagName('release/candidate.lock').success).toBe(false);
+    expect(validateTagName('release?candidate').success).toBe(false);
+  });
+
+  it('rejects names starting with a dash to prevent flag injection', () => {
+    expect(validateTagName('-v1.0.0').success).toBe(false);
   });
 });
 

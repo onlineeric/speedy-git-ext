@@ -76,6 +76,20 @@ pnpm build       # clean extension + webview build
 2. Delete a tag there. **Expect**: no "Also delete from remote" option; local
    delete works.
 
+## FR-017 — Force offered only on active push paths (T030)
+
+The repo has no React component-test harness (`@testing-library/react` / jsdom is
+not a dependency, and packages are not auto-installed), so this guard is verified
+manually rather than via an automated component test:
+
+1. Open **Delete Tag** (`DeleteTagDialog`). **Expect**: no "Force" control —
+   only "Also delete from remote".
+2. Open **Create Tag** and **uncheck** "Also push to remote". **Expect**: the
+   "Force" checkbox disappears (it is nested under "Also push" and only renders
+   while push is on).
+3. The "Force" control appears only on the create+push path (push checked) and on
+   the standalone **Push Tag** dialog (`PushTagDialog`).
+
 ## Scope guard checks
 
 - Watch the git Output channel during all of the above. **Expect**: no

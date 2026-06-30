@@ -32,6 +32,7 @@ import type {
   StashEntry,
   Submodule,
   SubmoduleNavEntry,
+  TagMetadata,
   UserSettings,
   UncommittedSummary,
   WorktreeInfo,
@@ -162,6 +163,8 @@ interface GraphStore {
   searchState: SearchState;
   activeToggleWidget: ActiveToggleWidget;
   gitHubAvatarUrls: Record<string, string>;
+  /** Tag annotation metadata keyed by tag name; whole-map replaced on each load (048). */
+  tagMetadata: Record<string, TagMetadata>;
   submodules: Submodule[];
   submoduleStack: SubmoduleNavEntry[];
   fileViewMode: FileViewMode;
@@ -208,6 +211,7 @@ interface GraphStore {
   updateCommitTableLayout: (updater: (layout: CommitTableLayout) => CommitTableLayout) => void;
   hydratePersistedUIState: (state: PersistedUIState) => void;
   setGitHubAvatarUrls: (urls: Record<string, string>) => void;
+  setTagMetadata: (metadata: Record<string, TagMetadata>) => void;
   setCommits: (commits: Commit[]) => void;
   appendCommits: (newCommits: Commit[], totalLoadedWithoutFilter?: number) => void;
   setBranches: (branches: Branch[]) => void;
@@ -373,6 +377,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   searchState: defaultSearchState,
   activeToggleWidget: null,
   gitHubAvatarUrls: {},
+  tagMetadata: {},
   submodules: [],
   submoduleStack: [],
   fileViewMode: DEFAULT_PERSISTED_UI_STATE.fileViewMode,
@@ -440,6 +445,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setGitHubAvatarUrls: (urls) => set((state) => ({
     gitHubAvatarUrls: { ...state.gitHubAvatarUrls, ...urls },
   })),
+  // Whole-map replace: a refresh's deferred load resends all tags, so replacing
+  // (not merging) invalidates metadata for tags that were deleted.
+  setTagMetadata: (tagMetadata) => set({ tagMetadata }),
   setCommits: (commits) => {
     const filters = get().filters;
     const hiddenCommitHashes = computeHiddenCommitHashes(commits, filters);
@@ -758,6 +766,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
             worktreeByHead: new Map(),
             worktreeByBranch: new Map(),
             detachedWorktreesByHead: new Map(),
+            tagMetadata: {},
             uncommittedStagedFiles: [],
             uncommittedUnstagedFiles: [],
             uncommittedConflictFiles: [],
@@ -801,6 +810,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       worktreeByHead: new Map(),
       worktreeByBranch: new Map(),
       detachedWorktreesByHead: new Map(),
+      tagMetadata: {},
       uncommittedStagedFiles: [],
       uncommittedUnstagedFiles: [],
       uncommittedConflictFiles: [],
@@ -846,6 +856,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       worktreeByHead: new Map(),
       worktreeByBranch: new Map(),
       detachedWorktreesByHead: new Map(),
+      tagMetadata: {},
       uncommittedStagedFiles: [],
       uncommittedUnstagedFiles: [],
       uncommittedConflictFiles: [],

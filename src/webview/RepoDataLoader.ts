@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { InitialDataPayload, ResponseMessage } from '../../shared/messages.js';
-import type { Commit, GraphFilters, UncommittedSummary, UserSettings } from '../../shared/types.js';
+import type { Commit, GraphFilters, TagMetadata, UncommittedSummary, UserSettings } from '../../shared/types.js';
 import { DEFAULT_USER_SETTINGS } from '../../shared/types.js';
 import type { Result } from '../../shared/errors.js';
 import { GitHubAvatarService } from '../services/GitHubAvatarService.js';
@@ -197,12 +197,14 @@ export class RepoDataLoader {
       worktreesSettled,
       stashesSettled,
       revertStateSettled,
+      tagMetadataSettled,
     ] = await Promise.allSettled([
       services.gitDiffService.getUncommittedSummary(),
       services.gitRemoteService.getRemotes(),
       services.gitWorktreeService.listWorktrees(),
       services.gitStashService.getStashes(),
       services.gitRevertService.getRevertState(),
+      services.gitTagService.getTagMetadata(),
     ]);
 
     if (generation !== this.deps.runtime.fetchGeneration) return;
@@ -213,6 +215,7 @@ export class RepoDataLoader {
     const worktrees = unwrapSettledResult(worktreesSettled, 'worktrees', errors);
     const stashes = unwrapSettledResult(stashesSettled, 'stashes', errors);
     const revertState = unwrapSettledResult(revertStateSettled, 'revertState', errors);
+    const tagMetadata = unwrapSettledResult(tagMetadataSettled, 'tagMetadata', errors);
 
     if (uncommittedChanges) {
       this.deps.postMessage({ type: 'uncommittedChanges', payload: uncommittedChanges });
@@ -228,6 +231,11 @@ export class RepoDataLoader {
     }
     if (revertState) {
       this.deps.postMessage({ type: 'revertState', payload: { state: revertState } });
+    }
+    if (tagMetadata) {
+      const metadata: Record<string, TagMetadata> = {};
+      for (const tag of tagMetadata) metadata[tag.name] = tag;
+      this.deps.postMessage({ type: 'tagMetadata', payload: { metadata } });
     }
 
     const currentServices = this.deps.services.current();

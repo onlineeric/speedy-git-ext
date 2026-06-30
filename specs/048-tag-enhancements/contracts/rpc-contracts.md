@@ -81,14 +81,14 @@ exactly like the other deferred posts.
 |--------|-----------|--------|-------|
 | `pushTag(name, remote?, force?)` | `push <remote\|origin> [--force] refs/tags/<name>` | `Result<string>` | 60 s timeout; validates name + remote. |
 | `deleteRemoteTag(remote, name)` | `push <remote> --delete <name>` | `Result<string>` | 60 s timeout; runs with `env: { LC_ALL: 'C' }`; `remote ref does not exist` → `ok(...)`. |
-| `getTagMetadata()` | `for-each-ref --format='%(refname:short)%00%(objecttype)%00%(contents:subject)%00%(taggername)%00%(taggerdate:unix)' refs/tags` | `Result<TagMetadata[]>` | parsed by `parseTagMetadata`; subject-only (single line/ref); no network. |
+| `getTagMetadata()` | `for-each-ref --format='%(refname:short)%00%(objecttype)%00%(contents)%00%(taggername)%00%(taggerdate:unix)%00' refs/tags` | `Result<TagMetadata[]>` | parsed by `parseTagMetadata`; full message with line breaks preserved; no network. |
 
 All preserve the `Result<T, GitError>` pattern (Constitution III); none throw.
 
 ## Validation contracts
 
-- Tag/remote names continue through `validateRefName` (flag-injection guard) —
-  existing behavior, covered by `GitTagService.test.ts`.
+- Tag names use `validateTagName` (git refname rules plus flag-injection guard);
+  remote names continue through `validateRefName`.
 - New flags (`force`, `deleteRemote`, `push`) are plain booleans/objects; no extra
   validation beyond the existing name checks.
 

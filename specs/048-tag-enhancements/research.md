@@ -10,13 +10,14 @@ and the alternatives considered.
 `git for-each-ref refs/tags` with a null-byte-delimited custom format and parses
 the output with a dedicated `parseTagMetadata` helper in `src/utils/gitParsers.ts`.
 
-Format fields (one record per tag, fields separated by `%00`, records by `\n`):
+Format fields (fields separated by `%00`; each record ends with a trailing `%00`
+plus git's normal newline):
 
 - `%(refname:short)` — tag name
 - `%(objecttype)` — `tag` for annotated, `commit` for lightweight
-- `%(contents:subject)` — the annotation message shown in the tooltip (annotated only).
-  Subject only (not `%(contents:body)`): a multi-line body would embed `\n` and break
-  the `\n` record split, so the body is intentionally excluded to keep one line per ref.
+- `%(contents)` — the full annotation message shown in the tooltip (annotated only).
+  This can contain line breaks, so parsing uses fixed-width NUL field groups
+  instead of splitting records by newline.
 - `%(taggername)` — tagger name (annotated only)
 - `%(taggerdate:unix)` — tag date as unix seconds (annotated only)
 
@@ -26,7 +27,8 @@ Format fields (one record per tag, fields separated by `%00`, records by `\n`):
   `RepoDataLoader.sendDeferredRepoData`.
 - `for-each-ref` with `%(...)` atoms is git's purpose-built typed query — no
   regex scraping of porcelain (Constitution IV). Null-byte separation matches the
-  existing parsing convention in `GitLogService`/`gitParsers.ts`.
+  existing parsing convention in `GitLogService`/`gitParsers.ts` and preserves
+  multi-line annotation messages.
 - `%(objecttype)` cleanly distinguishes annotated (`tag`) from lightweight
   (`commit`), satisfying FR-001/FR-003 at no extra cost.
 
@@ -51,7 +53,7 @@ becomes:
 
 ```
 <tagName>
-<annotation subject/body>     (annotated only)
+<annotation message>          (annotated only, line breaks preserved)
 Tagger: <name>                (annotated only)
 Date: <formatted date>        (annotated only)
 Lightweight tag               (lightweight only)

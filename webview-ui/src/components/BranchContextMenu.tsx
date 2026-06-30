@@ -5,15 +5,16 @@ import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import {
   buildDeleteRemoteBranchCommand,
-  buildDeleteTagCommand,
   buildFastForwardLocalBranchCommand,
   buildRenameBranchCommand,
   buildStashAndCheckoutCommand,
 } from '../utils/gitCommandBuilder';
-import { resolveDefaultRemote } from '../utils/resolveDefaultRemote';
+import { resolveDefaultRemote, resolveDefaultRemoteName } from '../utils/resolveDefaultRemote';
 import { CompareMenuItems } from './CompareMenuItems';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DeleteBranchDialog } from './DeleteBranchDialog';
+import { DeleteTagDialog } from './DeleteTagDialog';
+import { PushTagDialog } from './PushTagDialog';
 import { InputDialog } from './InputDialog';
 import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 import { MergeDialog } from './MergeDialog';
@@ -65,8 +66,10 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
   const [rebaseConfirmOpen, setRebaseConfirmOpen] = useState(false);
   const [fastForwardOpen, setFastForwardOpen] = useState(false);
   const [createWorktreeOpen, setCreateWorktreeOpen] = useState(false);
+  const [pushTagOpen, setPushTagOpen] = useState(false);
   const loading = useGraphStore((s) => s.loading);
   const branches = useGraphStore((s) => s.branches);
+  const remotes = useGraphStore((s) => s.remotes);
   const branchWorktree = useGraphStore((s) => refInfo.type === 'branch' ? s.worktreeByBranch.get(refInfo.name) : undefined);
   const { openRemoveWorktreeDialog, removeWorktreeDialog } = useRemoveWorktreeDialog();
 
@@ -87,6 +90,11 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
   const isBranch = isLocalBranch || isRemoteBranch;
   const isTag = refInfo.type === 'tag';
   const isStash = refInfo.type === 'stash';
+
+  // Tag push/delete-from-remote target: the configured default remote, or undefined
+  // when no remote exists (which hides the remote-bearing affordances). FR-009.
+  const hasRemote = remotes.length > 0;
+  const tagRemote = hasRemote ? resolveDefaultRemoteName(remotes) : undefined;
 
   // Compare-refs (042-compare-refs). Stashes are excluded by FR-017.
   const compareSlotForThisRef: SlotValue | null = isBranch
@@ -152,10 +160,9 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
     targetHash !== headBranch.hash;
 
   const deleteCommandPreview = useMemo(() => {
-    if (isTag) return buildDeleteTagCommand({ name: refInfo.name });
     if (isRemoteBranch && refInfo.remote) return buildDeleteRemoteBranchCommand({ remote: refInfo.remote, name: refInfo.name });
     return '';
-  }, [isTag, isRemoteBranch, refInfo.name, refInfo.remote]);
+  }, [isRemoteBranch, refInfo.name, refInfo.remote]);
 
   const buildRenamePreview = useCallback(
     (newName: string) => buildRenameBranchCommand({ oldName: refInfo.name, newName: newName || '<new-name>' }),
@@ -322,7 +329,10 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
 
             {isTag && (
               <>
-                <ContextMenu.Item className={menuItemClass} onSelect={() => rpcClient.pushTag(refInfo.name)}>
+                <ContextMenu.Item
+                  className={menuItemClass}
+                  onSelect={() => (tagRemote ? setPushTagOpen(true) : rpcClient.pushTag(refInfo.name))}
+                >
                   Push Tag
                 </ContextMenu.Item>
                 {showWorktreeGroup && (
@@ -356,28 +366,50 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
           </ContextMenu.Content>
         </ContextMenu.Portal>
 
-      {/* Delete confirmation for tags and remote branches */}
+      {/* Delete confirmation for remote branches */}
       <ConfirmDialog
-        open={deleteConfirmOpen && !isLocalBranch}
+        open={deleteConfirmOpen && isRemoteBranch}
         onConfirm={() => {
           setDeleteConfirmOpen(false);
-          if (isTag) {
-            rpcClient.deleteTag(refInfo.name);
-          } else if (isRemoteBranch && refInfo.remote) {
+          if (isRemoteBranch && refInfo.remote) {
             rpcClient.deleteRemoteBranch(refInfo.remote, refInfo.name);
           }
         }}
         onCancel={() => setDeleteConfirmOpen(false)}
-        title={isTag ? 'Delete Tag' : 'Delete Remote Branch'}
-        description={
-          isTag
-            ? `Are you sure you want to delete tag '${refInfo.name}'?`
-            : `Are you sure you want to delete remote branch '${displayName}'? This will remove it from the remote.`
-        }
+        title="Delete Remote Branch"
+        description={`Are you sure you want to delete remote branch '${displayName}'? This will remove it from the remote.`}
         confirmLabel="Delete"
         variant="danger"
         commandPreview={deleteCommandPreview}
       />
+
+      {/* Delete confirmation for tags (with optional remote delete) */}
+      {isTag && (
+        <DeleteTagDialog
+          open={deleteConfirmOpen}
+          tagName={refInfo.name}
+          remote={tagRemote}
+          onConfirm={(deleteRemote) => {
+            setDeleteConfirmOpen(false);
+            rpcClient.deleteTag(refInfo.name, deleteRemote);
+          }}
+          onCancel={() => setDeleteConfirmOpen(false)}
+        />
+      )}
+
+      {/* Push tag dialog (standalone push with optional force) */}
+      {isTag && tagRemote && (
+        <PushTagDialog
+          open={pushTagOpen}
+          tagName={refInfo.name}
+          remote={tagRemote}
+          onConfirm={(force) => {
+            setPushTagOpen(false);
+            rpcClient.pushTag(refInfo.name, tagRemote, force);
+          }}
+          onCancel={() => setPushTagOpen(false)}
+        />
+      )}
 
       {/* Delete confirmation for local branches (with optional remote delete) */}
       <DeleteBranchDialog
