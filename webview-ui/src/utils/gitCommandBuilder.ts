@@ -56,6 +56,14 @@ export interface TagCommandOptions {
   name: string;
   hash: string;
   message?: string;
+  /** When set, append the chained push command shown when "Also push to remote" is on. */
+  push?: { remote: string; force?: boolean };
+}
+
+export interface PushTagCommandOptions {
+  name: string;
+  remote: string;
+  force?: boolean;
 }
 
 export function buildPushCommand(options: PushCommandOptions): string {
@@ -192,6 +200,20 @@ export function buildDeleteTagCommand(options: DeleteTagCommandOptions): string 
   return `git tag -d ${options.name}`;
 }
 
+export interface DeleteTagWithRemoteCommandOptions {
+  name: string;
+  remote: string;
+}
+
+export function buildDeleteTagWithRemoteCommand(options: DeleteTagWithRemoteCommandOptions): string {
+  return `${buildDeleteTagCommand({ name: options.name })} && git push ${options.remote} --delete ${options.name}`;
+}
+
+export function buildPushTagCommand(options: PushTagCommandOptions): string {
+  const force = options.force ? '--force ' : '';
+  return `git push ${options.remote} ${force}refs/tags/${options.name}`;
+}
+
 export function buildDropStashCommand(options: DropStashCommandOptions): string {
   return `git stash drop stash@{${options.stashIndex}}`;
 }
@@ -231,7 +253,12 @@ export function buildTagCommand(options: TagCommandOptions): string {
   } else {
     parts.push(options.name, options.hash);
   }
-  return parts.join(' ');
+  const createCmd = parts.join(' ');
+  if (options.push) {
+    const pushCmd = buildPushTagCommand({ name: options.name, remote: options.push.remote, force: options.push.force });
+    return `${createCmd} && ${pushCmd}`;
+  }
+  return createCmd;
 }
 
 export function buildDiscardFilesCommand(paths: string[]): string {

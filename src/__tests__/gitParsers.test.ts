@@ -4,6 +4,7 @@ import {
   parseBranchLine,
   parseCommitLine,
   parseRefs,
+  parseTagMetadata,
 } from '../utils/gitParsers.js';
 
 const NUL = '\x00';
@@ -238,5 +239,63 @@ describe('parseBranchLine', () => {
   it('drops `<remote>/HEAD` entries from the branch list', () => {
     expect(parseBranchLine(branchLine('origin/HEAD', ' ', 'aaa1111'))).toBeNull();
     expect(parseBranchLine(branchLine('remotes/origin/HEAD', ' ', 'aaa1111'))).toBeNull();
+  });
+});
+
+describe('parseTagMetadata', () => {
+  const tagRecord = (name: string, type: string, message: string, tagger: string, date: string) =>
+    `${[name, type, message, tagger, date].join(NUL)}${NUL}`;
+
+  it('parses an annotated tag with all fields', () => {
+    const out = tagRecord('v1.0.0', 'tag', 'First release', 'Ada Lovelace', '1700000000');
+    expect(parseTagMetadata(out)).toEqual([
+      { name: 'v1.0.0', annotated: true, message: 'First release', tagger: 'Ada Lovelace', date: 1700000000 },
+    ]);
+  });
+
+  it('parses a lightweight tag with no annotation fields', () => {
+    const out = tagRecord('v0.9', 'commit', '', '', '');
+    expect(parseTagMetadata(out)).toEqual([{ name: 'v0.9', annotated: false }]);
+  });
+
+  it('treats an empty annotation message as undefined', () => {
+    const out = tagRecord('v2.0', 'tag', '', 'Grace Hopper', '1700000001');
+    expect(parseTagMetadata(out)).toEqual([
+      { name: 'v2.0', annotated: true, message: undefined, tagger: 'Grace Hopper', date: 1700000001 },
+    ]);
+  });
+
+  it('keeps tagger names and subjects with spaces intact as single fields', () => {
+    const out = tagRecord('v3.0', 'tag', 'Ship it now please', 'Mary Jane Watson', '1700000002');
+    expect(parseTagMetadata(out)).toEqual([
+      { name: 'v3.0', annotated: true, message: 'Ship it now please', tagger: 'Mary Jane Watson', date: 1700000002 },
+    ]);
+  });
+
+  it('preserves line breaks in an annotated tag message', () => {
+    const out = tagRecord('v4.0', 'tag', 'Line one\nLine two\nLine three\n', 'Ada', '1700000003');
+    expect(parseTagMetadata(out)).toEqual([
+      { name: 'v4.0', annotated: true, message: 'Line one\nLine two\nLine three', tagger: 'Ada', date: 1700000003 },
+    ]);
+  });
+
+  it('parses multiple records when annotation messages contain line breaks', () => {
+    const out = [
+      tagRecord('v4.0', 'tag', 'Line one\nLine two\n', 'Ada', '1700000003'),
+      tagRecord('v4.1', 'tag', 'Other release\nnotes\n', 'Grace', '1700000004'),
+    ].join('\n');
+    expect(parseTagMetadata(out)).toEqual([
+      { name: 'v4.0', annotated: true, message: 'Line one\nLine two', tagger: 'Ada', date: 1700000003 },
+      { name: 'v4.1', annotated: true, message: 'Other release\nnotes', tagger: 'Grace', date: 1700000004 },
+    ]);
+  });
+
+  it('skips a blank trailing record', () => {
+    const out = [tagRecord('v1.0', 'tag', 'msg', 'Ada', '1700000000'), ''].join('\n');
+    expect(parseTagMetadata(out)).toHaveLength(1);
+  });
+
+  it('returns an empty array for empty output', () => {
+    expect(parseTagMetadata('')).toEqual([]);
   });
 });

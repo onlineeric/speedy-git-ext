@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import type { Commit, CommitTableColumnId, UserSettings, WorktreeInfo } from '@shared/types';
+import type { Commit, CommitTableColumnId, TagMetadata, UserSettings, WorktreeInfo } from '@shared/types';
 import type { GraphTopology } from '../utils/graphTopology';
 import { useGraphStore } from '../stores/graphStore';
 import { GraphCell } from './GraphCell';
@@ -87,6 +87,7 @@ export const CommitTableRow = memo(function CommitTableRow({
   const stashIndex = isStash ? parseStashIndex(commit.refs) : -1;
   const graphColumn = layout.columns.find((column) => column.id === 'graph');
   const worktreeByBranch = useGraphStore((s) => s.worktreeByBranch);
+  const tagMetadata = useGraphStore((s) => s.tagMetadata);
   const detachedWorktrees = useGraphStore((s) => s.detachedWorktreesByHead.get(commit.hash) ?? EMPTY_WORKTREES);
 
   const node = topology.nodes.get(commit.hash);
@@ -165,6 +166,7 @@ export const CommitTableRow = memo(function CommitTableRow({
             laneColor,
             laneColorStyle,
             worktreeByBranch,
+            tagMetadata,
             detachedWorktrees,
             showDetachedWorktrees,
             isStash,
@@ -218,6 +220,7 @@ function renderColumn({
   laneColor,
   laneColorStyle,
   worktreeByBranch,
+  tagMetadata,
   detachedWorktrees,
   showDetachedWorktrees,
   isStash,
@@ -242,6 +245,7 @@ function renderColumn({
   laneColor: string | undefined;
   laneColorStyle: React.CSSProperties | undefined;
   worktreeByBranch: Map<string, WorktreeInfo>;
+  tagMetadata: Record<string, TagMetadata>;
   detachedWorktrees: WorktreeInfo[];
   showDetachedWorktrees: boolean;
   isStash: boolean;
@@ -302,12 +306,13 @@ function renderColumn({
                       displayRef={displayRef}
                       laneColorStyle={laneColorStyle}
                       worktree={worktreeForDisplayRef(displayRef, worktreeByBranch)}
+                      tagMeta={displayRef.type === 'tag' ? tagMetadata[displayRef.tagName] : undefined}
                       className="whitespace-nowrap"
                     />
                   </BranchContextMenu>
                 )
               )}
-              <OverflowRefsBadge hiddenRefs={overflowRefs} laneColorStyle={laneColorStyle} worktreeByBranch={worktreeByBranch} />
+              <OverflowRefsBadge hiddenRefs={overflowRefs} laneColorStyle={laneColorStyle} worktreeByBranch={worktreeByBranch} tagMetadata={tagMetadata} />
               {showDetachedWorktrees && <DetachedWorktreeBadge worktrees={detachedWorktrees} laneColorStyle={laneColorStyle} />}
             </div>
           )}

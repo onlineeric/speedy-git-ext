@@ -241,5 +241,5 @@ shared/                           # Shared types between backend & frontend
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/047-signing-verification/plan.md
+specs/048-tag-enhancements/plan.md
 <!-- SPECKIT END -->

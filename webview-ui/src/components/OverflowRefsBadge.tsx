@@ -1,5 +1,5 @@
 import * as Popover from '@radix-ui/react-popover';
-import type { WorktreeInfo } from '@shared/types';
+import type { TagMetadata, WorktreeInfo } from '@shared/types';
 import type { DisplayRef } from '../types/displayRefs';
 import { BranchContextMenu } from './BranchContextMenu';
 import { RefLabel } from './RefLabel';
@@ -10,9 +10,10 @@ interface OverflowRefsBadgeProps {
   hiddenRefs: DisplayRef[];
   laneColorStyle?: React.CSSProperties;
   worktreeByBranch?: Map<string, WorktreeInfo>;
+  tagMetadata?: Record<string, TagMetadata>;
 }
 
-export function OverflowRefsBadge({ hiddenRefs, laneColorStyle, worktreeByBranch }: OverflowRefsBadgeProps) {
+export function OverflowRefsBadge({ hiddenRefs, laneColorStyle, worktreeByBranch, tagMetadata }: OverflowRefsBadgeProps) {
   if (hiddenRefs.length === 0) return null;
 
   return (
@@ -50,6 +51,7 @@ export function OverflowRefsBadge({ hiddenRefs, laneColorStyle, worktreeByBranch
                 displayRef={displayRef}
                 laneColorStyle={laneColorStyle}
                 worktree={worktreeByBranch ? worktreeForDisplayRef(displayRef, worktreeByBranch) : undefined}
+                tagMeta={displayRef.type === 'tag' ? tagMetadata?.[displayRef.tagName] : undefined}
               />
             </BranchContextMenu>
           ))}

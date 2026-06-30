@@ -9,9 +9,11 @@ import {
   buildDropCommitCommand,
   buildCheckoutCommand,
   buildTagCommand,
+  buildPushTagCommand,
   buildDeleteBranchCommand,
   buildDeleteRemoteBranchCommand,
   buildDeleteTagCommand,
+  buildDeleteTagWithRemoteCommand,
   buildDropStashCommand,
   buildStashAndCheckoutCommand,
   buildRenameBranchCommand,
@@ -208,6 +210,35 @@ describe('buildTagCommand', () => {
   it('escapes double quotes in annotation message', () => {
     expect(buildTagCommand({ name: 'v1.0.0', hash: 'abc1234', message: 'Release "v1"' }))
       .toBe('git tag -a v1.0.0 -m "Release \\"v1\\"" abc1234');
+  });
+
+  it('appends a chained push line when "also push" is on', () => {
+    expect(buildTagCommand({ name: 'v1.0.0', hash: 'abc1234', push: { remote: 'origin' } }))
+      .toBe('git tag v1.0.0 abc1234 && git push origin refs/tags/v1.0.0');
+  });
+
+  it('appends --force to the chained push when forced', () => {
+    expect(buildTagCommand({ name: 'v1.0.0', hash: 'abc1234', message: 'r', push: { remote: 'origin', force: true } }))
+      .toBe('git tag -a v1.0.0 -m "r" abc1234 && git push origin --force refs/tags/v1.0.0');
+  });
+});
+
+describe('buildPushTagCommand', () => {
+  it('builds a plain push-tag command', () => {
+    expect(buildPushTagCommand({ name: 'v1.0.0', remote: 'origin' }))
+      .toBe('git push origin refs/tags/v1.0.0');
+  });
+
+  it('inserts --force when forced', () => {
+    expect(buildPushTagCommand({ name: 'v1.0.0', remote: 'upstream', force: true }))
+      .toBe('git push upstream --force refs/tags/v1.0.0');
+  });
+});
+
+describe('buildDeleteTagWithRemoteCommand', () => {
+  it('chains local delete with remote delete', () => {
+    expect(buildDeleteTagWithRemoteCommand({ name: 'v1.0.0', remote: 'origin' }))
+      .toBe('git tag -d v1.0.0 && git push origin --delete v1.0.0');
   });
 });
 
