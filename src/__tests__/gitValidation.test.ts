@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { validateFilePath, validateHash, validateRefName, validateTagName } from '../utils/gitValidation.js';
+import {
+  validateFilePath,
+  validateHash,
+  validateLocalBranchName,
+  validateRefName,
+  validateRemoteName,
+  validateTagName,
+} from '../utils/gitValidation.js';
 
 describe('validateHash', () => {
   it('accepts a 40-char SHA1 hash', () => {
@@ -101,6 +108,67 @@ describe('validateTagName', () => {
 
   it('rejects names starting with a dash to prevent flag injection', () => {
     expect(validateTagName('-v1.0.0').success).toBe(false);
+  });
+});
+
+describe('validateLocalBranchName', () => {
+  it('accepts ordinary and slash-containing branch names', () => {
+    expect(validateLocalBranchName('main').success).toBe(true);
+    expect(validateLocalBranchName('feature/login').success).toBe(true);
+    expect(validateLocalBranchName('release-1.0').success).toBe(true);
+  });
+
+  it('rejects the reserved name HEAD', () => {
+    expect(validateLocalBranchName('HEAD').success).toBe(false);
+  });
+
+  it('rejects git-invalid refname patterns', () => {
+    expect(validateLocalBranchName('feature branch').success).toBe(false);
+    expect(validateLocalBranchName('feature..branch').success).toBe(false);
+    expect(validateLocalBranchName('feature~1').success).toBe(false);
+    expect(validateLocalBranchName('feature^2').success).toBe(false);
+    expect(validateLocalBranchName('feature/.hidden').success).toBe(false);
+    expect(validateLocalBranchName('feature.lock').success).toBe(false);
+    expect(validateLocalBranchName('feature/').success).toBe(false);
+  });
+
+  it('rejects names starting with a dash to prevent flag injection', () => {
+    expect(validateLocalBranchName('-D').success).toBe(false);
+  });
+
+  it('returns VALIDATION_ERROR code on failure', () => {
+    const result = validateLocalBranchName('bad name');
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns the trimmed name so git never receives edge whitespace', () => {
+    const result = validateLocalBranchName(' feature ');
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.value).toBe('feature');
+  });
+});
+
+describe('validateRemoteName', () => {
+  it('accepts ordinary remote names', () => {
+    expect(validateRemoteName('origin').success).toBe(true);
+    expect(validateRemoteName('upstream-fork').success).toBe(true);
+  });
+
+  it('rejects git-invalid refname patterns', () => {
+    expect(validateRemoteName('my remote').success).toBe(false);
+    expect(validateRemoteName('remote^1').success).toBe(false);
+    expect(validateRemoteName('remote..name').success).toBe(false);
+  });
+
+  it('rejects names starting with a dash to prevent flag injection', () => {
+    expect(validateRemoteName('--mirror').success).toBe(false);
+  });
+
+  it('returns the trimmed name so git never receives edge whitespace', () => {
+    const result = validateRemoteName(' origin ');
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.value).toBe('origin');
   });
 });
 

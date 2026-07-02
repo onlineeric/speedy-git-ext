@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { CommandPreview } from './CommandPreview';
+import { FieldError } from './FieldError';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
 
 interface InputDialogProps {
@@ -27,19 +28,14 @@ export function InputDialog({
   buildCommandPreview,
 }: InputDialogProps) {
   const [value, setValue] = useState(defaultValue);
-  const [error, setError] = useState<string>();
+
+  const trimmed = value.trim();
+  const error = trimmed && validate ? validate(trimmed) : undefined;
+  const canSubmit = trimmed.length > 0 && !error;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    if (validate) {
-      const err = validate(trimmed);
-      if (err) {
-        setError(err);
-        return;
-      }
-    }
+    if (!canSubmit) return;
     onSubmit(trimmed);
   };
 
@@ -47,7 +43,6 @@ export function InputDialog({
     if (!isOpen) {
       onCancel();
       setValue(defaultValue);
-      setError(undefined);
     }
   };
 
@@ -69,20 +64,17 @@ export function InputDialog({
             <input
               type="text"
               value={value}
-              onChange={(e) => {
-                setValue(e.target.value);
-                setError(undefined);
-              }}
+              onChange={(e) => setValue(e.target.value)}
               placeholder={placeholder}
               autoFocus
+              aria-invalid={!!error}
+              aria-describedby={error ? 'input-dialog-error' : undefined}
               className="w-full px-2 py-1.5 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:border-[var(--vscode-focusBorder)]"
             />
-            {error && (
-              <p className="mt-1 text-xs text-[var(--vscode-errorForeground)]">{error}</p>
-            )}
+            <FieldError id="input-dialog-error" message={error} />
             {buildCommandPreview && (
               <div className="mt-3">
-                <CommandPreview command={buildCommandPreview(value.trim())} />
+                <CommandPreview command={buildCommandPreview(trimmed)} />
               </div>
             )}
             <div className="flex justify-end gap-2 mt-4">
@@ -94,7 +86,8 @@ export function InputDialog({
               </Dialog.Close>
               <button
                 type="submit"
-                className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                disabled={!canSubmit}
+                className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 OK
               </button>

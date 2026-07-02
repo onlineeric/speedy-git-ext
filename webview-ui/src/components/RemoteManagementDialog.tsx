@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
+import { validateGitRemoteName } from '@shared/gitRefValidation';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { ConfirmDialog } from './ConfirmDialog';
+import { FieldError } from './FieldError';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { deriveRefNameField } from '../utils/refNameField';
 
 interface RemoteManagementDialogProps {
   open: boolean;
@@ -31,14 +34,19 @@ export function RemoteManagementDialog({ open, onClose }: RemoteManagementDialog
 
   const [inputName, setInputName] = useState('');
   const [inputUrl, setInputUrl] = useState('');
-  const [nameError, setNameError] = useState<string | undefined>(undefined);
-  const [urlError, setUrlError] = useState<string | undefined>(undefined);
+
+  const trimmedName = inputName.trim();
+  const trimmedUrl = inputUrl.trim();
+  const nameField = deriveRefNameField(inputName, validateGitRemoteName);
+  const duplicateName = remotes.some((r) => r.name === trimmedName);
+  const nameError = nameField.error ?? (duplicateName ? 'A remote with this name already exists' : undefined);
+  const hasUrl = trimmedUrl.length > 0;
+  const canAdd = nameField.valid && !duplicateName && hasUrl;
+  const canSaveEdit = hasUrl;
 
   const resetForm = () => {
     setInputName('');
     setInputUrl('');
-    setNameError(undefined);
-    setUrlError(undefined);
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -73,59 +81,18 @@ export function RemoteManagementDialog({ open, onClose }: RemoteManagementDialog
     setEditingRemoteName(undefined);
   };
 
-  const validateAdd = (): boolean => {
-    let valid = true;
-    const trimmedName = inputName.trim();
-    const trimmedUrl = inputUrl.trim();
-
-    if (!trimmedName) {
-      setNameError('Name is required');
-      valid = false;
-    } else if (trimmedName.includes(' ')) {
-      setNameError('Name cannot contain spaces');
-      valid = false;
-    } else if (trimmedName.startsWith('-')) {
-      setNameError('Name cannot start with -');
-      valid = false;
-    } else if (remotes.some((r) => r.name === trimmedName)) {
-      setNameError('A remote with this name already exists');
-      valid = false;
-    } else {
-      setNameError(undefined);
-    }
-
-    if (!trimmedUrl) {
-      setUrlError('URL is required');
-      valid = false;
-    } else {
-      setUrlError(undefined);
-    }
-
-    return valid;
-  };
-
-  const validateEdit = (): boolean => {
-    const trimmedUrl = inputUrl.trim();
-    if (!trimmedUrl) {
-      setUrlError('URL is required');
-      return false;
-    }
-    setUrlError(undefined);
-    return true;
-  };
-
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateAdd()) return;
-    rpcClient.addRemote(inputName.trim(), inputUrl.trim());
+    if (!canAdd) return;
+    rpcClient.addRemote(trimmedName, trimmedUrl);
     setMode('view');
     resetForm();
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateEdit() || !editingRemoteName) return;
-    rpcClient.editRemote(editingRemoteName, inputUrl.trim());
+    if (!canSaveEdit || !editingRemoteName) return;
+    rpcClient.editRemote(editingRemoteName, trimmedUrl);
     setMode('view');
     resetForm();
     setEditingRemoteName(undefined);
@@ -212,22 +179,20 @@ export function RemoteManagementDialog({ open, onClose }: RemoteManagementDialog
                             <input
                               type="text"
                               value={inputUrl}
-                              onChange={(e) => {
-                                setInputUrl(e.target.value);
-                                setUrlError(undefined);
-                              }}
+                              onChange={(e) => setInputUrl(e.target.value)}
                               autoFocus
                               className={inputClass}
                             />
-                            {urlError && (
-                              <p className="mt-1 text-xs text-[var(--vscode-errorForeground)]">{urlError}</p>
-                            )}
                           </div>
                           <div className="flex justify-end gap-2">
                             <button type="button" className={buttonSecondaryClass} onClick={handleCancelForm}>
                               Cancel
                             </button>
-                            <button type="submit" className={buttonPrimaryClass}>
+                            <button
+                              type="submit"
+                              disabled={!canSaveEdit}
+                              className={`${buttonPrimaryClass} disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
                               Save
                             </button>
                           </div>
@@ -250,17 +215,14 @@ export function RemoteManagementDialog({ open, onClose }: RemoteManagementDialog
                   <input
                     type="text"
                     value={inputName}
-                    onChange={(e) => {
-                      setInputName(e.target.value);
-                      setNameError(undefined);
-                    }}
+                    onChange={(e) => setInputName(e.target.value)}
                     placeholder="origin"
                     autoFocus
+                    aria-invalid={!!nameError}
+                    aria-describedby={nameError ? 'remote-name-error' : undefined}
                     className={inputClass}
                   />
-                  {nameError && (
-                    <p className="mt-1 text-xs text-[var(--vscode-errorForeground)]">{nameError}</p>
-                  )}
+                  <FieldError id="remote-name-error" message={nameError} />
                 </div>
                 <div>
                   <label className="block text-xs text-[var(--vscode-descriptionForeground)] mb-1">
@@ -269,22 +231,20 @@ export function RemoteManagementDialog({ open, onClose }: RemoteManagementDialog
                   <input
                     type="text"
                     value={inputUrl}
-                    onChange={(e) => {
-                      setInputUrl(e.target.value);
-                      setUrlError(undefined);
-                    }}
+                    onChange={(e) => setInputUrl(e.target.value)}
                     placeholder="https://github.com/user/repo.git"
                     className={inputClass}
                   />
-                  {urlError && (
-                    <p className="mt-1 text-xs text-[var(--vscode-errorForeground)]">{urlError}</p>
-                  )}
                 </div>
                 <div className="flex justify-end gap-2">
                   <button type="button" className={buttonSecondaryClass} onClick={handleCancelForm}>
                     Cancel
                   </button>
-                  <button type="submit" className={buttonPrimaryClass}>
+                  <button
+                    type="submit"
+                    disabled={!canAdd}
+                    className={`${buttonPrimaryClass} disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
                     Add
                   </button>
                 </div>

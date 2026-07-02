@@ -2,7 +2,7 @@ import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { type Result, ok } from '../../shared/errors.js';
 import type { PushForceMode, RemoteInfo } from '../../shared/types.js';
-import { validateRefName } from '../utils/gitValidation.js';
+import { validateRefName, validateRemoteName } from '../utils/gitValidation.js';
 
 export class GitRemoteService {
   private executor: GitExecutor;
@@ -90,11 +90,11 @@ export class GitRemoteService {
 
   async addRemote(name: string, url: string): Promise<Result<string>> {
     this.log.info(`Add remote: ${name} → ${url}`);
-    const nameCheck = validateRefName(name);
+    const nameCheck = validateRemoteName(name);
     if (!nameCheck.success) return nameCheck;
 
     const result = await this.executor.execute({
-      args: ['remote', 'add', name, url],
+      args: ['remote', 'add', nameCheck.value, url],
       cwd: this.workspacePath,
     });
     if (!result.success) return result;

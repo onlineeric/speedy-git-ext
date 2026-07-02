@@ -6,7 +6,7 @@ import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { WorktreeInfo, WorktreeBranchMode } from '../../shared/types.js';
 import { isDirtyWorkingTree } from '../utils/gitQueries.js';
-import { validateRefName, validateWorktreePath } from '../utils/gitValidation.js';
+import { validateLocalBranchName, validateRefName, validateWorktreePath } from '../utils/gitValidation.js';
 import { mapWorktreeConflictError } from '../utils/worktreeErrors.js';
 
 export interface AddWorktreeOptions {
@@ -285,9 +285,9 @@ export class GitWorktreeService {
 
     if (opts.branchMode === 'new') {
       const name = opts.newBranchName ?? '';
-      const nameCheck = validateRefName(name);
+      const nameCheck = validateLocalBranchName(name);
       if (!nameCheck.success) return nameCheck;
-      args.push('-b', name, pathCheck.value, opts.ref);
+      args.push('-b', nameCheck.value, pathCheck.value, opts.ref);
     } else if (opts.branchMode === 'detached') {
       args.push('--detach', pathCheck.value, opts.ref);
     } else {

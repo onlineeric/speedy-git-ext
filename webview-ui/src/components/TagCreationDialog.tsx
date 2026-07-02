@@ -6,7 +6,9 @@ import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { buildTagCommand } from '../utils/gitCommandBuilder';
 import { resolveDefaultRemoteName } from '../utils/resolveDefaultRemote';
+import { deriveRefNameField } from '../utils/refNameField';
 import { CommandPreview } from './CommandPreview';
+import { FieldError } from './FieldError';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
 
 interface TagCreationDialogProps {
@@ -25,9 +27,7 @@ export function TagCreationDialog({ open, commit, onClose }: TagCreationDialogPr
   const hasRemote = remotes.length > 0;
   const remote = resolveDefaultRemoteName(remotes);
   const trimmedName = name.trim();
-  const nameValidation = validateGitTagName(name);
-  const nameError = name ? nameValidation.message : undefined;
-  const canCreate = nameValidation.valid;
+  const { error: nameError, valid: canCreate } = deriveRefNameField(name, validateGitTagName);
 
   const resetState = () => {
     setName('');
@@ -80,9 +80,7 @@ export function TagCreationDialog({ open, commit, onClose }: TagCreationDialogPr
                 aria-describedby={nameError ? 'tag-name-error' : undefined}
                 className="w-full px-2 py-1.5 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:border-[var(--vscode-focusBorder)]"
               />
-              {nameError && (
-                <p id="tag-name-error" className="mt-1 text-xs text-[var(--vscode-errorForeground)]">{nameError}</p>
-              )}
+              <FieldError id="tag-name-error" message={nameError} />
             </div>
             <div>
               <label className="block text-sm text-[var(--vscode-foreground)] mb-1">

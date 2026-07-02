@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { Commit } from '@shared/types';
+import { validateGitBranchName } from '@shared/gitRefValidation';
 import { rpcClient } from '../rpc/rpcClient';
 import { buildCreateBranchCommand } from '../utils/gitCommandBuilder';
+import { deriveRefNameField } from '../utils/refNameField';
 import { CommandPreview } from './CommandPreview';
+import { FieldError } from './FieldError';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
 
 interface CreateBranchDialogProps {
@@ -15,9 +18,9 @@ interface CreateBranchDialogProps {
 export function CreateBranchDialog({ open, commit, onClose }: CreateBranchDialogProps) {
   const [name, setName] = useState('');
   const [checkout, setCheckout] = useState(false);
-  const [nameError, setNameError] = useState<string | undefined>(undefined);
 
   const trimmedName = name.trim();
+  const { error: nameError, valid: canCreate } = deriveRefNameField(name, validateGitBranchName);
   const commandPreview = buildCreateBranchCommand({
     name: trimmedName || '<name>',
     startPoint: commit.abbreviatedHash,
@@ -27,17 +30,11 @@ export function CreateBranchDialog({ open, commit, onClose }: CreateBranchDialog
   const reset = () => {
     setName('');
     setCheckout(false);
-    setNameError(undefined);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!trimmedName) {
-      setNameError('Branch name is required');
-      return;
-    }
-    if (trimmedName.startsWith('-')) {
-      setNameError('Branch name cannot start with -');
+    if (!canCreate) {
       return;
     }
     rpcClient.createBranch(trimmedName, commit.hash, checkout);
@@ -71,17 +68,14 @@ export function CreateBranchDialog({ open, commit, onClose }: CreateBranchDialog
               <input
                 type="text"
                 value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  setNameError(undefined);
-                }}
+                onChange={(e) => setName(e.target.value)}
                 placeholder="feature/my-branch"
                 autoFocus
+                aria-invalid={!!nameError}
+                aria-describedby={nameError ? 'branch-name-error' : undefined}
                 className="w-full px-2 py-1.5 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:border-[var(--vscode-focusBorder)]"
               />
-              {nameError && (
-                <p className="mt-1 text-xs text-[var(--vscode-errorForeground)]">{nameError}</p>
-              )}
+              <FieldError id="branch-name-error" message={nameError} />
             </div>
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
@@ -106,7 +100,8 @@ export function CreateBranchDialog({ open, commit, onClose }: CreateBranchDialog
               </Dialog.Close>
               <button
                 type="submit"
-                className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+                disabled={!canCreate}
+                className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create Branch
               </button>
