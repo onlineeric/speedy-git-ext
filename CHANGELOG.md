@@ -4,6 +4,14 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.2.1] - 2026-07-02
+
+### Changed
+- **Branch and remote names are now validated as you type, like tag names.** The Create Tag dialog's live git refname validation (introduced in 5.2.0) now also covers every other dialog that creates or renames a ref: **Create Branch**, **Rename Branch**, the new-branch name in **Create Worktree**, and the remote name in **Manage Remotes**. Invalid names (spaces, `..`, `~`, `^`, `:`, a trailing `.lock`, a leading `-`, etc.) show a specific error under the input and disable the confirm button, instead of letting the operation run and surfacing a raw git error afterwards. Branch names also reject the reserved name `HEAD`.
+
+### Internal
+- Generalized the shared tag-name validator into a ref-name validator with tag/branch/remote wrappers, and applied the same full refname rules to the backend creation paths (`git branch`, `git branch -m`, `git worktree add -b`, `git remote add`) for defense in depth.
+
 ## [5.2.0] - 2026-07-01
 
 ### Added

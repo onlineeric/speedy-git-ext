@@ -1,5 +1,10 @@
 import { GitError, type Result, err } from '../../shared/errors.js';
-import { validateGitTagName } from '../../shared/gitRefValidation.js';
+import {
+  type GitRefNameValidation,
+  validateGitBranchName,
+  validateGitRemoteName,
+  validateGitTagName,
+} from '../../shared/gitRefValidation.js';
 
 const HASH_WITH_PARENT_RE = /^[0-9a-f]{4,40}(~\d+)?$/i;
 
@@ -19,33 +24,35 @@ export function validateRefName(name: string): Result<string> {
   return { success: true, value: name };
 }
 
-/** Validates a tag name using git refname rules plus flag-injection protection. */
-export function validateTagName(name: string): Result<string> {
-  const validation = validateGitTagName(name);
+/** Converts a `GitRefNameValidation` result into the `Result<string>` shape used by git services. */
+function toRefNameResult(validation: GitRefNameValidation, name: string, label: string): Result<string> {
   if (!validation.valid) {
-    return err(new GitError(validation.message ?? `Invalid tag name: ${name}`, 'VALIDATION_ERROR'));
+    return err(new GitError(validation.message ?? `Invalid ${label}: ${name}`, 'VALIDATION_ERROR'));
   }
   return { success: true, value: name.trim() };
 }
 
-const RESERVED_LOCAL_BRANCH_NAMES = new Set(['HEAD']);
+/** Validates a tag name using git refname rules plus flag-injection protection. */
+export function validateTagName(name: string): Result<string> {
+  return toRefNameResult(validateGitTagName(name), name, 'tag name');
+}
 
 /**
  * Validates a name that will be used to create or update a local branch
  * (i.e. anything that ends up writing `refs/heads/<name>`).
  *
- * `git branch <name>` already refuses reserved names like "HEAD", but lower-level
- * refspecs such as `git fetch origin HEAD:HEAD` bypass that check and silently
- * create a stray `refs/heads/HEAD`, which then makes every subsequent ref lookup
- * ambiguous. Guard the call sites that can hit that path.
+ * Applies full git refname rules, including the reserved name "HEAD":
+ * `git branch HEAD` is refused by git itself, but lower-level refspecs such as
+ * `git fetch origin HEAD:HEAD` bypass that check and silently create a stray
+ * `refs/heads/HEAD`, which then makes every subsequent ref lookup ambiguous.
  */
 export function validateLocalBranchName(name: string): Result<string> {
-  const base = validateRefName(name);
-  if (!base.success) return base;
-  if (RESERVED_LOCAL_BRANCH_NAMES.has(name)) {
-    return err(new GitError(`'${name}' is reserved and cannot be used as a local branch name.`, 'VALIDATION_ERROR'));
-  }
-  return { success: true, value: name };
+  return toRefNameResult(validateGitBranchName(name), name, 'branch name');
+}
+
+/** Validates a name that will be used to create a new remote (`git remote add`). */
+export function validateRemoteName(name: string): Result<string> {
+  return toRefNameResult(validateGitRemoteName(name), name, 'remote name');
 }
 
 /** Validates a file path — rejects empty strings and values starting with '-'. */

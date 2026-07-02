@@ -166,7 +166,7 @@ export class GitBranchService {
       if (!startCheck.success) return startCheck;
     }
 
-    const args = ['branch', name];
+    const args = ['branch', nameCheck.value];
     if (startPoint) args.push(startPoint);
 
     const result = await this.executor.execute({ args, cwd: this.workspacePath });
@@ -182,7 +182,7 @@ export class GitBranchService {
     if (!newCheck.success) return newCheck;
 
     const result = await this.executor.execute({
-      args: ['branch', '-m', oldName, newName],
+      args: ['branch', '-m', oldName, newCheck.value],
       cwd: this.workspacePath,
     });
     if (!result.success) return result;

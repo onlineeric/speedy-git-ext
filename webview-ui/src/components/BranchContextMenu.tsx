@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { RefInfo, SlotValue } from '@shared/types';
+import { validateGitBranchName } from '@shared/gitRefValidation';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import {
@@ -450,7 +451,11 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
         title="Rename Branch"
         label="New branch name"
         defaultValue={refInfo.name}
-        validate={(v) => v.startsWith('-') ? 'Branch name cannot start with -' : undefined}
+        validate={(v) =>
+          v === refInfo.name
+            ? 'New name is the same as the current name'
+            : validateGitBranchName(v).message
+        }
         buildCommandPreview={buildRenamePreview}
       />
 

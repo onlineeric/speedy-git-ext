@@ -1,10 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import type { WorktreeBranchMode, WorktreeInfo } from '@shared/types';
+import { validateGitBranchName } from '@shared/gitRefValidation';
 import { buildAddWorktreeCommand } from '../utils/gitCommandBuilder';
+import { deriveRefNameField } from '../utils/refNameField';
 import { WORKTREE_FOLDER_MISSING_TOOLTIP } from '../utils/worktreeDisplay';
 import { rpcClient } from '../rpc/rpcClient';
 import { CommandPreview } from './CommandPreview';
+import { FieldError } from './FieldError';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
 
 export type WorktreeSourceKind = 'local-branch' | 'remote-branch' | 'commit' | 'tag';
@@ -116,7 +119,9 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
         : ' - (no .env* file found)';
 
   const trimmedName = newBranchName.trim();
-  const nameInvalid = branchMode === 'new' && (trimmedName.length === 0 || trimmedName.startsWith('-'));
+  const branchNameField = deriveRefNameField(newBranchName, validateGitBranchName);
+  const nameError = branchMode === 'new' ? branchNameField.error : undefined;
+  const nameInvalid = branchMode === 'new' && !branchNameField.valid;
   const canConfirm = path.trim().length > 0 && !nameInvalid && !busy;
 
   const commandPreview = useMemo(
@@ -227,9 +232,12 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
                 type="text"
                 value={newBranchName}
                 onChange={(e) => setNewBranchName(e.target.value)}
+                aria-invalid={!!nameError}
+                aria-describedby={nameError ? 'worktree-branch-name-error' : undefined}
                 className="mt-1 w-full px-2 py-1 text-sm rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)]"
                 placeholder="my-feature"
               />
+              <FieldError id="worktree-branch-name-error" message={nameError} />
             </div>
           )}
 
