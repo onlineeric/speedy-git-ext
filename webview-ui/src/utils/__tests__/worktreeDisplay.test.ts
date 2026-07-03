@@ -63,6 +63,43 @@ describe('worktreeDisplay', () => {
     ]);
   });
 
+  it('keeps the checked-out branch first, ahead of worktree refs', () => {
+    const refs: DisplayRef[] = [
+      { type: 'merged-branch', localName: 'dev', remoteNames: ['origin/dev'] },
+      { type: 'local-branch', localName: 'dev2' },
+    ];
+    const prioritized = prioritizeWorktreeDisplayRefs(
+      refs,
+      new Map([['dev2', makeWorktree({ branch: 'refs/heads/dev2' })]]),
+      'dev',
+    );
+
+    expect(prioritized).toEqual([
+      { type: 'merged-branch', localName: 'dev', remoteNames: ['origin/dev'] },
+      { type: 'local-branch', localName: 'dev2' },
+    ]);
+  });
+
+  it('keeps the checked-out branch first even when it is itself a worktree branch', () => {
+    const refs: DisplayRef[] = [
+      { type: 'local-branch', localName: 'other' },
+      { type: 'local-branch', localName: 'dev2' },
+    ];
+    const prioritized = prioritizeWorktreeDisplayRefs(
+      refs,
+      new Map([
+        ['other', makeWorktree({ branch: 'refs/heads/other' })],
+        ['dev2', makeWorktree({ branch: 'refs/heads/dev2' })],
+      ]),
+      'dev2',
+    );
+
+    expect(prioritized).toEqual([
+      { type: 'local-branch', localName: 'dev2' },
+      { type: 'local-branch', localName: 'other' },
+    ]);
+  });
+
   it('builds detached badge text for single and aggregate badges', () => {
     expect(detachedWorktreeBadgeText([makeWorktree({ path: '/repo.worktrees/19eae44a9d' })])).toBe('detached 19eae44a9d');
     expect(detachedWorktreeBadgeText([

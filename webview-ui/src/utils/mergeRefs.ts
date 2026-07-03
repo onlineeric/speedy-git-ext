@@ -3,6 +3,8 @@ import type { DisplayRef } from '../types/displayRefs';
 
 export interface MergeRefsResult {
   isHead: boolean;
+  /** Checked-out branch name when HEAD points at a branch on this commit; null when detached or not HEAD. */
+  headBranchName: string | null;
   displayRefs: DisplayRef[];
 }
 
@@ -22,7 +24,9 @@ export interface MergeRefsResult {
  * 7. Emit stash entries
  */
 export function mergeRefs(refs: RefInfo[]): MergeRefsResult {
-  const isHead = refs.some((r) => r.type === 'head');
+  const headRef = refs.find((r) => r.type === 'head');
+  const isHead = headRef !== undefined;
+  const headBranchName = headRef && headRef.name !== 'HEAD' ? headRef.name : null;
   // Include 'head' refs that point to a named branch (HEAD -> branchName) so they
   // participate in remote-matching. Detached HEAD has name === 'HEAD' and is excluded.
   const localBranches = refs.filter((r) => r.type === 'branch' || (r.type === 'head' && r.name !== 'HEAD'));
@@ -69,7 +73,7 @@ export function mergeRefs(refs: RefInfo[]): MergeRefsResult {
     displayRefs.push({ type: 'stash', stashRef: stash.name });
   }
 
-  return { isHead, displayRefs };
+  return { isHead, headBranchName, displayRefs };
 }
 
 /**

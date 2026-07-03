@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - **Fast-forwarding the currently checked-out branch no longer fails.** Right-clicking a remote branch badge and choosing **"Fast-forward Local Branch from Remote"** while that branch was checked out ran `git fetch <remote> <branch>:<branch>`, which git refuses on the current branch, surfacing a raw git error. The dialog now detects this case and performs a `git pull <remote> <branch>` instead — the message explains that the branch is checked out so a pull will run, the confirm button reads **Pull**, and the command preview shows the pull command. Fast-forwarding any other branch is unchanged.
+- **The checked-out branch badge no longer gets bumped out of first place by a worktree branch.** When a commit had both the checked-out branch and a branch checked out in a linked worktree (e.g. `dev` checked out here, `dev2` checked out in a worktree), the worktree-badge prioritization added in 5.1.0 always moved the worktree branch's badge to the front, ahead of the branch you were actually on. The checked-out branch's badge now always stays first, immediately after the HEAD indicator; worktree-branch prioritization still applies to the remaining badges.
 
 ## [5.2.1] - 2026-07-02
 
