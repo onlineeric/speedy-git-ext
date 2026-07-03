@@ -18,6 +18,7 @@ import {
   buildStashAndCheckoutCommand,
   buildRenameBranchCommand,
   buildFastForwardLocalBranchCommand,
+  buildPullCommand,
   buildCreateBranchCommand,
   buildAddWorktreeCommand,
   buildRemoveWorktreeCommand,
@@ -335,6 +336,18 @@ describe('buildFastForwardLocalBranchCommand', () => {
   it('omits set-upstream when setUpstream is false', () => {
     expect(buildFastForwardLocalBranchCommand({ remote: 'origin', branch: 'dev', setUpstream: false }))
       .toBe('git fetch origin dev:dev');
+  });
+});
+
+describe('buildPullCommand', () => {
+  it('builds an explicit remote/branch pull', () => {
+    expect(buildPullCommand({ remote: 'origin', branch: 'main' }))
+      .toBe('git pull origin main');
+  });
+
+  it('uses a non-default remote when provided', () => {
+    expect(buildPullCommand({ remote: 'upstream', branch: 'release/1.2.x' }))
+      .toBe('git pull upstream release/1.2.x');
   });
 });
 

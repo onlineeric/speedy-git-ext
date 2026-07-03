@@ -47,24 +47,37 @@ export function worktreeForDisplayRef(
   return localBranch ? worktreeByBranch.get(localBranch) : undefined;
 }
 
+/** Sort priority for badge ordering: checked-out branch first, then worktree branches, then everything else. */
+function worktreeDisplayPriority(
+  displayRef: DisplayRef,
+  worktreeByBranch: Map<string, WorktreeInfo>,
+  headBranchName: string | null,
+): number {
+  const localBranch = localBranchNameForDisplayRef(displayRef);
+  if (localBranch === null) return 2;
+  if (localBranch === headBranchName) return 0;
+  return worktreeByBranch.has(localBranch) ? 1 : 2;
+}
+
+/**
+ * Orders badges so the checked-out branch (`headBranchName`) sorts first, branches
+ * that live in a linked worktree sort next, and everything else keeps its relative order.
+ */
 export function prioritizeWorktreeDisplayRefs(
   displayRefs: DisplayRef[],
   worktreeByBranch: Map<string, WorktreeInfo>,
+  headBranchName: string | null = null,
 ): DisplayRef[] {
-  if (displayRefs.length === 0 || worktreeByBranch.size === 0) return displayRefs;
+  if (displayRefs.length === 0) return displayRefs;
+  if (worktreeByBranch.size === 0 && headBranchName === null) return displayRefs;
 
-  const withWorktree: DisplayRef[] = [];
-  const withoutWorktree: DisplayRef[] = [];
-
-  for (const displayRef of displayRefs) {
-    if (worktreeForDisplayRef(displayRef, worktreeByBranch)) {
-      withWorktree.push(displayRef);
-    } else {
-      withoutWorktree.push(displayRef);
-    }
-  }
-
-  return withWorktree.length > 0 ? [...withWorktree, ...withoutWorktree] : displayRefs;
+  return displayRefs
+    .map((displayRef) => ({
+      displayRef,
+      priority: worktreeDisplayPriority(displayRef, worktreeByBranch, headBranchName),
+    }))
+    .sort((a, b) => a.priority - b.priority)
+    .map(({ displayRef }) => displayRef);
 }
 
 export function detachedWorktreeBadgeText(worktrees: WorktreeInfo[]): string {

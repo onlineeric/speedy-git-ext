@@ -95,7 +95,7 @@ export const CommitTableRow = memo(function CommitTableRow({
   const laneColor = node ? getColor(node.colorIndex, palette) : undefined;
   const laneColorStyle = laneColor ? getLaneColorStyle(laneColor) : undefined;
 
-  const { isHead, displayRefs } = useMemo(() => {
+  const { isHead, headBranchName, displayRefs } = useMemo(() => {
     const mergedRefs = mergeRefs(commit.refs);
     return {
       ...mergedRefs,
@@ -115,8 +115,8 @@ export const CommitTableRow = memo(function CommitTableRow({
   }, [commit.refs, showRemoteBranches, showTags]);
 
   const prioritizedDisplayRefs = useMemo(
-    () => prioritizeWorktreeDisplayRefs(displayRefs, worktreeByBranch),
-    [displayRefs, worktreeByBranch],
+    () => prioritizeWorktreeDisplayRefs(displayRefs, worktreeByBranch, headBranchName),
+    [displayRefs, worktreeByBranch, headBranchName],
   );
   const visibleRefs = prioritizedDisplayRefs.slice(0, maxVisibleRefs);
   const overflowRefs = prioritizedDisplayRefs.slice(maxVisibleRefs);

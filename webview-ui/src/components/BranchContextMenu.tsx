@@ -7,6 +7,7 @@ import { useGraphStore } from '../stores/graphStore';
 import {
   buildDeleteRemoteBranchCommand,
   buildFastForwardLocalBranchCommand,
+  buildPullCommand,
   buildRenameBranchCommand,
   buildStashAndCheckoutCommand,
 } from '../utils/gitCommandBuilder';
@@ -184,9 +185,16 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
   // local branch is being created and has no pre-existing upstream config.
   // For established local branches, leave any user-configured upstream alone.
   const fastForwardSetUpstream = checkoutState === 'remote-only';
+  // `git fetch <remote> <branch>:<branch>` refuses to update the checked-out branch,
+  // so when the fast-forward target is the current branch (reachable from its remote
+  // badge), the dialog degrades to a plain pull instead.
+  const fastForwardTargetIsCurrent = !!headBranch && headBranch.name === refInfo.name;
   const fastForwardPreview = useMemo(
-    () => buildFastForwardLocalBranchCommand({ remote: fastForwardRemote, branch: refInfo.name, setUpstream: fastForwardSetUpstream }),
-    [fastForwardRemote, refInfo.name, fastForwardSetUpstream],
+    () =>
+      fastForwardTargetIsCurrent
+        ? buildPullCommand({ remote: fastForwardRemote, branch: refInfo.name })
+        : buildFastForwardLocalBranchCommand({ remote: fastForwardRemote, branch: refInfo.name, setUpstream: fastForwardSetUpstream }),
+    [fastForwardTargetIsCurrent, fastForwardRemote, refInfo.name, fastForwardSetUpstream],
   );
 
   const handleRebaseConfirm = (ignoreDate: boolean) => {
@@ -489,22 +497,29 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
       />
 
       {/* Fast-forward local branch from remote (no checkout).
-         Shared between two entry points: from a local/dual branch badge (local exists, fast-forward it),
-         and from a remote-only branch badge (local does not yet exist, create it from remote tip). */}
+         Shared between three entry points: from a local/dual branch badge (local exists, fast-forward it),
+         from a remote-only branch badge (local does not yet exist, create it from remote tip), and from
+         the remote badge of the checked-out branch (fetch into the current branch is refused, so pull). */}
       <ConfirmDialog
         open={fastForwardOpen}
         onConfirm={() => {
           setFastForwardOpen(false);
-          rpcClient.fastForwardLocalBranch(fastForwardRemote, refInfo.name, fastForwardSetUpstream);
+          if (fastForwardTargetIsCurrent) {
+            rpcClient.pull(fastForwardRemote, refInfo.name);
+          } else {
+            rpcClient.fastForwardLocalBranch(fastForwardRemote, refInfo.name, fastForwardSetUpstream);
+          }
         }}
         onCancel={() => setFastForwardOpen(false)}
         title="Fast-forward Local Branch from Remote"
         description={
           checkoutState === 'remote-only'
             ? `Create local branch '${refInfo.name}' from '${fastForwardRemote}/${refInfo.name}' and set it as the upstream, without checkout. Your current branch and working tree are not affected.`
-            : `Update local branch '${refInfo.name}' to match remote branch without checkout. Your current branch and working tree are not affected.`
+            : fastForwardTargetIsCurrent
+              ? `Update local branch '${refInfo.name}' to match the remote branch. Since '${refInfo.name}' is the currently checked-out branch, will do a Pull.`
+              : `Update local branch '${refInfo.name}' to match remote branch without checkout. Your current branch and working tree are not affected.`
         }
-        confirmLabel="Fast-forward"
+        confirmLabel={fastForwardTargetIsCurrent ? 'Pull' : 'Fast-forward'}
         variant="warning"
         commandPreview={fastForwardPreview}
       />

@@ -16,6 +16,12 @@ describe('mergeRefs', () => {
     expect(result.displayRefs).toEqual([]);
   });
 
+  it('returns headBranchName for a checked-out branch, null when detached or not HEAD', () => {
+    expect(mergeRefs([{ type: 'head', name: 'dev' }]).headBranchName).toBe('dev');
+    expect(mergeRefs([{ type: 'head', name: 'HEAD' }]).headBranchName).toBeNull();
+    expect(mergeRefs([{ type: 'branch', name: 'dev' }]).headBranchName).toBeNull();
+  });
+
   it('emits local-branch for a local branch with no matching remote', () => {
     const refs: RefInfo[] = [{ type: 'branch', name: 'feature' }];
     const result = mergeRefs(refs);

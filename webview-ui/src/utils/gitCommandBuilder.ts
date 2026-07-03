@@ -76,6 +76,15 @@ export function buildPushCommand(options: PushCommandOptions): string {
   return parts.join(' ');
 }
 
+export interface PullCommandOptions {
+  remote: string;
+  branch: string;
+}
+
+export function buildPullCommand(options: PullCommandOptions): string {
+  return `git pull ${options.remote} ${options.branch}`;
+}
+
 export function buildFastForwardLocalBranchCommand(options: FastForwardLocalBranchCommandOptions): string {
   const fetchCmd = `git fetch ${options.remote} ${options.branch}:${options.branch}`;
   if (options.setUpstream) {
