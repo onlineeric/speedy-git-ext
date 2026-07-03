@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.2.2] - 2026-07-03
+
+### Fixed
+- **Fast-forwarding the currently checked-out branch no longer fails.** Right-clicking a remote branch badge and choosing **"Fast-forward Local Branch from Remote"** while that branch was checked out ran `git fetch <remote> <branch>:<branch>`, which git refuses on the current branch, surfacing a raw git error. The dialog now detects this case and performs a `git pull <remote> <branch>` instead — the message explains that the branch is checked out so a pull will run, the confirm button reads **Pull**, and the command preview shows the pull command. Fast-forwarding any other branch is unchanged.
+
 ## [5.2.1] - 2026-07-02
 
 ### Changed
