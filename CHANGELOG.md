@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.4.0] - 2026-07-04
+
+### Changed
+- **Graph connection lines are now smooth rounded curves.** Lines that change lanes — branch splits and merges — were previously drawn as diagonals with hard corners, and visibly kinked where they crossed from one commit row into the next. They are now drawn as rounded elbows, the style used by tools like GitKraken and Fork: lines leave and enter a commit node horizontally at its side, turn with a smooth rounded corner, and cross every row boundary perfectly vertically, so connections join seamlessly across rows. Merges that span several lanes get a clean horizontal run instead of a flattened diagonal, branch lines no longer pile into the top of the node, dotted hidden-history lines keep their dashes through the curve, and lines now stop at the edge of the larger HEAD ring instead of poking inside it. The graph's topology, colors, and rendering performance are unchanged — only the line geometry is different.
+
 ## [5.3.0] - 2026-07-04
 
 ### Added
