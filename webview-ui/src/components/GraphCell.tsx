@@ -2,6 +2,7 @@ import { memo } from 'react';
 import type { Commit } from '@shared/types';
 import { type GraphTopology, getPassingLanes } from '../utils/graphTopology';
 import { getColor, resolvePalette } from '../utils/colorUtils';
+import { curveIntoNodePath, curveOutOfNodePath } from '../utils/graphPaths';
 
 interface GraphCellProps {
   commit: Commit;
@@ -50,6 +51,7 @@ export const GraphCell = memo(function GraphCell({
 
   const nodeX = getLaneX(node.lane);
   const nodeY = height / 2;
+  const nodeRadius = isHeadCommit ? HEAD_NODE_RADIUS : NODE_RADIUS;
   const color = getColor(node.colorIndex, palette);
   const hasMerge = commit.parents.length > 1;
   const isUncommitted = commit.refs.some(r => r.type === 'uncommitted');
@@ -93,18 +95,18 @@ export const GraphCell = memo(function GraphCell({
               x1={toX}
               y1={0}
               x2={toX}
-              y2={nodeY - NODE_RADIUS}
+              y2={nodeY - nodeRadius}
               stroke={incomingColor}
               strokeWidth={2}
               {...incomingDottedProps}
             />
           );
         } else {
-          // Different lane - diagonal from top corner to node
+          // Different lane - drop vertically, then rounded elbow into the node's side
           return (
             <path
               key={`incoming-${idx}`}
-              d={`M ${fromX} 0 Q ${fromX} ${nodeY * 0.5} ${toX} ${nodeY - NODE_RADIUS}`}
+              d={curveIntoNodePath(fromX, toX, nodeY, nodeRadius)}
               stroke={incomingColor}
               strokeWidth={2}
               fill="none"
@@ -120,7 +122,7 @@ export const GraphCell = memo(function GraphCell({
           x1={nodeX}
           y1={0}
           x2={nodeX}
-          y2={nodeY - NODE_RADIUS}
+          y2={nodeY - nodeRadius}
           stroke={color}
           strokeWidth={2}
         />
@@ -143,7 +145,7 @@ export const GraphCell = memo(function GraphCell({
               {tooltip}
               <line
                 x1={fromX}
-                y1={nodeY + NODE_RADIUS}
+                y1={nodeY + nodeRadius}
                 x2={toX}
                 y2={height}
                 stroke={connColor}
@@ -161,7 +163,7 @@ export const GraphCell = memo(function GraphCell({
                 {tooltip}
                 <line
                   x1={fromX}
-                  y1={nodeY + NODE_RADIUS}
+                  y1={nodeY + nodeRadius}
                   x2={fromX}
                   y2={height}
                   stroke={connColor}
@@ -172,13 +174,12 @@ export const GraphCell = memo(function GraphCell({
             );
           }
 
-          // Different lane - curve from node to target lane
-          const midY = nodeY + NODE_RADIUS + 4;
+          // Different lane - rounded elbow from the node's side down into the target lane
           return (
             <g key={`parent-${idx}`}>
               {tooltip}
               <path
-                d={`M ${fromX} ${nodeY + NODE_RADIUS} L ${fromX} ${midY} Q ${fromX} ${height * 0.75} ${toX} ${height}`}
+                d={curveOutOfNodePath(fromX, toX, nodeY, height, nodeRadius)}
                 stroke={connColor}
                 strokeWidth={2}
                 fill="none"
@@ -193,7 +194,7 @@ export const GraphCell = memo(function GraphCell({
       <circle
         cx={nodeX}
         cy={nodeY}
-        r={isHeadCommit ? HEAD_NODE_RADIUS : NODE_RADIUS}
+        r={nodeRadius}
         fill={isUncommitted ? 'transparent' : hasMerge ? 'transparent' : color}
         stroke={isUncommitted ? uncommittedColor : color}
         strokeWidth={2}
