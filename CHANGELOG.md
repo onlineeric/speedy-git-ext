@@ -4,6 +4,12 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.3.0] - 2026-07-04
+
+### Added
+- **Toolbar buttons now show text labels.** Each toolbar icon button (Filter, Search, Compare, Worktrees, Refresh, Fetch, View, Remote, Settings) now shows a small text label under its icon, making the toolbar easier to learn for new users while keeping the buttons compact. Labels are on by default and can be turned off with the new `speedyGit.toolbar.showLabels` setting, or by right-clicking any toolbar button and choosing **Hide Labels** — the right-click menu toggles all labels at once and persists the choice.
+- **The Remote button can be hidden.** The new `speedyGit.toolbar.showRemoteButton` setting (on by default) hides the Remote (Manage Remotes) button entirely for users who don't need remote management in the toolbar. It can also be toggled by right-clicking one of the right-aligned toolbar buttons (View, Remote, Settings) and choosing **Hide Remote Button** / **Show Remote Button** — the View and Settings buttons keep the item while Remote is hidden, so it's always one right-click away from coming back.
+
 ## [5.2.2] - 2026-07-03
 
 ### Fixed

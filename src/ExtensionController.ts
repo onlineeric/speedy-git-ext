@@ -319,6 +319,8 @@ export class ExtensionController {
       'speedyGit.batchCommitSize',
       'speedyGit.overScan',
       'speedyGit.worktree.basePath',
+      'speedyGit.toolbar.showLabels',
+      'speedyGit.toolbar.showRemoteButton',
     ].some((section) => event.affectsConfiguration(section));
   }
 
@@ -356,6 +358,8 @@ export class ExtensionController {
       batchCommitSize,
       overScan,
       worktreeBasePath,
+      toolbarShowLabels: config.get<boolean>('toolbar.showLabels', DEFAULT_USER_SETTINGS.toolbarShowLabels),
+      toolbarShowRemoteButton: config.get<boolean>('toolbar.showRemoteButton', DEFAULT_USER_SETTINGS.toolbarShowRemoteButton),
     };
   }
 

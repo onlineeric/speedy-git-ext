@@ -14,6 +14,15 @@ export const vscodeCommandHandlers = {
     }
   },
 
+  setToolbarSetting: async (message) => {
+    // The settings-change listener in ExtensionController picks this up and
+    // broadcasts fresh settingsData to the webview, so no direct response here.
+    const { setting, value } = message.payload;
+    await vscode.workspace
+      .getConfiguration('speedyGit')
+      .update(`toolbar.${setting}`, value, vscode.ConfigurationTarget.Global);
+  },
+
   copyToClipboard: async (message, context) => {
     await vscode.env.clipboard.writeText(message.payload.text);
     context.postMessage({ type: 'success', payload: { message: 'Copied to clipboard' } });
@@ -28,5 +37,5 @@ export const vscodeCommandHandlers = {
   },
 } satisfies Pick<
   RequestHandlerMap,
-  'openSettings' | 'getSettings' | 'copyToClipboard' | 'openExternal' | 'updatePersistedUIState'
+  'openSettings' | 'getSettings' | 'setToolbarSetting' | 'copyToClipboard' | 'openExternal' | 'updatePersistedUIState'
 >;

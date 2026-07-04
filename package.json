@@ -2,7 +2,7 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "5.2.2",
+  "version": "5.3.0",
   "publisher": "onlineeric",
   "license": "MIT",
   "repository": {
@@ -158,6 +158,16 @@
           "minimum": 0,
           "maximum": 200,
           "markdownDescription": "Number of commit rows to render above and below the visible graph viewport. Higher values reduce blank-row flicker during fast scrolling at the cost of more DOM nodes. Lower values use less memory but may show empty rows when scrolling quickly."
+        },
+        "speedyGit.toolbar.showLabels": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show a small text label under each toolbar icon button (Filter, Search, Compare, Worktrees, Refresh, Fetch, View, Remote, Settings). You can also toggle this by right-clicking any toolbar button."
+        },
+        "speedyGit.toolbar.showRemoteButton": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show the Remote (Manage Remotes) button in the toolbar. You can also toggle this by right-clicking the View, Remote, or Settings toolbar button."
         },
         "speedyGit.worktree.basePath": {
           "type": "string",
