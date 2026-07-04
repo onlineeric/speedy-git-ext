@@ -6,6 +6,7 @@ import { RepoSelector } from './RepoSelector';
 import { SubmoduleSelector } from './SubmoduleSelector';
 import { MultiBranchDropdown } from './MultiBranchDropdown';
 import { CommitListSettingsPopover } from './CommitListSettingsPopover';
+import { ToolbarIconButton, RemoteButtonToggleItem } from './ToolbarIconButton';
 import {
   CloudIcon,
   FilterIcon,
@@ -29,6 +30,7 @@ export function ControlBar() {
   const { branches, filters, setFilters, mergedCommits, loading, totalLoadedWithoutFilter, setActiveToggleWidget, activeToggleWidget, isRefreshing } = useGraphStore();
   const graphFilters = useGraphStore((state) => state.filters);
   const isCurrentLinkedWorktree = useGraphStore((state) => state.worktreeList.some((wt) => wt.isCurrent && !wt.isMain));
+  const showRemoteButton = useGraphStore((state) => state.userSettings.toolbarShowRemoteButton);
   const [remoteDialogOpen, setRemoteDialogOpen] = useState(false);
 
   // Reconcile selected branches when branch list changes (e.g., after fetch/prune)
@@ -88,8 +90,6 @@ export function ControlBar() {
     });
   };
 
-  const iconButtonClass =
-    'flex items-center justify-center p-1.5 rounded focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--vscode-toolbar-hoverBackground)]';
   const iconClass = 'w-6 h-6';
 
   const hasAnyFilter = (graphFilters.branches?.length ?? 0) > 0
@@ -133,56 +133,56 @@ export function ControlBar() {
         onClearSelection={handleClearSelection}
       />
 
-      <button
+      <ToolbarIconButton
+        label="Filter"
+        icon={<FilterIcon className={iconClass} />}
         onClick={() => setActiveToggleWidget('filter')}
-        className={`${iconButtonClass} ${filterColor}`}
+        className={filterColor}
         title="Filter"
-      >
-        <FilterIcon className={iconClass} />
-      </button>
+      />
 
-      <button
+      <ToolbarIconButton
+        label="Search"
+        icon={<SearchIcon className={iconClass} />}
         onClick={() => setActiveToggleWidget('search')}
-        className={`${iconButtonClass} ${searchColor}`}
+        className={searchColor}
         title="Search commits"
-      >
-        <SearchIcon className={iconClass} />
-      </button>
+      />
 
-      <button
+      <ToolbarIconButton
+        label="Compare"
+        icon={<CompareIcon className={iconClass} />}
         onClick={() => setActiveToggleWidget('compare')}
-        className={`${iconButtonClass} ${compareColor}`}
+        className={compareColor}
         title="Compare refs (Base vs Target)"
-      >
-        <CompareIcon className={iconClass} />
-      </button>
+      />
 
-      <button
+      <ToolbarIconButton
+        label="Worktrees"
+        icon={<WorktreeIcon className={iconClass} />}
         onClick={() => setActiveToggleWidget('worktree')}
-        className={`${iconButtonClass} ${worktreeColor}`}
+        className={worktreeColor}
         title={worktreeTitle}
-      >
-        <WorktreeIcon className={iconClass} />
-      </button>
+      />
 
       <ToolbarSeparatorIcon className="h-6 w-4 text-[var(--vscode-panel-border)] opacity-90" />
 
-      <button
+      <ToolbarIconButton
+        label="Refresh"
+        icon={<RefreshIcon className={`${iconClass}${isRefreshing ? ' animate-spin' : ''}`} />}
         onClick={handleRefresh}
-        className={`${iconButtonClass} ${isRefreshing ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}`}
+        className={isRefreshing ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}
         title="Refresh"
-      >
-        <RefreshIcon className={`${iconClass}${isRefreshing ? ' animate-spin' : ''}`} />
-      </button>
+      />
 
-      <button
+      <ToolbarIconButton
+        label="Fetch"
+        icon={<FetchIcon className={iconClass} />}
         onClick={handleFetch}
         disabled={fetching || loading}
-        className={`${iconButtonClass} ${fetching ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}`}
+        className={fetching ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}
         title="Fetch all remotes"
-      >
-        <FetchIcon className={iconClass} />
-      </button>
+      />
 
       <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)] px-1">
         {totalLoadedWithoutFilter !== null ? totalLoadedWithoutFilter : mergedCommits.length} loaded
@@ -190,23 +190,27 @@ export function ControlBar() {
 
       <CommitListSettingsPopover />
 
-      <button
-        onClick={() => setRemoteDialogOpen(true)}
-        aria-label="Manage Remotes"
-        className={`${iconButtonClass} ${TOGGLE_BUTTON_COLORS.inactive}`}
-        title="Manage Remotes"
-      >
-        <CloudIcon className={iconClass} />
-      </button>
+      {showRemoteButton && (
+        <ToolbarIconButton
+          label="Remote"
+          icon={<CloudIcon className={iconClass} />}
+          onClick={() => setRemoteDialogOpen(true)}
+          aria-label="Manage Remotes"
+          className={TOGGLE_BUTTON_COLORS.inactive}
+          title="Manage Remotes"
+          extraMenuItems={<RemoteButtonToggleItem />}
+        />
+      )}
 
-      <button
+      <ToolbarIconButton
+        label="Settings"
+        icon={<SettingsIcon className={iconClass} />}
         onClick={() => rpcClient.openSettings()}
         aria-label="Open extension settings"
-        className={`${iconButtonClass} ${TOGGLE_BUTTON_COLORS.inactive}`}
+        className={TOGGLE_BUTTON_COLORS.inactive}
         title="Extension settings"
-      >
-        <SettingsIcon className={iconClass} />
-      </button>
+        extraMenuItems={<RemoteButtonToggleItem />}
+      />
 
       <RemoteManagementDialog open={remoteDialogOpen} onClose={() => setRemoteDialogOpen(false)} />
     </div>

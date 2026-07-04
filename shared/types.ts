@@ -25,7 +25,17 @@ export interface UserSettings {
   overScan: number;
   /** Parent dir for new worktrees; default '../${repoName}.worktrees'. Ref appended as leaf. */
   worktreeBasePath: string;
+  /** Show small text labels under the toolbar icon buttons. */
+  toolbarShowLabels: boolean;
+  /** Show the Remote (Manage Remotes) button in the toolbar. */
+  toolbarShowRemoteButton: boolean;
 }
+
+/**
+ * `speedyGit.toolbar.*` boolean settings the webview can persist directly
+ * (via the `setToolbarSetting` RPC, from the toolbar right-click menu).
+ */
+export type ToolbarBooleanSetting = 'showLabels' | 'showRemoteButton';
 
 export interface SearchState {
   isOpen: boolean;
@@ -84,6 +94,8 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   batchCommitSize: 500,
   overScan: 20,
   worktreeBasePath: '../${repoName}.worktrees',
+  toolbarShowLabels: true,
+  toolbarShowRemoteButton: true,
 };
 
 export interface Commit {

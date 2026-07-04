@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata, ToolbarBooleanSetting } from './types.js';
 
 /** Payload for the batched initial data message */
 export interface InitialDataPayload {
@@ -104,6 +104,8 @@ export type RequestMessage =
    */
   | { type: 'displayRepo'; payload: { repoPath: string } }
   | { type: 'getSettings'; payload: Record<string, never> }
+  /** Persist a `speedyGit.toolbar.*` boolean setting from the webview (toolbar right-click menu). */
+  | { type: 'setToolbarSetting'; payload: { setting: ToolbarBooleanSetting; value: boolean } }
   | { type: 'getSubmodules'; payload: Record<string, never> }
   /** @deprecated since 041-submodule-selector — selector navigation uses switchRepo. Handler kept for legacy compatibility; will be removed in a follow-up. */
   | { type: 'openSubmodule'; payload: { submodulePath: string } }
@@ -216,7 +218,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   getSignatureInfo: true, detectSignaturePresence: true, verifySignatures: true, openSignatureHelp: true,
   dropCommit: true, isCommitPushed: true, getCommitParents: true,
   loadMoreCommits: true, openSettings: true, switchRepo: true, displayRepo: true,
-  getSettings: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
+  getSettings: true, setToolbarSetting: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
   updateSubmodule: true, initSubmodule: true,
   stashAndCheckout: true, stashAndCheckoutCommit: true,
   getWorktreeList: true, resolveWorktreePath: true, getWorktreeEnvFiles: true, addWorktree: true,

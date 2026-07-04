@@ -1,5 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, CompareMode, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode } from '@shared/types';
+import type { CherryPickOptions, CompareMode, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 
 declare const acquireVsCodeApi: () => {
@@ -621,6 +621,10 @@ class RpcClient {
 
   getSettings() {
     this.send({ type: 'getSettings', payload: {} });
+  }
+
+  setToolbarSetting(setting: ToolbarBooleanSetting, value: boolean) {
+    this.send({ type: 'setToolbarSetting', payload: { setting, value } });
   }
 
   getSubmodules() {

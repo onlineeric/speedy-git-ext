@@ -28,6 +28,7 @@ import {
   setCommitTableColumnVisibility,
 } from '../utils/commitTableLayout';
 import { ColumnsIcon } from './icons';
+import { ToolbarIconButton, RemoteButtonToggleItem } from './ToolbarIconButton';
 
 const COLUMN_LABELS: Record<CommitTableColumnId, string> = {
   graph: 'Graph',
@@ -116,14 +117,14 @@ export function CommitListSettingsPopover() {
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <button
-          type="button"
-          className={`flex items-center justify-center rounded p-1.5 hover:bg-[var(--vscode-toolbar-hoverBackground)] focus:outline-none ${triggerColor}`}
+        <ToolbarIconButton
+          label="View"
+          icon={<ColumnsIcon className="h-6 w-6" />}
+          className={triggerColor}
           title="Commit list settings"
           aria-label="Commit list settings"
-        >
-          <ColumnsIcon className="h-6 w-6" />
-        </button>
+          extraMenuItems={<RemoteButtonToggleItem />}
+        />
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
