@@ -28,7 +28,7 @@ import {
   setCommitTableColumnVisibility,
 } from '../utils/commitTableLayout';
 import { ColumnsIcon } from './icons';
-import { ToolbarIconButton } from './ToolbarIconButton';
+import { ToolbarIconButton, RemoteButtonToggleItem } from './ToolbarIconButton';
 
 const COLUMN_LABELS: Record<CommitTableColumnId, string> = {
   graph: 'Graph',
@@ -123,7 +123,7 @@ export function CommitListSettingsPopover() {
           className={triggerColor}
           title="Commit list settings"
           aria-label="Commit list settings"
-          withRemoteButtonToggle
+          extraMenuItems={<RemoteButtonToggleItem />}
         />
       </Popover.Trigger>
       <Popover.Portal>

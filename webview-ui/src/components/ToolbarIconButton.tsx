@@ -9,29 +9,29 @@ interface ToolbarIconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
   label: string;
   icon: ReactNode;
   /**
-   * Adds a "Show/Hide Remote Button" item to the right-click menu. Enabled on
-   * the right-aligned buttons (View, Remote, Settings) so the Remote button
-   * can be brought back even while it is hidden.
+   * Extra `ContextMenu.Item`s appended after the shared "Show/Hide Labels" item.
+   * Lets callers add per-button menu actions (e.g. `RemoteButtonToggleItem`)
+   * without the shared button knowing about any specific feature.
    */
-  withRemoteButtonToggle?: boolean;
+  extraMenuItems?: ReactNode;
 }
 
 /**
  * Toolbar icon button with an optional tiny text label under the icon,
  * driven by the `speedyGit.toolbar.showLabels` setting (default on).
  *
- * Right-clicking any toolbar button opens a context menu whose single item
- * toggles the labels for ALL toolbar buttons at once — it persists the change
- * through the `setToolbarLabels` RPC, and the refreshed settings flow back to
- * every button via the store.
+ * Right-clicking any toolbar button opens a context menu whose "Show/Hide
+ * Labels" item toggles the labels for ALL toolbar buttons at once — it persists
+ * the change through the `setToolbarSetting` RPC, and the refreshed settings
+ * flow back to every button via the store. Callers may append button-specific
+ * actions via `extraMenuItems`.
  *
  * Forwards ref/props to the underlying <button> so it composes with Radix
  * `asChild` triggers (e.g. the View button's Popover.Trigger).
  */
 export const ToolbarIconButton = forwardRef<HTMLButtonElement, ToolbarIconButtonProps>(
-  function ToolbarIconButton({ label, icon, withRemoteButtonToggle, className, ...buttonProps }, ref) {
+  function ToolbarIconButton({ label, icon, extraMenuItems, className, ...buttonProps }, ref) {
     const showLabels = useGraphStore((state) => state.userSettings.toolbarShowLabels);
-    const showRemoteButton = useGraphStore((state) => state.userSettings.toolbarShowRemoteButton);
 
     const layoutClass = showLabels ? 'px-1.5 pt-1 pb-0.5' : 'p-1.5';
 
@@ -58,17 +58,28 @@ export const ToolbarIconButton = forwardRef<HTMLButtonElement, ToolbarIconButton
             >
               {showLabels ? 'Hide Labels' : 'Show Labels'}
             </ContextMenu.Item>
-            {withRemoteButtonToggle && (
-              <ContextMenu.Item
-                className={menuItemClass}
-                onSelect={() => rpcClient.setToolbarSetting('showRemoteButton', !showRemoteButton)}
-              >
-                {showRemoteButton ? 'Hide Remote Button' : 'Show Remote Button'}
-              </ContextMenu.Item>
-            )}
+            {extraMenuItems}
           </ContextMenu.Content>
         </ContextMenu.Portal>
       </ContextMenu.Root>
     );
   }
 );
+
+/**
+ * "Show/Hide Remote Button" context-menu item. Rendered as `extraMenuItems` on
+ * the right-aligned buttons (View, Remote, Settings) so the Remote button can be
+ * brought back even while it is hidden. Owns its own `showRemoteButton`
+ * subscription so buttons that don't render it never subscribe.
+ */
+export function RemoteButtonToggleItem() {
+  const showRemoteButton = useGraphStore((state) => state.userSettings.toolbarShowRemoteButton);
+  return (
+    <ContextMenu.Item
+      className={menuItemClass}
+      onSelect={() => rpcClient.setToolbarSetting('showRemoteButton', !showRemoteButton)}
+    >
+      {showRemoteButton ? 'Hide Remote Button' : 'Show Remote Button'}
+    </ContextMenu.Item>
+  );
+}

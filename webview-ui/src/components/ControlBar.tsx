@@ -6,7 +6,7 @@ import { RepoSelector } from './RepoSelector';
 import { SubmoduleSelector } from './SubmoduleSelector';
 import { MultiBranchDropdown } from './MultiBranchDropdown';
 import { CommitListSettingsPopover } from './CommitListSettingsPopover';
-import { ToolbarIconButton } from './ToolbarIconButton';
+import { ToolbarIconButton, RemoteButtonToggleItem } from './ToolbarIconButton';
 import {
   CloudIcon,
   FilterIcon,
@@ -198,7 +198,7 @@ export function ControlBar() {
           aria-label="Manage Remotes"
           className={TOGGLE_BUTTON_COLORS.inactive}
           title="Manage Remotes"
-          withRemoteButtonToggle
+          extraMenuItems={<RemoteButtonToggleItem />}
         />
       )}
 
@@ -209,7 +209,7 @@ export function ControlBar() {
         aria-label="Open extension settings"
         className={TOGGLE_BUTTON_COLORS.inactive}
         title="Extension settings"
-        withRemoteButtonToggle
+        extraMenuItems={<RemoteButtonToggleItem />}
       />
 
       <RemoteManagementDialog open={remoteDialogOpen} onClose={() => setRemoteDialogOpen(false)} />
