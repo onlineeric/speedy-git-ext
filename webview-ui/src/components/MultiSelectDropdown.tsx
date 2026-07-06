@@ -3,8 +3,16 @@ import * as Popover from '@radix-ui/react-popover';
 
 // --- Flat list item types ---
 
-interface ClearAllItem {
-  type: 'clearAll';
+/** A command pinned above the data items (e.g. "clear all", "Select all Local Branches"). */
+export interface DropdownAction {
+  key: string;
+  label: string;
+  onAction: () => void;
+}
+
+interface ActionItem {
+  type: 'action';
+  action: DropdownAction;
 }
 
 interface GroupHeaderItem {
@@ -18,12 +26,12 @@ interface DataItem<T> {
   key: string;
 }
 
-type ListItem<T> = ClearAllItem | GroupHeaderItem | DataItem<T>;
+type ListItem<T> = ActionItem | GroupHeaderItem | DataItem<T>;
 
 // --- Pure helpers ---
 
 function isSelectable<T>(item: ListItem<T>): boolean {
-  return item.type === 'clearAll' || item.type === 'data';
+  return item.type !== 'header';
 }
 
 function findFirstSelectable<T>(items: ListItem<T>[]): number {
@@ -65,6 +73,8 @@ export interface MultiSelectDropdownProps<T> {
   groupBy?: (item: T) => string;
   placeholder?: string;
   clearAllLabel?: string;
+  /** Custom commands rendered directly below the "clear all" item. Always visible regardless of the filter text. */
+  actions?: DropdownAction[];
   className?: string;
 }
 
@@ -84,6 +94,7 @@ function MultiSelectDropdownInner<T>({
   groupBy,
   placeholder = 'Filter...',
   clearAllLabel = 'All',
+  actions,
   className,
 }: MultiSelectDropdownProps<T>) {
   const [open, setOpen] = useState(false);
@@ -108,8 +119,8 @@ function MultiSelectDropdownInner<T>({
 
   // --- Filtered & grouped list ---
 
-  const filteredList = useMemo<ListItem<T>[]>(() => {
-    const result: ListItem<T>[] = [{ type: 'clearAll' }];
+  const filteredDataList = useMemo<ListItem<T>[]>(() => {
+    const result: ListItem<T>[] = [];
     const lowerFilter = filterText.toLowerCase();
 
     const matched = items.filter((item) =>
@@ -142,6 +153,17 @@ function MultiSelectDropdownInner<T>({
     return result;
   }, [items, filterText, getKey, getSearchText, groupBy]);
 
+  // Command items never participate in filtering, and their identity may change
+  // every parent render — keep them out of the expensive memo above.
+  const commandActions: DropdownAction[] = [
+    { key: '__clear_all__', label: clearAllLabel, onAction: onClearAll },
+    ...(actions ?? []),
+  ];
+  const filteredList: ListItem<T>[] = [
+    ...commandActions.map((action): ListItem<T> => ({ type: 'action', action })),
+    ...filteredDataList,
+  ];
+
   const highlightedIndex = clampHighlightedIndex(filteredList, rawHighlightedIndex);
 
   // --- Open/Close handlers ---
@@ -158,8 +180,8 @@ function MultiSelectDropdownInner<T>({
 
   const handleItemClick = (item: ListItem<T>) => {
     isSelectingRef.current = true;
-    if (item.type === 'clearAll') {
-      onClearAll();
+    if (item.type === 'action') {
+      item.action.onAction();
     } else if (item.type === 'data') {
       onToggle(item.item);
     }
@@ -307,10 +329,10 @@ function MultiSelectDropdownInner<T>({
               const isSelected = listItem.type === 'data' && selectedKeySet.has(listItem.key);
               const isHighlighted = index === highlightedIndex;
 
-              if (listItem.type === 'clearAll') {
+              if (listItem.type === 'action') {
                 return (
                   <div
-                    key="__clear_all__"
+                    key={`action-${listItem.action.key}`}
                     id={getItemId(index)}
                     ref={(el) => setItemRef(index, el)}
                     role="option"
@@ -322,7 +344,7 @@ function MultiSelectDropdownInner<T>({
                         : 'text-[var(--vscode-menu-foreground)] hover:bg-[var(--vscode-list-hoverBackground)]'
                     }`}
                   >
-                    {clearAllLabel}
+                    {listItem.action.label}
                   </div>
                 );
               }

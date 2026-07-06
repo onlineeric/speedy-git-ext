@@ -57,7 +57,7 @@ src/                              # Backend — esbuild → dist/extension.js (C
 │       ├── graphDataHandlers.ts  # getCommits/loadMore/getBranches/getCommitDetails/getAuthors/refresh
 │       ├── branchHandlers.ts     # checkout/create/rename/delete/merge/fast-forward branch
 │       ├── remoteHandlers.ts     # fetch/push/pull, add/edit/remove remote
-│       ├── tagHandlers.ts        # create/delete/push tag
+│       ├── tagHandlers.ts        # create/delete/push tag (optional chained push, remote delete, force — 048)
 │       ├── stashHandlers.ts      # get/apply/pop/drop/create stash
 │       ├── historyHandlers.ts    # reset/cherry-pick/revert/rebase + continue/abort, dropCommit
 │       ├── signatureHandlers.ts  # presence detection, verification, signature help
@@ -77,7 +77,7 @@ src/                              # Backend — esbuild → dist/extension.js (C
 │   ├── GitRebaseService.ts       # Interactive rebase with drag-drop reordering
 │   ├── GitCherryPickService.ts   # Cherry-pick with conflict handling
 │   ├── GitRevertService.ts       # Revert commits
-│   ├── GitTagService.ts          # Create, delete, push tags
+│   ├── GitTagService.ts          # Create/delete/push tags (incl. remote delete, force push), tag metadata from refs/tags (048)
 │   ├── GitStashService.ts        # Apply, pop, drop stash entries
 │   ├── GitIndexService.ts        # Stage/unstage, discard, commit (uncommitted-node operations)
 │   ├── GitWorktreeService.ts     # Worktree list/add/remove
@@ -90,7 +90,7 @@ src/                              # Backend — esbuild → dist/extension.js (C
 └── utils/
     ├── gitParsers.ts             # Parse git log lines, refs (%D), branch list
     ├── gitQueries.ts             # Shared read-only git queries (e.g., isDirtyWorkingTree)
-    ├── gitValidation.ts          # Input validation for git operations
+    ├── gitValidation.ts          # Input validation for git operations (backend wrappers over shared/gitRefValidation)
     └── worktreeErrors.ts         # Map raw git worktree failures → friendly messages
 
 webview-ui/src/                   # Frontend — Vite + React → dist/webview/
@@ -100,9 +100,10 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
 │   ├── CommitRow.tsx             # Graph cell + commit metadata (memoized)
 │   ├── CommitTableRow.tsx        # Table-style commit row with resizable columns
 │   ├── CommitTableHeader.tsx     # Draggable/resizable column headers (@dnd-kit)
-│   ├── GraphCell.tsx             # SVG graph rendering (LANE_WIDTH: 16px, 8 cycling colors)
+│   ├── GraphCell.tsx             # SVG graph rendering (LANE_WIDTH: 16px, 8 cycling colors); lane-changing lines drawn via utils/graphPaths.ts
 │   ├── CommitDetailsPanel.tsx    # Resizable bottom/right panel, commit metadata + file changes
 │   ├── ControlBar.tsx            # Top toolbar with actions
+│   ├── ToolbarIconButton.tsx     # Shared toolbar button: icon + optional text label (speedyGit.toolbar.showLabels); right-click menu toggles labels / Remote button, extensible via extraMenuItems
 │   ├── TogglePanel.tsx           # Collapsible panel for Filter/Search/Compare widgets
 │   ├── FilterWidget.tsx          # Author/date filter panel (react-datepicker)
 │   ├── SearchWidget.tsx          # Text search across commits
@@ -115,6 +116,7 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
 │   ├── LazyContextMenu.tsx       # Wraps a Radix context menu so its heavy body (items/dialogs/store subscriptions) mounts only on first right-click — keeps virtualized rows cheap during fast scrolling
 │   ├── CompareMenuItems.tsx      # Shared "Set as Compare Base" / "Compare with Base" item pair (042), reused across Commit/Branch/Uncommitted menus
 │   ├── menuStyles.ts             # Shared Tailwind class strings for context-menu items (enabled/disabled/separator)
+│   ├── FieldError.tsx            # Validation message under form inputs (pairs with aria-invalid/aria-describedby)
 │   └── CommandPreview.tsx        # Live git command preview shown in dialogs
 ├── stores/
 │   └── graphStore.ts             # Zustand store: commits, branches, topology, filters, UI state (~1250 lines). 044-code-refactor replaced whole-store subscriptions with selectors rather than splitting the file
@@ -127,6 +129,7 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
 │   └── displayRefs.ts            # Discriminated union for ref-label rendering (local-branch/remote-branch/tag/HEAD/…)
 └── utils/
     ├── graphTopology.ts          # Core graph algorithm (~700 lines): lanes, colors, connections
+    ├── graphPaths.ts             # SVG "rounded elbow" path builders for lane-changing connection lines — lines cross row boundaries perfectly vertically so per-row SVG cells join without kinks (5.4.0)
     ├── gitCommandBuilder.ts      # Constructs git command strings for preview display
     ├── commitReachability.ts     # Determines branch reachability for commits
     ├── commitVisibility.ts       # Visibility/filter predicates for the virtualized row list
@@ -137,6 +140,7 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
     ├── externalRefParser.ts      # Parse typed commit-ish expressions (HEAD~3, origin/main^2, …)
     ├── resolveDefaultRemote.ts   # Pick `origin` else first-alpha remote (fast-forward, push, etc.)
     ├── mergedCommits.ts          # Detect merged-branch commit grouping for badges
+    ├── refNameField.ts           # Live-validation state for ref-name inputs (error suppressed while field is pristine), shared by Create Tag/Branch/Worktree/Remote dialogs
     ├── refStyle.ts               # Per-ref-kind badge styling
     ├── repoPath.ts               # Repo path normalization
     ├── stashMessage.ts           # Format stash entries for display
@@ -158,7 +162,8 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
 shared/                           # Shared types between backend & frontend
 ├── types.ts                      # Domain types: Commit, Branch, RefInfo, GraphFilters, CommitDetails, etc.
 ├── messages.ts                   # RequestMessage/ResponseMessage union types for RPC
-└── errors.ts                     # Result<T,E> monad, GitError class, GitErrorCode enum
+├── errors.ts                     # Result<T,E> monad, GitError class, GitErrorCode enum
+└── gitRefValidation.ts           # git check-ref-format validator with tag/branch/remote wrappers — same rules drive live dialog validation (frontend) and creation-path guards (backend, defense in depth)
 ```
 
 ### Path Alias
@@ -234,12 +239,11 @@ shared/                           # Shared types between backend & frontend
 - App state is transient (Zustand, session-only); persistent settings via VS Code config (e.g. `speedyGit.worktree.basePath`) and `context.globalState`
 
 ## Recent Changes
-- refactor_webViewProvider: Split the ~2400-line `WebviewProvider` god object into the composed `src/webview/` subsystem (facade + PanelHost/Runtime/ServiceRegistry/MessageRouter/RequestContext/PersistedUIStateStore/RepoDataLoader/RefreshCoordinator/EditorCommandService/OperationGuard + per-domain `handlers/`). `src/WebviewProvider.ts` is now a compatibility re-export; RPC dispatch is an exhaustive typed handler map; handlers resolve services from `GitServiceRegistry` at request time to avoid stale references after repo switch
 - 047-signing-verification: 7-state flat `SignatureStatus` enum (drops `verificationUnavailable`); presence detection via raw `gpgsig` header (`git cat-file --batch`, no crypto) so SSH-signed commits without `allowedSignersFile` read as `unavailable` not `unsigned` (FR-017); opt-in hidden-by-default "Signature" history column with 3 grouped glyphs, async viewport-first + cached-by-hash (zero cost when hidden); bundled offline help doc (`docs/signing-verification.md`) opened via `openSignatureHelp` RPC
+- 048-tag-enhancements (v5.2.0–5.2.1): tag badges show annotated/lightweight metadata in tooltips (one deferred `refs/tags` read via `RepoDataLoader`, cached in webview); Create Tag can chain a push (opt-in force), Delete Tag can also delete from remote (missing remote tag = benign no-op), standalone Push Tag gained a force option — all with command previews (`DeleteTagDialog`, `PushTagDialog`). Introduced `shared/gitRefValidation.ts`: live `git check-ref-format` validation in every ref-creating dialog (tag/branch/rename/worktree branch/remote name via `refNameField.ts` + `FieldError`), with the same rules enforced on backend creation paths for defense in depth
+- Toolbar & graph polish (v5.2.2–5.4.0, no spec): `ToolbarIconButton` adds text labels under toolbar icons (`speedyGit.toolbar.showLabels`) and a hideable Remote button (`speedyGit.toolbar.showRemoteButton`), both toggleable via right-click menu; fast-forwarding the checked-out branch now runs `git pull` instead of the refused `git fetch <b>:<b>`; the checked-out branch badge always sorts first, ahead of worktree-branch prioritization; graph lane-change lines are now rounded elbows built by `webview-ui/src/utils/graphPaths.ts`
 
 
 <!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan:
-specs/048-tag-enhancements/plan.md
+No active feature plan (specs/048-tag-enhancements/ is the most recently completed feature; it is merged).
 <!-- SPECKIT END -->

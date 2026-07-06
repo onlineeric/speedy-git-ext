@@ -7,7 +7,6 @@ import type {
   RevertOptions,
   Commit,
   CommitDetails,
-  CommitListMode,
   CommitTableLayout,
   CommitSignatureInfo,
   SignaturePresence,
@@ -170,7 +169,6 @@ interface GraphStore {
   fileViewMode: FileViewMode;
   bottomPanelHeight: number;
   rightPanelWidth: number;
-  commitListMode: CommitListMode;
   commitTableLayout: CommitTableLayout;
   // Tooltip state
   hoveredCommitHash: string | null;
@@ -206,7 +204,6 @@ interface GraphStore {
   setFileViewMode: (mode: FileViewMode) => void;
   setBottomPanelHeight: (height: number) => void;
   setRightPanelWidth: (width: number) => void;
-  setCommitListMode: (mode: CommitListMode) => void;
   setCommitTableLayout: (layout: CommitTableLayout) => void;
   updateCommitTableLayout: (updater: (layout: CommitTableLayout) => CommitTableLayout) => void;
   hydratePersistedUIState: (state: PersistedUIState) => void;
@@ -383,7 +380,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   fileViewMode: DEFAULT_PERSISTED_UI_STATE.fileViewMode,
   bottomPanelHeight: DEFAULT_PERSISTED_UI_STATE.bottomPanelHeight,
   rightPanelWidth: DEFAULT_PERSISTED_UI_STATE.rightPanelWidth,
-  commitListMode: DEFAULT_PERSISTED_UI_STATE.commitListMode,
   commitTableLayout: cloneCommitTableLayout(DEFAULT_PERSISTED_UI_STATE.commitTableLayout),
   hoveredCommitHash: null,
   tooltipAnchorRect: null,
@@ -427,7 +423,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setFileViewMode: (mode) => set({ fileViewMode: mode }),
   setBottomPanelHeight: (bottomPanelHeight) => set({ bottomPanelHeight }),
   setRightPanelWidth: (rightPanelWidth) => set({ rightPanelWidth }),
-  setCommitListMode: (commitListMode) => set({ commitListMode }),
   setCommitTableLayout: (commitTableLayout) => set({
     commitTableLayout: cloneCommitTableLayout(commitTableLayout),
   }),
@@ -439,7 +434,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     fileViewMode: state.fileViewMode,
     bottomPanelHeight: state.bottomPanelHeight,
     rightPanelWidth: state.rightPanelWidth,
-    commitListMode: state.commitListMode,
     commitTableLayout: cloneCommitTableLayout(state.commitTableLayout),
   }),
   setGitHubAvatarUrls: (urls) => set((state) => ({

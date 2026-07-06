@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.4.1] - 2026-07-06
+
+### Added
+- **"Select all Local Branches" option in the branch filter.** The branch filter dropdown now has a **Select all Local Branches** option directly below **All Branches**. Clicking it selects every local branch in one go — purely additively: local branches you already selected stay selected, remote branch selections are untouched, and clicking it again never deselects anything (when all local branches are already selected it's a no-op). Handy for quickly focusing the graph on all local work while ignoring remote-only branches.
+
 ## [5.4.0] - 2026-07-04
 
 ### Changed

@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { CommitListMode, CommitTableColumnId } from '@shared/types';
+import type { CommitTableColumnId } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import {
@@ -44,14 +44,9 @@ const COLUMN_WARNINGS: Partial<Record<CommitTableColumnId, string>> = {
     'Warning: signature checks run in the background and can use high CPU in large repositories. Keep this column hidden on slower machines.',
 };
 
-const buttonBaseClass =
-  'rounded px-2.5 py-1 text-xs transition-colors focus:outline-none';
-
 export function CommitListSettingsPopover() {
   const [open, setOpen] = useState(false);
-  const commitListMode = useGraphStore((state) => state.commitListMode);
   const commitTableLayout = useGraphStore((state) => state.commitTableLayout);
-  const setCommitListMode = useGraphStore((state) => state.setCommitListMode);
   const setCommitTableLayout = useGraphStore((state) => state.setCommitTableLayout);
 
   const optionalColumnIds = useMemo(
@@ -63,15 +58,6 @@ export function CommitListSettingsPopover() {
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
-
-  const handleModeChange = (mode: CommitListMode) => {
-    if (mode === commitListMode) {
-      return;
-    }
-
-    setCommitListMode(mode);
-    rpcClient.persistUIState({ commitListMode: mode });
-  };
 
   const handleVisibilityChange = (columnId: CommitTableColumnId, visible: boolean) => {
     const nextLayout = setCommitTableColumnVisibility(commitTableLayout, columnId, visible);
@@ -141,33 +127,11 @@ export function CommitListSettingsPopover() {
         >
           <div className="space-y-3">
             <section>
-              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--vscode-descriptionForeground)]">
-                View Mode
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <ModeButton
-                  active={commitListMode === 'classic'}
-                  label="Classic"
-                  onClick={() => handleModeChange('classic')}
-                />
-                <ModeButton
-                  active={commitListMode === 'table'}
-                  label="Table"
-                  onClick={() => handleModeChange('table')}
-                />
-              </div>
-            </section>
-
-            <div className="border-t border-[var(--vscode-panel-border)]" />
-
-            <section className={commitListMode === 'classic' ? 'opacity-50 pointer-events-none' : ''}>
               <div className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--vscode-descriptionForeground)]">
                 Columns
               </div>
               <p className="mb-3 text-xs text-[var(--vscode-descriptionForeground)]">
-                {commitListMode === 'classic'
-                  ? 'Switch to Table mode to configure columns.'
-                  : 'Graph stays first and always visible. Drag optional columns to reorder them.'}
+                Graph stays first and always visible. Drag optional columns to reorder them.
               </p>
 
               <div className="mb-2 flex items-center justify-between rounded border border-[var(--vscode-panel-border)] px-2 py-1.5 text-sm">
@@ -186,25 +150,22 @@ export function CommitListSettingsPopover() {
                         warning={COLUMN_WARNINGS[columnId]}
                         visible={commitTableLayout.columns[columnId].visible}
                         onVisibilityChange={handleVisibilityChange}
-                        disabled={commitListMode === 'classic'}
                       />
                     ))}
                   </div>
                 </SortableContext>
               </DndContext>
 
-              {commitListMode === 'table' && (
-                <div className="mt-4 border-t border-[var(--vscode-panel-border)] pt-2">
-                  <button
-                    type="button"
-                    onClick={handleResetWidths}
-                    className="w-full rounded px-2.5 py-1.5 text-left text-xs text-[var(--vscode-descriptionForeground)] transition-colors hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)] focus:outline-none"
-                    title="Restore all column widths to their factory defaults"
-                  >
-                    Reset column widths to defaults
-                  </button>
-                </div>
-              )}
+              <div className="mt-4 border-t border-[var(--vscode-panel-border)] pt-2">
+                <button
+                  type="button"
+                  onClick={handleResetWidths}
+                  className="w-full rounded px-2.5 py-1.5 text-left text-xs text-[var(--vscode-descriptionForeground)] transition-colors hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)] focus:outline-none"
+                  title="Restore all column widths to their factory defaults"
+                >
+                  Reset column widths to defaults
+                </button>
+              </div>
             </section>
           </div>
           <Popover.Arrow className="fill-[var(--vscode-menu-border)]" />
@@ -214,48 +175,21 @@ export function CommitListSettingsPopover() {
   );
 }
 
-function ModeButton({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`${buttonBaseClass} ${
-        active
-          ? 'bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)]'
-          : 'bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]'
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
 function SortableColumnRow({
   columnId,
   label,
   warning,
   visible,
   onVisibilityChange,
-  disabled,
 }: {
   columnId: CommitTableColumnId;
   label: string;
   warning?: string;
   visible: boolean;
   onVisibilityChange: (columnId: CommitTableColumnId, visible: boolean) => void;
-  disabled?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: columnId,
-    disabled,
   });
 
   return (
@@ -272,10 +206,9 @@ function SortableColumnRow({
         type="button"
         {...attributes}
         {...listeners}
-        className={`px-1 text-base leading-none text-[var(--vscode-descriptionForeground)] ${disabled ? 'cursor-default' : 'cursor-grab'}`}
+        className="cursor-grab px-1 text-base leading-none text-[var(--vscode-descriptionForeground)]"
         title={`Drag to reorder ${label}`}
         aria-label={`Drag to reorder ${label}`}
-        disabled={disabled}
       >
         ⠿
       </button>
@@ -299,7 +232,6 @@ function SortableColumnRow({
           checked={visible}
           onChange={(event) => onVisibilityChange(columnId, event.target.checked)}
           className="h-3.5 w-3.5"
-          disabled={disabled}
         />
       </label>
     </div>

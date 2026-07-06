@@ -376,16 +376,15 @@ describe('WebviewProvider per-repo column layout', () => {
     );
   });
 
-  it('saves commitListMode to global state (not per-repo)', () => {
+  it('saves global UI state without the per-repo table layout', () => {
     const store: Record<string, unknown> = {};
     const { store: uiStateStore, extensionContext } = createUIStateStore(store, '/repo-a');
 
-    uiStateStore.savePersistedUIState({ commitListMode: 'classic' });
+    uiStateStore.savePersistedUIState({ detailsPanelPosition: 'right' });
 
-    // Global state key should be updated with commitListMode
     expect(extensionContext.globalState.update).toHaveBeenCalledWith(
       'speedyGit.uiState',
-      expect.objectContaining({ commitListMode: 'classic' }),
+      expect.objectContaining({ detailsPanelPosition: 'right' }),
     );
 
     // Global state should NOT contain commitTableLayout
@@ -433,12 +432,6 @@ describe('WebviewProvider per-repo column layout', () => {
     expect(uiStateStore).toBeDefined();
   });
 
-  it('defaults commitListMode to table for new users', () => {
-    const { store } = createUIStateStore();
-
-    const state = store.loadPersistedUIState();
-    expect(state.commitListMode).toBe('table');
-  });
 });
 
 describe('WebviewProvider validateCommitTableLayout healing', () => {
