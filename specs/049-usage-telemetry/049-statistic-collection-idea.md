@@ -17,10 +17,26 @@ usage statistics to answer questions like:
 - Which errors do users hit in the wild (by error code, not message)?
 - Basic health/performance signals (load times, repo-size buckets).
 
-**Hard constraint: zero confidential data.** No repo names, no branch names, no
+**Hard constraint 1: zero confidential data.** No repo names, no branch names, no
 commit content, no file paths, no user identity. Only anonymous, aggregate-able
 statistics of the kind the official package and VS Code guidelines explicitly
 allow.
+
+**Hard constraint 2: zero performance impact.** Telemetry must never affect how the
+app performs or feels. No measurable CPU, memory, or main-thread cost on any user
+path; no synchronous work in render loops, RPC handlers, or activation. All
+collection and sending is fire-and-forget and happens off the critical path — the
+user must never wait on, or notice, telemetry. If instrumenting something would add
+cost to a hot path (scroll, hover, keystroke, auto-refresh), don't instrument it.
+
+**Hard constraint 3: invisible to the user.** Telemetry must be completely silent.
+No notifications, dialogs, prompts, warnings, info messages or status-bar text visible to the user — ever, only output log is allowed. We never ask for consent or agreement: if a
+mechanism *requires* the user to agree, approve, or acknowledge anything, we do not
+build it. (We still honor VS Code's global `telemetry.telemetryLevel` — that's the
+user's existing choice, requiring no new prompt from us.) Transparency is provided
+passively, through written disclosure only: a clear statement — in the README,
+`LICENSE.md`, or a dedicated telemetry doc — of exactly what we collect, why, and
+that no confidential or personal user data is ever gathered.
 
 ## Technical investigation (confirmed facts)
 
@@ -59,12 +75,26 @@ allow.
   arch, UI kind (desktop/web), remote name (wsl/ssh/devcontainer),
   anonymized `machineId` (random GUID — enables "distinct users" counts, not
   identity), and session ID. This alone answers the "what OS" question.
-- **The connection string is not a secret.** Microsoft's docs state it doesn't
-  need special handling — App Insights ingestion keys are client-side by
-  design (same model as VS Code itself and every MS extension). It can be a
-  checked-in constant; a build-time `define` in `esbuild.config.mjs` is a
-  nice-to-have so dev/watch builds get an empty string (= telemetry disabled)
-  and only `--production` builds get the real one.
+- **The connection string is not a secret, but we still keep it out of the repo.**
+  App Insights ingestion keys are client-side by design (same model as VS Code
+  itself and every MS extension) — Microsoft's docs say they need no special
+  handling, and the value is anyway extractable from any shipped `.vsix` (just a
+  zip). So this is not confidentiality; it's *misuse-friction* for a public repo:
+  keeping the string off GitHub removes the casual copy-paste vector, nothing more.
+  The **real** safeguard against abuse (data pollution / bill inflation) is an
+  Azure-side **daily ingestion cap**, not where the string lives.
+- **How we store and inject it (decided).** The string lives in a **local,
+  gitignored `.env`** file — never committed. `esbuild.config.mjs` injects it via a
+  build-time `define`, **only on `--production` builds**:
+  - dev / watch / tests → the `define` is an empty string ⇒ `TelemetryService` is a
+    no-op (telemetry disabled while hacking).
+  - `--production` → the config loads `.env` (e.g. `process.loadEnvFile('.env')` on
+    Node 20.12+, or the `dotenv` package) and defines
+    `SPEEDYGIT_TELEMETRY_CONNECTION_STRING`. If `.env` is absent, the value stays
+    empty and the extension simply ships with telemetry off (safe default).
+  - Publishing is local (`pnpm ext:publish`), not CI, so no GitHub/CI secret is
+    involved. `vsce`/`ovsx` both run `vscode:prepublish` → `build:prod`
+    (`--production`), so every packaged/published artifact embeds the string.
 
 ### IDE detection (the Cursor/fork question)
 
@@ -235,11 +265,16 @@ the funnel), not reviewer-vigilance.
 - `shared/errors.ts` — `GitErrorCode` enum, the only error detail ever sent.
 - `webview-ui/src/rpc/rpcClient.ts` — add the fire-and-forget `trackUiEvent`
   send helper used by menus/dialogs/toolbar.
-- `esbuild.config.mjs` — build-time `define` for the connection string
-  (empty in dev/watch, real value in `--production`).
+- `esbuild.config.mjs` — load the gitignored `.env` on `--production` only and
+  inject the connection string via a build-time `define`; empty string in
+  dev/watch/tests (⇒ no-op telemetry) and when `.env` is absent.
+- `.env` (new, **gitignored**) — holds `SPEEDYGIT_TELEMETRY_CONNECTION_STRING`;
+  never committed. Add the entry to `.gitignore`.
 - `package.json` — new `speedyGit.telemetry.enabled` setting; dependency on
   `@vscode/extension-telemetry` (^1.5.2). **Install manually:**
-  `pnpm add @vscode/extension-telemetry`.
+  `pnpm add @vscode/extension-telemetry`. (Publish is local via `pnpm
+  ext:publish`; `vsce`/`ovsx` both trigger `vscode:prepublish` → `build:prod`, so
+  published artifacts are always production builds that embed the string.)
 
 ## Open questions for /speckit-clarify
 
@@ -247,9 +282,10 @@ the funnel), not reviewer-vigilance.
    context-menu item + toolbar button + dialog confirm/cancel; nothing else.)
 2. Should `settingsSnapshot` fire on every activation or only when settings
    changed since last snapshot?
-3. Ship the connection string as a checked-in constant (Microsoft-sanctioned,
-   simplest) or esbuild `define` only (keeps it out of the repo, needs a CI
-   secret)?
+3. ~~How to ship the connection string?~~ **Decided:** local gitignored `.env`
+   → esbuild `define` on `--production` only → empty (no-op) in dev/tests and when
+   absent. Not confidentiality (it's extractable from the `.vsix`); the Azure daily
+   ingestion cap is the real abuse safeguard. See *The connection string* note above.
 4. Do we want a one-time, non-blocking "this extension collects anonymous
    usage data — see README, opt out here" notification on first activation?
    (Not required by policy since we honor the global setting, but good will.)
