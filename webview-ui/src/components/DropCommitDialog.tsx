@@ -2,6 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { buildDropCommitCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface DropCommitDialogProps {
   open: boolean;
@@ -20,8 +21,15 @@ export function DropCommitDialog({
   isPushed,
   onConfirm,
 }: DropCommitDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('dropCommit', open);
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) dialogTelemetry.cancelled();
+        onOpenChange(isOpen);
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
         <Dialog.Content
@@ -51,7 +59,10 @@ export function DropCommitDialog({
             </Dialog.Close>
             <button
               type="button"
-              onClick={onConfirm}
+              onClick={() => {
+                dialogTelemetry.confirmed();
+                onConfirm();
+              }}
               className="rounded bg-[var(--vscode-errorForeground)] px-3 py-1.5 text-sm text-white hover:opacity-90"
             >
               Drop Commit

@@ -3,6 +3,7 @@ import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { buildPushTagCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface PushTagDialogProps {
   open: boolean;
@@ -15,6 +16,7 @@ interface PushTagDialogProps {
 /** Standalone "Push Tag" dialog with an opt-in Force toggle (default off) for
  *  overwriting a tag that diverged on the remote (048-tag-enhancements US4). */
 export function PushTagDialog({ open, tagName, remote, onConfirm, onCancel }: PushTagDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('pushTag', open);
   const [force, setForce] = useState(false);
 
   const commandPreview = useMemo(
@@ -23,11 +25,13 @@ export function PushTagDialog({ open, tagName, remote, onConfirm, onCancel }: Pu
   );
 
   const handleConfirm = () => {
+    dialogTelemetry.confirmed();
     onConfirm(force);
     setForce(false);
   };
 
   const handleCancel = () => {
+    dialogTelemetry.cancelled();
     setForce(false);
     onCancel();
   };

@@ -10,6 +10,7 @@ import { deriveRefNameField } from '../utils/refNameField';
 import { CommandPreview } from './CommandPreview';
 import { FieldError } from './FieldError';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface TagCreationDialogProps {
   open: boolean;
@@ -18,6 +19,7 @@ interface TagCreationDialogProps {
 }
 
 export function TagCreationDialog({ open, commit, onClose }: TagCreationDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('createTag', open);
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [push, setPush] = useState(true);
@@ -41,6 +43,7 @@ export function TagCreationDialog({ open, commit, onClose }: TagCreationDialogPr
     if (!canCreate) {
       return;
     }
+    dialogTelemetry.confirmed();
     const pushOption = hasRemote && push ? { remote, force } : undefined;
     rpcClient.createTag(trimmedName, commit.hash, message.trim() || undefined, pushOption);
     resetState();
@@ -49,6 +52,7 @@ export function TagCreationDialog({ open, commit, onClose }: TagCreationDialogPr
 
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
+      dialogTelemetry.cancelled();
       resetState();
       onClose();
     }

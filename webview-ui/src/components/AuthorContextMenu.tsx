@@ -1,6 +1,7 @@
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
+import { trackUiInteraction } from '../utils/telemetry';
 import { menuItemClass } from './menuStyles';
 
 interface AuthorContextMenuProps {
@@ -53,7 +54,7 @@ function AuthorFilterMenuItems({ authorEmail }: { authorEmail: string }) {
   };
 
   return (
-    <ContextMenu.Item className={menuItemClass} onSelect={handleToggle}>
+    <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('authorMenu', 'toggleAuthorFilter'); handleToggle(); }}>
       {isFiltered ? 'Remove Author from filter' : 'Add Author to filter'}
     </ContextMenu.Item>
   );

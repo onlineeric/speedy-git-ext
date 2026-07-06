@@ -107,6 +107,7 @@ export function WorktreeWidget() {
         onCancel={() => setPruneOpen(false)}
         title="Prune Worktrees"
         description={pruneDescription}
+        telemetryId="pruneWorktree"
         confirmLabel="Prune"
         variant="warning"
         commandPreview={buildPruneWorktreeCommand()}

@@ -26,6 +26,7 @@ export function DiscardDialog({ open, onOpenChange, file, onConfirm }: DiscardDi
       open={open}
       onConfirm={onConfirm}
       onCancel={() => onOpenChange(false)}
+      telemetryId="discard"
       title="Discard Changes"
       description={description}
       confirmLabel="Discard"

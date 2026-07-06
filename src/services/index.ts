@@ -11,3 +11,5 @@ export { GitRevertService } from './GitRevertService.js';
 export { GitRebaseService } from './GitRebaseService.js';
 export { GitSignatureService } from './GitSignatureService.js';
 export { GitSubmoduleService } from './GitSubmoduleService.js';
+export { createTelemetryService } from './TelemetryService.js';
+export type { TelemetryService, SettingsSnapshotProperties } from './TelemetryService.js';

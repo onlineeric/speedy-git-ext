@@ -27,8 +27,18 @@ import {
   setCommitTableColumnPreferredWidth,
   setCommitTableColumnVisibility,
 } from '../utils/commitTableLayout';
+import { trackUiInteraction } from '../utils/telemetry';
 import { ColumnsIcon } from './icons';
 import { ToolbarIconButton, RemoteButtonToggleItem } from './ToolbarIconButton';
+
+/** Column show/hide telemetry actions per optional column (049-usage-telemetry). */
+const COLUMN_VISIBILITY_ACTIONS = {
+  hash: { show: 'columnShowHash', hide: 'columnHideHash' },
+  message: { show: 'columnShowMessage', hide: 'columnHideMessage' },
+  author: { show: 'columnShowAuthor', hide: 'columnHideAuthor' },
+  date: { show: 'columnShowDate', hide: 'columnHideDate' },
+  signature: { show: 'columnShowSignature', hide: 'columnHideSignature' },
+} as const;
 
 const COLUMN_LABELS: Record<CommitTableColumnId, string> = {
   graph: 'Graph',
@@ -60,6 +70,9 @@ export function CommitListSettingsPopover() {
   );
 
   const handleVisibilityChange = (columnId: CommitTableColumnId, visible: boolean) => {
+    if (columnId !== 'graph') {
+      trackUiInteraction('columnHeader', COLUMN_VISIBILITY_ACTIONS[columnId][visible ? 'show' : 'hide']);
+    }
     const nextLayout = setCommitTableColumnVisibility(commitTableLayout, columnId, visible);
     setCommitTableLayout(nextLayout);
     rpcClient.persistUIState({ commitTableLayout: nextLayout });
@@ -106,6 +119,7 @@ export function CommitListSettingsPopover() {
         <ToolbarIconButton
           label="View"
           icon={<ColumnsIcon className="h-6 w-6" />}
+          onClick={() => trackUiInteraction('toolbar', 'view')}
           className={triggerColor}
           title="Commit list settings"
           aria-label="Commit list settings"

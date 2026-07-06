@@ -5,6 +5,7 @@ import { useGraphStore } from '../stores/graphStore';
 import { buildCherryPickCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface CherryPickDialogProps {
   open: boolean;
@@ -14,6 +15,11 @@ interface CherryPickDialogProps {
 }
 
 export function CherryPickDialog({ open, commits, onConfirm, onCancel }: CherryPickDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('cherryPick', open);
+  const handleCancel = () => {
+    dialogTelemetry.cancelled();
+    onCancel();
+  };
   const setCherryPickOptions = useGraphStore((s) => s.setCherryPickOptions);
   const mergedCommits = useGraphStore((s) => s.mergedCommits);
   const cherryPickOptions = useGraphStore((s) => s.cherryPickOptions);
@@ -36,6 +42,7 @@ export function CherryPickDialog({ open, commits, onConfirm, onCancel }: CherryP
   }, [open, cherryPickOptions]);
 
   const handleConfirm = () => {
+    dialogTelemetry.confirmed();
     const options: CherryPickOptions = {
       appendSourceRef,
       noCommit,
@@ -51,7 +58,7 @@ export function CherryPickDialog({ open, commits, onConfirm, onCancel }: CherryP
       : `${commits.length} commits`;
 
   return (
-    <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
+    <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && handleCancel()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <Dialog.Content
@@ -143,7 +150,7 @@ export function CherryPickDialog({ open, commits, onConfirm, onCancel }: CherryP
           <div className="flex justify-end gap-2 mt-6">
             <Dialog.Close
               className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
-              onClick={onCancel}
+              onClick={handleCancel}
             >
               Cancel
             </Dialog.Close>

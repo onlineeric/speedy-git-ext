@@ -20,6 +20,7 @@ import type { RebaseEntry, SquashGroupMessage, InteractiveRebaseConfig } from '@
 import { InteractiveRebaseRow } from './InteractiveRebaseRow';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface InteractiveRebaseDialogProps {
   open: boolean;
@@ -76,6 +77,7 @@ function validateStep1(entries: RebaseEntry[]): string | null {
 }
 
 export function InteractiveRebaseDialog({ open, baseHash, initialEntries, onClose }: InteractiveRebaseDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('interactiveRebase', open);
   const [step, setStep] = useState<Step>(1);
   const [entries, setEntries] = useState<RebaseEntry[]>(() => initialEntries);
   const [squashMessages, setSquashMessages] = useState<SquashGroupMessage[]>([]);
@@ -138,6 +140,7 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, onClos
   };
 
   const handleStart = () => {
+    dialogTelemetry.confirmed();
     const config: InteractiveRebaseConfig = { baseHash, entries, squashMessages };
     useGraphStore.getState().setLoading(true);
     rpcClient.interactiveRebase(config);
@@ -145,6 +148,7 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, onClos
   };
 
   const handleClose = () => {
+    dialogTelemetry.cancelled();
     setStep(1);
     setValidationError(null);
     setAllDropWarningShown(false);

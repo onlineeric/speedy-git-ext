@@ -7,6 +7,7 @@ import { useGraphStore } from '../stores/graphStore';
 import { worktreeLocalBranch } from '../utils/worktreeDisplay';
 import { CommandPreview } from './CommandPreview';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface RemoveWorktreeDialogProps {
   open: boolean;
@@ -55,6 +56,7 @@ function runBranchDelete(name: string, force: boolean): Promise<BranchDeleteOutc
 }
 
 export function RemoveWorktreeDialog({ open, worktree, onClose }: RemoveWorktreeDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('removeWorktree', open);
   const name = worktreeLocalBranch(worktree);
   const [force, setForce] = useState(false);
   const [alsoDeleteBranch, setAlsoDeleteBranch] = useState(false);
@@ -92,6 +94,7 @@ export function RemoveWorktreeDialog({ open, worktree, onClose }: RemoveWorktree
   }, [name, forceDeleteBranch]);
 
   const handleConfirm = useCallback(async () => {
+    dialogTelemetry.confirmed();
     setBusy(true);
     setError(null);
 
@@ -124,12 +127,13 @@ export function RemoveWorktreeDialog({ open, worktree, onClose }: RemoveWorktree
     }
 
     onClose();
-  }, [worktreeRemoved, deleteBranchStep, worktree.path, force, alsoDeleteBranch, name, onClose]);
+  }, [worktreeRemoved, deleteBranchStep, worktree.path, force, alsoDeleteBranch, name, onClose, dialogTelemetry]);
 
   const handleCancel = useCallback(() => {
+    dialogTelemetry.cancelled();
     rpcClient.clearPendingDialogAction();
     onClose();
-  }, [onClose]);
+  }, [onClose, dialogTelemetry]);
 
   return (
     <AlertDialog.Root open={open} onOpenChange={(isOpen) => !isOpen && handleCancel()}>

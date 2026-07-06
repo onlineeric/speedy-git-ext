@@ -2,6 +2,7 @@ import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
+import { trackUiInteraction } from '../utils/telemetry';
 import { menuContentClass, menuItemClass } from './menuStyles';
 
 interface ToolbarIconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -54,7 +55,10 @@ export const ToolbarIconButton = forwardRef<HTMLButtonElement, ToolbarIconButton
           <ContextMenu.Content className={`min-w-[140px] ${menuContentClass}`}>
             <ContextMenu.Item
               className={menuItemClass}
-              onSelect={() => rpcClient.setToolbarSetting('showLabels', !showLabels)}
+              onSelect={() => {
+                trackUiInteraction('toolbarContextMenu', 'toggleLabels');
+                rpcClient.setToolbarSetting('showLabels', !showLabels);
+              }}
             >
               {showLabels ? 'Hide Labels' : 'Show Labels'}
             </ContextMenu.Item>
@@ -77,7 +81,10 @@ export function RemoteButtonToggleItem() {
   return (
     <ContextMenu.Item
       className={menuItemClass}
-      onSelect={() => rpcClient.setToolbarSetting('showRemoteButton', !showRemoteButton)}
+      onSelect={() => {
+        trackUiInteraction('toolbarContextMenu', 'toggleRemoteButton');
+        rpcClient.setToolbarSetting('showRemoteButton', !showRemoteButton);
+      }}
     >
       {showRemoteButton ? 'Hide Remote Button' : 'Show Remote Button'}
     </ContextMenu.Item>

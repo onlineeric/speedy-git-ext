@@ -1,6 +1,7 @@
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
+import { trackUiInteraction } from '../utils/telemetry';
 import { menuItemClass } from './menuStyles';
 
 interface DateContextMenuProps {
@@ -59,10 +60,10 @@ function DateFilterMenuItems({ authorDate }: { authorDate: number }) {
 
   return (
     <>
-      <ContextMenu.Item className={menuItemClass} onSelect={handleFilterFrom}>
+      <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('dateMenu', 'filterFromDate'); handleFilterFrom(); }}>
         Filter from this date
       </ContextMenu.Item>
-      <ContextMenu.Item className={menuItemClass} onSelect={handleFilterTo}>
+      <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('dateMenu', 'filterToDate'); handleFilterTo(); }}>
         Filter to this date
       </ContextMenu.Item>
     </>

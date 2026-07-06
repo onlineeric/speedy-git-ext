@@ -5,6 +5,7 @@ import { GitServiceRegistry } from '../webview/GitServiceRegistry.js';
 import { PersistedUIStateStore } from '../webview/PersistedUIStateStore.js';
 import { RepoDataLoader, computeCommitFingerprint } from '../webview/RepoDataLoader.js';
 import { WebviewRuntime } from '../webview/WebviewRuntime.js';
+import { createTelemetryStub } from './telemetryTestStub.js';
 
 vi.mock('vscode', () => ({
   Uri: {
@@ -73,6 +74,7 @@ function createLoaderFixture(options: {
     },
     gitSubmoduleService: { getSubmodules: vi.fn().mockResolvedValue({ success: true, value: [] }) },
   } as never);
+  const telemetry = createTelemetryStub();
   const uiStateStore = new PersistedUIStateStore({
     globalState: {
       get: vi.fn(),
@@ -88,9 +90,10 @@ function createLoaderFixture(options: {
     getSettings: () => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }),
     getBatchSize: () => 500,
     getSubmoduleHandlers: () => undefined,
+    telemetry,
   });
 
-  return { dataLoader, runtime, services, postMessage, gitLogService };
+  return { dataLoader, runtime, services, postMessage, gitLogService, telemetry };
 }
 
 describe('RepoDataLoader', () => {

@@ -84,6 +84,20 @@ Open Speedy Git from the Source Control panel:
 Open Speedy Git from the status bar:
 ![Speedy Git Status Bar](resources/status-bar-screenshot.png)
 
+## Telemetry
+
+Speedy Git collects **anonymous, aggregate-only usage statistics** (feature
+usage counts, standardized error codes, performance timings) to guide
+development — never repository names, branch names, file paths, commit
+content, or anything you type. Collection honors VS Code's global
+`telemetry.telemetryLevel` **and** the extension's own
+`speedyGit.telemetry.enabled` setting (default on): turning either off stops
+all collection, with no restart needed. A dedicated "Speedy Git Telemetry"
+output channel logs every sent event for full transparency.
+
+See [docs/telemetry.md](docs/telemetry.md) for the complete list of what is
+and is not collected and how to opt out.
+
 ## Issues, Feature Requests & Feedback
 
 - Issues and feature requests: [GitHub Issues](https://github.com/onlineeric/speedy-git-ext/issues)

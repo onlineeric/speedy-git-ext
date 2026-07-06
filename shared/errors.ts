@@ -32,18 +32,26 @@ export class GitError extends Error {
   }
 }
 
-export type GitErrorCode =
-  | 'NOT_A_REPOSITORY'
-  | 'COMMAND_FAILED'
-  | 'BRANCH_NOT_FULLY_MERGED'
-  | 'PARSE_ERROR'
-  | 'VALIDATION_ERROR'
-  | 'TIMEOUT'
-  | 'CHERRY_PICK_CONFLICT'
-  | 'REVERT_CONFLICT'
-  | 'REVERT_CONFLICT_NO_RECOVERY'
-  | 'REVERT_IN_PROGRESS'
-  | 'REBASE_CONFLICT'
-  | 'OPERATION_IN_PROGRESS'
-  | 'CANCELLED'
-  | 'UNKNOWN';
+/**
+ * Runtime list of standardized error codes. The `GitErrorCode` type is derived
+ * from it so compile-time and runtime views can never drift — telemetry
+ * validates codes against this list before transmitting (049-usage-telemetry).
+ */
+export const GIT_ERROR_CODES = [
+  'NOT_A_REPOSITORY',
+  'COMMAND_FAILED',
+  'BRANCH_NOT_FULLY_MERGED',
+  'PARSE_ERROR',
+  'VALIDATION_ERROR',
+  'TIMEOUT',
+  'CHERRY_PICK_CONFLICT',
+  'REVERT_CONFLICT',
+  'REVERT_CONFLICT_NO_RECOVERY',
+  'REVERT_IN_PROGRESS',
+  'REBASE_CONFLICT',
+  'OPERATION_IN_PROGRESS',
+  'CANCELLED',
+  'UNKNOWN',
+] as const;
+
+export type GitErrorCode = (typeof GIT_ERROR_CODES)[number];

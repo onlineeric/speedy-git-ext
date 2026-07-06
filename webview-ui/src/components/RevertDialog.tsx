@@ -5,6 +5,7 @@ import { useGraphStore } from '../stores/graphStore';
 import { buildRevertCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface RevertDialogProps {
   open: boolean;
@@ -23,6 +24,7 @@ function defaultRevertMessage(commit: Pick<Commit, 'hash' | 'subject'>): string 
 }
 
 export function RevertDialog({ open, commit, parents, onConfirm, onCancel }: RevertDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('revert', open);
   const setRevertOptions = useGraphStore((s) => s.setRevertOptions);
   const revertOptions = useGraphStore((s) => s.revertOptions);
 
@@ -106,6 +108,7 @@ export function RevertDialog({ open, commit, parents, onConfirm, onCancel }: Rev
     submitting || (isMergeCommit && mainlineParent === null) || messageEmpty;
 
   const handleConfirm = () => {
+    dialogTelemetry.confirmed();
     if (confirmDisabled) return;
     const options: RevertOptions = {
       mode,
@@ -127,7 +130,14 @@ export function RevertDialog({ open, commit, parents, onConfirm, onCancel }: Rev
   const title = isMergeCommit ? 'Revert Merge Commit' : 'Revert Commit';
 
   return (
-    <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && !submitting && onCancel()}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (isOpen || submitting) return;
+        dialogTelemetry.cancelled();
+        onCancel();
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <Dialog.Content
@@ -254,7 +264,10 @@ export function RevertDialog({ open, commit, parents, onConfirm, onCancel }: Rev
           <div className="flex justify-end gap-2 mt-6">
             <Dialog.Close
               className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={onCancel}
+              onClick={() => {
+                dialogTelemetry.cancelled();
+                onCancel();
+              }}
               disabled={submitting}
             >
               Cancel

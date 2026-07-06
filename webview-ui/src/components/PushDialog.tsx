@@ -6,6 +6,7 @@ import { rpcClient } from '../rpc/rpcClient';
 import { buildPushCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface PushDialogProps {
   open: boolean;
@@ -24,6 +25,7 @@ function getDefaultRemote(remotes: { name: string }[]): string {
 }
 
 export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('push', open);
   const remotes = useGraphStore((s) => s.remotes);
 
   const [setUpstream, setSetUpstream] = useState(true);
@@ -46,6 +48,7 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
   const noRemotes = remotes.length === 0;
 
   const handleExecute = async () => {
+    dialogTelemetry.confirmed();
     setIsPushing(true);
     try {
       await rpcClient.pushAsync(selectedRemote, branchName, setUpstream, forceMode);
@@ -59,6 +62,7 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
 
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen && !isPushing) {
+      dialogTelemetry.cancelled();
       onCancel();
     }
   };

@@ -3,6 +3,7 @@ import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { buildCheckoutCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface CheckoutWithPullDialogProps {
   open: boolean;
@@ -14,14 +15,17 @@ interface CheckoutWithPullDialogProps {
 const customDialogContentStyle = { ...dialogContentStyle, width: '38rem' };
 
 export function CheckoutWithPullDialog({ open, branchName, onConfirm, onCancel }: CheckoutWithPullDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('checkoutWithPull', open);
   const [pull, setPull] = useState(true);
 
   const handleConfirm = () => {
+    dialogTelemetry.confirmed();
     onConfirm(pull);
     setPull(true);
   };
 
   const handleCancel = () => {
+    dialogTelemetry.cancelled();
     setPull(true);
     onCancel();
   };

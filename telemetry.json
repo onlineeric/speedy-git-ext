@@ -1,0 +1,52 @@
+{
+  "events": {
+    "activate": {
+      "hasMultiRoot": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "'true' | 'false' — whether the workspace has multiple root folders." },
+      "activationMs": { "classification": "SystemMetaData", "purpose": "PerformanceAndHealth", "isMeasurement": true, "comment": "Extension activation duration in milliseconds." },
+      "repoCount": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "isMeasurement": true, "comment": "Number of git repositories discovered in the workspace." }
+    },
+    "panelOpened": {
+      "trigger": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "'command' | 'scmButton' — how the graph panel was opened." }
+    },
+    "operation": {
+      "operation": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "Operation identifier from the closed allowlist in shared/telemetry.ts (e.g. mergeBranch, checkoutBranch)." },
+      "outcome": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "'success' | 'error'." },
+      "errorCode": { "classification": "SystemMetaData", "purpose": "PerformanceAndHealth", "comment": "Standardized GitErrorCode enum value; present only on error outcome. Never raw error text." },
+      "durationMs": { "classification": "SystemMetaData", "purpose": "PerformanceAndHealth", "isMeasurement": true, "comment": "Operation duration in milliseconds." }
+    },
+    "uiInteraction": {
+      "surface": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "UI surface id from the closed catalog (e.g. commitMenu, toolbar)." },
+      "action": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "Action id from the closed catalog (e.g. cherryPick, copyHash)." }
+    },
+    "dialogOutcome": {
+      "dialog": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "Dialog id from the closed catalog (e.g. merge, createTag)." },
+      "outcome": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "'confirmed' | 'cancelled'. Never any values typed into the dialog." }
+    },
+    "settingsSnapshot": {
+      "dateFormat": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "Configured date format option (enum)." },
+      "avatarsEnabled": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "'true' | 'false'." },
+      "showTags": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "'true' | 'false'." },
+      "showRemoteBranches": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "'true' | 'false'." },
+      "toolbarShowLabels": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "'true' | 'false'." },
+      "toolbarShowRemoteButton": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "'true' | 'false'." },
+      "statusBarText": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "'icon' | 'iconAndText'." },
+      "signatureColumnVisible": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "'true' | 'false'; omitted when unavailable." },
+      "batchCommitSize": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "isMeasurement": true, "comment": "Configured commit batch size." },
+      "overScan": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "isMeasurement": true, "comment": "Configured virtual-scroll overscan." }
+    },
+    "perf": {
+      "kind": { "classification": "SystemMetaData", "purpose": "PerformanceAndHealth", "comment": "'initialLoad' | 'topology'." },
+      "commitCountBucket": { "classification": "SystemMetaData", "purpose": "PerformanceAndHealth", "comment": "Coarse bucket ('<=500' | '501-1000' | '1001-5000' | '5001-10000' | '>10000'); exact commit counts are never sent." },
+      "durationMs": { "classification": "SystemMetaData", "purpose": "PerformanceAndHealth", "isMeasurement": true, "comment": "Measured duration in milliseconds." }
+    },
+    "error": {
+      "area": { "classification": "SystemMetaData", "purpose": "PerformanceAndHealth", "comment": "Functional area from a closed set (e.g. watcher, dataLoader, repoDiscovery)." },
+      "errorCode": { "classification": "SystemMetaData", "purpose": "PerformanceAndHealth", "comment": "Standardized GitErrorCode enum value. Never messages, stack traces, or user data." }
+    }
+  },
+  "commonProperties": {
+    "common.appName": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "Editor product name (VS Code, Cursor, …)." },
+    "common.appHost": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "Editor host kind (desktop, codespaces, …)." },
+    "common.uiKind": { "classification": "SystemMetaData", "purpose": "FeatureInsight", "comment": "'desktop' | 'web'." }
+  }
+}

@@ -8,6 +8,7 @@ import type { OperationGuard } from './OperationGuard.js';
 import type { PersistedUIStateStore } from './PersistedUIStateStore.js';
 import type { RefreshCoordinator } from './RefreshCoordinator.js';
 import type { RepoDataLoader, SubmoduleNavigationHandlers } from './RepoDataLoader.js';
+import type { TelemetryService } from '../services/TelemetryService.js';
 import type { WebviewRuntime } from './WebviewRuntime.js';
 
 export interface WebviewRequestContext {
@@ -20,6 +21,7 @@ export interface WebviewRequestContext {
   readonly editorCommands: EditorCommandService;
   readonly operationGuard: OperationGuard;
   readonly uiStateStore: PersistedUIStateStore;
+  readonly telemetry: TelemetryService;
 
   postMessage(message: ResponseMessage): void;
   getSettings(): UserSettings | undefined;

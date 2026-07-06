@@ -2,7 +2,7 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "5.4.0",
+  "version": "5.5.0",
   "publisher": "onlineeric",
   "license": "MIT",
   "repository": {
@@ -49,7 +49,9 @@
     "signed commits",
     "cursor"
   ],
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -91,6 +93,15 @@
     "configuration": {
       "title": "Speedy Git",
       "properties": {
+        "speedyGit.telemetry.enabled": {
+          "type": "boolean",
+          "default": true,
+          "tags": [
+            "telemetry",
+            "usesOnlineServices"
+          ],
+          "markdownDescription": "Allow Speedy Git to send anonymous usage statistics (feature usage counts, error codes, performance timings — never repository names, branch names, file paths, or anything you type). **Note:** anonymous usage statistics are sent only when this setting and VS Code's global `#telemetry.telemetryLevel#` setting are both enabled — turning either off stops all collection. See [what we collect](https://github.com/onlineeric/speedy-git-ext/blob/main/docs/telemetry.md)."
+        },
         "speedyGit.batchCommitSize": {
           "type": "number",
           "default": 500,
@@ -99,7 +110,10 @@
         },
         "speedyGit.statusBarText": {
           "type": "string",
-          "enum": ["iconAndText", "icon"],
+          "enum": [
+            "iconAndText",
+            "icon"
+          ],
           "enumItemLabels": [
             "Icon + text",
             "Icon only"
@@ -116,12 +130,29 @@
           "items": {
             "type": "string"
           },
-          "default": ["#F44336", "#2196F3", "#4CAF50", "#FF9800", "#9C27B0", "#00BCD4", "#FF5722", "#8BC34A", "#3F51B5", "#FFEB3B"],
+          "default": [
+            "#F44336",
+            "#2196F3",
+            "#4CAF50",
+            "#FF9800",
+            "#9C27B0",
+            "#00BCD4",
+            "#FF5722",
+            "#8BC34A",
+            "#3F51B5",
+            "#FFEB3B"
+          ],
           "markdownDescription": "Array of hex color strings used for graph branch lines. Colors cycle in order."
         },
         "speedyGit.dateFormat": {
           "type": "string",
-          "enum": ["relative", "absolute", "absolute-date", "system", "custom"],
+          "enum": [
+            "relative",
+            "absolute",
+            "absolute-date",
+            "system",
+            "custom"
+          ],
           "enumDescriptions": [
             "Short relative time (e.g. \"3h ago\")",
             "YYYY-MM-DD HH:mm (e.g. 2026-05-18 14:32)",
@@ -212,5 +243,8 @@
     "typescript-eslint": "^8.55.0",
     "vitest": "^4.0.18"
   },
-  "packageManager": "pnpm@10.28.2"
+  "packageManager": "pnpm@10.28.2",
+  "dependencies": {
+    "@vscode/extension-telemetry": "^1.5.2"
+  }
 }

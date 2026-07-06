@@ -3,6 +3,7 @@ import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { buildDeleteBranchCommand, buildDeleteBranchWithRemoteCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface DeleteBranchDialogProps {
   open: boolean;
@@ -23,6 +24,7 @@ export function DeleteBranchDialog({
   onConfirm,
   onCancel,
 }: DeleteBranchDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('deleteBranch', open);
   const [deleteRemote, setDeleteRemote] = useState(initialDeleteRemote);
 
   const commandPreview = useMemo(() => {
@@ -44,11 +46,13 @@ export function DeleteBranchDialog({
   const confirmLabel = force ? 'Force Delete' : 'Delete';
 
   const handleConfirm = () => {
+    dialogTelemetry.confirmed();
     onConfirm(deleteRemote && remoteBranch ? remoteBranch : undefined);
     setDeleteRemote(false);
   };
 
   const handleCancel = () => {
+    dialogTelemetry.cancelled();
     setDeleteRemote(false);
     onCancel();
   };

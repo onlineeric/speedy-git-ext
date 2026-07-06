@@ -2,8 +2,10 @@ import * as vscode from 'vscode';
 import type { InitialDataPayload, ResponseMessage } from '../../shared/messages.js';
 import type { Commit, GraphFilters, TagMetadata, UncommittedSummary, UserSettings } from '../../shared/types.js';
 import { DEFAULT_USER_SETTINGS } from '../../shared/types.js';
-import type { Result } from '../../shared/errors.js';
+import { GitError, type GitErrorCode, type Result } from '../../shared/errors.js';
+import { toCommitCountBucket } from '../../shared/telemetry.js';
 import { GitHubAvatarService } from '../services/GitHubAvatarService.js';
+import type { TelemetryService } from '../services/TelemetryService.js';
 import type { GitServiceRegistry } from './GitServiceRegistry.js';
 import type { PersistedUIStateStore } from './PersistedUIStateStore.js';
 import type { WebviewRuntime } from './WebviewRuntime.js';
@@ -23,6 +25,7 @@ export interface RepoDataLoaderDependencies {
   readonly getSettings: () => UserSettings | undefined;
   readonly getBatchSize: () => number;
   readonly getSubmoduleHandlers: () => SubmoduleNavigationHandlers | undefined;
+  readonly telemetry: TelemetryService;
 }
 
 function emptyUncommittedSummary(): UncommittedSummary {
@@ -40,10 +43,12 @@ function unwrapSettledResult<T>(
   settled: PromiseSettledResult<Result<T>>,
   label: string,
   errors: string[],
+  onError?: (code: GitErrorCode) => void,
 ): T | undefined {
   if (settled.status === 'rejected') {
     const reason = String(settled.reason);
     if (reason) errors.push(`${label}: ${reason}`);
+    onError?.(settled.reason instanceof GitError ? settled.reason.code : 'UNKNOWN');
     return undefined;
   }
   if (settled.value.success) {
@@ -51,6 +56,7 @@ function unwrapSettledResult<T>(
   }
   const reason = settled.value.error.message;
   if (reason) errors.push(`${label}: ${reason}`);
+  onError?.(settled.value.error.code ?? 'UNKNOWN');
   return undefined;
 }
 
@@ -62,6 +68,8 @@ export function computeCommitFingerprint(commits: Commit[]): string {
 }
 
 export class RepoDataLoader {
+  /** One-shot: the `perf initialLoad` telemetry event fires once per session. */
+  private initialLoadPerfSent = false;
   private gitHubAvatarService: GitHubAvatarService | null = null;
   // In-flight init, so concurrent loads coalesce onto one attempt. Cleared once
   // settled; a failed attempt (null service) is retried on the next load.
@@ -127,12 +135,16 @@ export class RepoDataLoader {
     const batchSize = this.deps.getBatchSize();
     const errors: string[] = [];
     const currentServices = this.deps.services.current();
+    const loadStart = performance.now();
     const [commitsSettled, branchesSettled] = await Promise.allSettled([
       currentServices.gitLogService.getCommits({ ...effectiveFilters, maxCount: batchSize }),
       currentServices.gitLogService.getBranches(),
     ]);
 
-    const commitsValue = unwrapSettledResult(commitsSettled, 'commits', errors);
+    // Untracked-path failures (FR-014): area + standardized code only.
+    const reportLoadError = (code: GitErrorCode) => this.deps.telemetry.sendError('dataLoader', code);
+
+    const commitsValue = unwrapSettledResult(commitsSettled, 'commits', errors, reportLoadError);
     let fetchedCommits: Commit[] = [];
     let commitsForPayload: Commit[] | null = [];
     let totalLoadedWithoutFilter = 0;
@@ -152,7 +164,7 @@ export class RepoDataLoader {
       hasMore = false;
     }
 
-    const branches = unwrapSettledResult(branchesSettled, 'branches', errors) ?? [];
+    const branches = unwrapSettledResult(branchesSettled, 'branches', errors, reportLoadError) ?? [];
 
     const payload: InitialDataPayload = {
       commits: commitsForPayload,
@@ -172,6 +184,16 @@ export class RepoDataLoader {
     };
 
     this.deps.postMessage({ type: 'initialData', payload });
+
+    if (isInitialLoad && !this.initialLoadPerfSent) {
+      // Once per session (US5): duration of the first data load with the
+      // commit count expressed only as a coarse bucket (FR-013).
+      this.initialLoadPerfSent = true;
+      this.deps.telemetry.sendPerfInitialLoad(
+        performance.now() - loadStart,
+        toCommitCountBucket(fetchedCommits.length),
+      );
+    }
 
     if (isInitialLoad) {
       this.deps.postMessage({ type: 'loading', payload: { loading: false } });
@@ -210,12 +232,14 @@ export class RepoDataLoader {
     if (generation !== this.deps.runtime.fetchGeneration) return;
 
     const errors: string[] = [];
-    const uncommittedChanges = unwrapSettledResult(uncommittedSettled, 'uncommittedChanges', errors);
-    const remotes = unwrapSettledResult(remotesSettled, 'remotes', errors);
-    const worktrees = unwrapSettledResult(worktreesSettled, 'worktrees', errors);
-    const stashes = unwrapSettledResult(stashesSettled, 'stashes', errors);
-    const revertState = unwrapSettledResult(revertStateSettled, 'revertState', errors);
-    const tagMetadata = unwrapSettledResult(tagMetadataSettled, 'tagMetadata', errors);
+    // Untracked-path failures (FR-014): area + standardized code only.
+    const reportLoadError = (code: GitErrorCode) => this.deps.telemetry.sendError('dataLoader', code);
+    const uncommittedChanges = unwrapSettledResult(uncommittedSettled, 'uncommittedChanges', errors, reportLoadError);
+    const remotes = unwrapSettledResult(remotesSettled, 'remotes', errors, reportLoadError);
+    const worktrees = unwrapSettledResult(worktreesSettled, 'worktrees', errors, reportLoadError);
+    const stashes = unwrapSettledResult(stashesSettled, 'stashes', errors, reportLoadError);
+    const revertState = unwrapSettledResult(revertStateSettled, 'revertState', errors, reportLoadError);
+    const tagMetadata = unwrapSettledResult(tagMetadataSettled, 'tagMetadata', errors, reportLoadError);
 
     if (uncommittedChanges) {
       this.deps.postMessage({ type: 'uncommittedChanges', payload: uncommittedChanges });
@@ -278,6 +302,8 @@ export class RepoDataLoader {
         },
       });
     } else {
+      // Untracked-path failure (FR-014): area + standardized code only.
+      this.deps.telemetry.sendError('dataLoader', result.error.code ?? 'UNKNOWN');
       this.deps.postMessage({ type: 'error', payload: { error: result.error } });
     }
   }

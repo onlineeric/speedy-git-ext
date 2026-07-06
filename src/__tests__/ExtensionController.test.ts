@@ -1,6 +1,7 @@
 import type { LogOutputChannel } from 'vscode';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExtensionController } from '../ExtensionController.js';
+import { createTelemetryStub } from './telemetryTestStub.js';
 
 type ConfigChangeListener = (event: { affectsConfiguration: (key: string) => boolean }) => void;
 type StatusBarItemStub = {
@@ -97,7 +98,7 @@ function createController() {
     extensionUri: {},
   } as unknown as ConstructorParameters<typeof ExtensionController>[0];
 
-  return new ExtensionController(context, log);
+  return new ExtensionController(context, log, createTelemetryStub(), 0);
 }
 
 function fireConfigChange(changedKey: string) {

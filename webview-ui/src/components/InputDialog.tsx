@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
+import type { DialogId } from '@shared/telemetry';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 import { CommandPreview } from './CommandPreview';
 import { FieldError } from './FieldError';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
@@ -14,6 +16,8 @@ interface InputDialogProps {
   placeholder?: string;
   validate?: (value: string) => string | undefined;
   buildCommandPreview?: (value: string) => string;
+  /** Dialog-outcome telemetry id (049-usage-telemetry); omit to disable tracking. */
+  telemetryId?: DialogId;
 }
 
 export function InputDialog({
@@ -26,7 +30,9 @@ export function InputDialog({
   placeholder,
   validate,
   buildCommandPreview,
+  telemetryId,
 }: InputDialogProps) {
+  const dialogTelemetry = useDialogTelemetry(telemetryId, open);
   const [value, setValue] = useState(defaultValue);
 
   const trimmed = value.trim();
@@ -36,11 +42,13 @@ export function InputDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
+    dialogTelemetry.confirmed();
     onSubmit(trimmed);
   };
 
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
+      dialogTelemetry.cancelled();
       onCancel();
       setValue(defaultValue);
     }
