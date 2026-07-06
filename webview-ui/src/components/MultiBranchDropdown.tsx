@@ -1,20 +1,14 @@
 import { useCallback, useMemo } from 'react';
 import type { Branch } from '@shared/types';
 import { MultiSelectDropdown } from './MultiSelectDropdown';
+import { getBranchKey } from '../utils/branchSelection';
 
 interface MultiBranchDropdownProps {
   branches: Branch[];
   selectedBranches: string[];
   onBranchToggle: (branch: string) => void;
   onClearSelection: () => void;
-}
-
-function getBranchKey(branch: Branch): string {
-  return branch.remote ? `${branch.remote}/${branch.name}` : branch.name;
-}
-
-function getBranchSearchText(branch: Branch): string {
-  return branch.remote ? `${branch.remote}/${branch.name}` : branch.name;
+  onSelectAllLocalBranches: () => void;
 }
 
 function getBranchGroup(branch: Branch): string {
@@ -26,6 +20,7 @@ export function MultiBranchDropdown({
   selectedBranches,
   onBranchToggle,
   onClearSelection,
+  onSelectAllLocalBranches,
 }: MultiBranchDropdownProps) {
   const selectedItems = useMemo(
     () => branches.filter((b) => selectedBranches.includes(getBranchKey(b))),
@@ -95,12 +90,19 @@ export function MultiBranchDropdown({
       onToggle={handleToggle}
       onClearAll={onClearSelection}
       getKey={getBranchKey}
-      getSearchText={getBranchSearchText}
+      getSearchText={getBranchKey}
       renderItem={renderItem}
       renderTrigger={renderTrigger}
       groupBy={getBranchGroup}
       placeholder="Filter branches..."
       clearAllLabel="All Branches"
+      actions={[
+        {
+          key: 'select-all-local',
+          label: 'Select all Local Branches',
+          onAction: onSelectAllLocalBranches,
+        },
+      ]}
     />
   );
 }

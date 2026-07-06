@@ -5,6 +5,7 @@ import { RemoteManagementDialog } from './RemoteManagementDialog';
 import { RepoSelector } from './RepoSelector';
 import { SubmoduleSelector } from './SubmoduleSelector';
 import { MultiBranchDropdown } from './MultiBranchDropdown';
+import { addAllLocalBranches } from '../utils/branchSelection';
 import { CommitListSettingsPopover } from './CommitListSettingsPopover';
 import { ToolbarIconButton, RemoteButtonToggleItem } from './ToolbarIconButton';
 import {
@@ -49,20 +50,27 @@ export function ControlBar() {
     }
   }, [branches, setFilters]);
 
+  const applyBranchFilter = (newBranches: string[] | undefined) => {
+    setFilters({ branches: newBranches });
+    rpcClient.getCommits({ ...filters, branches: newBranches });
+  };
+
   const handleBranchToggle = (branch: string) => {
     const current = filters.branches ?? [];
     const next = current.includes(branch)
       ? current.filter((b) => b !== branch)
       : [...current, branch];
     // When last branch is deselected, clear to "All Branches"
-    const newBranches = next.length > 0 ? next : undefined;
-    setFilters({ branches: newBranches });
-    rpcClient.getCommits({ ...filters, branches: newBranches });
+    applyBranchFilter(next.length > 0 ? next : undefined);
   };
 
   const handleClearSelection = () => {
-    setFilters({ branches: undefined });
-    rpcClient.getCommits({ ...filters, branches: undefined });
+    applyBranchFilter(undefined);
+  };
+
+  const handleSelectAllLocalBranches = () => {
+    const next = addAllLocalBranches(filters.branches ?? [], branches);
+    if (next) applyBranchFilter(next);
   };
 
   const handleRefresh = () => {
@@ -131,6 +139,7 @@ export function ControlBar() {
         selectedBranches={filters.branches ?? []}
         onBranchToggle={handleBranchToggle}
         onClearSelection={handleClearSelection}
+        onSelectAllLocalBranches={handleSelectAllLocalBranches}
       />
 
       <ToolbarIconButton
