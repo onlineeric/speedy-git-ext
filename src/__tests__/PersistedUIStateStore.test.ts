@@ -34,15 +34,37 @@ describe('PersistedUIStateStore', () => {
     const { store } = createStore({
       'speedyGit.uiState': {
         ...DEFAULT_PERSISTED_UI_STATE,
-        commitListMode: 'classic',
+        detailsPanelPosition: 'right',
       },
       [repoLayoutKey('/repo-a')]: layout,
     });
 
     const state = store.loadPersistedUIState();
 
-    expect(state.commitListMode).toBe('classic');
+    expect(state.detailsPanelPosition).toBe('right');
     expect(state.commitTableLayout.columns.message.preferredWidth).toBe(600);
+  });
+
+  it('ignores a legacy commitListMode key persisted by versions that had the Classic view', () => {
+    const { store, extensionContext } = createStore({
+      'speedyGit.uiState': {
+        ...DEFAULT_PERSISTED_UI_STATE,
+        commitListMode: 'classic',
+      },
+    });
+
+    const state = store.loadPersistedUIState();
+
+    expect(state).not.toHaveProperty('commitListMode');
+    expect(state.version).toBe(DEFAULT_PERSISTED_UI_STATE.version);
+    expect(state.detailsPanelPosition).toBe(DEFAULT_PERSISTED_UI_STATE.detailsPanelPosition);
+
+    // The next save rewrites global state without the stale key.
+    store.savePersistedUIState({ detailsPanelPosition: 'right' });
+    expect(extensionContext.globalState.update).toHaveBeenCalledWith(
+      'speedyGit.uiState',
+      expect.not.objectContaining({ commitListMode: expect.anything() }),
+    );
   });
 
   it('saves table layout to the repo key and leaves global state layout-free', () => {
@@ -51,7 +73,7 @@ describe('PersistedUIStateStore', () => {
     layout.columns.author.preferredWidth = 220;
 
     store.savePersistedUIState({
-      commitListMode: 'classic',
+      detailsPanelPosition: 'right',
       commitTableLayout: layout,
     });
 

@@ -1,7 +1,6 @@
 import * as crypto from 'crypto';
 import * as vscode from 'vscode';
 import type {
-  CommitListMode,
   CommitTableColumnId,
   CommitTableLayout,
   PersistedUIState,
@@ -47,10 +46,6 @@ export function clonePersistedUIStateDefaults(): PersistedUIState {
     ...DEFAULT_PERSISTED_UI_STATE,
     commitTableLayout: cloneCommitTableLayout(DEFAULT_PERSISTED_UI_STATE.commitTableLayout),
   };
-}
-
-function isCommitListMode(value: unknown): value is CommitListMode {
-  return value === 'classic' || value === 'table';
 }
 
 function isCommitTableColumnId(value: unknown): value is CommitTableColumnId {
@@ -188,10 +183,6 @@ export class PersistedUIStateStore {
         typeof raw.rightPanelWidth === 'number' && isFinite(raw.rightPanelWidth) && raw.rightPanelWidth >= MIN_PANEL_SIZE
           ? raw.rightPanelWidth
           : defaults.rightPanelWidth,
-      commitListMode:
-        isCommitListMode(raw.commitListMode)
-          ? raw.commitListMode
-          : defaults.commitListMode,
       commitTableLayout: cloneCommitTableLayout(this.loadRepoTableLayout()),
     };
     return this.uiStateCache;
@@ -237,13 +228,6 @@ export class PersistedUIStateStore {
       ...(typeof partial.rightPanelWidth === 'number' && isFinite(partial.rightPanelWidth)
         ? { rightPanelWidth: Math.max(MIN_PANEL_SIZE, partial.rightPanelWidth) }
         : partial.rightPanelWidth !== undefined ? { rightPanelWidth: defaults.rightPanelWidth } : {}),
-      ...(partial.commitListMode !== undefined
-        ? {
-            commitListMode: isCommitListMode(partial.commitListMode)
-              ? partial.commitListMode
-              : defaults.commitListMode,
-          }
-        : {}),
     };
 
     if (Object.keys(globalValidated).length > 0) {

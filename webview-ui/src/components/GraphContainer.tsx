@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
-import { CommitRow } from './CommitRow';
 import { CommitTableHeader } from './CommitTableHeader';
 import { CommitTableRow } from './CommitTableRow';
 import { CherryPickConflictBanner } from './CherryPickConflictBanner';
@@ -18,7 +17,6 @@ import {
 } from '../utils/commitTableLayout';
 
 const ROW_HEIGHT = 28;
-const LANE_WIDTH = 16;
 
 interface GraphContainerProps {
   selectedCommit: string | undefined;
@@ -42,7 +40,6 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
   const filteredOutCount = useGraphStore((state) => state.filteredOutCount);
   const allCommitsCount = useGraphStore((state) => state.commits.length);
   const selectedCommits = useGraphStore((state) => state.selectedCommits);
-  const commitListMode = useGraphStore((state) => state.commitListMode);
   const commitTableLayout = useGraphStore((state) => state.commitTableLayout);
   const selectedCommitsSet = useMemo(() => new Set(selectedCommits), [selectedCommits]);
   const toggleSelectedCommit = useGraphStore((state) => state.toggleSelectedCommit);
@@ -63,7 +60,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
     [hoveredCommitHash, commits]
   );
 
-  // Stable callback refs to avoid breaking CommitRow memoization
+  // Stable callback refs to avoid breaking CommitTableRow memoization
   const stableOnNodeMouseEnter = useCallback(
     (hash: string, rect: DOMRect) => onNodeMouseEnter(hash, rect),
     [onNodeMouseEnter]
@@ -111,8 +108,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
 
   // Signature history column (047): viewport-first presence + verify scheduling,
   // active only while the column is visible (FR-013/016).
-  const signatureColumnVisible =
-    commitListMode === 'table' && commitTableLayout.columns.signature.visible;
+  const signatureColumnVisible = commitTableLayout.columns.signature.visible;
   useSignatureColumnLoader({
     enabled: signatureColumnVisible,
     commits,
@@ -248,7 +244,6 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
     onSelectCommit(hash);
   };
 
-  const graphWidth = Math.max(LANE_WIDTH * (topology.maxLanes + 1), 40);
   const resolvedTableLayout = useMemo(
     () =>
       resolveCommitTableLayout({
@@ -257,7 +252,6 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
       }),
     [commitTableLayout, containerWidth]
   );
-  const tableMode = commitListMode === 'table';
 
   const filters = useGraphStore((state) => state.filters);
   const loading = useGraphStore((state) => state.loading);
@@ -298,21 +292,19 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
         </div>
       ) : (
         <>
-          {tableMode && (
-            <div className="overflow-hidden bg-[var(--vscode-editor-background)]">
-              <CommitTableHeader layout={resolvedTableLayout} />
-            </div>
-          )}
+          <div className="overflow-hidden bg-[var(--vscode-editor-background)]">
+            <CommitTableHeader layout={resolvedTableLayout} />
+          </div>
           <div
             ref={containerRef}
-            className={`flex-1 bg-[var(--vscode-list-background)] ${tableMode ? 'overflow-y-auto overflow-x-hidden' : 'overflow-auto'}`}
+            className="flex-1 bg-[var(--vscode-list-background)] overflow-y-auto overflow-x-hidden"
           >
             <div
-              className={`relative ${tableMode ? '' : 'w-full'}`}
+              className="relative"
               style={{
                 height: totalSize,
-                width: tableMode ? resolvedTableLayout.tableWidth : undefined,
-                minWidth: tableMode ? resolvedTableLayout.minimumTableWidth : undefined,
+                width: resolvedTableLayout.tableWidth,
+                minWidth: resolvedTableLayout.minimumTableWidth,
               }}
             >
               {virtualItems.map((virtualItem) => {
@@ -326,44 +318,20 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
                   position: 'absolute' as const,
                   top: 0,
                   left: 0,
-                  width: tableMode ? resolvedTableLayout.tableWidth : '100%',
+                  width: resolvedTableLayout.tableWidth,
                   height: ROW_HEIGHT,
                   transform: `translateY(${virtualItem.start}px)`,
                 };
 
-                if (tableMode) {
-                  return (
-                    <CommitTableRow
-                      key={commit.hash}
-                      commit={commit}
-                      commits={commits}
-                      index={virtualItem.index}
-                      topology={topology}
-                      rowHeight={ROW_HEIGHT}
-                      layout={resolvedTableLayout}
-                      maxVisibleRefs={maxVisibleRefs}
-                      userSettings={userSettings}
-                      isSelected={isSelected}
-                      isMultiSelected={isMultiSelected}
-                      isSearchMatch={isSearchMatch}
-                      isCurrentSearchMatch={isCurrentSearchMatch}
-                      onClick={(event) => handleCommitClick(commit.hash, virtualItem.index, event)}
-                      onNodeMouseEnter={stableOnNodeMouseEnter}
-                      onNodeMouseLeave={stableOnNodeMouseLeave}
-                      style={rowStyle}
-                    />
-                  );
-                }
-
                 return (
-                  <CommitRow
+                  <CommitTableRow
                     key={commit.hash}
                     commit={commit}
                     commits={commits}
                     index={virtualItem.index}
                     topology={topology}
-                    graphWidth={graphWidth}
                     rowHeight={ROW_HEIGHT}
+                    layout={resolvedTableLayout}
                     maxVisibleRefs={maxVisibleRefs}
                     userSettings={userSettings}
                     isSelected={isSelected}
