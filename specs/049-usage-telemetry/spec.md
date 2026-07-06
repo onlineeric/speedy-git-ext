@@ -13,6 +13,15 @@ Speedy Git currently ships with zero visibility into real-world usage. The maint
 2. **Zero performance impact** — collection must never affect how the extension performs or feels; everything is fire-and-forget and off the critical path.
 3. **Invisible to the user** — completely silent. No notifications, prompts, or consent dialogs, ever. The user's existing editor-wide telemetry preference is honored automatically; transparency is provided passively through written disclosure.
 
+## Clarifications
+
+### Session 2026-07-06
+
+- Q: Which UI interactions make the first-cut tracking allowlist? → A: All context-menu items + all toolbar buttons + dialog confirm/cancel + panel toggles + column show/hide; nothing else.
+- Q: What is the scope of the standalone `error` event, given tracked operations already report `outcome: error` + error code? → A: Standalone `error` events cover only failures outside tracked operations (background fetches, watcher errors, internal service errors); tracked-operation failures are reported solely via the `operation` event — each failure counted exactly once.
+- Q: What telemetry visibility appears in the Output log? → A: A dedicated telemetry output channel logs every sent event (name + properties) plus one status line at activation stating whether telemetry is enabled/disabled and why. Silent unless the user opens the Output panel.
+- Q: Should the settings snapshot fire on every activation or only when settings changed? → A: Every session — one snapshot at each activation (stateless, directly queryable per period).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Feature Usage Visibility (Priority: P1)
@@ -117,12 +126,13 @@ As the extension maintainer, I can see an anonymous snapshot of which extension 
 - **FR-006**: The privacy contract in FR-005 MUST be enforced structurally: event names and property values are drawn from closed, typed catalogs (no free-form strings accepted), and every event passes through a single collection funnel that re-validates incoming reports against the catalog before recording.
 - **FR-007**: All collection MUST be fire-and-forget: no user-facing flow, rendering path, request handler, or activation sequence may wait on telemetry work, and no instrumentation may be added to hot paths (scroll, hover, keystroke, auto-refresh).
 - **FR-008**: The system MUST be completely silent: no notifications, dialogs, prompts, consent requests, or status-bar messages related to telemetry, ever. Diagnostic output to the extension's output log is the only permitted visibility.
+- **FR-008a**: The system MUST provide a dedicated telemetry output channel that logs every sent event (event name + properties) and one status line at activation stating whether telemetry is enabled or disabled and why (e.g., global setting off, extension setting off, no destination configured). This channel serves as live passive transparency and never draws attention to itself (no auto-show, no badges).
 - **FR-009**: All outbound telemetry MUST leave from the extension's backend process through the single funnel; the UI layer MUST NOT communicate with any external collection service directly (its content-security policy stays fully strict).
 - **FR-010**: The UI layer MUST report its interactions (tracked menu items, toolbar buttons, dialog confirm/cancel, panel toggles, column visibility changes) to the backend via a one-way, fire-and-forget message that never blocks the UI and expects no response.
 - **FR-011**: Each event MUST carry environment context sufficient to answer distribution questions: editor product name, host kind, UI kind, OS/platform, editor version, extension name and version, and an anonymized random machine identifier for distinct-user counting.
 - **FR-012**: The system MUST record, per session: one activation event (with activation duration and repository count), one settings snapshot (option choices from closed sets plus numeric values), and sampled performance events (initial load and graph computation durations with repository-size buckets).
 - **FR-013**: Numeric values that could fingerprint a user via exact magnitudes (e.g., commit counts) MUST be reported as coarse buckets; simple counts (e.g., number of repositories) MAY be exact.
-- **FR-014**: Error events MUST identify only the functional area and the standardized error code — never messages, stack traces, or any content derived from user data.
+- **FR-014**: Error events MUST identify only the functional area and the standardized error code — never messages, stack traces, or any content derived from user data. Standalone error events cover only failures occurring outside tracked operations (background fetches, watcher errors, internal service errors); failures of tracked operations are reported solely via the operation event's error outcome, so each failure is counted exactly once.
 - **FR-015**: Development builds, test runs, debug sessions, and any build lacking a collection destination MUST behave as an inert no-op: zero overhead, zero transmission, no errors, and no null-handling burden at call sites.
 - **FR-016**: Telemetry failures of any kind (network, backend, internal) MUST be swallowed silently and MUST NOT affect any user operation.
 - **FR-017**: Pending events MUST be flushed when the extension shuts down, without noticeably delaying deactivation.
@@ -151,8 +161,8 @@ As the extension maintainer, I can see an anonymous snapshot of which extension 
 ## Assumptions
 
 - **Consent baseline**: honoring the editor's existing global telemetry preference plus an extension-level opt-out (default on) with passive written disclosure is a sufficient consent model; no first-run notification will be shown. The idea document floated an optional one-time notification (open question 4), but it conflicts with the hard "invisible to the user" constraint — resolved as **no notification**.
-- **First-cut UI interaction catalog** (idea document open question 1): every context-menu item, every toolbar button, and every dialog confirm/cancel — nothing else. Panel toggles and column show/hide are included as dialog-adjacent toolbar-level interactions. Scroll, hover, keystroke, row selection, and auto-refresh are permanently excluded.
-- **Settings snapshot cadence** (idea document open question 2): once per session on activation. Simple to reason about and query; deduplicating "only when changed" adds state for negligible volume savings.
+- **First-cut UI interaction catalog** (idea document open question 1, confirmed in clarification 2026-07-06): every context-menu item, every toolbar button, every dialog confirm/cancel, panel toggles, and column show/hide — nothing else. Scroll, hover, keystroke, row selection, and auto-refresh are permanently excluded.
+- **Settings snapshot cadence** (idea document open question 2, confirmed in clarification 2026-07-06): once per session on activation. Simple to reason about and query; deduplicating "only when changed" adds state for negligible volume savings.
 - **Technical direction is pre-decided** in the idea document and validated there: the official editor telemetry module (`@vscode/extension-telemetry` ^1.5.2) with an Azure Application Insights backend, a connection string held in a local gitignored `.env` injected at production build time only, and a `TelemetryService` funnel wrapping the router's dispatch. These are planning-phase inputs, not open spec questions.
 - **Collection service provisioning** (Azure resource, dashboards, ingestion cap, starter queries) is owned by the maintainer and out of implementation scope; implementation only needs the destination value present at production build time.
 - **Publishing flow is local** (`pnpm ext:publish` runs a production build), so every published artifact embeds the destination value when the local `.env` is present; a missing value ships a telemetry-off build, which is the safe default.

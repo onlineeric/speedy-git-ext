@@ -245,5 +245,5 @@ shared/                           # Shared types between backend & frontend
 
 
 <!-- SPECKIT START -->
-No active feature plan (specs/048-tag-enhancements/ is the most recently completed feature; it is merged).
+Active feature: 049-usage-telemetry (anonymous usage statistics via @vscode/extension-telemetry). Plan: specs/049-usage-telemetry/plan.md (spec.md, research.md, data-model.md, contracts/telemetry-events.md, quickstart.md alongside).
 <!-- SPECKIT END -->
