@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import type { Commit } from '@shared/types';
-import { type GraphTopology, getPassingLanes } from '../utils/graphTopology';
+import { type GraphTopology, getPassingLanes, connectionContinuationLane } from '../utils/graphTopology';
 import { getColor, resolvePalette } from '../utils/colorUtils';
 import { curveIntoNodePath, curveOutOfNodePath } from '../utils/graphPaths';
 
@@ -155,8 +155,8 @@ export const GraphCell = memo(function GraphCell({
             </g>
           );
         } else {
-          if ((!hasMerge && !conn.isMergeProxy) || conn.reReserved) {
-            // For regular branch commits, keep child row straight and let the parent row
+          if (connectionContinuationLane(hasMerge, conn) === conn.fromLane) {
+            // Branch-style connection: keep child row straight and let the parent row
             // render the split curve via incomingConnections (matches Git Graph style).
             return (
               <g key={`parent-${idx}`}>

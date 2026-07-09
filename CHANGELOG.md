@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.4.2] - 2026-07-09
+
+### Fixed
+- **A merge commit's line no longer overlaps another branch's line on the way to their shared parent.** When a merge commit's first parent was a commit that another branch already connected to from above (e.g. the main line running straight down to it), the merge's connection bent into the parent's column immediately below the merge node and rode down that column — drawing its differently-colored line directly on top of the other branch's line for the whole span. The lane bookkeeping even reserved the merge's own column for the line, so an empty column was held open while the line was drawn in the wrong one. Such connections now stay in the merge's own column and only bend into the parent at the parent's row — the same style regular branch lines already use — so every line keeps its own column and no two different-colored lines are drawn on top of each other. Merge lines to a *secondary* parent are unchanged: they still bend at the merge row and join the feature branch's own line.
+
 ## [5.4.1] - 2026-07-06
 
 ### Added
