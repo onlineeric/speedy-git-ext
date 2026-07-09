@@ -5,25 +5,34 @@ import type { Commit } from '@shared/types';
  * Assigns lanes (x-positions) and colors to commits based on branch structure.
  */
 
+export interface ParentConnection {
+  parentHash: string;
+  fromLane: number;
+  toLane: number;
+  colorIndex: number;
+  /**
+   * True when the line descends in the child's own lane (fromLane) and bends
+   * at the parent row, even though the child is a merge commit. Set when the
+   * target lane already carries another child's line down to the same parent
+   * (descending there would draw two different-colored lines on top of each
+   * other), and when reReserveParent rewrites a same-lane connection to
+   * cross-lane.
+   */
+  descendsInOwnLane?: boolean;
+  /** True when the connection spans hidden (filtered-out) commits */
+  isDotted?: boolean;
+  /** Number of hidden commits between the two visible commits */
+  hiddenCount?: number;
+  /** True when this connection is a proxy for a hidden merge commit's secondary parent */
+  isMergeProxy?: boolean;
+}
+
 export interface CommitNode {
   hash: string;
   lane: number;
   colorIndex: number;
   /** Connections to draw FROM this commit's row going DOWN to parent lanes */
-  parentConnections: {
-    parentHash: string;
-    fromLane: number;
-    toLane: number;
-    colorIndex: number;
-    /** True when reReserveParent changed this from same-lane to cross-lane */
-    reReserved?: boolean;
-    /** True when the connection spans hidden (filtered-out) commits */
-    isDotted?: boolean;
-    /** Number of hidden commits between the two visible commits */
-    hiddenCount?: number;
-    /** True when this connection is a proxy for a hidden merge commit's secondary parent */
-    isMergeProxy?: boolean;
-  }[];
+  parentConnections: ParentConnection[];
   /** Connections coming INTO this commit from ABOVE (from child commits) */
   incomingConnections: {
     fromLane: number;
@@ -42,6 +51,22 @@ export interface GraphTopology {
   passingLanesByRow: Map<number, { lane: number; colorIndex: number; isDotted?: boolean }[]>;
   /** Hash to index map for O(1) lookups */
   commitIndexByHash: Map<string, number>;
+}
+
+/**
+ * The lane a connection's vertical segment travels in between the child row
+ * and the parent row. Merge connections normally bend at the child row and
+ * ride the target lane down; branch connections (and connections flagged
+ * descendsInOwnLane) stay in their own lane and bend at the parent row.
+ */
+export function connectionContinuationLane(isMergeCommit: boolean, conn: ParentConnection): number {
+  if (conn.fromLane === conn.toLane) {
+    return conn.toLane;
+  }
+  if ((isMergeCommit || conn.isMergeProxy) && !conn.descendsInOwnLane) {
+    return conn.toLane;
+  }
+  return conn.fromLane;
 }
 
 /**
@@ -221,15 +246,19 @@ export function calculateTopology(commits: Commit[], hiddenHashes?: Set<string>,
               // reReserveParent freed existingLane but the rewritten connection still passes through it
               markBusyLane(busyLanes, existingLane, parentRow);
             } else {
-              // Already reserved on lower lane, connect to that lane
+              // Already reserved on lower lane, connect to that lane.
+              // The reserving child's line already descends that lane to the
+              // same parent, so this line must stay in its own lane and bend
+              // at the parent row to avoid drawing on top of it.
               const childColor = colorIndex;
               parentConnections.push({
                 parentHash,
                 fromLane: assignedLane,
                 toLane: existingLane,
                 colorIndex: childColor,
+                descendsInOwnLane: true,
               });
-              // Connection line passes through assignedLane until the merge's continuation reaches toLane
+              // Connection line passes through assignedLane until it bends into toLane at the parent row
               markBusyLane(busyLanes, assignedLane, parentRow);
             }
           } else {
@@ -492,16 +521,9 @@ function buildIncomingConnections(
       const parentNode = nodes.get(conn.parentHash);
       if (!parentNode) continue;
 
-      let incomingLane: number;
-      if (conn.fromLane === conn.toLane) {
-        incomingLane = conn.toLane;
-      } else if ((isMergeCommit || conn.isMergeProxy) && !conn.reReserved) {
-        // Merge rows already bend onto toLane on the child row.
-        incomingLane = conn.toLane;
-      } else {
-        // Regular branch rows bend on the parent row.
-        incomingLane = conn.fromLane;
-      }
+      // Merge connections already bend onto toLane on the child row;
+      // branch-style connections bend on the parent row, arriving from fromLane.
+      const incomingLane = connectionContinuationLane(isMergeCommit, conn);
 
       addIncomingConnection(incomingByHash, conn.parentHash, incomingLane, conn.colorIndex, conn.isDotted);
       if (incomingLane === parentNode.lane) {
@@ -560,12 +582,7 @@ function computePassingLanes(
       for (const conn of node.parentConnections) {
         const parentIndex = commitIndexByHash.get(conn.parentHash);
         if (parentIndex !== undefined && parentIndex > i) {
-          const continuationLane =
-            conn.fromLane === conn.toLane
-              ? conn.toLane
-              : ((isMergeCommit || conn.isMergeProxy) && !conn.reReserved)
-              ? conn.toLane
-              : conn.fromLane;
+          const continuationLane = connectionContinuationLane(isMergeCommit, conn);
 
           const laneConnections = activeConnections.get(continuationLane) || [];
           laneConnections.push({ colorIndex: conn.colorIndex, endRowIndex: parentIndex, isDotted: conn.isDotted });
@@ -615,7 +632,7 @@ function reReserveParent(
       for (const conn of previousNode.parentConnections) {
         if (conn.parentHash === parentHash && conn.toLane === oldLane) {
           conn.toLane = newLane;
-          conn.reReserved = true;
+          conn.descendsInOwnLane = true;
           break;
         }
       }
