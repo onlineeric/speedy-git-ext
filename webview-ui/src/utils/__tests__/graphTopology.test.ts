@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Commit, RefInfo } from '@shared/types';
-import { calculateTopology } from '../graphTopology';
+import { calculateTopology, connectionContinuationLane } from '../graphTopology';
 
 function makeCommit(hash: string, parents: string[] = [], refs: RefInfo[] = []): Commit {
   return {
@@ -168,6 +168,89 @@ describe('calculateTopology', () => {
       expect(featBLane).not.toBe(stashLane);
       // All three should be on different lanes (or featureA/B may share if one is same as base)
       expect(featALane).not.toBe(featBLane);
+    });
+  });
+
+  describe('merge first-parent connection to an already-claimed lane', () => {
+    // Regression for the line-overlap bug (docs/issue-pic1.png):
+    // r2 → r1 → p is the main line on lane 0; r1 reserves p on lane 0.
+    // m1 is a merge with parents [p, f1]. Its first-parent line must NOT ride
+    // down lane 0 (r1's line to p already occupies it) — it stays in m1's own
+    // lane and bends into p at the parent row.
+    const buildBugTopology = () =>
+      calculateTopology([
+        makeCommit('r2', ['r1']),
+        makeCommit('r1', ['p']),
+        makeCommit('m1', ['p', 'f1']),
+        makeCommit('x', ['p']),
+        makeCommit('y', ['p']),
+        makeCommit('f1', ['p']),
+        makeCommit('p', ['root']),
+        makeCommit('w', ['root']),
+        makeCommit('root'),
+      ]);
+
+    it('flags the connection to descend in the merge own lane', () => {
+      const topo = buildBugTopology();
+      const m1 = topo.nodes.get('m1')!;
+      const pLane = topo.nodes.get('p')!.lane;
+
+      const firstParentConn = m1.parentConnections.find(c => c.parentHash === 'p')!;
+      expect(firstParentConn.toLane).toBe(pLane);
+      expect(firstParentConn.fromLane).toBe(m1.lane);
+      expect(firstParentConn.descendsInOwnLane).toBe(true);
+      expect(connectionContinuationLane(true, firstParentConn)).toBe(m1.lane);
+    });
+
+    it('routes the passing line through the merge own lane, not the claimed lane', () => {
+      const topo = buildBugTopology();
+      const m1 = topo.nodes.get('m1')!;
+
+      // Rows between m1 (row 2) and p (row 6) must show m1's line passing in
+      // m1's own lane with m1's color.
+      for (const row of [3, 4, 5]) {
+        const passing = topo.passingLanesByRow.get(row)!;
+        expect(passing).toContainEqual(
+          expect.objectContaining({ lane: m1.lane, colorIndex: m1.colorIndex })
+        );
+      }
+
+      // p receives the connection from m1's lane (bend happens on p's row)
+      const p = topo.nodes.get('p')!;
+      expect(p.incomingConnections).toContainEqual(
+        expect.objectContaining({ fromLane: m1.lane, colorIndex: m1.colorIndex })
+      );
+    });
+
+    it('never draws two different-colored lines in the same lane over the same rows', () => {
+      const topo = buildBugTopology();
+      const idx = topo.commitIndexByHash;
+
+      // Collect every connection's vertical segment (lane + row span) using
+      // the same continuation rule as the renderer.
+      const segments: { lane: number; colorIndex: number; fromRow: number; toRow: number }[] = [];
+      for (const node of topo.nodes.values()) {
+        const isMergeCommit = node.parentConnections.length > 1;
+        for (const conn of node.parentConnections) {
+          segments.push({
+            lane: connectionContinuationLane(isMergeCommit, conn),
+            colorIndex: conn.colorIndex,
+            fromRow: idx.get(node.hash)!,
+            toRow: idx.get(conn.parentHash)!,
+          });
+        }
+      }
+
+      for (let a = 0; a < segments.length; a++) {
+        for (let b = a + 1; b < segments.length; b++) {
+          const s1 = segments[a];
+          const s2 = segments[b];
+          if (s1.lane !== s2.lane || s1.colorIndex === s2.colorIndex) continue;
+          const overlapStart = Math.max(s1.fromRow, s2.fromRow);
+          const overlapEnd = Math.min(s1.toRow, s2.toRow);
+          expect(overlapStart).toBeGreaterThanOrEqual(overlapEnd);
+        }
+      }
     });
   });
 });
