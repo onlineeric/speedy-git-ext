@@ -142,7 +142,9 @@ export class RepoDataLoader {
     ]);
 
     // Untracked-path failures (FR-014): area + standardized code only.
-    const reportLoadError = (code: GitErrorCode) => this.deps.telemetry.sendError('dataLoader', code);
+    const reportLoadError = isAutoRefresh
+      ? undefined
+      : (code: GitErrorCode) => this.deps.telemetry.sendError('dataLoader', code);
 
     const commitsValue = unwrapSettledResult(commitsSettled, 'commits', errors, reportLoadError);
     let fetchedCommits: Commit[] = [];
@@ -200,10 +202,10 @@ export class RepoDataLoader {
       runtime.initialLoadSent = true;
     }
 
-    void this.sendDeferredRepoData(runtime.fetchGeneration);
+    void this.sendDeferredRepoData(runtime.fetchGeneration, !isAutoRefresh);
 
     if (!runtime.isDisplayingSubmodule) {
-      void this.sendSubmodulesData();
+      void this.sendSubmodulesData(!isAutoRefresh);
     }
 
     if ((settings ?? DEFAULT_USER_SETTINGS).avatarsEnabled !== false && fetchedCommits.length > 0) {
@@ -211,7 +213,7 @@ export class RepoDataLoader {
     }
   }
 
-  async sendDeferredRepoData(generation: number): Promise<void> {
+  async sendDeferredRepoData(generation: number, reportTelemetryErrors = true): Promise<void> {
     const services = this.deps.services.current();
     const [
       uncommittedSettled,
@@ -233,7 +235,9 @@ export class RepoDataLoader {
 
     const errors: string[] = [];
     // Untracked-path failures (FR-014): area + standardized code only.
-    const reportLoadError = (code: GitErrorCode) => this.deps.telemetry.sendError('dataLoader', code);
+    const reportLoadError = reportTelemetryErrors
+      ? (code: GitErrorCode) => this.deps.telemetry.sendError('dataLoader', code)
+      : undefined;
     const uncommittedChanges = unwrapSettledResult(uncommittedSettled, 'uncommittedChanges', errors, reportLoadError);
     const remotes = unwrapSettledResult(remotesSettled, 'remotes', errors, reportLoadError);
     const worktrees = unwrapSettledResult(worktreesSettled, 'worktrees', errors, reportLoadError);
@@ -289,7 +293,7 @@ export class RepoDataLoader {
     }
   }
 
-  async sendSubmodulesData(): Promise<void> {
+  async sendSubmodulesData(reportTelemetryErrors = true): Promise<void> {
     const generation = this.deps.runtime.fetchGeneration;
     const result = await this.deps.services.current().gitSubmoduleService.getSubmodules();
     if (generation !== this.deps.runtime.fetchGeneration) return;
@@ -303,7 +307,9 @@ export class RepoDataLoader {
       });
     } else {
       // Untracked-path failure (FR-014): area + standardized code only.
-      this.deps.telemetry.sendError('dataLoader', result.error.code ?? 'UNKNOWN');
+      if (reportTelemetryErrors) {
+        this.deps.telemetry.sendError('dataLoader', result.error.code ?? 'UNKNOWN');
+      }
       this.deps.postMessage({ type: 'error', payload: { error: result.error } });
     }
   }

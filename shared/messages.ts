@@ -28,7 +28,7 @@ export interface InitialDataPayload {
   /** Data source errors (empty if all succeeded) */
   errors: string[];
 }
-import type { GitError } from './errors.js';
+import type { GitError, GitErrorCode } from './errors.js';
 import type { UiTelemetryEvent } from './telemetry.js';
 
 export type RequestMessage =
@@ -185,11 +185,16 @@ export type ResponseMessage =
   | { type: 'checkoutNeedsStash'; payload: { name: string; pull?: boolean } }
   | { type: 'checkoutCommitNeedsStash'; payload: { hash: string } }
   | { type: 'deleteBranchNeedsForce'; payload: { name: string; deleteRemote?: { remote: string; name: string } } }
-  | { type: 'checkoutPullFailed'; payload: { branch: string; error: { message: string } } }
+  | { type: 'checkoutPullFailed'; payload: { branch: string; error: { message: string; code: GitErrorCode } } }
   | { type: 'settingsData'; payload: { settings: UserSettings } }
   | { type: 'submodulesData'; payload: { submodules: Submodule[]; stack: SubmoduleNavEntry[] } }
   | { type: 'submoduleOperationResult'; payload: { success: boolean; error?: string } }
-  | { type: 'pushResult'; payload: { success: boolean; message: string } }
+  | {
+      type: 'pushResult';
+      payload:
+        | { success: true; message: string }
+        | { success: false; message: string; errorCode: GitErrorCode };
+    }
   | { type: 'avatarUrls'; payload: { urls: AvatarUrlMap } }
   | { type: 'tagMetadata'; payload: { metadata: Record<string, TagMetadata> } }
   | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[] } }

@@ -118,7 +118,8 @@ class ReporterTelemetryService implements TelemetryService {
     this.channel = createStatusChannel(this.describeGateStatus());
 
     // Re-log the status line whenever either consent gate changes (FR-008a).
-    // The global level is enforced inside the reporter; we only mirror it here.
+    // The reporter also enforces the global level, while this service checks it
+    // before sending so the transparency channel reflects eligible events only.
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration((event) => {
         if (!event.affectsConfiguration(EXTENSION_SETTING_SECTION)) return;
@@ -201,8 +202,8 @@ class ReporterTelemetryService implements TelemetryService {
 
   /**
    * The one place events leave the process. Skips when the extension setting
-   * gate is off (the global level is enforced inside the reporter), and
-   * swallows every failure — telemetry must never affect any user operation.
+   * or the global telemetry gate is off, and swallows every failure —
+   * telemetry must never affect any user operation.
    */
   private send(
     name: TelemetryEventName,
@@ -211,7 +212,7 @@ class ReporterTelemetryService implements TelemetryService {
     isErrorEvent = false,
   ): void {
     try {
-      if (!this.extensionSettingEnabled) return;
+      if (!this.extensionSettingEnabled || !vscode.env.isTelemetryEnabled) return;
       const enriched = { ...properties, ...this.commonProperties };
       if (isErrorEvent) {
         this.reporter.sendTelemetryErrorEvent(name, enriched, measurements);

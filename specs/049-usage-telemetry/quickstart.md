@@ -4,13 +4,17 @@
 
 ## One-time developer setup
 
-1. **Install the dependency** (agents must not do this):
+1. **Use Node.js 20.12 or newer for production builds and publishing.** The
+   release build loads its local `.env` with `process.loadEnvFile()`, which was
+   added in Node 20.12. The bundled extension remains targeted at Node 18.
+
+2. **Install the dependency** (agents must not do this):
 
    ```bash
    pnpm add @vscode/extension-telemetry
    ```
 
-2. **(Maintainer, for real collection only)** Create `.env` at the repo root — it is already gitignored (`.env*`):
+3. **(Maintainer, for real collection only)** Create `.env` at the repo root — it is already gitignored (`.env*`):
 
    ```bash
    SPEEDYGIT_TELEMETRY_CONNECTION_STRING=InstrumentationKey=...;IngestionEndpoint=https://...

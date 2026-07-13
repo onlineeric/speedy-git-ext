@@ -17,7 +17,13 @@ export const branchHandlers = {
     if (message.payload.pull) {
       const pullResult = await context.services.current().gitRemoteService.pull();
       if (!pullResult.success) {
-        context.postMessage({ type: 'checkoutPullFailed', payload: { branch: message.payload.name, error: { message: pullResult.error.message } } });
+        context.postMessage({
+          type: 'checkoutPullFailed',
+          payload: {
+            branch: message.payload.name,
+            error: { message: pullResult.error.message, code: pullResult.error.code },
+          },
+        });
         await context.refreshCoordinator.reload();
         return;
       }
@@ -55,7 +61,13 @@ export const branchHandlers = {
     if (message.payload.pull) {
       const pullAfterStash = await context.services.current().gitRemoteService.pull();
       if (!pullAfterStash.success) {
-        context.postMessage({ type: 'checkoutPullFailed', payload: { branch: message.payload.name, error: { message: pullAfterStash.error.message } } });
+        context.postMessage({
+          type: 'checkoutPullFailed',
+          payload: {
+            branch: message.payload.name,
+            error: { message: pullAfterStash.error.message, code: pullAfterStash.error.code },
+          },
+        });
         await context.refreshCoordinator.reload();
         return;
       }

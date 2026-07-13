@@ -248,6 +248,21 @@ describe('extension setting gate (speedyGit.telemetry.enabled)', () => {
     expect(channelInfo).toHaveBeenCalledWith('telemetry disabled (reason: global setting)');
   });
 
+  it('does not send or log events while the global telemetry gate is off', () => {
+    const service = createTelemetryService(productionContext(), 'InstrumentationKey=abc');
+    globalTelemetryEnabled = false;
+    telemetryEnabledListener?.();
+    channelInfo.mockClear();
+
+    service.sendPanelOpened('command');
+    service.sendOperation('push', 'success', 1);
+    service.sendError('watcher', 'UNKNOWN');
+
+    expect(sendTelemetryEvent).not.toHaveBeenCalled();
+    expect(sendTelemetryErrorEvent).not.toHaveBeenCalled();
+    expect(channelInfo).not.toHaveBeenCalled();
+  });
+
   it('ignores unrelated configuration changes', () => {
     createTelemetryService(productionContext(), 'InstrumentationKey=abc');
     channelInfo.mockClear();

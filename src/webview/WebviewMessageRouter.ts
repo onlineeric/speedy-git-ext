@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import type { RequestMessage } from '../../shared/messages.js';
+import type { RequestMessage, ResponseMessage } from '../../shared/messages.js';
 import { GIT_ERROR_CODES, type GitErrorCode } from '../../shared/errors.js';
 import { TRACKED_OPERATIONS, type TrackedOperation } from '../../shared/telemetry.js';
 import type { WebviewRequestContext } from './WebviewRequestContext.js';
@@ -59,6 +59,21 @@ function extractGitCode(error: unknown): GitErrorCode {
   return 'UNKNOWN';
 }
 
+function classifyFailureResponse(response: ResponseMessage): GitErrorCode | undefined {
+  switch (response.type) {
+    case 'error':
+    case 'compareError':
+    case 'checkoutPullFailed':
+      return extractGitCode(response.payload.error);
+    case 'pushResult':
+      return response.payload.success
+        ? undefined
+        : extractGitCode({ code: response.payload.errorCode });
+    default:
+      return undefined;
+  }
+}
+
 export class WebviewMessageRouter {
   constructor(
     private readonly log: vscode.LogOutputChannel,
@@ -77,18 +92,20 @@ export class WebviewMessageRouter {
 
     // Operation telemetry middleware (US1): observe posted responses through a
     // per-dispatch context copy so concurrent dispatches never cross-attribute
-    // errors. Handlers post errors rather than throwing (Result pattern), so a
-    // `type: 'error'` response is the outcome signal; interim domain responses
-    // (checkoutNeedsStash, deleteBranchNeedsForce, …) still count as success.
+    // errors. Handlers post failures rather than throwing (Result pattern), so
+    // both generic and domain-specific failure responses are outcome signals.
+    // True interim responses (checkoutNeedsStash, deleteBranchNeedsForce, …)
+    // still count as success.
     const start = performance.now();
     let outcome: 'success' | 'error' = 'success';
     let errorCode: GitErrorCode | undefined;
     const trackedContext: WebviewRequestContext = {
       ...this.context,
       postMessage: (response) => {
-        if (response.type === 'error') {
+        const responseErrorCode = classifyFailureResponse(response);
+        if (responseErrorCode !== undefined) {
           outcome = 'error';
-          errorCode = extractGitCode(response.payload.error);
+          errorCode = responseErrorCode;
         }
         this.context.postMessage(response);
       },

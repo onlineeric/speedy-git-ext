@@ -30,6 +30,7 @@ function createTrackedTestSetup(serviceOverrides: Record<string, unknown>) {
     services,
     postMessage,
     log: {},
+    runtime: { activeCompareController: null },
     refreshCoordinator: { reload: vi.fn().mockResolvedValue(undefined) },
     telemetry: { sendOperation },
   } as never;
@@ -78,6 +79,63 @@ describe('WebviewMessageRouter operation telemetry middleware', () => {
     await router.dispatch({ type: 'applyStash', payload: { index: 0 } });
 
     expect(sendOperation).toHaveBeenCalledWith('applyStash', 'error', expect.any(Number), 'UNKNOWN');
+  });
+
+  it('reports a failed pushResult as an error with its standardized code', async () => {
+    const { router, sendOperation } = createTrackedTestSetup({
+      gitRemoteService: {
+        push: vi.fn().mockResolvedValue({
+          success: false,
+          error: { code: 'TIMEOUT', message: 'push timed out' },
+        }),
+      },
+    });
+
+    await router.dispatch({
+      type: 'push',
+      payload: { remote: 'origin', branch: 'main', setUpstream: false, forceMode: 'none' },
+    });
+
+    expect(sendOperation).toHaveBeenCalledWith('push', 'error', expect.any(Number), 'TIMEOUT');
+  });
+
+  it('reports compareError as an error with its standardized code', async () => {
+    const { router, sendOperation } = createTrackedTestSetup({
+      gitDiffService: {
+        compareRefs: vi.fn().mockResolvedValue({
+          success: false,
+          error: { code: 'COMMAND_FAILED', message: 'compare failed' },
+        }),
+      },
+    });
+
+    await router.dispatch({
+      type: 'compareRefs',
+      payload: { a: { kind: 'head' }, b: { kind: 'workingTree' }, mode: 'two-dot', requestId: 'request-1' },
+    });
+
+    expect(sendOperation).toHaveBeenCalledWith('compareRefs', 'error', expect.any(Number), 'COMMAND_FAILED');
+  });
+
+  it('reports checkoutPullFailed as an error with its standardized code', async () => {
+    const { router, sendOperation } = createTrackedTestSetup({
+      gitBranchService: {
+        checkout: vi.fn().mockResolvedValue({ success: true, value: 'checked out' }),
+      },
+      gitRemoteService: {
+        pull: vi.fn().mockResolvedValue({
+          success: false,
+          error: { code: 'COMMAND_FAILED', message: 'pull failed' },
+        }),
+      },
+    });
+
+    await router.dispatch({
+      type: 'checkoutBranch',
+      payload: { name: 'main', pull: true },
+    });
+
+    expect(sendOperation).toHaveBeenCalledWith('checkoutBranch', 'error', expect.any(Number), 'COMMAND_FAILED');
   });
 
   it('reports error UNKNOWN and rethrows when the handler throws', async () => {

@@ -69,7 +69,7 @@ dispatch(message):
     start = performance.now()
     outcome = 'success'; errorCode = undefined
     wrappedContext = { ...context, postMessage(m) {
-        if m.type === 'error':            outcome='error'; errorCode = extractGitCode(m.payload.error)
+        if m is a failure response:        outcome='error'; errorCode = extractGitCode(m)
         forward to real postMessage(m)
     }}
     try { await handler(message, wrappedContext) }
@@ -77,8 +77,9 @@ dispatch(message):
     finally { telemetry.sendOperation(message.type, outcome, now()-start, errorCode) }
 ```
 
-- `extractGitCode`: returns `payload.error.code` when it is a valid `GitErrorCode` literal, else `'UNKNOWN'`. Never reads `.message`/`.stderr`/`.command`.
-- Domain "needs-force/needs-stash" interim responses (`checkoutNeedsStash`, `deleteBranchNeedsForce`, `checkoutCommitNeedsStash`, `checkoutPullFailed`) count as `success` for the initial operation (the user gets a follow-up dialog; the follow-up RPC is tracked separately).
+- Failure responses are `error`, `compareError`, `checkoutPullFailed`, and `pushResult` when `success === false`.
+- `extractGitCode`: returns the response's standardized code when it is a valid `GitErrorCode` literal, else `'UNKNOWN'`. Never reads `.message`/`.stderr`/`.command`.
+- Domain "needs-force/needs-stash" interim responses (`checkoutNeedsStash`, `deleteBranchNeedsForce`, `checkoutCommitNeedsStash`) count as `success` for the initial operation because the user gets a follow-up dialog.
 - Concurrency-safe: wrapper state is per-dispatch (closure), not shared.
 
 ## D. Outbound event schema (Application Insights `customEvents`)
