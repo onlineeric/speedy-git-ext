@@ -137,6 +137,7 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
   }, [refInfo, branches]);
 
   const handleCheckout = () => {
+    track('checkout');
     if (checkoutState === 'dual') {
       // Local branch with remote counterpart (or remote badge with local counterpart): show pull dialog
       setCheckoutWithPullOpen(true);
@@ -150,6 +151,7 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
   };
 
   const handleCopyName = () => {
+    track('copyName');
     rpcClient.copyToClipboard(displayName);
   };
 
@@ -271,7 +273,7 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
             )}
 
             {isBranch && !isCurrentBranch && (
-              <ContextMenu.Item className={menuItemClass} onSelect={() => { track('checkout'); handleCheckout(); }}>
+              <ContextMenu.Item className={menuItemClass} onSelect={handleCheckout}>
                 Checkout {refInfo.name}
               </ContextMenu.Item>
             )}
@@ -379,7 +381,7 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
             {!isStash && (
               <>
                 <ContextMenu.Separator className={menuSeparatorClass} />
-                <ContextMenu.Item className={menuItemClass} onSelect={() => { track('copyName'); handleCopyName(); }}>
+                <ContextMenu.Item className={menuItemClass} onSelect={handleCopyName}>
                   Copy {isTag ? 'Tag' : 'Branch'} Name
                 </ContextMenu.Item>
               </>
@@ -619,6 +621,7 @@ function BranchFilterMenuItem({ refInfo, surface }: { refInfo: RefInfo; surface:
   const isFiltered = branchNames.some((name) => filters.branches?.includes(name));
 
   const handleToggle = () => {
+    trackUiInteraction(surface, 'toggleBranchFilter');
     const current = filters.branches ?? [];
     let next: string[];
     if (isFiltered) {
@@ -633,7 +636,7 @@ function BranchFilterMenuItem({ refInfo, surface }: { refInfo: RefInfo; surface:
   };
 
   return (
-    <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction(surface, 'toggleBranchFilter'); handleToggle(); }}>
+    <ContextMenu.Item className={menuItemClass} onSelect={handleToggle}>
       {isFiltered ? 'Remove branch from filter' : 'Add branch to filter'}
     </ContextMenu.Item>
   );

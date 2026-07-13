@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.5.1] - 2026-07-14
+
+### Internal
+- Expanded anonymous, aggregate-only telemetry to cover user selections in the Author, Branch, Commit, and Date context menus, so context-menu feature usage is recorded consistently. No repository or user content is collected.
+
 ## [5.5.0] - pre-release - 2026-07-13
 
 ### Added
