@@ -47,12 +47,14 @@ function DateFilterMenuItems({ authorDate }: { authorDate: number }) {
   const datePortion = toLocalDateString(authorDate);
 
   const handleFilterFrom = () => {
+    trackUiInteraction('dateMenu', 'filterFromDate');
     const afterDate = `${datePortion}T00:00:00`;
     setFilters({ afterDate });
     rpcClient.getCommits({ ...useGraphStore.getState().filters, afterDate });
   };
 
   const handleFilterTo = () => {
+    trackUiInteraction('dateMenu', 'filterToDate');
     const beforeDate = `${datePortion}T23:59:59`;
     setFilters({ beforeDate });
     rpcClient.getCommits({ ...useGraphStore.getState().filters, beforeDate });
@@ -60,10 +62,10 @@ function DateFilterMenuItems({ authorDate }: { authorDate: number }) {
 
   return (
     <>
-      <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('dateMenu', 'filterFromDate'); handleFilterFrom(); }}>
+      <ContextMenu.Item className={menuItemClass} onSelect={handleFilterFrom}>
         Filter from this date
       </ContextMenu.Item>
-      <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('dateMenu', 'filterToDate'); handleFilterTo(); }}>
+      <ContextMenu.Item className={menuItemClass} onSelect={handleFilterTo}>
         Filter to this date
       </ContextMenu.Item>
     </>

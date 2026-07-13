@@ -275,6 +275,7 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
   };
 
   const openCherryPickDialog = (commits: Commit[], clearSelection = false) => {
+    trackCommitMenu('cherryPick');
     if (clearSelection) clearSelectedCommits();
     setCherryPickCommits(commits);
     setCherryPickOpen(true);
@@ -344,7 +345,6 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
                   <ContextMenu.Item
                     className={menuItemClass}
                     onSelect={() => {
-                      trackCommitMenu('cherryPick');
                       openCherryPickDialog([commit]);
                     }}
                   >
@@ -356,7 +356,6 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
                     disabled={hasSelectedMergeCommit}
                     title={hasSelectedMergeCommit ? 'Selection contains merge commits. Cherry-pick merge commits individually.' : undefined}
                     onSelect={() => {
-                      trackCommitMenu('cherryPick');
                       openCherryPickDialog(mergedCommits.filter((item) => selectedCommits.includes(item.hash)));
                     }}
                   >
@@ -366,7 +365,6 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
                   <ContextMenu.Item
                     className={menuItemClass}
                     onSelect={() => {
-                      trackCommitMenu('cherryPick');
                       openCherryPickDialog([commit], selectedCommits.length > 1);
                     }}
                   >

@@ -41,6 +41,7 @@ function AuthorFilterMenuItems({ authorEmail }: { authorEmail: string }) {
   const isFiltered = filters.authors?.includes(authorEmail) ?? false;
 
   const handleToggle = () => {
+    trackUiInteraction('authorMenu', 'toggleAuthorFilter');
     const current = useGraphStore.getState().filters.authors ?? [];
     let next: string[];
     if (isFiltered) {
@@ -54,7 +55,7 @@ function AuthorFilterMenuItems({ authorEmail }: { authorEmail: string }) {
   };
 
   return (
-    <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('authorMenu', 'toggleAuthorFilter'); handleToggle(); }}>
+    <ContextMenu.Item className={menuItemClass} onSelect={handleToggle}>
       {isFiltered ? 'Remove Author from filter' : 'Add Author to filter'}
     </ContextMenu.Item>
   );
