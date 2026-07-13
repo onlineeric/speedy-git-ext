@@ -12,6 +12,7 @@ import { RefreshCoordinator } from '../webview/RefreshCoordinator.js';
 import { RepoDataLoader, computeCommitFingerprint } from '../webview/RepoDataLoader.js';
 import { WebviewMessageRouter } from '../webview/WebviewMessageRouter.js';
 import { WebviewRuntime } from '../webview/WebviewRuntime.js';
+import { createTelemetryStub } from './telemetryTestStub.js';
 import { submoduleHandlers } from '../webview/handlers/submoduleHandlers.js';
 import type { WebviewRequestContext } from '../webview/WebviewRequestContext.js';
 
@@ -122,6 +123,7 @@ function createRepoDataLoaderFixture(options: {
     getSettings: () => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }),
     getBatchSize: () => 500,
     getSubmoduleHandlers: () => undefined,
+    telemetry: createTelemetryStub(),
   });
 
   return { dataLoader, runtime, services, postMessage, gitLogService, commits };
@@ -170,6 +172,7 @@ describe('WebviewProvider initial load performance', () => {
       getSettings: () => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }),
       getBatchSize: () => 500,
       getSubmoduleHandlers: () => undefined,
+      telemetry: createTelemetryStub(),
     });
 
     await dataLoader.sendInitialData();

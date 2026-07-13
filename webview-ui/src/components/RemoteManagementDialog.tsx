@@ -273,6 +273,7 @@ export function RemoteManagementDialog({ open, onClose }: RemoteManagementDialog
         onCancel={handleDeleteCancel}
         title="Remove Remote"
         description={deleteDescription}
+        telemetryId="removeRemote"
         confirmLabel="Remove"
         variant={deleteTargetHasTrackingBranches ? 'warning' : 'danger'}
       />

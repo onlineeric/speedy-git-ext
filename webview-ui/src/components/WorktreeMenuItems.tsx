@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { WorktreeInfo } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
+import { trackUiInteraction } from '../utils/telemetry';
 import { WORKTREE_FOLDER_MISSING_TOOLTIP, worktreeFolderName } from '../utils/worktreeDisplay';
 import { RemoveWorktreeDialog } from './RemoveWorktreeDialog';
 import { dangerItemClass, menuItemClass, menuItemDisabledClass, menuSeparatorClass } from './menuStyles';
@@ -39,7 +40,10 @@ export function WorktreeMenuItems({
         className={openDisabled ? menuItemDisabledClass : menuItemClass}
         disabled={openDisabled}
         title={openDisabled ? WORKTREE_FOLDER_MISSING_TOOLTIP : worktree.path}
-        onSelect={() => rpcClient.openWorktree(worktree.path)}
+        onSelect={() => {
+          trackUiInteraction('worktreeMenu', 'openWorktree');
+          rpcClient.openWorktree(worktree.path);
+        }}
       >
         Open Worktree in New Window
       </ContextMenu.Item>
@@ -47,7 +51,10 @@ export function WorktreeMenuItems({
         className={removeDisabled ? menuItemDisabledClass : dangerItemClass}
         disabled={removeDisabled}
         title={removeDisabled ? 'The current worktree cannot be removed.' : worktree.path}
-        onSelect={() => onRemove(worktree)}
+        onSelect={() => {
+          trackUiInteraction('worktreeMenu', 'removeWorktree');
+          onRemove(worktree);
+        }}
       >
         Remove Worktree…
       </ContextMenu.Item>

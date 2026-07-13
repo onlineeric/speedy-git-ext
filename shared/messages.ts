@@ -28,7 +28,8 @@ export interface InitialDataPayload {
   /** Data source errors (empty if all succeeded) */
   errors: string[];
 }
-import type { GitError } from './errors.js';
+import type { GitError, GitErrorCode } from './errors.js';
+import type { UiTelemetryEvent } from './telemetry.js';
 
 export type RequestMessage =
   | { type: 'getCommits'; payload: { filters?: Partial<GraphFilters> } }
@@ -149,7 +150,14 @@ export type RequestMessage =
   // Compare refs (042-compare-refs)
   | { type: 'compareRefs'; payload: { a: SlotValue; b: SlotValue; mode: CompareMode; requestId: string } }
   | { type: 'cancelCompare'; payload: { requestId: string } }
-  | { type: 'openCompareDiff'; payload: { filePath: string; aHash: string | null; bHash: string | null; status: FileChangeStatus; title: string } };
+  | { type: 'openCompareDiff'; payload: { filePath: string; aHash: string | null; bHash: string | null; status: FileChangeStatus; title: string } }
+  /**
+   * Fire-and-forget UI telemetry report (049-usage-telemetry). One-way by
+   * contract: the webview never awaits it and the handler never posts a
+   * response. The payload is re-validated against the closed catalog in
+   * `shared/telemetry.ts` before anything is recorded.
+   */
+  | { type: 'trackUiEvent'; payload: { event: UiTelemetryEvent } };
 
 export type ResponseMessage =
   | { type: 'commits'; payload: { commits: Commit[]; branches?: Branch[]; hasMore?: boolean; totalLoadedWithoutFilter?: number } }
@@ -177,11 +185,16 @@ export type ResponseMessage =
   | { type: 'checkoutNeedsStash'; payload: { name: string; pull?: boolean } }
   | { type: 'checkoutCommitNeedsStash'; payload: { hash: string } }
   | { type: 'deleteBranchNeedsForce'; payload: { name: string; deleteRemote?: { remote: string; name: string } } }
-  | { type: 'checkoutPullFailed'; payload: { branch: string; error: { message: string } } }
+  | { type: 'checkoutPullFailed'; payload: { branch: string; error: { message: string; code: GitErrorCode } } }
   | { type: 'settingsData'; payload: { settings: UserSettings } }
   | { type: 'submodulesData'; payload: { submodules: Submodule[]; stack: SubmoduleNavEntry[] } }
   | { type: 'submoduleOperationResult'; payload: { success: boolean; error?: string } }
-  | { type: 'pushResult'; payload: { success: boolean; message: string } }
+  | {
+      type: 'pushResult';
+      payload:
+        | { success: true; message: string }
+        | { success: false; message: string; errorCode: GitErrorCode };
+    }
   | { type: 'avatarUrls'; payload: { urls: AvatarUrlMap } }
   | { type: 'tagMetadata'; payload: { metadata: Record<string, TagMetadata> } }
   | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[] } }
@@ -230,6 +243,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   discardFiles: true, discardAllUnstaged: true, stashWithMessage: true, stashSelected: true,
   getConflictState: true, openStagedDiff: true,
   compareRefs: true, cancelCompare: true, openCompareDiff: true,
+  trackUiEvent: true,
 };
 
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {

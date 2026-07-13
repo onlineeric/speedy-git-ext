@@ -28,7 +28,10 @@ export const remoteHandlers = {
       context.postMessage({ type: 'pushResult', payload: { success: true, message: result.value } });
       await context.refreshCoordinator.reload();
     } else {
-      context.postMessage({ type: 'pushResult', payload: { success: false, message: result.error.message } });
+      context.postMessage({
+        type: 'pushResult',
+        payload: { success: false, message: result.error.message, errorCode: result.error.code },
+      });
     }
   },
 

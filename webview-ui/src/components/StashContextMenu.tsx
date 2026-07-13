@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { Commit } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
+import { trackUiInteraction } from '../utils/telemetry';
 import { buildDropStashCommand } from '../utils/gitCommandBuilder';
 import { ConfirmDialog } from './ConfirmDialog';
 import { dangerItemClass, menuContentClass, menuItemClass, menuSeparatorClass } from './menuStyles';
@@ -31,18 +32,22 @@ function StashContextMenuBody({ commit, stashIndex }: Omit<StashContextMenuProps
   const isValidIndex = stashIndex >= 0;
 
   const handleApply = () => {
+    trackUiInteraction('stashMenu', 'applyStash');
     rpcClient.applyStash(stashIndex);
   };
 
   const handlePop = () => {
+    trackUiInteraction('stashMenu', 'popStash');
     rpcClient.popStash(stashIndex);
   };
 
   const handleDrop = () => {
+    trackUiInteraction('stashMenu', 'dropStash');
     if (isValidIndex) setDropConfirmOpen(true);
   };
 
   const handleCopyHash = () => {
+    trackUiInteraction('stashMenu', 'copyHash');
     rpcClient.copyToClipboard(commit.hash);
   };
 
@@ -76,6 +81,7 @@ function StashContextMenuBody({ commit, stashIndex }: Omit<StashContextMenuProps
         onCancel={() => setDropConfirmOpen(false)}
         title="Drop Stash"
         description={`Are you sure you want to drop stash@{${stashIndex}}? This cannot be undone.`}
+        telemetryId="dropStash"
         confirmLabel="Drop"
         variant="danger"
         commandPreview={buildDropStashCommand({ stashIndex })}

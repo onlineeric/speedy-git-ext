@@ -51,6 +51,8 @@ import type { InitialDataPayload } from '@shared/messages';
 import { type GraphTopology } from '../utils/graphTopology';
 import { computeHiddenCommitHashes } from '../utils/commitVisibility';
 import { computeMergedTopology, type UncommittedContext } from '../utils/mergedCommits';
+import { toCommitCountBucket } from '@shared/telemetry';
+import { trackUi } from '../utils/telemetry';
 import { joinRepoPath } from '../utils/repoPath';
 import { stripLocalBranchPrefix } from '../utils/worktreeDisplay';
 
@@ -322,6 +324,9 @@ function retainByHash<T>(map: Record<string, T>, hashes: Set<string>): Record<st
   }
   return next;
 }
+
+/** One-shot: the `perf topology` telemetry event fires once per webview session (049-usage-telemetry). */
+let topologyPerfSent = false;
 
 export const useGraphStore = create<GraphStore>((set, get) => ({
   commits: [],
@@ -1083,7 +1088,20 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     // Compute hidden hashes, merged commits, and topology in one pass
     const hiddenCommitHashes = computeHiddenCommitHashes(commits, filters);
     const uncommitted: UncommittedContext = { hasUncommittedChanges: hasChanges, counts, branches: payload.branches };
+    // `perf topology` telemetry (US5): wrap the existing computation for the
+    // initial load only; the one-shot flag keeps refreshes/re-renders free.
+    const measureTopology = !topologyPerfSent && commits.length > 0;
+    const topologyStart = measureTopology ? performance.now() : 0;
     const { mergedCommits, topology } = computeMergedTopology(commits, stashes, filters, hiddenCommitHashes, uncommitted);
+    if (measureTopology) {
+      topologyPerfSent = true;
+      trackUi({
+        kind: 'perf',
+        perfKind: 'topology',
+        durationMs: performance.now() - topologyStart,
+        commitCountBucket: toCommitCountBucket(commits.length),
+      });
+    }
 
     // Preserve selection for hashes that still exist
     const newHashSet = new Set(mergedCommits.map((c) => c.hash));

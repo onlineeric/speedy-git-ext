@@ -4,6 +4,8 @@ import type { RefInfo, SlotValue } from '@shared/types';
 import { validateGitBranchName } from '@shared/gitRefValidation';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
+import type { UiAction, UiSurface } from '@shared/telemetry';
+import { trackUiInteraction } from '../utils/telemetry';
 import {
   buildDeleteRemoteBranchCommand,
   buildFastForwardLocalBranchCommand,
@@ -92,6 +94,10 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
   const isBranch = isLocalBranch || isRemoteBranch;
   const isTag = refInfo.type === 'tag';
   const isStash = refInfo.type === 'stash';
+
+  // UI telemetry (049-usage-telemetry): one component serves three badge kinds.
+  const menuSurface: UiSurface = isTag ? 'tagMenu' : isRemoteBranch ? 'remoteBranchMenu' : 'branchMenu';
+  const track = (action: UiAction) => trackUiInteraction(menuSurface, action);
 
   // Tag push/delete-from-remote target: the configured default remote, or undefined
   // when no remote exists (which hides the remote-bearing affordances). FR-009.
@@ -228,7 +234,7 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
   const showWorktreeGroup = worktreeSource !== null || branchWorktree !== undefined;
   // A single "Create worktree…" item, reused across the local / remote / tag arms.
   const createWorktreeItem = worktreeSource ? (
-    <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
+    <ContextMenu.Item className={menuItemClass} onSelect={() => { track('createWorktree'); setCreateWorktreeOpen(true); }}>
       Create worktree…
     </ContextMenu.Item>
   ) : null;
@@ -238,7 +244,10 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
   const fastForwardItem = (
     <ContextMenu.Item
       className={menuItemClass}
-      onSelect={() => setFastForwardOpen(true)}
+      onSelect={() => {
+        track('fastForward');
+        setFastForwardOpen(true);
+      }}
       disabled={loading || rebaseInProgress}
     >
       Fast-forward Local Branch from Remote
@@ -256,13 +265,13 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
             {/* Compare-refs (042-compare-refs) — branches and tags only; stashes excluded (FR-017) */}
             {!isStash && compareSlotForThisRef && (
               <>
-                <CompareMenuItems slot={compareSlotForThisRef} />
+                <CompareMenuItems slot={compareSlotForThisRef} surface={menuSurface} />
                 <ContextMenu.Separator className={menuSeparatorClass} />
               </>
             )}
 
             {isBranch && !isCurrentBranch && (
-              <ContextMenu.Item className={menuItemClass} onSelect={handleCheckout}>
+              <ContextMenu.Item className={menuItemClass} onSelect={() => { track('checkout'); handleCheckout(); }}>
                 Checkout {refInfo.name}
               </ContextMenu.Item>
             )}
@@ -271,7 +280,10 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
               <ContextMenu.Item
                 className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
                 disabled={isOperationInProgress}
-                onSelect={() => setRebaseConfirmOpen(true)}
+                onSelect={() => {
+                  track('rebase');
+                  setRebaseConfirmOpen(true);
+                }}
               >
                 Rebase Current Branch onto This
               </ContextMenu.Item>
@@ -280,21 +292,24 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
             {isLocalBranch && (
               <>
                 {!isCurrentBranch && (
-                  <ContextMenu.Item className={menuItemClass} onSelect={() => setMergeDialogOpen(true)}>
+                  <ContextMenu.Item className={menuItemClass} onSelect={() => { track('merge'); setMergeDialogOpen(true); }}>
                     Merge into Current Branch
                   </ContextMenu.Item>
                 )}
-                <ContextMenu.Item className={menuItemClass} onSelect={() => setRenameOpen(true)}>
+                <ContextMenu.Item className={menuItemClass} onSelect={() => { track('renameBranch'); setRenameOpen(true); }}>
                   Rename Branch...
                 </ContextMenu.Item>
-                <ContextMenu.Item className={menuItemClass} onSelect={() => setPushDialogOpen(true)}>
+                <ContextMenu.Item className={menuItemClass} onSelect={() => { track('push'); setPushDialogOpen(true); }}>
                   Push Branch
                 </ContextMenu.Item>
                 {!isCurrentBranch && !isMergedBadge && fastForwardItem}
                 {isCurrentBranch && (
                   <ContextMenu.Item
                     className={menuItemClass}
-                    onSelect={() => rpcClient.pull()}
+                    onSelect={() => {
+                      track('pull');
+                      rpcClient.pull();
+                    }}
                     disabled={loading}
                   >
                     Pull Branch
@@ -312,7 +327,7 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
                 {!isCurrentBranch && (
                   <>
                     <ContextMenu.Separator className={menuSeparatorClass} />
-                    <ContextMenu.Item className={dangerItemClass} onSelect={() => setDeleteConfirmOpen(true)}>
+                    <ContextMenu.Item className={dangerItemClass} onSelect={() => { track('deleteBranch'); setDeleteConfirmOpen(true); }}>
                       Delete Branch
                     </ContextMenu.Item>
                   </>
@@ -330,7 +345,7 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
                   </>
                 )}
                 <ContextMenu.Separator className={menuSeparatorClass} />
-                <ContextMenu.Item className={dangerItemClass} onSelect={() => setDeleteConfirmOpen(true)}>
+                <ContextMenu.Item className={dangerItemClass} onSelect={() => { track('deleteRemoteBranch'); setDeleteConfirmOpen(true); }}>
                   Delete Remote Branch
                 </ContextMenu.Item>
               </>
@@ -340,7 +355,11 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
               <>
                 <ContextMenu.Item
                   className={menuItemClass}
-                  onSelect={() => (tagRemote ? setPushTagOpen(true) : rpcClient.pushTag(refInfo.name))}
+                  onSelect={() => {
+                    track('pushTag');
+                    if (tagRemote) setPushTagOpen(true);
+                    else rpcClient.pushTag(refInfo.name);
+                  }}
                 >
                   Push Tag
                 </ContextMenu.Item>
@@ -351,7 +370,7 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
                   </>
                 )}
                 <ContextMenu.Separator className={menuSeparatorClass} />
-                <ContextMenu.Item className={dangerItemClass} onSelect={() => setDeleteConfirmOpen(true)}>
+                <ContextMenu.Item className={dangerItemClass} onSelect={() => { track('deleteTag'); setDeleteConfirmOpen(true); }}>
                   Delete Tag
                 </ContextMenu.Item>
               </>
@@ -360,7 +379,7 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
             {!isStash && (
               <>
                 <ContextMenu.Separator className={menuSeparatorClass} />
-                <ContextMenu.Item className={menuItemClass} onSelect={handleCopyName}>
+                <ContextMenu.Item className={menuItemClass} onSelect={() => { track('copyName'); handleCopyName(); }}>
                   Copy {isTag ? 'Tag' : 'Branch'} Name
                 </ContextMenu.Item>
               </>
@@ -369,7 +388,7 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
             {isBranch && (
               <>
                 <ContextMenu.Separator className={menuSeparatorClass} />
-                <BranchFilterMenuItem refInfo={refInfo} />
+                <BranchFilterMenuItem refInfo={refInfo} surface={menuSurface} />
               </>
             )}
           </ContextMenu.Content>
@@ -387,6 +406,7 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
         onCancel={() => setDeleteConfirmOpen(false)}
         title="Delete Remote Branch"
         description={`Are you sure you want to delete remote branch '${displayName}'? This will remove it from the remote.`}
+        telemetryId="deleteRemoteBranch"
         confirmLabel="Delete"
         variant="danger"
         commandPreview={deleteCommandPreview}
@@ -458,6 +478,7 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
         onCancel={() => setRenameOpen(false)}
         title="Rename Branch"
         label="New branch name"
+        telemetryId="renameBranch"
         defaultValue={refInfo.name}
         validate={(v) =>
           v === refInfo.name
@@ -512,6 +533,7 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
         }}
         onCancel={() => setFastForwardOpen(false)}
         title="Fast-forward Local Branch from Remote"
+        telemetryId="fastForward"
         description={
           checkoutState === 'remote-only'
             ? `Create local branch '${refInfo.name}' from '${fastForwardRemote}/${refInfo.name}' and set it as the upstream, without checkout. Your current branch and working tree are not affected.`
@@ -537,6 +559,7 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
         onCancel={() => useGraphStore.getState().setPendingCheckout(null)}
         title="Stash Changes"
         description="You have uncommitted changes. Stash them and checkout the branch?"
+        telemetryId="stashAndCheckout"
         confirmLabel="Stash & Checkout"
         variant="warning"
         commandPreview={stashAndCheckoutPreview}
@@ -566,7 +589,7 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
   );
 }
 
-function BranchFilterMenuItem({ refInfo }: { refInfo: RefInfo }) {
+function BranchFilterMenuItem({ refInfo, surface }: { refInfo: RefInfo; surface: UiSurface }) {
   const filters = useGraphStore((s) => s.filters);
   const setFilters = useGraphStore((s) => s.setFilters);
   const branches = useGraphStore((s) => s.branches);
@@ -610,7 +633,7 @@ function BranchFilterMenuItem({ refInfo }: { refInfo: RefInfo }) {
   };
 
   return (
-    <ContextMenu.Item className={menuItemClass} onSelect={handleToggle}>
+    <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction(surface, 'toggleBranchFilter'); handleToggle(); }}>
       {isFiltered ? 'Remove branch from filter' : 'Add branch to filter'}
     </ContextMenu.Item>
   );

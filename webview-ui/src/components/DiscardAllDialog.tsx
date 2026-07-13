@@ -32,6 +32,7 @@ export function DiscardAllDialog({
       open={open}
       onConfirm={onConfirm}
       onCancel={() => onOpenChange(false)}
+      telemetryId="discardAll"
       title={title}
       description={description}
       confirmLabel={confirmLabel}

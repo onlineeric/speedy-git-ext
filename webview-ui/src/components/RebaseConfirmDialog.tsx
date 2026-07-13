@@ -3,6 +3,7 @@ import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { buildRebaseCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface RebaseConfirmDialogProps {
   open: boolean;
@@ -21,14 +22,17 @@ export function RebaseConfirmDialog({
   description,
   targetRef,
 }: RebaseConfirmDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('rebase', open);
   const [ignoreDate, setIgnoreDate] = useState(false);
 
   const handleConfirm = () => {
+    dialogTelemetry.confirmed();
     onConfirm(ignoreDate);
     setIgnoreDate(false);
   };
 
   const handleCancel = () => {
+    dialogTelemetry.cancelled();
     setIgnoreDate(false);
     onCancel();
   };

@@ -18,6 +18,9 @@ import { GitIndexService } from './services/GitIndexService.js';
 import { GitShowContentProvider } from './GitShowContentProvider.js';
 import { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
 import { GitWatcherService } from './services/GitWatcherService.js';
+import type { SettingsSnapshotProperties, TelemetryService } from './services/TelemetryService.js';
+import { PersistedUIStateStore } from './webview/PersistedUIStateStore.js';
+import { GitError } from '../shared/errors.js';
 import { DEFAULT_GRAPH_COLORS, DEFAULT_USER_SETTINGS, type SubmoduleNavEntry, type UserDateFormat, type UserSettings } from '../shared/types.js';
 
 export class ExtensionController {
@@ -46,7 +49,9 @@ export class ExtensionController {
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly log: vscode.LogOutputChannel
+    private readonly log: vscode.LogOutputChannel,
+    private readonly telemetry: TelemetryService,
+    private readonly activationStart: number,
   ) {
     this.initRepoDiscovery();
     this.registerSettingsListener();
@@ -58,6 +63,7 @@ export class ExtensionController {
 
     discovery.initialize().then(() => {
       this.updateStatusBar();
+      this.sendActivationTelemetry(discovery);
 
       // Subscribe to repo list changes
       this.context.subscriptions.push(
@@ -71,6 +77,8 @@ export class ExtensionController {
       );
     }).catch((err) => {
       this.log.error(`GitRepoDiscoveryService initialization failed: ${err}`);
+      // Untracked-path failure (FR-014): functional area + standardized code only.
+      this.telemetry.sendError('repoDiscovery', err instanceof GitError ? err.code : 'UNKNOWN');
     });
 
     // Create status bar item
@@ -87,6 +95,52 @@ export class ExtensionController {
         this.updateStatusBar();
       })
     );
+  }
+
+  /**
+   * Session-level telemetry (US3/US5): one `activate` + one `settingsSnapshot`
+   * per session, sent fire-and-forget after repo discovery resolves so the
+   * activation path never waits on it. One-shot behavior is guaranteed by the
+   * TelemetryService itself.
+   */
+  private sendActivationTelemetry(discovery: GitRepoDiscoveryService) {
+    const hasMultiRoot = (vscode.workspace.workspaceFolders?.length ?? 0) > 1;
+    this.telemetry.sendActivate(
+      {
+        activationMs: performance.now() - this.activationStart,
+        repoCount: discovery.getRepos().length,
+      },
+      hasMultiRoot,
+    );
+
+    const settings = this.readUserSettings();
+    const snapshot: SettingsSnapshotProperties = {
+      dateFormat: settings.dateFormat,
+      avatarsEnabled: settings.avatarsEnabled ? 'true' : 'false',
+      showTags: settings.showTags ? 'true' : 'false',
+      showRemoteBranches: settings.showRemoteBranches ? 'true' : 'false',
+      toolbarShowLabels: settings.toolbarShowLabels ? 'true' : 'false',
+      toolbarShowRemoteButton: settings.toolbarShowRemoteButton ? 'true' : 'false',
+      statusBarText: this.readStatusBarText() === '$(zap)' ? 'icon' : 'iconAndText',
+    };
+    const signatureColumnVisible = this.readSignatureColumnVisible(discovery);
+    if (signatureColumnVisible !== undefined) {
+      snapshot.signatureColumnVisible = signatureColumnVisible;
+    }
+    this.telemetry.sendSettingsSnapshot(snapshot, {
+      batchCommitSize: settings.batchCommitSize,
+      overScan: settings.overScan,
+    });
+  }
+
+  /** Persisted-UI-state read for the snapshot; omitted when unavailable. */
+  private readSignatureColumnVisible(discovery: GitRepoDiscoveryService): 'true' | 'false' | undefined {
+    try {
+      const store = new PersistedUIStateStore(this.context, () => discovery.getActiveRepoPath());
+      return store.loadPersistedUIState().commitTableLayout.columns.signature.visible ? 'true' : 'false';
+    } catch {
+      return undefined;
+    }
   }
 
   private updateStatusBar() {
@@ -160,7 +214,7 @@ export class ExtensionController {
     );
   }
 
-  async showGraph() {
+  async showGraph(trigger: 'command' | 'scmButton' = 'command') {
     const discovery = this.gitRepoDiscoveryService;
     let workspacePath: string;
 
@@ -209,6 +263,7 @@ export class ExtensionController {
         this.gitWorktreeService!,
         this.gitIndexService!,
         this.log,
+        this.telemetry,
         this.gitRepoDiscoveryService,
         workspacePath
       );
@@ -246,12 +301,19 @@ export class ExtensionController {
       this.gitWatcherService.onDidDetectChange(() => {
         this.webviewProvider?.triggerAutoRefresh().catch((err: unknown) => {
           this.log.error(`Auto-refresh failed: ${err}`);
+          // Untracked-path failure (FR-014): area + standardized code only.
+          this.telemetry.sendError('watcher', err instanceof GitError ? err.code : 'UNKNOWN');
         });
       });
       await this.gitWatcherService.initialize(workspacePath);
     }
 
+    // Panel creation vs reveal: only a fresh panel counts as `panelOpened`.
+    const panelWasAlreadyOpen = this.webviewProvider.isPanelOpen();
     await this.webviewProvider.show();
+    if (!panelWasAlreadyOpen) {
+      this.telemetry.sendPanelOpened(trigger);
+    }
   }
 
   /** Handler for speedyGit.openForRepo command (triggered from scm/title menu). */
@@ -262,7 +324,7 @@ export class ExtensionController {
     this.switchActiveRepo(repoPath);
     // Capture before showGraph() potentially creates the provider/panel
     const panelWasOpen = this.webviewProvider?.isPanelOpen() ?? false;
-    await this.showGraph();
+    await this.showGraph('scmButton');
     if (panelWasOpen && repoChanged && this.webviewProvider && this.gitRepoDiscoveryService) {
       // Panel was already open and repo changed: showGraph() only revealed it without reloading data.
       // Send updated repo list and reload commits for the new repo.

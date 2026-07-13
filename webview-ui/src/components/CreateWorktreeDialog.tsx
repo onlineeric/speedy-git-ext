@@ -9,6 +9,7 @@ import { rpcClient } from '../rpc/rpcClient';
 import { CommandPreview } from './CommandPreview';
 import { FieldError } from './FieldError';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 export type WorktreeSourceKind = 'local-branch' | 'remote-branch' | 'commit' | 'tag';
 
@@ -55,6 +56,7 @@ function initialBranchMode(defaultMode: WorktreeBranchMode, existingBranchDisabl
 }
 
 export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }: CreateWorktreeDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('createWorktree', open);
   const { modes, defaultMode } = useMemo(() => modesForKind(source.kind), [source.kind]);
   const existingBranchDisabled = source.kind === 'local-branch' && existingWorktree !== undefined;
   const [branchMode, setBranchMode] = useState<WorktreeBranchMode>(() => initialBranchMode(defaultMode, existingBranchDisabled));
@@ -130,6 +132,7 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
   );
 
   const handleConfirm = useCallback(async () => {
+    dialogTelemetry.confirmed();
     if (!canConfirm) return;
     setBusy(true);
     setError(null);
@@ -149,12 +152,13 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
       setError(typeof e === 'string' ? e : (e as Error).message);
       setBusy(false);
     }
-  }, [canConfirm, path, source.ref, branchMode, trimmedName, envCopyEnabled, copyEnvFiles, onClose]);
+  }, [canConfirm, path, source.ref, branchMode, trimmedName, envCopyEnabled, copyEnvFiles, onClose, dialogTelemetry]);
 
   const handleCancel = useCallback(() => {
+    dialogTelemetry.cancelled();
     rpcClient.clearPendingDialogAction();
     onClose();
-  }, [onClose]);
+  }, [onClose, dialogTelemetry]);
 
   const handleOpenExistingWorktree = useCallback(() => {
     if (!existingWorktree || existingWorktree.isPrunable) return;

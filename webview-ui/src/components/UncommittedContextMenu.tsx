@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
+import { trackUiInteraction } from '../utils/telemetry';
 import { StashDialog } from './StashDialog';
 import { DiscardAllDialog } from './DiscardAllDialog';
 import { FilePickerDialog } from './FilePickerDialog';
@@ -30,9 +31,18 @@ function UncommittedContextMenuBody() {
   const hasUnstagedChanges = uncommittedUnstagedFiles.length > 0;
   const hasAnyChanges = uncommittedCounts.stagedCount + uncommittedCounts.unstagedCount + uncommittedCounts.untrackedCount > 0;
 
-  const handleRefresh = () => rpcClient.refresh();
-  const handleStageAll = () => rpcClient.stageAll();
-  const handleUnstageAll = () => rpcClient.unstageAll();
+  const handleRefresh = () => {
+    trackUiInteraction('uncommittedMenu', 'refresh');
+    rpcClient.refresh();
+  };
+  const handleStageAll = () => {
+    trackUiInteraction('uncommittedMenu', 'stageAll');
+    rpcClient.stageAll();
+  };
+  const handleUnstageAll = () => {
+    trackUiInteraction('uncommittedMenu', 'unstageAll');
+    rpcClient.unstageAll();
+  };
 
   const handleStashConfirm = (message?: string) => {
     rpcClient.stashWithMessage(message);
@@ -49,10 +59,10 @@ function UncommittedContextMenuBody() {
       <ContextMenu.Portal>
         <ContextMenu.Content className={`min-w-[200px] ${menuContentClass}`}>
             {/* Compare-refs (042-compare-refs) — Working Tree sentinel */}
-            <CompareMenuItems slot={{ kind: 'workingTree' }} />
+            <CompareMenuItems slot={{ kind: 'workingTree' }} surface="uncommittedMenu" />
             <ContextMenu.Separator className={menuSeparatorClass} />
             {hasAnyChanges && (
-              <ContextMenu.Item className={menuItemClass} onSelect={() => setStashDialogOpen(true)}>
+              <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('uncommittedMenu', 'stash'); setStashDialogOpen(true); }}>
                 Stash Everything…
               </ContextMenu.Item>
             )}
@@ -67,14 +77,14 @@ function UncommittedContextMenuBody() {
               </ContextMenu.Item>
             )}
             {hasUnstagedChanges && (
-              <ContextMenu.Item className={menuItemClass} onSelect={() => setDiscardAllDialogOpen(true)}>
+              <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('uncommittedMenu', 'discardAll'); setDiscardAllDialogOpen(true); }}>
                 Discard All Unstaged Changes
               </ContextMenu.Item>
             )}
             {hasAnyChanges && (
               <>
                 <ContextMenu.Separator className={menuSeparatorClass} />
-                <ContextMenu.Item className={menuItemClass} onSelect={() => setFilePickerOpen(true)}>
+                <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('uncommittedMenu', 'selectFiles'); setFilePickerOpen(true); }}>
                   Select files for...
                 </ContextMenu.Item>
               </>

@@ -8,6 +8,7 @@ import { deriveRefNameField } from '../utils/refNameField';
 import { CommandPreview } from './CommandPreview';
 import { FieldError } from './FieldError';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface CreateBranchDialogProps {
   open: boolean;
@@ -16,6 +17,7 @@ interface CreateBranchDialogProps {
 }
 
 export function CreateBranchDialog({ open, commit, onClose }: CreateBranchDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('createBranch', open);
   const [name, setName] = useState('');
   const [checkout, setCheckout] = useState(false);
 
@@ -37,6 +39,7 @@ export function CreateBranchDialog({ open, commit, onClose }: CreateBranchDialog
     if (!canCreate) {
       return;
     }
+    dialogTelemetry.confirmed();
     rpcClient.createBranch(trimmedName, commit.hash, checkout);
     reset();
     onClose();
@@ -44,6 +47,7 @@ export function CreateBranchDialog({ open, commit, onClose }: CreateBranchDialog
 
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
+      dialogTelemetry.cancelled();
       reset();
       onClose();
     }

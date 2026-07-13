@@ -15,6 +15,7 @@ import {
   type RadioAvailability,
 } from '../utils/radioAvailability';
 import { buildDefaultStashMessage } from '../utils/stashMessage';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 import {
   buildSelectiveStageCommand,
   buildSelectiveUnstageCommand,
@@ -60,6 +61,7 @@ function FilePickerDialogInner({
   stagedFiles,
   unstagedFiles,
 }: FilePickerDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('filePicker', open);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [selectedRadio, setSelectedRadio] = useState<ActionKind | null>(null);
   const [stashMessage, setStashMessage] = useState('');
@@ -175,6 +177,7 @@ function FilePickerDialogInner({
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
+      dialogTelemetry.cancelled();
       setSelectedPaths(new Set());
       setStashMessage('');
       setErrorBanner(null);
@@ -290,6 +293,7 @@ function FilePickerDialogInner({
 
   const handleActionButton = useCallback(() => {
     if (!selectedRadio || isRunning) return;
+    dialogTelemetry.confirmed();
     switch (selectedRadio) {
       case 'stage':
         void runWithDialogAction(() => rpcClient.stageFiles(effectiveStagePaths));
@@ -313,6 +317,7 @@ function FilePickerDialogInner({
   }, [
     selectedRadio,
     isRunning,
+    dialogTelemetry,
     runWithDialogAction,
     effectiveStagePaths,
     effectiveUnstagePaths,

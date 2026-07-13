@@ -3,6 +3,7 @@ import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { buildDeleteTagCommand, buildDeleteTagWithRemoteCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface DeleteTagDialogProps {
   open: boolean;
@@ -14,6 +15,7 @@ interface DeleteTagDialogProps {
 }
 
 export function DeleteTagDialog({ open, tagName, remote, onConfirm, onCancel }: DeleteTagDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('deleteTag', open);
   const [deleteRemote, setDeleteRemote] = useState(true);
 
   const commandPreview = useMemo(() => {
@@ -24,11 +26,13 @@ export function DeleteTagDialog({ open, tagName, remote, onConfirm, onCancel }: 
   }, [tagName, deleteRemote, remote]);
 
   const handleConfirm = () => {
+    dialogTelemetry.confirmed();
     onConfirm(deleteRemote && remote ? { remote } : undefined);
     setDeleteRemote(true);
   };
 
   const handleCancel = () => {
+    dialogTelemetry.cancelled();
     setDeleteRemote(true);
     onCancel();
   };

@@ -3,6 +3,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { buildStashWithMessageCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface StashDialogProps {
   open: boolean;
@@ -21,9 +22,11 @@ export function StashDialog({
   title = 'Stash All Changes',
   description = 'Stash all changes including untracked files.',
 }: StashDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('stash', open);
   const [message, setMessage] = useState('');
 
   const handleConfirm = () => {
+    dialogTelemetry.confirmed();
     onConfirm(message.trim() || undefined);
     setMessage('');
   };

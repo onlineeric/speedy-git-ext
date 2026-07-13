@@ -159,6 +159,7 @@ export function App() {
         onCancel={() => useGraphStore.getState().setPendingCommitCheckout(null)}
         title="Stash Changes"
         description={`You have uncommitted changes. Stash them and checkout commit ${pendingCheckoutAbbreviatedHash ?? 'selected commit'}?`}
+        telemetryId="stashAndCheckout"
         confirmLabel="Stash & Checkout"
         variant="warning"
       />

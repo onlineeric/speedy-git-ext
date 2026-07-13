@@ -37,8 +37,8 @@ VS Code extension with **backend** (Node.js extension host) and **frontend** (Re
 
 ```
 src/                              # Backend — esbuild → dist/extension.js (CJS, node18)
-├── extension.ts                  # Entry point, registers speedyGit.showGraph command
-├── ExtensionController.ts        # Orchestrates services, repo discovery, settings
+├── extension.ts                  # Entry point; creates telemetry service, registers speedyGit.showGraph
+├── ExtensionController.ts        # Orchestrates services, repo discovery, settings, session telemetry
 ├── WebviewProvider.ts            # Compatibility re-export of webview/WebviewProvider
 ├── GitShowContentProvider.ts     # git-show:// URI protocol for diffs
 ├── webview/                      # Backend webview subsystem (refactored from the old ~2400-line WebviewProvider)
@@ -46,10 +46,10 @@ src/                              # Backend — esbuild → dist/extension.js (C
 │   ├── WebviewPanelHost.ts       # VS Code panel lifecycle, HTML/CSP/nonce, postMessage, visibility
 │   ├── WebviewRuntime.ts         # Mutable non-service state: repo path, filters, fetch generation, flags
 │   ├── GitServiceRegistry.ts     # Holds repo-bound git services; atomic replacement on repo switch
-│   ├── WebviewMessageRouter.ts   # Exhaustive typed RPC dispatch (satisfies RequestHandlerMap)
-│   ├── WebviewRequestContext.ts  # Narrow per-request handler API (no provider instance leaks to handlers)
+│   ├── WebviewMessageRouter.ts   # Exhaustive typed RPC dispatch + allowlisted operation telemetry middleware
+│   ├── WebviewRequestContext.ts  # Narrow per-request handler API, including TelemetryService
 │   ├── PersistedUIStateStore.ts  # Load/save/validate UI state + per-repo table layout (column-width healing)
-│   ├── RepoDataLoader.ts         # Initial + deferred data, avatars, submodules; what to fetch and post
+│   ├── RepoDataLoader.ts         # Initial + deferred data, avatars, submodules, initial-load perf/error telemetry
 │   ├── RefreshCoordinator.ts     # When to load: initial/manual/auto, hidden-panel deferral, loading lifecycle
 │   ├── EditorCommandService.ts   # VS Code diff/file/compare editors, worktree folder/reveal, signature help
 │   ├── OperationGuard.ts         # In-progress checks (rebase/cherry-pick/revert/merge) → GitError | null
@@ -65,6 +65,7 @@ src/                              # Backend — esbuild → dist/extension.js (C
 │       ├── worktreeHandlers.ts   # list/resolve/add/remove/prune/open/reveal worktree
 │       ├── workingTreeHandlers.ts# uncommitted changes, stage/unstage/discard, diff editors
 │       ├── compareHandlers.ts    # compareRefs/cancelCompare/openCompareDiff (latest-wins by request id)
+│       ├── telemetryHandlers.ts  # Validates one-way webview telemetry against closed catalogs
 │       └── vscodeCommandHandlers.ts # settings, clipboard, openExternal, updatePersistedUIState
 ├── services/
 │   ├── index.ts                  # Barrel export for all services
@@ -86,7 +87,8 @@ src/                              # Backend — esbuild → dist/extension.js (C
 │   ├── GitWatcherService.ts      # File system watcher for auto-refresh
 │   ├── GitRepoDiscoveryService.ts # Multi-root workspace scanning
 │   ├── GitHubAvatarService.ts    # Avatar URL fetching (GitHub/Gravatar)
-│   └── GitConfigService.ts       # Git config reading
+│   ├── GitConfigService.ts       # Git config reading
+│   └── TelemetryService.ts       # Single consent-aware backend telemetry funnel; real + no-op implementations
 └── utils/
     ├── gitParsers.ts             # Parse git log lines, refs (%D), branch list
     ├── gitQueries.ts             # Shared read-only git queries (e.g., isDirtyWorkingTree)
@@ -124,7 +126,8 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
 │   └── rpcClient.ts              # Singleton RPC client, webview↔extension via acquireVsCodeApi()
 ├── hooks/
 │   ├── useTooltipHover.ts        # Tooltip positioning logic
-│   └── useSignatureColumnLoader.ts # Async viewport-first signature verification loader (047)
+│   ├── useSignatureColumnLoader.ts # Async viewport-first signature verification loader (047)
+│   └── useDialogTelemetry.ts     # Reports one confirmed/cancelled outcome per dialog open cycle
 ├── types/
 │   └── displayRefs.ts            # Discriminated union for ref-label rendering (local-branch/remote-branch/tag/HEAD/…)
 └── utils/
@@ -156,6 +159,7 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
     ├── inlineCodeRenderer.tsx    # Renders inline-code spans in commit messages
     ├── mergeRefs.ts              # Merges local/remote refs into DisplayRef[] for display
     ├── signatureGlyph.ts         # Maps SignatureStatus enum → glyph/color for the signature column (047)
+    ├── telemetry.ts              # Fire-and-forget webview telemetry helpers
     ├── worktreeBadgeStyle.ts     # Styling for worktree badges on graph rows (046)
     └── worktreeDisplay.ts        # Worktree list formatting/derivation helpers (046)
 
@@ -163,7 +167,11 @@ shared/                           # Shared types between backend & frontend
 ├── types.ts                      # Domain types: Commit, Branch, RefInfo, GraphFilters, CommitDetails, etc.
 ├── messages.ts                   # RequestMessage/ResponseMessage union types for RPC
 ├── errors.ts                     # Result<T,E> monad, GitError class, GitErrorCode enum
-└── gitRefValidation.ts           # git check-ref-format validator with tag/branch/remote wrappers — same rules drive live dialog validation (frontend) and creation-path guards (backend, defense in depth)
+├── gitRefValidation.ts           # git check-ref-format validator with tag/branch/remote wrappers — same rules drive live dialog validation (frontend) and creation-path guards (backend, defense in depth)
+└── telemetry.ts                  # Closed telemetry catalogs, payload types, buckets, runtime validator
+
+telemetry.json                    # Machine-readable event manifest used by VS Code telemetry inspection
+esbuild.config.mjs                # Production-only telemetry destination injection; empty in dev/test builds
 ```
 
 ### Path Alias
@@ -173,9 +181,10 @@ shared/                           # Shared types between backend & frontend
 ### Data Flow
 
 1. Backend services fetch git data via `GitExecutor`, return `Result<T, GitError>`
-2. `WebviewPanelHost` receives the message and `WebviewMessageRouter` dispatches it to a domain handler in `webview/handlers/`; the handler resolves current services from `GitServiceRegistry`, calls them, and posts a `ResponseMessage`
-3. Frontend `rpcClient` sends `RequestMessage`, updates Zustand store on response
-4. Graph topology computed entirely in the frontend (`graphTopology.ts`), not backend
+2. `WebviewPanelHost` receives the message and `WebviewMessageRouter` dispatches it to a domain handler in `webview/handlers/`; allowlisted user operations are wrapped once to record outcome and duration
+3. UI-only telemetry uses the one-way `trackUiEvent` RPC; `telemetryHandlers` re-validates it and forwards it to the backend-only `TelemetryService`
+4. Frontend `rpcClient` sends `RequestMessage`, updates Zustand store on response
+5. Graph topology is computed entirely in the frontend (`graphTopology.ts`), not backend; its initial computation reports one bucketed performance event
 
 ### Webview Backend Conventions
 
@@ -183,6 +192,13 @@ shared/                           # Shared types between backend & frontend
 - **Handlers must stay stateless about repos**: resolve git services via `context.services` (the `GitServiceRegistry`) *at request time*. Never capture a service instance at construction — repo switching and submodule navigation atomically replace the registry, so captured references go stale.
 - **Don't pass the provider to handlers**: give them only what they need through `WebviewRequestContext`.
 - **State ownership**: generation guards / mutable runtime flags live in `WebviewRuntime`; refresh timing lives in `RefreshCoordinator`; per-repo table layout (with column-width healing) is persisted by `PersistedUIStateStore`. Table layout is per-repo; other UI state is global.
+
+### Telemetry Requirements
+
+- **Every new or enhanced feature must include a telemetry review and applicable instrumentation.** Track user-initiated Git operations and the approved UI surfaces: context-menu items, toolbar buttons, dialog outcomes, panel toggles, and column visibility changes. Do not track chatty/background interactions such as loading, scrolling, hovering, typing, or auto-refresh.
+- **Allowed data**: fixed feature/action identifiers, success/error outcomes, standardized error codes, durations, dialog outcomes, reviewed boolean/enum settings, editor/OS/extension versions, simple counts, and coarse buckets for content-derived magnitudes such as commit counts.
+- **Never collect**: repository/workspace names or paths, remote URLs, branch/tag/stash/worktree names, commit hashes/messages/diffs, author details, Git configuration, file names/paths, raw Git output, exception messages/stacks, search/filter values, or anything entered by the user. Hashing or encoding this data is still forbidden.
+- Use only the closed catalogs and existing telemetry helpers in `shared/telemetry.ts`; never send free-form values. Keep telemetry fire-and-forget, consent-gated, and failure-isolated. Update `telemetry.json` and focused tests when telemetry coverage changes.
 
 ### Performance Design
 
@@ -199,6 +215,7 @@ shared/                           # Shared types between backend & frontend
 - TypeScript **strict mode** with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`
 - Uses **`Result<T, E>`** pattern instead of throwing exceptions in git operations
 - UI state persisted via VS Code `context.globalState`; application state is transient (Zustand)
+- Telemetry is privacy-first and allowlist-only: fixed catalogs, backend-only transmission, dual consent, fire-and-forget, and no repository/user content
 
 ## Tech Stack
 
@@ -208,6 +225,7 @@ shared/                           # Shared types between backend & frontend
 - **@tanstack/react-virtual** — virtual scrolling
 - **@dnd-kit** — drag-and-drop (column reorder, interactive rebase)
 - **react-datepicker 9.x** + **date-fns 4.x** — date range filtering
+- **@vscode/extension-telemetry** — consent-aware telemetry transport to Azure Application Insights
 - **Vitest** — unit testing
 
 ## Coding Preferences / Guidelines
@@ -236,14 +254,12 @@ shared/                           # Shared types between backend & frontend
 ## Active Technologies
 - TypeScript 5.x (strict: `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) — both backend and frontend
 - React 18 + Zustand + Radix UI + Tailwind CSS (webview); esbuild (extension host), Vite (frontend); VS Code Extension API 1.80+
+- `@vscode/extension-telemetry` with a backend-only `TelemetryService`; closed shared catalogs and fire-and-forget webview reports
 - App state is transient (Zustand, session-only); persistent settings via VS Code config (e.g. `speedyGit.worktree.basePath`) and `context.globalState`
 
 ## Recent Changes
-- 047-signing-verification: 7-state flat `SignatureStatus` enum (drops `verificationUnavailable`); presence detection via raw `gpgsig` header (`git cat-file --batch`, no crypto) so SSH-signed commits without `allowedSignersFile` read as `unavailable` not `unsigned` (FR-017); opt-in hidden-by-default "Signature" history column with 3 grouped glyphs, async viewport-first + cached-by-hash (zero cost when hidden); bundled offline help doc (`docs/signing-verification.md`) opened via `openSignatureHelp` RPC
-- 048-tag-enhancements (v5.2.0–5.2.1): tag badges show annotated/lightweight metadata in tooltips (one deferred `refs/tags` read via `RepoDataLoader`, cached in webview); Create Tag can chain a push (opt-in force), Delete Tag can also delete from remote (missing remote tag = benign no-op), standalone Push Tag gained a force option — all with command previews (`DeleteTagDialog`, `PushTagDialog`). Introduced `shared/gitRefValidation.ts`: live `git check-ref-format` validation in every ref-creating dialog (tag/branch/rename/worktree branch/remote name via `refNameField.ts` + `FieldError`), with the same rules enforced on backend creation paths for defense in depth
-- Toolbar & graph polish (v5.2.2–5.4.0, no spec): `ToolbarIconButton` adds text labels under toolbar icons (`speedyGit.toolbar.showLabels`) and a hideable Remote button (`speedyGit.toolbar.showRemoteButton`), both toggleable via right-click menu; fast-forwarding the checked-out branch now runs `git pull` instead of the refused `git fetch <b>:<b>`; the checked-out branch badge always sorts first, ahead of worktree-branch prioritization; graph lane-change lines are now rounded elbows built by `webview-ui/src/utils/graphPaths.ts`
-
+- 049-usage-telemetry (v5.5.0): anonymous aggregate usage telemetry through a single backend `TelemetryService`; router middleware records allowlisted user-operation outcome/duration, the webview reports cataloged UI/dialog/topology events through a validated one-way RPC, and activation/settings/initial-load/error signals use fixed properties and coarse buckets. Dual consent (`telemetry.telemetryLevel` + `speedyGit.telemetry.enabled`), production/no-destination no-op behavior, dedicated output logging, `telemetry.json`, and strict never-collect rules are mandatory for future features.
 
 <!-- SPECKIT START -->
-No active feature plan (specs/048-tag-enhancements/ is the most recently completed feature; it is merged).
+Active feature: 049-usage-telemetry (anonymous usage statistics via @vscode/extension-telemetry). Plan: specs/049-usage-telemetry/plan.md (spec.md, research.md, data-model.md, contracts/telemetry-events.md, quickstart.md alongside).
 <!-- SPECKIT END -->

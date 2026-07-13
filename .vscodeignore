@@ -10,6 +10,7 @@ test-repo/**
 .specify/**
 docs/**
 !docs/signing-verification.md
+!docs/telemetry.md
 scripts/**
 specs/**
 AGENTS.md
@@ -18,6 +19,7 @@ eslint.config.mjs
 vitest.config.ts
 .npmrc
 .gitignore
+.env*
 *.ts
 tsconfig*.json
 esbuild.config.mjs

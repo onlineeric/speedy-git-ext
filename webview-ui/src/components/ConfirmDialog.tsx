@@ -1,4 +1,6 @@
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
+import type { DialogId } from '@shared/telemetry';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 import { CommandPreview } from './CommandPreview';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
 
@@ -11,6 +13,8 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   variant?: 'danger' | 'warning';
   commandPreview?: string;
+  /** Dialog-outcome telemetry id (049-usage-telemetry); omit to disable tracking. */
+  telemetryId?: DialogId;
 }
 
 export function ConfirmDialog({
@@ -22,14 +26,23 @@ export function ConfirmDialog({
   confirmLabel = 'Confirm',
   variant = 'warning',
   commandPreview,
+  telemetryId,
 }: ConfirmDialogProps) {
+  const dialogTelemetry = useDialogTelemetry(telemetryId, open);
   const confirmButtonClass =
     variant === 'danger'
       ? 'bg-[var(--vscode-errorForeground)] text-white hover:opacity-90'
       : 'bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]';
 
   return (
-    <AlertDialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onCancel()}>
+    <AlertDialog.Root
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (isOpen) return;
+        dialogTelemetry.cancelled();
+        onCancel();
+      }}
+    >
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <AlertDialog.Content
@@ -56,7 +69,10 @@ export function ConfirmDialog({
             </AlertDialog.Cancel>
             <AlertDialog.Action
               className={`px-3 py-1.5 text-sm rounded ${confirmButtonClass}`}
-              onClick={onConfirm}
+              onClick={() => {
+                dialogTelemetry.confirmed();
+                onConfirm();
+              }}
             >
               {confirmLabel}
             </AlertDialog.Action>

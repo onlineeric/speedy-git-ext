@@ -3,6 +3,8 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { Commit, CherryPickOptions, ResetMode, RebaseEntry, CommitParentInfo, RevertOptions, SlotValue } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
+import type { UiAction } from '@shared/telemetry';
+import { trackUiInteraction } from '../utils/telemetry';
 import { buildResetCommand, buildCheckoutCommand } from '../utils/gitCommandBuilder';
 import { setSlotsAndCompare } from '../utils/compareDispatch';
 import { CompareMenuItems } from './CompareMenuItems';
@@ -173,6 +175,11 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
   );
 }
 
+/** Track a commit-menu item click (049-usage-telemetry). */
+function trackCommitMenu(action: UiAction) {
+  trackUiInteraction('commitMenu', action);
+}
+
 function CommitContextMenuBody({ commit }: { commit: Commit }) {
   const [checkoutCommitConfirmOpen, setCheckoutCommitConfirmOpen] = useState(false);
   const [createBranchOpen, setCreateBranchOpen] = useState(false);
@@ -292,32 +299,38 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
             {isMultiSelectActive ? (
               <ContextMenu.Item
                 className={menuItemClass}
-                onSelect={handleCompareRange}
+                onSelect={() => {
+                  trackCommitMenu('compareCommits');
+                  handleCompareRange();
+                }}
               >
                 Compare these commits
               </ContextMenu.Item>
             ) : (
-              <CompareMenuItems slot={{ kind: 'commit', hash: commit.hash }} resolvedHash={commit.hash} />
+              <CompareMenuItems slot={{ kind: 'commit', hash: commit.hash }} surface="commitMenu" resolvedHash={commit.hash} />
             )}
             <ContextMenu.Separator className={menuSeparatorClass} />
 
             <ContextMenu.Item
               className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
               disabled={isOperationInProgress}
-              onSelect={() => setCheckoutCommitConfirmOpen(true)}
+              onSelect={() => {
+                trackCommitMenu('checkoutCommit');
+                setCheckoutCommitConfirmOpen(true);
+              }}
             >
               Checkout this commit
             </ContextMenu.Item>
             <ContextMenu.Separator className={menuSeparatorClass} />
 
-            <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateBranchOpen(true)}>
+            <ContextMenu.Item className={menuItemClass} onSelect={() => { trackCommitMenu('createBranch'); setCreateBranchOpen(true); }}>
               Create Branch Here...
             </ContextMenu.Item>
-            <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateTagOpen(true)}>
+            <ContextMenu.Item className={menuItemClass} onSelect={() => { trackCommitMenu('createTag'); setCreateTagOpen(true); }}>
               Create Tag Here...
             </ContextMenu.Item>
             <ContextMenu.Separator className={menuSeparatorClass} />
-            <ContextMenu.Item className={menuItemClass} onSelect={() => setCreateWorktreeOpen(true)}>
+            <ContextMenu.Item className={menuItemClass} onSelect={() => { trackCommitMenu('createWorktree'); setCreateWorktreeOpen(true); }}>
               Create worktree…
             </ContextMenu.Item>
             <ContextMenu.Separator className={menuSeparatorClass} />
@@ -330,7 +343,10 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
                 {isMergeCommit ? (
                   <ContextMenu.Item
                     className={menuItemClass}
-                    onSelect={() => openCherryPickDialog([commit])}
+                    onSelect={() => {
+                      trackCommitMenu('cherryPick');
+                      openCherryPickDialog([commit]);
+                    }}
                   >
                     Cherry-Pick Commit
                   </ContextMenu.Item>
@@ -339,14 +355,20 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
                     className={hasSelectedMergeCommit ? menuItemDisabledClass : menuItemClass}
                     disabled={hasSelectedMergeCommit}
                     title={hasSelectedMergeCommit ? 'Selection contains merge commits. Cherry-pick merge commits individually.' : undefined}
-                    onSelect={() => openCherryPickDialog(mergedCommits.filter((item) => selectedCommits.includes(item.hash)))}
+                    onSelect={() => {
+                      trackCommitMenu('cherryPick');
+                      openCherryPickDialog(mergedCommits.filter((item) => selectedCommits.includes(item.hash)));
+                    }}
                   >
                     Cherry-Pick Selected Commits ({selectedCommits.length})
                   </ContextMenu.Item>
                 ) : (
                   <ContextMenu.Item
                     className={menuItemClass}
-                    onSelect={() => openCherryPickDialog([commit], selectedCommits.length > 1)}
+                    onSelect={() => {
+                      trackCommitMenu('cherryPick');
+                      openCherryPickDialog([commit], selectedCommits.length > 1);
+                    }}
                   >
                     Cherry-Pick Commit
                   </ContextMenu.Item>
@@ -360,14 +382,20 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
                 <ContextMenu.Item
                   className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
                   disabled={isOperationInProgress}
-                  onSelect={() => setRebaseOntoConfirmOpen(true)}
+                  onSelect={() => {
+                    trackCommitMenu('rebase');
+                    setRebaseOntoConfirmOpen(true);
+                  }}
                 >
                   Rebase Current Branch onto This Commit
                 </ContextMenu.Item>
                 <ContextMenu.Item
                   className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
                   disabled={isOperationInProgress}
-                  onSelect={interactiveRebase.start}
+                  onSelect={() => {
+                    trackCommitMenu('interactiveRebase');
+                    interactiveRebase.start();
+                  }}
                 >
                   Start Interactive Rebase from Here
                 </ContextMenu.Item>
@@ -380,7 +408,10 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
                 <ContextMenu.Item
                   className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
                   disabled={isOperationInProgress}
-                  onSelect={revert.start}
+                  onSelect={() => {
+                    trackCommitMenu('revert');
+                    void revert.start();
+                  }}
                 >
                   Revert Commit
                 </ContextMenu.Item>
@@ -390,10 +421,10 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
 
             {revertInProgress && (
               <>
-                <ContextMenu.Item className={menuItemClass} onSelect={() => rpcClient.continueRevert()}>
+                <ContextMenu.Item className={menuItemClass} onSelect={() => { trackCommitMenu('continueRevert'); rpcClient.continueRevert(); }}>
                   Continue Revert
                 </ContextMenu.Item>
-                <ContextMenu.Item className={menuItemClass} onSelect={() => rpcClient.abortRevert()}>
+                <ContextMenu.Item className={menuItemClass} onSelect={() => { trackCommitMenu('abortRevert'); rpcClient.abortRevert(); }}>
                   Abort Revert
                 </ContextMenu.Item>
                 <ContextMenu.Separator className={menuSeparatorClass} />
@@ -405,7 +436,10 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
                 <ContextMenu.Item
                   className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
                   disabled={isOperationInProgress}
-                  onSelect={drop.start}
+                  onSelect={() => {
+                    trackCommitMenu('dropCommit');
+                    void drop.start();
+                  }}
                 >
                   Drop Commit
                 </ContextMenu.Item>
@@ -413,14 +447,14 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
               </>
             )}
 
-            <ContextMenu.Item className={menuItemClass} onSelect={() => rpcClient.copyToClipboard(commit.hash)}>
+            <ContextMenu.Item className={menuItemClass} onSelect={() => { trackCommitMenu('copyHash'); rpcClient.copyToClipboard(commit.hash); }}>
               Copy Commit Hash
             </ContextMenu.Item>
-            <ContextMenu.Item className={menuItemClass} onSelect={() => rpcClient.copyToClipboard(commit.abbreviatedHash)}>
+            <ContextMenu.Item className={menuItemClass} onSelect={() => { trackCommitMenu('copyShortHash'); rpcClient.copyToClipboard(commit.abbreviatedHash); }}>
               Copy Short Hash
             </ContextMenu.Item>
             <ContextMenu.Separator className={menuSeparatorClass} />
-            <ContextMenu.Item className={menuItemClass} onSelect={() => rpcClient.copyToClipboard(commit.subject)}>
+            <ContextMenu.Item className={menuItemClass} onSelect={() => { trackCommitMenu('copyMessage'); rpcClient.copyToClipboard(commit.subject); }}>
               Copy Commit Message
             </ContextMenu.Item>
 
@@ -433,13 +467,13 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
                   </ContextMenu.SubTrigger>
                   <ContextMenu.Portal>
                     <ContextMenu.SubContent className={`min-w-[160px] ${menuContentClass}`}>
-                      <ContextMenu.Item className={menuItemClass} onSelect={() => handleResetSelect('soft')}>
+                      <ContextMenu.Item className={menuItemClass} onSelect={() => { trackCommitMenu('resetSoft'); handleResetSelect('soft'); }}>
                         Soft (keep staged)
                       </ContextMenu.Item>
-                      <ContextMenu.Item className={menuItemClass} onSelect={() => handleResetSelect('mixed')}>
+                      <ContextMenu.Item className={menuItemClass} onSelect={() => { trackCommitMenu('resetMixed'); handleResetSelect('mixed'); }}>
                         Mixed (keep unstaged)
                       </ContextMenu.Item>
-                      <ContextMenu.Item className={menuItemClass} onSelect={() => handleResetSelect('hard')}>
+                      <ContextMenu.Item className={menuItemClass} onSelect={() => { trackCommitMenu('resetHard'); handleResetSelect('hard'); }}>
                         Hard (discard all)
                       </ContextMenu.Item>
                     </ContextMenu.SubContent>
@@ -459,6 +493,7 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
         onCancel={() => setCheckoutCommitConfirmOpen(false)}
         title="Checkout Commit"
         description={`Checkout commit ${commit.abbreviatedHash} will result in detached HEAD. Continue?`}
+        telemetryId="checkoutCommit"
         commandPreview={buildCheckoutCommand({ branch: commit.abbreviatedHash, pull: false })}
       />
 
@@ -494,6 +529,7 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
           setPendingResetMode(null);
         }}
         title={pendingResetMode === 'hard' ? 'Reset Branch (Hard)' : 'Reset Branch'}
+        telemetryId="reset"
         description={buildResetDescription(pendingResetMode, hasRemoteUpstream, currentLocalBranch?.name)}
         confirmLabel={pendingResetMode === 'hard' ? 'Discard Changes' : 'Reset'}
         variant={pendingResetMode === 'hard' ? 'danger' : 'warning'}

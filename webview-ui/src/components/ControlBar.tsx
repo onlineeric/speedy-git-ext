@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
+import { trackUiInteraction } from '../utils/telemetry';
 import { RemoteManagementDialog } from './RemoteManagementDialog';
 import { RepoSelector } from './RepoSelector';
 import { SubmoduleSelector } from './SubmoduleSelector';
@@ -19,6 +20,18 @@ import {
   ToolbarSeparatorIcon,
   WorktreeIcon,
 } from './icons';
+
+/**
+ * Panel-toggle telemetry actions (049-usage-telemetry). The four toggle
+ * buttons are the panel toggles, so a click is tracked once as a
+ * `panelToggle` open/close — not additionally as a plain toolbar click.
+ */
+const PANEL_TOGGLE_ACTIONS = {
+  filter: { open: 'filterOpen', close: 'filterClose' },
+  search: { open: 'searchOpen', close: 'searchClose' },
+  compare: { open: 'compareOpen', close: 'compareClose' },
+  worktree: { open: 'worktreeOpen', close: 'worktreeClose' },
+} as const;
 
 const TOGGLE_BUTTON_COLORS = {
   inactive: 'text-[var(--vscode-icon-foreground)] opacity-70 hover:opacity-100',
@@ -73,7 +86,14 @@ export function ControlBar() {
     if (next) applyBranchFilter(next);
   };
 
+  const handleToggleWidget = (widget: keyof typeof PANEL_TOGGLE_ACTIONS) => {
+    const isClosing = activeToggleWidget === widget;
+    trackUiInteraction('panelToggle', PANEL_TOGGLE_ACTIONS[widget][isClosing ? 'close' : 'open']);
+    setActiveToggleWidget(widget);
+  };
+
   const handleRefresh = () => {
+    trackUiInteraction('toolbar', 'refresh');
     useGraphStore.getState().setIsRefreshing(true);
     rpcClient.refresh(filters);
   };
@@ -81,6 +101,7 @@ export function ControlBar() {
   const [fetching, setFetching] = useState(false);
 
   const handleFetch = () => {
+    trackUiInteraction('toolbar', 'fetch');
     setFetching(true);
 
     rpcClient.fetch(undefined, true, filters);
@@ -145,7 +166,7 @@ export function ControlBar() {
       <ToolbarIconButton
         label="Filter"
         icon={<FilterIcon className={iconClass} />}
-        onClick={() => setActiveToggleWidget('filter')}
+        onClick={() => handleToggleWidget('filter')}
         className={filterColor}
         title="Filter"
       />
@@ -153,7 +174,7 @@ export function ControlBar() {
       <ToolbarIconButton
         label="Search"
         icon={<SearchIcon className={iconClass} />}
-        onClick={() => setActiveToggleWidget('search')}
+        onClick={() => handleToggleWidget('search')}
         className={searchColor}
         title="Search commits"
       />
@@ -161,7 +182,7 @@ export function ControlBar() {
       <ToolbarIconButton
         label="Compare"
         icon={<CompareIcon className={iconClass} />}
-        onClick={() => setActiveToggleWidget('compare')}
+        onClick={() => handleToggleWidget('compare')}
         className={compareColor}
         title="Compare refs (Base vs Target)"
       />
@@ -169,7 +190,7 @@ export function ControlBar() {
       <ToolbarIconButton
         label="Worktrees"
         icon={<WorktreeIcon className={iconClass} />}
-        onClick={() => setActiveToggleWidget('worktree')}
+        onClick={() => handleToggleWidget('worktree')}
         className={worktreeColor}
         title={worktreeTitle}
       />
@@ -203,7 +224,10 @@ export function ControlBar() {
         <ToolbarIconButton
           label="Remote"
           icon={<CloudIcon className={iconClass} />}
-          onClick={() => setRemoteDialogOpen(true)}
+          onClick={() => {
+            trackUiInteraction('toolbar', 'remote');
+            setRemoteDialogOpen(true);
+          }}
           aria-label="Manage Remotes"
           className={TOGGLE_BUTTON_COLORS.inactive}
           title="Manage Remotes"
@@ -214,7 +238,10 @@ export function ControlBar() {
       <ToolbarIconButton
         label="Settings"
         icon={<SettingsIcon className={iconClass} />}
-        onClick={() => rpcClient.openSettings()}
+        onClick={() => {
+          trackUiInteraction('toolbar', 'settings');
+          rpcClient.openSettings();
+        }}
         aria-label="Open extension settings"
         className={TOGGLE_BUTTON_COLORS.inactive}
         title="Extension settings"

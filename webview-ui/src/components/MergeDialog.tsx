@@ -3,6 +3,7 @@ import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import type { MergeOptions } from '@shared/types';
 import { buildMergeCommand } from '../utils/gitCommandBuilder';
 import { InlineCode } from '../utils/inlineCodeRenderer';
+import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 import { CommandPreview } from './CommandPreview';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
 
@@ -14,11 +15,13 @@ interface MergeDialogProps {
 }
 
 export function MergeDialog({ open, branchName, onConfirm, onCancel }: MergeDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('merge', open);
   const [squash, setSquash] = useState(false);
   const [noCommit, setNoCommit] = useState(false);
   const [noFastForward, setNoFastForward] = useState(false);
 
   const handleConfirm = () => {
+    dialogTelemetry.confirmed();
     onConfirm({ squash, noCommit, noFastForward: noCommit ? true : noFastForward });
     setSquash(false);
     setNoCommit(false);
@@ -26,6 +29,7 @@ export function MergeDialog({ open, branchName, onConfirm, onCancel }: MergeDial
   };
 
   const handleCancel = () => {
+    dialogTelemetry.cancelled();
     setSquash(false);
     setNoCommit(false);
     setNoFastForward(false);

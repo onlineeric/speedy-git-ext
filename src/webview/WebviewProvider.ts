@@ -16,6 +16,7 @@ import type { GitStashService } from '../services/GitStashService.js';
 import type { GitSubmoduleService } from '../services/GitSubmoduleService.js';
 import type { GitTagService } from '../services/GitTagService.js';
 import type { GitWorktreeService } from '../services/GitWorktreeService.js';
+import type { TelemetryService } from '../services/TelemetryService.js';
 import { DEFAULT_USER_SETTINGS } from '../../shared/types.js';
 import { EditorCommandService } from './EditorCommandService.js';
 import { GitServiceRegistry, type GitServiceSet } from './GitServiceRegistry.js';
@@ -60,6 +61,7 @@ export class WebviewProvider {
     gitWorktreeService: GitWorktreeService,
     gitIndexService: GitIndexService,
     private readonly log: vscode.LogOutputChannel,
+    private readonly telemetry: TelemetryService,
     private readonly gitRepoDiscoveryService?: GitRepoDiscoveryService,
     currentRepoPath?: string,
   ) {
@@ -91,6 +93,7 @@ export class WebviewProvider {
       getSettings: () => this.getSettingsHandler?.(),
       getBatchSize: () => this.getBatchSize(),
       getSubmoduleHandlers: () => this.submoduleHandlers,
+      telemetry: this.telemetry,
     });
     this.refreshCoordinator = new RefreshCoordinator(this.log, this.dataLoader);
     this.editorCommands = new EditorCommandService(this.log, this.context.extensionUri, this.runtime, this.services);
@@ -223,6 +226,7 @@ export class WebviewProvider {
       editorCommands: this.editorCommands,
       operationGuard: this.operationGuard,
       uiStateStore: this.uiStateStore,
+      telemetry: this.telemetry,
       postMessage: (message) => this.postMessage(message),
       getSettings: () => this.getSettingsHandler?.(),
       getBatchSize: () => this.getBatchSize(),

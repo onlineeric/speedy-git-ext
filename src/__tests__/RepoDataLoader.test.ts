@@ -5,6 +5,7 @@ import { GitServiceRegistry } from '../webview/GitServiceRegistry.js';
 import { PersistedUIStateStore } from '../webview/PersistedUIStateStore.js';
 import { RepoDataLoader, computeCommitFingerprint } from '../webview/RepoDataLoader.js';
 import { WebviewRuntime } from '../webview/WebviewRuntime.js';
+import { createTelemetryStub } from './telemetryTestStub.js';
 
 vi.mock('vscode', () => ({
   Uri: {
@@ -32,14 +33,15 @@ function createLoaderFixture(options: {
   runtime?: WebviewRuntime;
   commits?: Commit[];
   branches?: Array<{ name: string; remote?: string; current: boolean; hash: string }>;
-  deferredUncommitted?: Promise<never>;
+  commitsResult?: unknown;
+  deferredUncommitted?: Promise<unknown>;
 } = {}) {
   const runtime = options.runtime ?? new WebviewRuntime('/repo-a');
   const commits = options.commits ?? [makeCommit('aaa1111')];
   const branches = options.branches ?? [];
   const postMessage = vi.fn();
   const gitLogService = {
-    getCommits: vi.fn().mockResolvedValue({
+    getCommits: vi.fn().mockResolvedValue(options.commitsResult ?? {
       success: true,
       value: { commits, totalLoadedWithoutFilter: commits.length },
     }),
@@ -73,6 +75,7 @@ function createLoaderFixture(options: {
     },
     gitSubmoduleService: { getSubmodules: vi.fn().mockResolvedValue({ success: true, value: [] }) },
   } as never);
+  const telemetry = createTelemetryStub();
   const uiStateStore = new PersistedUIStateStore({
     globalState: {
       get: vi.fn(),
@@ -88,9 +91,10 @@ function createLoaderFixture(options: {
     getSettings: () => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }),
     getBatchSize: () => 500,
     getSubmoduleHandlers: () => undefined,
+    telemetry,
   });
 
-  return { dataLoader, runtime, services, postMessage, gitLogService };
+  return { dataLoader, runtime, services, postMessage, gitLogService, telemetry };
 }
 
 describe('RepoDataLoader', () => {
@@ -126,6 +130,51 @@ describe('RepoDataLoader', () => {
       type: 'initialData',
       payload: expect.objectContaining({ commits: null }),
     }));
+  });
+
+  it('suppresses initial and deferred data-loader telemetry errors during auto-refresh', async () => {
+    const runtime = new WebviewRuntime('/repo-a');
+    runtime.initialLoadSent = true;
+    runtime.isDisplayingSubmodule = true;
+    const loadFailure = {
+      success: false,
+      error: { code: 'COMMAND_FAILED', message: 'persistent read failure' },
+    };
+    const { dataLoader, telemetry } = createLoaderFixture({
+      runtime,
+      commitsResult: loadFailure,
+      deferredUncommitted: Promise.resolve(loadFailure),
+    });
+    const deferredLoad = vi.spyOn(dataLoader, 'sendDeferredRepoData');
+
+    await dataLoader.sendInitialData(undefined, true);
+    await deferredLoad.mock.results[0]?.value;
+
+    expect(deferredLoad).toHaveBeenCalledWith(runtime.fetchGeneration, false);
+    expect(telemetry.sendError).not.toHaveBeenCalled();
+  });
+
+  it('continues reporting data-loader telemetry errors for user-initiated loads', async () => {
+    const runtime = new WebviewRuntime('/repo-a');
+    runtime.initialLoadSent = true;
+    runtime.isDisplayingSubmodule = true;
+    const loadFailure = {
+      success: false,
+      error: { code: 'COMMAND_FAILED', message: 'read failure' },
+    };
+    const { dataLoader, telemetry } = createLoaderFixture({
+      runtime,
+      commitsResult: loadFailure,
+      deferredUncommitted: Promise.resolve(loadFailure),
+    });
+    const deferredLoad = vi.spyOn(dataLoader, 'sendDeferredRepoData');
+
+    await dataLoader.sendInitialData();
+    await deferredLoad.mock.results[0]?.value;
+
+    expect(deferredLoad).toHaveBeenCalledWith(runtime.fetchGeneration, true);
+    expect(telemetry.sendError).toHaveBeenCalledTimes(2);
+    expect(telemetry.sendError).toHaveBeenCalledWith('dataLoader', 'COMMAND_FAILED');
   });
 
   it('removes stale branch filters before fetching commits', async () => {
