@@ -4,7 +4,7 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [5.5.0] - 2026-07-13
+## [5.5.0] - pre-release - 2026-07-13
 
 ### Added
 - **Anonymous, aggregate-only usage telemetry.** Speedy Git can now report which user-initiated Git operations and selected UI features are used, whether operations succeed, standardized error codes, dialog outcomes, and coarse performance measurements. Events use fixed identifiers only and never include repository content or values entered by the user.
