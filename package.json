@@ -100,7 +100,7 @@
             "telemetry",
             "usesOnlineServices"
           ],
-          "markdownDescription": "Allow Speedy Git to send anonymous usage statistics (feature usage counts, error codes, performance timings — never repository names, branch names, file paths, or anything you type). **Note:** anonymous usage statistics are sent only when this setting and VS Code's global `#telemetry.telemetryLevel#` setting are both enabled — turning either off stops all collection. See [what we collect](https://github.com/onlineeric/speedy-git-ext/blob/main/docs/telemetry.md)."
+          "markdownDescription": "Allow Speedy Git to send anonymous usage statistics (feature usage counts, error codes, performance timings — never repository names, branch names, file paths, or anything you type). **Note:** anonymous usage statistics are sent only when this setting and VS Code's global `#telemetry.telemetryLevel#` setting are both enabled — turning either off stops all collection. See [telemetry details](https://github.com/onlineeric/speedy-git-ext#telemetry)."
         },
         "speedyGit.batchCommitSize": {
           "type": "number",

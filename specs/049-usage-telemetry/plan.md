@@ -93,7 +93,6 @@ package.json                         # MODIFIED — speedyGit.telemetry.enabled 
                                      #   usesOnlineServices); dependency @vscode/extension-telemetry
 telemetry.json                       # NEW — machine-readable event manifest (`code --telemetry` dump)
 README.md                            # MODIFIED — "Telemetry" section (what/never/opt-out)
-docs/telemetry.md                    # NEW — full disclosure doc linked from README + setting description
 .env                                 # NEW, local only — already covered by `.env*` in .gitignore ✓
 ```
 
@@ -106,7 +105,7 @@ docs/telemetry.md                    # NEW — full disclosure doc linked from R
 3. **UI events via one RPC**: `trackUiEvent` payload is `UiTelemetryEvent` (discriminated union: `uiInteraction` | `dialogOutcome` | `perf`). Handler re-validates every field against the closed catalog before forwarding (never trust webview input). No response message ever.
 4. **Consent**: reporter internally honors `telemetry.telemetryLevel` / `isTelemetryEnabled` (incl. live changes). `speedyGit.telemetry.enabled` is checked in `TelemetryService` before every send, read live via `onDidChangeConfiguration` — both gates must pass (FR-004).
 5. **Connection string**: gitignored `.env` → esbuild `define` on `--production` only → `process.env.SPEEDYGIT_TELEMETRY_CONNECTION_STRING` literal in bundle. Absent/dev ⇒ empty string ⇒ no-op service. Also gated on `context.extensionMode === Production` so F5 sessions never report (FR-015).
-6. **Transparency**: "Speedy Git Telemetry" `LogOutputChannel` — one activation status line (enabled/disabled + why) + one line per sent event (name + properties). Never auto-shown (FR-008a). `telemetry.json` manifest at extension root; README section + `docs/telemetry.md`.
+6. **Transparency**: "Speedy Git Telemetry" `LogOutputChannel` — one activation status line (enabled/disabled + why) + one line per sent event (name + properties). Never auto-shown (FR-008a). `telemetry.json` manifest at extension root; compact README section with a collapsed full disclosure.
 7. **`panelOpened` trigger granularity**: `command` | `scmButton`. Keybinding/status-bar/palette all execute `speedyGit.showGraph` and are not distinguishable without new plumbing — collapsed into `command` (documented deviation from the idea doc's 4-value enum; YAGNI).
 8. **Buckets**: commit counts reported as `'≤500' | '501-1000' | '1001-5000' | '5001-10000' | '>10000'` (FR-013).
 

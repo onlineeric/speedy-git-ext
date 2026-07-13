@@ -51,4 +51,4 @@
 | Webview send helper | `webview-ui/src/utils/telemetry.ts` (+ `rpc/rpcClient.ts`) |
 | Build injection | `esbuild.config.mjs` |
 | Setting + dependency | `package.json` |
-| Transparency | `telemetry.json`, `README.md`, `docs/telemetry.md` |
+| Transparency | `telemetry.json`, README "Telemetry" section |

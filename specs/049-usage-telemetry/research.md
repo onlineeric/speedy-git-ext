@@ -77,5 +77,5 @@ No NEEDS CLARIFICATION markers remained in the Technical Context; this document 
 
 ## R12. Transparency artifacts
 
-- **Decision**: `telemetry.json` at extension root enumerating every event/property/measurement (surfaces in `code --telemetry` dump); README "Telemetry" section (what we collect / never collect / how to opt out) linking `docs/telemetry.md` with the full tables from the spec.
+- **Decision**: `telemetry.json` at extension root enumerating every event/property/measurement (surfaces in `code --telemetry` dump); a compact README "Telemetry" section with the opt-out instructions and a collapsed full disclosure of what is and is not collected.
 - **Rationale**: FR-018; both lists already exist in spec — cheap to produce, and the closed catalog in `shared/telemetry.ts` is the single source they're derived from.

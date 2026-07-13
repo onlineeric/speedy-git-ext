@@ -87,16 +87,33 @@ Open Speedy Git from the status bar:
 ## Telemetry
 
 Speedy Git collects **anonymous, aggregate-only usage statistics** (feature
-usage counts, standardized error codes, performance timings) to guide
-development — never repository names, branch names, file paths, commit
-content, or anything you type. Collection honors VS Code's global
-`telemetry.telemetryLevel` **and** the extension's own
-`speedyGit.telemetry.enabled` setting (default on): turning either off stops
-all collection, with no restart needed. A dedicated "Speedy Git Telemetry"
-output channel logs every sent event for full transparency.
+usage, standardized error codes, and performance timings) to improve
+compatibility, reliability, and product direction. It never collects repository
+content, repository names or paths, or anything you type.
 
-See [docs/telemetry.md](docs/telemetry.md) for the complete list of what is
-and is not collected and how to opt out.
+Telemetry is sent only when both VS Code's global telemetry setting and
+`speedyGit.telemetry.enabled` are enabled. Turning either setting off stops all
+collection immediately.
+
+<details>
+<summary>What is collected</summary>
+
+- Feature and UI usage from fixed action identifiers, operation outcomes, and
+  standardized error codes.
+- Performance timings, with commit counts reported only as coarse ranges.
+- Editor, operating system, and extension versions; Speedy Git setting choices;
+  and VS Code's anonymized machine and session identifiers.
+
+Speedy Git never collects repository or workspace names and paths; remote URLs;
+branch, tag, stash, or worktree names; commit hashes, messages, or diffs; author
+names, emails, or avatars; Git configuration values; file names or paths; raw
+Git output or exception messages; search or filter values; or anything entered
+into an input.
+
+The exact event schema is available in [`telemetry.json`](telemetry.json). Every
+sent event is also recorded in the **Speedy Git Telemetry** output channel.
+
+</details>
 
 ## Issues, Feature Requests & Feedback
 

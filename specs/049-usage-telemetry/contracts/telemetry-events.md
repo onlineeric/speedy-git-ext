@@ -96,7 +96,7 @@ Event name format: `onlineeric.speedy-git-ext/<eventName>` (reporter prefixes au
 | `…/perf` | kind, commitCountBucket, common.* | durationMs |
 | `…/error` | area, errorCode, common.* | — |
 
-This table is mirrored 1:1 by `telemetry.json` (extension root) for the `code --telemetry` transparency dump and by `docs/telemetry.md` for humans (FR-018).
+This table is mirrored 1:1 by `telemetry.json` (extension root) for the `code --telemetry` transparency dump and summarized in the README "Telemetry" disclosure for humans (FR-018).
 
 ## E. Configuration contract (`package.json`)
 
@@ -105,7 +105,7 @@ This table is mirrored 1:1 by `telemetry.json` (extension root) for the `code --
   "type": "boolean",
   "default": true,
   "tags": ["telemetry", "usesOnlineServices"],
-  "markdownDescription": "Allow Speedy Git to send anonymous usage statistics (feature usage counts, error codes, performance timings — never repository names, branch names, file paths, or anything you type). **Note:** statistics are sent only when this setting and VS Code's global `#telemetry.telemetryLevel#` are both enabled — turning either off stops all collection. See [what we collect](https://github.com/onlineeric/speedy-git-ext/blob/main/docs/telemetry.md)."
+  "markdownDescription": "Allow Speedy Git to send anonymous usage statistics (feature usage counts, error codes, performance timings — never repository names, branch names, file paths, or anything you type). **Note:** statistics are sent only when this setting and VS Code's global `#telemetry.telemetryLevel#` are both enabled — turning either off stops all collection. See [telemetry details](https://github.com/onlineeric/speedy-git-ext#telemetry)."
 }
 ```
 
