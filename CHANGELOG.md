@@ -4,6 +4,21 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.5.0] - 2026-07-13
+
+### Added
+- **Anonymous, aggregate-only usage telemetry.** Speedy Git can now report which user-initiated Git operations and selected UI features are used, whether operations succeed, standardized error codes, dialog outcomes, and coarse performance measurements. Events use fixed identifiers only and never include repository content or values entered by the user.
+- **Independent telemetry opt-out.** The new `speedyGit.telemetry.enabled` setting works alongside VS Code's global telemetry preference. Both must allow telemetry; turning either one off stops collection immediately without a restart.
+- **Passive telemetry visibility.** The **Speedy Git Telemetry** output channel records the current enabled/disabled status and every event sent. A machine-readable `telemetry.json` manifest documents the exact event schema.
+
+### Privacy
+- Telemetry never collects repository or workspace names and paths, remote URLs, branch/tag/stash/worktree names, commit hashes/messages/diffs, author details, Git configuration, file names, raw Git output, exception messages or stack traces, search/filter values, or anything typed into an input. Commit counts are reported only in coarse buckets.
+- Development, test, and debug builds, plus builds without a telemetry destination, use an inert no-op implementation. Telemetry is fire-and-forget, failures are swallowed, and no telemetry prompts or notifications are shown.
+
+### Internal
+- Added a single backend `TelemetryService` funnel using `@vscode/extension-telemetry`, operation tracking middleware in `WebviewMessageRouter`, and a validated one-way webview telemetry RPC. Shared closed catalogs in `shared/telemetry.ts` prevent free-form event properties from leaving the extension.
+- Added focused coverage for consent gates, catalog validation, operation outcomes, one-shot session events, error sanitization, and invalid webview payload rejection. Telemetry disclosure is consolidated in the README.
+
 ## [5.4.2] - 2026-07-09
 
 ### Fixed
