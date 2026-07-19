@@ -12,6 +12,12 @@ export interface CommitsResult {
 // Git format placeholder %x00 outputs a null byte - used as field separator
 const LOG_FORMAT = '%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D';
 
+/**
+ * How deep `getCommitPosition` searches the log stream before giving up.
+ * Keeps the hash-only listing bounded on enormous repositories.
+ */
+const COMMIT_POSITION_SEARCH_CAP = 100_000;
+
 export class GitLogService {
   private executor: GitExecutor;
 
@@ -22,18 +28,22 @@ export class GitLogService {
     this.executor = new GitExecutor(log);
   }
 
-  async getCommits(filters?: Partial<GraphFilters>): Promise<Result<CommitsResult>> {
-    this.log.info('Fetching commits');
+  /**
+   * Build the shared `git log` argument list used by every query that must
+   * walk the exact same commit stream as the paginated graph (`getCommits`,
+   * `getCommitPosition`). Keeping the ordering/filter arguments in one place
+   * guarantees positions computed by one query match the other's pagination.
+   */
+  private buildLogArgs(format: string, filters?: Partial<GraphFilters>): string[] {
     const maxCount = filters?.maxCount ?? 500;
     const args = ['log'];
-    const revisionArgs: string[] = [];
 
     if (filters?.skip && filters.skip > 0) {
       args.push(`--skip=${filters.skip}`);
     }
     args.push(
       `--max-count=${maxCount}`,
-      `--format=${LOG_FORMAT}`,
+      `--format=${format}`,
       '--date-order'
     );
 
@@ -49,7 +59,7 @@ export class GitLogService {
 
     // Add branch filter(s) or default ref namespaces after options so refs are parsed as revisions.
     if (filters?.branches && filters.branches.length > 0) {
-      revisionArgs.push(...filters.branches);
+      args.push(...filters.branches);
     } else {
       // Show user-facing Git history only. `--all` also includes tool-owned
       // namespaces such as refs/jj/keep/*, which can surface internal commits
@@ -60,8 +70,13 @@ export class GitLogService {
     }
 
     // Separate revisions from paths to avoid ambiguous argument errors
-    args.push(...revisionArgs);
     args.push('--');
+    return args;
+  }
+
+  async getCommits(filters?: Partial<GraphFilters>): Promise<Result<CommitsResult>> {
+    this.log.info('Fetching commits');
+    const args = this.buildLogArgs(LOG_FORMAT, filters);
 
     const result = await this.executor.execute({
       args,
@@ -87,6 +102,42 @@ export class GitLogService {
       commits,
       totalLoadedWithoutFilter: hasFilter ? undefined : commits.length,
     });
+  }
+
+  /** Full hash of the commit HEAD points at. Fails on an unborn branch (fresh repo). */
+  async getHeadCommitHash(): Promise<Result<string>> {
+    const result = await this.executor.execute({
+      args: ['rev-parse', 'HEAD'],
+      cwd: this.workspacePath,
+    });
+
+    if (!result.success) {
+      return result;
+    }
+
+    return ok(result.value.stdout.trim());
+  }
+
+  /**
+   * 0-based position of `hash` in the same ordered log stream `getCommits`
+   * paginates through (hash-only listing, so this stays cheap even for large
+   * repositories). Returns -1 when the commit is not in the stream — filtered
+   * out by branch/date filters or deeper than the search cap.
+   */
+  async getCommitPosition(hash: string, filters?: Partial<GraphFilters>): Promise<Result<number>> {
+    this.log.info('Locating commit position in log stream');
+    const args = this.buildLogArgs('%H', { ...filters, maxCount: COMMIT_POSITION_SEARCH_CAP, skip: 0 });
+
+    const result = await this.executor.execute({
+      args,
+      cwd: this.workspacePath,
+    });
+
+    if (!result.success) {
+      return result;
+    }
+
+    return ok(result.value.stdout.split('\n').indexOf(hash));
   }
 
   async getAuthors(): Promise<Result<Author[]>> {

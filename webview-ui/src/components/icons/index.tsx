@@ -275,6 +275,23 @@ export function FetchIcon({ className }: IconProps) {
   );
 }
 
+/** Locate reticle around a commit node — go to the HEAD commit — 12×12, inherits text color via currentColor */
+export function GoToHeadIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      {/* Commit node at the center */}
+      <circle cx={6} cy={6} r={1.4} fill="currentColor" />
+      {/* Reticle ring */}
+      <circle cx={6} cy={6} r={3.4} stroke="currentColor" strokeWidth={1.2} />
+      {/* Crosshair ticks */}
+      <line x1={6} y1={0.6} x2={6} y2={2.1} stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" />
+      <line x1={6} y1={9.9} x2={6} y2={11.4} stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" />
+      <line x1={0.6} y1={6} x2={2.1} y2={6} stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" />
+      <line x1={9.9} y1={6} x2={11.4} y2={6} stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /** Vertical toolbar divider aligned to icon-button height */
 export function ToolbarSeparatorIcon({ className }: IconProps) {
   return (

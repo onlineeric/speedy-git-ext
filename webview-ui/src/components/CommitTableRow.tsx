@@ -56,6 +56,8 @@ interface CommitTableRowProps {
   isMultiSelected?: boolean;
   isSearchMatch?: boolean;
   isCurrentSearchMatch?: boolean;
+  /** Briefly pulses the row background after a "Go to HEAD" navigation. */
+  isFlashing?: boolean;
   onClick: (event: React.MouseEvent) => void;
   onNodeMouseEnter?: (hash: string, rect: DOMRect) => void;
   onNodeMouseLeave?: () => void;
@@ -75,6 +77,7 @@ export const CommitTableRow = memo(function CommitTableRow({
   isMultiSelected = false,
   isSearchMatch = false,
   isCurrentSearchMatch = false,
+  isFlashing = false,
   onClick,
   onNodeMouseEnter,
   onNodeMouseLeave,
@@ -136,7 +139,7 @@ export const CommitTableRow = memo(function CommitTableRow({
 
   const row = (
     <div
-      className={`grid cursor-pointer hover:bg-[var(--vscode-list-hoverBackground)] ${bgClass}`}
+      className={`grid cursor-pointer hover:bg-[var(--vscode-list-hoverBackground)] ${bgClass}${isFlashing ? ' animate-head-flash' : ''}`}
       style={{
         ...style,
         gridTemplateColumns: layout.gridTemplateColumns,

@@ -91,7 +91,13 @@ export type RequestMessage =
   // Authors
   | { type: 'getAuthors'; payload: Record<string, never> }
   // Pagination & settings
-  | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string } } }
+  | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string }; targetIndex?: number } }
+  /**
+   * Resolve the HEAD commit hash and its position in the paginated log stream
+   * under the given backend filters. Answered with a `headLocation` response;
+   * used by the toolbar "Go to HEAD" navigation.
+   */
+  | { type: 'locateHead'; payload: { filters: { branches?: string[]; afterDate?: string; beforeDate?: string } } }
   | { type: 'openSettings'; payload: { query?: string } }
   | { type: 'switchRepo'; payload: { repoPath: string } }
   /**
@@ -181,6 +187,12 @@ export type ResponseMessage =
   | { type: 'commitParents'; payload: { parents: CommitParentInfo[] } }
   | { type: 'commitsAppended'; payload: { commits: Commit[]; hasMore: boolean; generation: number; totalLoadedWithoutFilter?: number } }
   | { type: 'prefetchError'; payload: { error: GitError | { message: string } } }
+  /**
+   * Answer to `locateHead`. `hash` is null when HEAD cannot be resolved (e.g.
+   * unborn branch in a fresh repo); `index` is HEAD's 0-based position in the
+   * filtered log stream, or -1 when HEAD is not part of that stream.
+   */
+  | { type: 'headLocation'; payload: { hash: string | null; index: number } }
   | { type: 'repoList'; payload: { repos: RepoInfo[]; activeRepoPath: string } }
   | { type: 'checkoutNeedsStash'; payload: { name: string; pull?: boolean } }
   | { type: 'checkoutCommitNeedsStash'; payload: { hash: string } }
@@ -230,7 +242,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   abortRebase: true, continueRebase: true,
   getSignatureInfo: true, detectSignaturePresence: true, verifySignatures: true, openSignatureHelp: true,
   dropCommit: true, isCommitPushed: true, getCommitParents: true,
-  loadMoreCommits: true, openSettings: true, switchRepo: true, displayRepo: true,
+  loadMoreCommits: true, locateHead: true, openSettings: true, switchRepo: true, displayRepo: true,
   getSettings: true, setToolbarSetting: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
   updateSubmodule: true, initSubmodule: true,
   stashAndCheckout: true, stashAndCheckoutCommit: true,
@@ -253,7 +265,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   rebaseState: true, rebaseCommits: true, signatureInfo: true,
   signaturePresence: true, signaturePresenceFailed: true, signaturesVerified: true,
   commitPushedResult: true, commitParents: true,
-  commitsAppended: true, prefetchError: true, repoList: true,
+  commitsAppended: true, prefetchError: true, headLocation: true, repoList: true,
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
   pushResult: true, avatarUrls: true, tagMetadata: true, worktreeList: true, worktreePathResolved: true, worktreeEnvFiles: true, containingBranches: true,

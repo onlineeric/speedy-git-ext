@@ -4,6 +4,9 @@ import { UNCOMMITTED_HASH } from '../../../shared/types.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 import { postUncommittedCommitDetails } from './workingTreeHandlers.js';
 
+/** Upper bound for a single targeted `loadMoreCommits` batch (Go to HEAD). */
+const MAX_TARGETED_BATCH = 10_000;
+
 export const graphDataHandlers = {
   getAuthors: async (_message, context) => {
     const result = await context.services.current().gitLogService.getAuthors();
@@ -37,38 +40,63 @@ export const graphDataHandlers = {
 
   loadMoreCommits: async (message, context) => {
     const batchSize = context.getBatchSize();
-    const { skip, generation, filters } = message.payload;
-    const result = await context.services.current().gitLogService.getCommits({ ...filters, maxCount: batchSize, skip });
-    if (result.success) {
+    const { skip, generation, filters, targetIndex } = message.payload;
+    // Targeted loads (Go to HEAD) grow the batch to reach a known log position
+    // in one request, rounded up to whole batches and capped so a single
+    // response never carries an unbounded commit payload; the webview keeps
+    // requesting until the target commit is loaded.
+    const maxCount = targetIndex !== undefined && targetIndex >= skip
+      ? Math.min(Math.ceil((targetIndex - skip + 1) / batchSize) * batchSize, MAX_TARGETED_BATCH)
+      : batchSize;
+    const result = await context.services.current().gitLogService.getCommits({ ...filters, maxCount, skip });
+    const postAppended = (value: Extract<typeof result, { success: true }>['value']) => {
       context.postMessage({
         type: 'commitsAppended',
         payload: {
-          commits: result.value.commits,
-          hasMore: result.value.commits.length >= batchSize,
+          commits: value.commits,
+          hasMore: value.commits.length >= maxCount,
           generation,
-          totalLoadedWithoutFilter: result.value.totalLoadedWithoutFilter,
+          totalLoadedWithoutFilter: value.totalLoadedWithoutFilter,
         },
       });
+    };
+    if (result.success) {
+      postAppended(result.value);
     } else {
       context.postMessage({ type: 'prefetchError', payload: { error: result.error } });
       vscode.window.showErrorMessage('Failed to load commits', 'Retry').then(async (choice) => {
         if (choice !== 'Retry') return;
-        const retryResult = await context.services.current().gitLogService.getCommits({ ...filters, maxCount: batchSize, skip });
+        const retryResult = await context.services.current().gitLogService.getCommits({ ...filters, maxCount, skip });
         if (retryResult.success) {
-          context.postMessage({
-            type: 'commitsAppended',
-            payload: {
-              commits: retryResult.value.commits,
-              hasMore: retryResult.value.commits.length >= batchSize,
-              generation,
-              totalLoadedWithoutFilter: retryResult.value.totalLoadedWithoutFilter,
-            },
-          });
+          postAppended(retryResult.value);
         } else {
           context.postMessage({ type: 'prefetchError', payload: { error: retryResult.error } });
         }
       });
     }
+  },
+
+  locateHead: async (message, context) => {
+    const gitLogService = context.services.current().gitLogService;
+
+    const headResult = await gitLogService.getHeadCommitHash();
+    if (!headResult.success) {
+      // Unresolvable HEAD (e.g. unborn branch in a fresh repo) is a normal
+      // state, not a git failure — let the webview show a friendly notice.
+      context.postMessage({ type: 'headLocation', payload: { hash: null, index: -1 } });
+      return;
+    }
+
+    const positionResult = await gitLogService.getCommitPosition(headResult.value, message.payload.filters);
+    if (!positionResult.success) {
+      context.postMessage({ type: 'error', payload: { error: positionResult.error } });
+      return;
+    }
+
+    context.postMessage({
+      type: 'headLocation',
+      payload: { hash: headResult.value, index: positionResult.value },
+    });
   },
 
   getBranches: async (_message, context) => {
@@ -129,6 +157,7 @@ export const graphDataHandlers = {
   | 'getAuthors'
   | 'getCommits'
   | 'loadMoreCommits'
+  | 'locateHead'
   | 'getBranches'
   | 'getCommitDetails'
   | 'getContainingBranches'

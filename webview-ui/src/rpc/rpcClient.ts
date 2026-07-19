@@ -1,6 +1,7 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
 import type { CherryPickOptions, CompareMode, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
+import { decideHeadNavigation, HEAD_NAVIGATION_MESSAGES, MAX_GO_TO_HEAD_LOADS, type HeadNavigationDecision } from '../utils/headNavigation';
 
 declare const acquireVsCodeApi: () => {
   postMessage: (message: unknown) => void;
@@ -80,11 +81,15 @@ class RpcClient {
       case 'commitsAppended': {
         if (message.payload.generation !== store.fetchGeneration) {
           store.setPrefetching(false);
+          // A stale batch means the graph was reloaded mid-navigation; the
+          // located HEAD position no longer applies.
+          store.resetGoToHead();
           break;
         }
         store.appendCommits(message.payload.commits, message.payload.totalLoadedWithoutFilter);
         store.setHasMore(message.payload.hasMore);
         store.setPrefetching(false);
+        this.continueGoToHeadAfterAppend();
         // Auto-retry: if batch yielded no visible commits and cap not reached, fetch more
         const updatedStore = useGraphStore.getState();
         if (
@@ -94,6 +99,21 @@ class RpcClient {
         ) {
           this.firePrefetch();
         }
+        break;
+      }
+      case 'headLocation': {
+        // Ignore unsolicited/stale answers (e.g. after a refresh reset the flow).
+        if (store.goToHeadState !== 'locating') break;
+        const { hash, index } = message.payload;
+        const decision = decideHeadNavigation({
+          hash,
+          index,
+          loadedCount: store.commits.length,
+          mergedIndex: hash ? store.mergedCommits.findIndex((c) => c.hash === hash) : -1,
+          isHiddenClientSide: hash ? store.hiddenCommitHashes.has(hash) : false,
+          hasMore: store.hasMore,
+        });
+        this.applyHeadNavigation(decision, hash);
         break;
       }
       case 'repoList':
@@ -116,6 +136,9 @@ class RpcClient {
         store.setError(errorMessage);
         store.setIsRefreshing(false);
         store.setWorktreeListLoading(false);
+        // A failed locateHead (or any interleaved failure) must not leave the
+        // Go to HEAD button stuck in its busy state.
+        store.resetGoToHead();
         // Clear the author-fetch guard so a failed getAuthors() can be retried.
         // Author fetch failures arrive here (not as an `authorList` message), so
         // without this the FilterWidget's `authorListLoading` guard stays true and
@@ -155,6 +178,7 @@ class RpcClient {
       case 'prefetchError':
         store.setError(message.payload.error.message);
         store.setPrefetching(false);
+        store.resetGoToHead();
         break;
       case 'success':
         store.setSuccessMessage(message.payload.message);
@@ -711,8 +735,104 @@ class RpcClient {
   }
 
   // Pagination
-  loadMoreCommits(skip: number, generation: number, filters: { branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string }) {
-    this.send({ type: 'loadMoreCommits', payload: { skip, generation, filters } });
+  loadMoreCommits(skip: number, generation: number, filters: { branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string }, targetIndex?: number) {
+    this.send({ type: 'loadMoreCommits', payload: { skip, generation, filters, targetIndex } });
+  }
+
+  // Go to HEAD (toolbar)
+  goToHead() {
+    const store = useGraphStore.getState();
+    if (store.goToHeadState !== 'idle' || store.loading) return;
+    store.setGoToHeadState('locating');
+    // Author/text filtering is client-side; only backend filters shape the log stream.
+    const { branches, afterDate, beforeDate } = store.filters;
+    this.send({ type: 'locateHead', payload: { filters: { branches, afterDate, beforeDate } } });
+  }
+
+  /** Execute the decided next step of a Go to HEAD navigation. */
+  private applyHeadNavigation(decision: HeadNavigationDecision, hash: string | null) {
+    const store = useGraphStore.getState();
+    switch (decision.kind) {
+      case 'scrollTo':
+        if (hash && store.navigateToCommit(hash)) {
+          this.refreshDetailsPanelIfOpen(hash);
+        }
+        break;
+      case 'loadMore': {
+        if (!hash) break;
+        store.setPendingHead({
+          hash,
+          targetIndex: decision.targetIndex,
+          attempts: (store.pendingHead?.attempts ?? 0) + 1,
+        });
+        store.setGoToHeadState('loading');
+        this.requestTargetedBatch(decision.targetIndex);
+        break;
+      }
+      // hiddenByFilter / notInView / unresolved: each decision kind is also its
+      // user-facing message key, so one branch handles all the terminal cases.
+      default:
+        store.resetGoToHead();
+        store.setError(HEAD_NAVIGATION_MESSAGES[decision.kind]);
+        break;
+    }
+  }
+
+  /**
+   * Refresh the details panel content after Go to HEAD lands on a row.
+   * Navigation must never change the panel's visibility, and receiving
+   * details force-opens it — so only fetch when the panel is already open.
+   */
+  private refreshDetailsPanelIfOpen(hash: string) {
+    if (useGraphStore.getState().detailsPanelOpen) {
+      this.getCommitDetails(hash);
+    }
+  }
+
+  /**
+   * Issue the next targeted `loadMoreCommits` batch for a Go to HEAD in flight.
+   * No-op when a prefetch is already running — that batch's commitsAppended
+   * response re-enters continueGoToHeadAfterAppend and drives the next step.
+   */
+  private requestTargetedBatch(targetIndex: number) {
+    const store = useGraphStore.getState();
+    if (store.prefetching) return;
+    store.setPrefetching(true);
+    const { branches, afterDate, beforeDate } = store.filters;
+    this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branches, afterDate, beforeDate }, targetIndex);
+  }
+
+  /**
+   * After each commitsAppended batch, finish (or keep driving) a pending
+   * Go to HEAD navigation: navigate once the target row exists, otherwise
+   * request the next targeted batch until found or capped.
+   */
+  private continueGoToHeadAfterAppend() {
+    const store = useGraphStore.getState();
+    const pending = store.pendingHead;
+    if (store.goToHeadState !== 'loading' || !pending) return;
+
+    if (store.mergedCommits.some((c) => c.hash === pending.hash)) {
+      if (store.navigateToCommit(pending.hash)) {
+        this.refreshDetailsPanelIfOpen(pending.hash);
+      }
+      return;
+    }
+    if (store.hiddenCommitHashes.has(pending.hash)) {
+      store.resetGoToHead();
+      store.setError(HEAD_NAVIGATION_MESSAGES.hiddenByFilter);
+      return;
+    }
+    if (!store.hasMore || pending.attempts >= MAX_GO_TO_HEAD_LOADS) {
+      store.resetGoToHead();
+      store.setError(HEAD_NAVIGATION_MESSAGES.unreachable);
+      return;
+    }
+
+    store.setPendingHead({ ...pending, attempts: pending.attempts + 1 });
+    // History may have grown since HEAD was located — never request less than
+    // one batch past what is already loaded.
+    this.requestTargetedBatch(Math.max(pending.targetIndex, store.commits.length));
   }
 
   stageFiles(paths: string[]) {
