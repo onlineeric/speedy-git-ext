@@ -181,6 +181,19 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
     }
   }, [selectedCommitIndex, virtualizer]);
 
+  // Go to HEAD: center the flashed row (overriding the minimal 'auto' scroll
+  // above — this effect runs after it) and clear the flash once it has played.
+  const flashCommitHash = useGraphStore((state) => state.flashCommitHash);
+  useEffect(() => {
+    if (!flashCommitHash) return;
+    const flashIndex = commits.findIndex((commit) => commit.hash === flashCommitHash);
+    if (flashIndex >= 0) {
+      virtualizer.scrollToIndex(flashIndex, { align: 'center' });
+    }
+    const timer = setTimeout(() => useGraphStore.getState().clearCommitFlash(), 2000);
+    return () => clearTimeout(timer);
+  }, [flashCommitHash, commits, virtualizer]);
+
   useEffect(() => {
     const currentMatch = searchState.matchIndices[searchState.currentMatchIndex];
     if (currentMatch !== undefined) {
@@ -338,6 +351,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
                     isMultiSelected={isMultiSelected}
                     isSearchMatch={isSearchMatch}
                     isCurrentSearchMatch={isCurrentSearchMatch}
+                    isFlashing={flashCommitHash === commit.hash}
                     onClick={(event) => handleCommitClick(commit.hash, virtualItem.index, event)}
                     onNodeMouseEnter={stableOnNodeMouseEnter}
                     onNodeMouseLeave={stableOnNodeMouseLeave}

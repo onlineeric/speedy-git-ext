@@ -90,7 +90,7 @@ export type UiSurface = (typeof UI_SURFACES)[number];
 
 export const UI_ACTIONS = [
   // Toolbar buttons (ControlBar)
-  'filter', 'search', 'compare', 'worktrees', 'refresh', 'fetch', 'view', 'remote', 'settings',
+  'filter', 'search', 'compare', 'worktrees', 'refresh', 'fetch', 'goToHead', 'view', 'remote', 'settings',
   // Toolbar right-click menu
   'toggleLabels', 'toggleRemoteButton',
   // Commit context menu

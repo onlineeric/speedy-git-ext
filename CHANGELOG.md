@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.6.0] - 2026-07-19
+
+### Added
+- **"Go to HEAD" toolbar button.** A new **HEAD** button (next to Fetch, with its own separator) jumps the graph straight to the commit you have checked out — no more hunting for the small HEAD indicator when your checkout is far down the history. Clicking it selects the HEAD row, scrolls it to the center of the view, opens its details, and briefly flashes the row so it's easy to spot. It works even when HEAD is thousands of commits deep and not loaded yet: the extension locates HEAD's exact position in the history and loads commits up to it in large targeted batches instead of paging through one batch at a time. Detached HEAD checkouts are supported, and clear messages explain the cases where HEAD can't be shown — when it's excluded by the current branch or date filter, hidden by an author or search filter, or the repository has no commits yet. The button shows a busy state while locating/loading and is safe to use alongside refreshes, repo switches, and background loading.
+
 ## [5.5.1] - 2026-07-14
 
 ### Internal

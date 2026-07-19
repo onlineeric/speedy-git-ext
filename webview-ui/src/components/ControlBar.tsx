@@ -17,6 +17,7 @@ import {
   SearchIcon,
   RefreshIcon,
   FetchIcon,
+  GoToHeadIcon,
   ToolbarSeparatorIcon,
   WorktreeIcon,
 } from './icons';
@@ -99,6 +100,13 @@ export function ControlBar() {
   };
 
   const [fetching, setFetching] = useState(false);
+
+  const goToHeadBusy = useGraphStore((state) => state.goToHeadState !== 'idle');
+
+  const handleGoToHead = () => {
+    trackUiInteraction('toolbar', 'goToHead');
+    rpcClient.goToHead();
+  };
 
   const handleFetch = () => {
     trackUiInteraction('toolbar', 'fetch');
@@ -212,6 +220,18 @@ export function ControlBar() {
         disabled={fetching || loading}
         className={fetching ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}
         title="Fetch all remotes"
+      />
+
+      <ToolbarSeparatorIcon className="h-6 w-4 text-[var(--vscode-panel-border)] opacity-90" />
+
+      <ToolbarIconButton
+        label="HEAD"
+        icon={<GoToHeadIcon className={iconClass} />}
+        onClick={handleGoToHead}
+        disabled={goToHeadBusy || loading}
+        aria-label="Go to HEAD commit"
+        className={goToHeadBusy ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}
+        title="Go to HEAD commit (current checkout)"
       />
 
       <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)] px-1">

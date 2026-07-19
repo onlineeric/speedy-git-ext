@@ -135,6 +135,12 @@ interface GraphStore {
   prefetching: boolean;
   fetchGeneration: number;
   lastBatchStartIndex: number;
+  /** Lifecycle of a toolbar "Go to HEAD" navigation; non-idle disables the button. */
+  goToHeadState: 'idle' | 'locating' | 'loading';
+  /** Target of an in-flight Go to HEAD that still needs commits loaded. */
+  pendingHead: { hash: string; targetIndex: number; attempts: number } | null;
+  /** Row briefly highlighted (and centered) after a Go to HEAD navigation. */
+  flashCommitHash: string | null;
   totalLoadedWithoutFilter: number | null;
   pendingCheckout: { name: string; pull?: boolean } | null;
   pendingCommitCheckout: { hash: string } | null;
@@ -217,6 +223,17 @@ interface GraphStore {
   setSelectedCommit: (hash: string | undefined) => void;
   selectCommit: (index: number) => void;
   moveSelection: (delta: number) => void;
+  setGoToHeadState: (state: 'idle' | 'locating' | 'loading') => void;
+  setPendingHead: (pending: { hash: string; targetIndex: number; attempts: number } | null) => void;
+  /**
+   * Complete a Go to HEAD navigation: select the row (like a plain click) and
+   * mark it for the centered scroll + flash highlight. No-op that just resets
+   * the navigation when the hash is not displayed. Returns whether it navigated.
+   */
+  navigateToCommit: (hash: string) => boolean;
+  /** Abandon any in-flight Go to HEAD navigation (keeps an active flash alive). */
+  resetGoToHead: () => void;
+  clearCommitFlash: () => void;
   setCommitDetails: (details: CommitDetails | undefined) => void;
   setDetailsPanelOpen: (open: boolean) => void;
   toggleDetailsPanelPosition: () => void;
@@ -365,6 +382,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   prefetching: false,
   fetchGeneration: 0,
   lastBatchStartIndex: 0,
+  goToHeadState: 'idle',
+  pendingHead: null,
+  flashCommitHash: null,
   totalLoadedWithoutFilter: null,
   pendingCheckout: null,
   pendingCommitCheckout: null,
@@ -474,6 +494,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       prefetching: false,
       fetchGeneration: get().fetchGeneration + 1,
       lastBatchStartIndex: 0,
+      goToHeadState: 'idle',
+      pendingHead: null,
+      flashCommitHash: null,
       totalLoadedWithoutFilter: null,
       pendingCommitCheckout: null,
       signatureCache: retainByHash(get().signatureCache, newHashSet),
@@ -557,6 +580,28 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       compareResult: null,
     });
   },
+  setGoToHeadState: (goToHeadState) => set({ goToHeadState }),
+  setPendingHead: (pendingHead) => set({ pendingHead }),
+  navigateToCommit: (hash) => {
+    const index = get().mergedCommits.findIndex((commit) => commit.hash === hash);
+    if (index < 0) {
+      set({ goToHeadState: 'idle', pendingHead: null });
+      return false;
+    }
+    set({
+      selectedCommit: hash,
+      selectedCommitIndex: index,
+      lastClickedHash: hash,
+      selectedCommits: [],
+      compareResult: null,
+      flashCommitHash: hash,
+      goToHeadState: 'idle',
+      pendingHead: null,
+    });
+    return true;
+  },
+  resetGoToHead: () => set({ goToHeadState: 'idle', pendingHead: null }),
+  clearCommitFlash: () => set({ flashCommitHash: null }),
   moveSelection: (delta) => {
     const commits = get().mergedCommits;
     if (commits.length === 0) return;
@@ -796,6 +841,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       pendingCommitCheckout: null,
       selectedCommit: undefined,
       selectedCommitIndex: -1,
+      goToHeadState: 'idle',
+      pendingHead: null,
+      flashCommitHash: null,
       selectedCommits: [],
       lastClickedHash: undefined,
       commitDetails: undefined,
@@ -842,6 +890,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       pendingCommitCheckout: null,
       selectedCommit: undefined,
       selectedCommitIndex: -1,
+      goToHeadState: 'idle',
+      pendingHead: null,
+      flashCommitHash: null,
       selectedCommits: [],
       lastClickedHash: undefined,
       commitDetails: undefined,
