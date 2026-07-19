@@ -755,7 +755,7 @@ class RpcClient {
     switch (decision.kind) {
       case 'scrollTo':
         if (hash && store.navigateToCommit(hash)) {
-          this.getCommitDetails(hash);
+          this.refreshDetailsPanelIfOpen(hash);
         }
         break;
       case 'loadMore': {
@@ -766,29 +766,40 @@ class RpcClient {
           attempts: (store.pendingHead?.attempts ?? 0) + 1,
         });
         store.setGoToHeadState('loading');
-        // If a scroll-triggered prefetch is already in flight, its
-        // commitsAppended response re-enters continueGoToHeadAfterAppend and
-        // issues the targeted load from there.
-        if (!store.prefetching) {
-          store.setPrefetching(true);
-          const { branches, afterDate, beforeDate } = store.filters;
-          this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branches, afterDate, beforeDate }, decision.targetIndex);
-        }
+        this.requestTargetedBatch(decision.targetIndex);
         break;
       }
-      case 'hiddenByFilter':
+      // hiddenByFilter / notInView / unresolved: each decision kind is also its
+      // user-facing message key, so one branch handles all the terminal cases.
+      default:
         store.resetGoToHead();
-        store.setError(HEAD_NAVIGATION_MESSAGES.hiddenByFilter);
-        break;
-      case 'notInView':
-        store.resetGoToHead();
-        store.setError(HEAD_NAVIGATION_MESSAGES.notInView);
-        break;
-      case 'unresolved':
-        store.resetGoToHead();
-        store.setError(HEAD_NAVIGATION_MESSAGES.unresolved);
+        store.setError(HEAD_NAVIGATION_MESSAGES[decision.kind]);
         break;
     }
+  }
+
+  /**
+   * Refresh the details panel content after Go to HEAD lands on a row.
+   * Navigation must never change the panel's visibility, and receiving
+   * details force-opens it — so only fetch when the panel is already open.
+   */
+  private refreshDetailsPanelIfOpen(hash: string) {
+    if (useGraphStore.getState().detailsPanelOpen) {
+      this.getCommitDetails(hash);
+    }
+  }
+
+  /**
+   * Issue the next targeted `loadMoreCommits` batch for a Go to HEAD in flight.
+   * No-op when a prefetch is already running — that batch's commitsAppended
+   * response re-enters continueGoToHeadAfterAppend and drives the next step.
+   */
+  private requestTargetedBatch(targetIndex: number) {
+    const store = useGraphStore.getState();
+    if (store.prefetching) return;
+    store.setPrefetching(true);
+    const { branches, afterDate, beforeDate } = store.filters;
+    this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branches, afterDate, beforeDate }, targetIndex);
   }
 
   /**
@@ -803,7 +814,7 @@ class RpcClient {
 
     if (store.mergedCommits.some((c) => c.hash === pending.hash)) {
       if (store.navigateToCommit(pending.hash)) {
-        this.getCommitDetails(pending.hash);
+        this.refreshDetailsPanelIfOpen(pending.hash);
       }
       return;
     }
@@ -819,14 +830,9 @@ class RpcClient {
     }
 
     store.setPendingHead({ ...pending, attempts: pending.attempts + 1 });
-    if (!store.prefetching) {
-      store.setPrefetching(true);
-      const { branches, afterDate, beforeDate } = store.filters;
-      // History may have grown since HEAD was located — never request less
-      // than one batch past what is already loaded.
-      const targetIndex = Math.max(pending.targetIndex, store.commits.length);
-      this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branches, afterDate, beforeDate }, targetIndex);
-    }
+    // History may have grown since HEAD was located — never request less than
+    // one batch past what is already loaded.
+    this.requestTargetedBatch(Math.max(pending.targetIndex, store.commits.length));
   }
 
   stageFiles(paths: string[]) {

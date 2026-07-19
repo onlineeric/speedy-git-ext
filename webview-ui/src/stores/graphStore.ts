@@ -345,6 +345,9 @@ function retainByHash<T>(map: Record<string, T>, hashes: Set<string>): Record<st
 /** One-shot: the `perf topology` telemetry event fires once per webview session (049-usage-telemetry). */
 let topologyPerfSent = false;
 
+/** Full reset of the "Go to HEAD" navigation, including any active flash. */
+const GO_TO_HEAD_RESET = { goToHeadState: 'idle', pendingHead: null, flashCommitHash: null } as const;
+
 export const useGraphStore = create<GraphStore>((set, get) => ({
   commits: [],
   branches: [],
@@ -382,9 +385,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   prefetching: false,
   fetchGeneration: 0,
   lastBatchStartIndex: 0,
-  goToHeadState: 'idle',
-  pendingHead: null,
-  flashCommitHash: null,
+  ...GO_TO_HEAD_RESET,
   totalLoadedWithoutFilter: null,
   pendingCheckout: null,
   pendingCommitCheckout: null,
@@ -494,9 +495,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       prefetching: false,
       fetchGeneration: get().fetchGeneration + 1,
       lastBatchStartIndex: 0,
-      goToHeadState: 'idle',
-      pendingHead: null,
-      flashCommitHash: null,
+      ...GO_TO_HEAD_RESET,
       totalLoadedWithoutFilter: null,
       pendingCommitCheckout: null,
       signatureCache: retainByHash(get().signatureCache, newHashSet),
@@ -588,16 +587,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       set({ goToHeadState: 'idle', pendingHead: null });
       return false;
     }
-    set({
-      selectedCommit: hash,
-      selectedCommitIndex: index,
-      lastClickedHash: hash,
-      selectedCommits: [],
-      compareResult: null,
-      flashCommitHash: hash,
-      goToHeadState: 'idle',
-      pendingHead: null,
-    });
+    // Reuse the canonical single-commit selection, then layer on the flash.
+    get().selectCommit(index);
+    set({ flashCommitHash: hash, goToHeadState: 'idle', pendingHead: null });
     return true;
   },
   resetGoToHead: () => set({ goToHeadState: 'idle', pendingHead: null }),
@@ -841,9 +833,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       pendingCommitCheckout: null,
       selectedCommit: undefined,
       selectedCommitIndex: -1,
-      goToHeadState: 'idle',
-      pendingHead: null,
-      flashCommitHash: null,
+      ...GO_TO_HEAD_RESET,
       selectedCommits: [],
       lastClickedHash: undefined,
       commitDetails: undefined,
@@ -890,9 +880,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       pendingCommitCheckout: null,
       selectedCommit: undefined,
       selectedCommitIndex: -1,
-      goToHeadState: 'idle',
-      pendingHead: null,
-      flashCommitHash: null,
+      ...GO_TO_HEAD_RESET,
       selectedCommits: [],
       lastClickedHash: undefined,
       commitDetails: undefined,

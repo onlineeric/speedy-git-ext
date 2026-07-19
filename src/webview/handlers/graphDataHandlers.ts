@@ -49,31 +49,26 @@ export const graphDataHandlers = {
       ? Math.min(Math.ceil((targetIndex - skip + 1) / batchSize) * batchSize, MAX_TARGETED_BATCH)
       : batchSize;
     const result = await context.services.current().gitLogService.getCommits({ ...filters, maxCount, skip });
-    if (result.success) {
+    const postAppended = (value: Extract<typeof result, { success: true }>['value']) => {
       context.postMessage({
         type: 'commitsAppended',
         payload: {
-          commits: result.value.commits,
-          hasMore: result.value.commits.length >= maxCount,
+          commits: value.commits,
+          hasMore: value.commits.length >= maxCount,
           generation,
-          totalLoadedWithoutFilter: result.value.totalLoadedWithoutFilter,
+          totalLoadedWithoutFilter: value.totalLoadedWithoutFilter,
         },
       });
+    };
+    if (result.success) {
+      postAppended(result.value);
     } else {
       context.postMessage({ type: 'prefetchError', payload: { error: result.error } });
       vscode.window.showErrorMessage('Failed to load commits', 'Retry').then(async (choice) => {
         if (choice !== 'Retry') return;
         const retryResult = await context.services.current().gitLogService.getCommits({ ...filters, maxCount, skip });
         if (retryResult.success) {
-          context.postMessage({
-            type: 'commitsAppended',
-            payload: {
-              commits: retryResult.value.commits,
-              hasMore: retryResult.value.commits.length >= maxCount,
-              generation,
-              totalLoadedWithoutFilter: retryResult.value.totalLoadedWithoutFilter,
-            },
-          });
+          postAppended(retryResult.value);
         } else {
           context.postMessage({ type: 'prefetchError', payload: { error: retryResult.error } });
         }

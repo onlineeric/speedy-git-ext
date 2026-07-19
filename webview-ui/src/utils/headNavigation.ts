@@ -25,7 +25,7 @@ export interface HeadLocationContext {
 
 export type HeadNavigationDecision =
   /** HEAD row is on screen data — select, scroll, and flash it. */
-  | { kind: 'scrollTo'; mergedIndex: number }
+  | { kind: 'scrollTo' }
   /** HEAD is deeper than what is loaded — request commits up to its position. */
   | { kind: 'loadMore'; targetIndex: number }
   /** HEAD is loaded but hidden by a client-side author/search filter. */
@@ -40,7 +40,7 @@ export function decideHeadNavigation(context: HeadLocationContext): HeadNavigati
     return { kind: 'unresolved' };
   }
   if (context.mergedIndex >= 0) {
-    return { kind: 'scrollTo', mergedIndex: context.mergedIndex };
+    return { kind: 'scrollTo' };
   }
   if (context.isHiddenClientSide) {
     return { kind: 'hiddenByFilter' };

@@ -19,18 +19,12 @@ describe('decideHeadNavigation', () => {
   });
 
   it('scrolls to the displayed row when HEAD is already in the merged list', () => {
-    expect(decideHeadNavigation(context({ mergedIndex: 42 }))).toEqual({
-      kind: 'scrollTo',
-      mergedIndex: 42,
-    });
+    expect(decideHeadNavigation(context({ mergedIndex: 42 }))).toEqual({ kind: 'scrollTo' });
   });
 
   it('prefers the displayed row even when the backend index looks out of range', () => {
     // Stashes/uncommitted rows shift merged indices; the displayed list wins.
-    expect(decideHeadNavigation(context({ mergedIndex: 3, index: 9999 }))).toEqual({
-      kind: 'scrollTo',
-      mergedIndex: 3,
-    });
+    expect(decideHeadNavigation(context({ mergedIndex: 3, index: 9999 }))).toEqual({ kind: 'scrollTo' });
   });
 
   it('reports hiddenByFilter when HEAD is loaded but hidden client-side', () => {
