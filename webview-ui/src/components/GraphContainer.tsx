@@ -15,6 +15,7 @@ import {
   resolveCommitTableLayout,
   setCommitTableColumnPreferredWidth,
 } from '../utils/commitTableLayout';
+import { computeScrollTopForRow } from '../utils/rowVisibility';
 
 const ROW_HEIGHT = 28;
 
@@ -180,6 +181,29 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
       virtualizer.scrollToIndex(selectedCommitIndex, { align: 'auto' });
     }
   }, [selectedCommitIndex, virtualizer]);
+
+  // The details panel opens only when commit details arrive (after the click),
+  // so the bottom panel can shrink the viewport and hide the row the user just
+  // clicked. Once the panel is open at the bottom, re-scroll the selected row
+  // into the reduced viewport. Reading clientHeight here sees the post-panel
+  // layout because the panel mounts in the same React commit.
+  const detailsPanelOpen = useGraphStore((state) => state.detailsPanelOpen);
+  const detailsPanelPosition = useGraphStore((state) => state.detailsPanelPosition);
+  useEffect(() => {
+    if (!detailsPanelOpen || detailsPanelPosition !== 'bottom') return;
+    const element = containerRef.current;
+    if (!element) return;
+    const rowIndex = useGraphStore.getState().selectedCommitIndex;
+    const newScrollTop = computeScrollTopForRow({
+      rowIndex,
+      rowHeight: ROW_HEIGHT,
+      scrollTop: element.scrollTop,
+      viewportHeight: element.clientHeight,
+    });
+    if (newScrollTop !== null) {
+      element.scrollTo({ top: newScrollTop });
+    }
+  }, [detailsPanelOpen, detailsPanelPosition]);
 
   // Go to HEAD: center the flashed row (overriding the minimal 'auto' scroll
   // above — this effect runs after it) and clear the flash once it has played.

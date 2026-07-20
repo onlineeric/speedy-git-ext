@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.6.1] - 2026-07-20
+
+### Fixed
+- **Clicking a commit no longer leaves the row hidden behind the bottom details panel.** When the commit details panel is positioned at the bottom, opening it by clicking a commit near the bottom of the graph could cover the very row that was clicked, since the panel only appears once the commit's details have loaded. The graph now scrolls just enough to keep the clicked row visible directly above the panel — including when moving the panel from the right to the bottom while a low row is selected. Rows that are already fully visible are left alone, so there's no unnecessary scrolling.
+
 ## [5.6.0] - 2026-07-19
 
 ### Added
