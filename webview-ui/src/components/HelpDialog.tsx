@@ -2,7 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import type { UiAction } from '@shared/telemetry';
 import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
-import { HELP_LINKS, ISSUES_URL, formatVersionLabel, getExtensionVersion } from '../utils/helpLinks';
+import { HELP_LINKS, ISSUES_URL, VERSION_LABEL } from '../utils/helpLinks';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
 import { CopyIcon } from './icons';
 
@@ -23,8 +23,6 @@ const linkRowClass =
  * RPC; the webview cannot navigate itself.
  */
 export function HelpDialog({ open, onClose }: HelpDialogProps) {
-  const versionLabel = formatVersionLabel(getExtensionVersion());
-
   const handleOpenLink = (url: string, telemetryAction: UiAction) => {
     trackUiInteraction('helpDialog', telemetryAction);
     rpcClient.openExternal(url);
@@ -61,7 +59,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
           <div className="mt-4 flex flex-col gap-2">
             {HELP_LINKS.map((link) => (
               <button
-                key={link.id}
+                key={link.telemetryAction}
                 type="button"
                 className={linkRowClass}
                 onClick={() => handleOpenLink(link.url, link.telemetryAction)}
@@ -76,15 +74,15 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
             ))}
           </div>
 
-          <div className="mt-4 text-xs text-[var(--vscode-descriptionForeground)]">
-            <p>
-              When reporting a bug, including the version below, your OS, and the steps to reproduce
-              makes it much faster to fix.
-            </p>
-          </div>
+          <p className="mt-4 text-xs text-[var(--vscode-descriptionForeground)]">
+            When reporting a bug, including the version below, your OS, your IDE (VSCode / Cursor / etc), 
+            and the steps to reproduce makes it much faster to fix.
+          </p>
 
           <div className="mt-4 flex items-center justify-between">
-            <span className="text-xs text-[var(--vscode-descriptionForeground)]">{versionLabel}</span>
+            <span className="text-xs text-[var(--vscode-descriptionForeground)]">
+              {VERSION_LABEL}
+            </span>
             <Dialog.Close className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]">
               Close
             </Dialog.Close>

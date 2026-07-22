@@ -145,7 +145,7 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
     ├── resolveDefaultRemote.ts   # Pick `origin` else first-alpha remote (fast-forward, push, etc.)
     ├── mergedCommits.ts          # Detect merged-branch commit grouping for badges
     ├── refNameField.ts           # Live-validation state for ref-name inputs (error suppressed while field is pristine), shared by Create Tag/Branch/Worktree/Remote dialogs
-    ├── helpLinks.ts              # Help dialog link catalog + build-time extension version (`__EXTENSION_VERSION__`, injected by vite.config define)
+    ├── helpLinks.ts              # Help dialog link catalog + build-time extension version (`__EXTENSION_VERSION__`, injected by the vite.config/vitest.config define)
     ├── refStyle.ts               # Per-ref-kind badge styling
     ├── repoPath.ts               # Repo path normalization
     ├── stashMessage.ts           # Format stash entries for display

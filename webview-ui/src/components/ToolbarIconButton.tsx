@@ -72,7 +72,7 @@ export const ToolbarIconButton = forwardRef<HTMLButtonElement, ToolbarIconButton
 
 /**
  * "Show/Hide Remote Button" context-menu item. Rendered as `extraMenuItems` on
- * the right-aligned buttons (View, Remote, Settings) so the Remote button can be
+ * the right-aligned buttons (View, Remote, Settings, Help) so the Remote button can be
  * brought back even while it is hidden. Owns its own `showRemoteButton`
  * subscription so buttons that don't render it never subscribe.
  */
