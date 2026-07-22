@@ -118,6 +118,7 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
 │   ├── LazyContextMenu.tsx       # Wraps a Radix context menu so its heavy body (items/dialogs/store subscriptions) mounts only on first right-click — keeps virtualized rows cheap during fast scrolling
 │   ├── CompareMenuItems.tsx      # Shared "Set as Compare Base" / "Compare with Base" item pair (042), reused across Commit/Branch/Uncommitted menus
 │   ├── menuStyles.ts             # Shared Tailwind class strings for context-menu items (enabled/disabled/separator)
+│   ├── HelpDialog.tsx            # "Help & Feedback" dialog (toolbar Help button): GitHub Issues link + docs/changelog/marketplace links + version
 │   ├── FieldError.tsx            # Validation message under form inputs (pairs with aria-invalid/aria-describedby)
 │   └── CommandPreview.tsx        # Live git command preview shown in dialogs
 ├── stores/
@@ -144,6 +145,7 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
     ├── resolveDefaultRemote.ts   # Pick `origin` else first-alpha remote (fast-forward, push, etc.)
     ├── mergedCommits.ts          # Detect merged-branch commit grouping for badges
     ├── refNameField.ts           # Live-validation state for ref-name inputs (error suppressed while field is pristine), shared by Create Tag/Branch/Worktree/Remote dialogs
+    ├── helpLinks.ts              # Help dialog link catalog + build-time extension version (`__EXTENSION_VERSION__`, injected by vite.config define)
     ├── refStyle.ts               # Per-ref-kind badge styling
     ├── repoPath.ts               # Repo path normalization
     ├── stashMessage.ts           # Format stash entries for display

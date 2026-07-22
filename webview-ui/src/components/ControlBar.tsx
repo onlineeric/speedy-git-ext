@@ -3,6 +3,7 @@ import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
 import { RemoteManagementDialog } from './RemoteManagementDialog';
+import { HelpDialog } from './HelpDialog';
 import { RepoSelector } from './RepoSelector';
 import { SubmoduleSelector } from './SubmoduleSelector';
 import { MultiBranchDropdown } from './MultiBranchDropdown';
@@ -18,6 +19,7 @@ import {
   RefreshIcon,
   FetchIcon,
   GoToHeadIcon,
+  HelpIcon,
   ToolbarSeparatorIcon,
   WorktreeIcon,
 } from './icons';
@@ -47,6 +49,7 @@ export function ControlBar() {
   const isCurrentLinkedWorktree = useGraphStore((state) => state.worktreeList.some((wt) => wt.isCurrent && !wt.isMain));
   const showRemoteButton = useGraphStore((state) => state.userSettings.toolbarShowRemoteButton);
   const [remoteDialogOpen, setRemoteDialogOpen] = useState(false);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
 
   // Reconcile selected branches when branch list changes (e.g., after fetch/prune)
   useEffect(() => {
@@ -268,7 +271,21 @@ export function ControlBar() {
         extraMenuItems={<RemoteButtonToggleItem />}
       />
 
+      <ToolbarIconButton
+        label="Help"
+        icon={<HelpIcon className={iconClass} />}
+        onClick={() => {
+          trackUiInteraction('toolbar', 'help');
+          setHelpDialogOpen(true);
+        }}
+        aria-label="Help and feedback"
+        className={TOGGLE_BUTTON_COLORS.inactive}
+        title="Help & feedback"
+        extraMenuItems={<RemoteButtonToggleItem />}
+      />
+
       <RemoteManagementDialog open={remoteDialogOpen} onClose={() => setRemoteDialogOpen(false)} />
+      <HelpDialog open={helpDialogOpen} onClose={() => setHelpDialogOpen(false)} />
     </div>
   );
 }
