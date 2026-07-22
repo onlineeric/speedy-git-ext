@@ -421,6 +421,23 @@ export function SignatureUnverifiedIcon({ className, style }: IconProps) {
   );
 }
 
+/** Circled "?" for the toolbar Help button — 12×12, inherits text color via currentColor */
+export function HelpIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <circle cx={6} cy={6} r={5} stroke="currentColor" strokeWidth={1.2} />
+      <path
+        d="M 4.4 4.5 C 4.4 3.4 5.3 2.9 6.1 2.9 C 7 2.9 7.7 3.5 7.7 4.4 C 7.7 5.6 6 5.7 6 7"
+        stroke="currentColor"
+        strokeWidth={1.2}
+        strokeLinecap="round"
+        fill="none"
+      />
+      <circle cx={6} cy={8.8} r={0.7} fill="currentColor" />
+    </svg>
+  );
+}
+
 /** Info/help affordance — circled "i" (047-signing-verification). */
 export function InfoIcon({ className, style }: IconProps) {
   return (

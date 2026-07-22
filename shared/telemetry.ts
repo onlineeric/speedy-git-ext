@@ -82,6 +82,7 @@ export const UI_SURFACES = [
   'worktreeMenu',
   'toolbar',
   'toolbarContextMenu',
+  'helpDialog',
   'panelToggle',
   'columnHeader',
 ] as const;
@@ -90,9 +91,12 @@ export type UiSurface = (typeof UI_SURFACES)[number];
 
 export const UI_ACTIONS = [
   // Toolbar buttons (ControlBar)
-  'filter', 'search', 'compare', 'worktrees', 'refresh', 'fetch', 'goToHead', 'view', 'remote', 'settings',
+  'filter', 'search', 'compare', 'worktrees', 'refresh', 'fetch', 'goToHead', 'view', 'remote', 'settings', 'help',
   // Toolbar right-click menu
   'toggleLabels', 'toggleRemoteButton',
+  // Help dialog links (which support surface the user chose)
+  'helpReportIssue', 'helpOpenRepository', 'helpOpenChangelog', 'helpOpenMarketplace',
+  'helpCopyIssuesUrl',
   // Commit context menu
   'compareCommits', 'setCompareBase', 'compareWithBase',
   'checkoutCommit', 'createBranch', 'createTag', 'createWorktree',

@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import type { FileChange, FileViewMode } from '@shared/types';
 import { UNCOMMITTED_HASH } from '@shared/types';
 import { CopyIcon, CheckIcon, FileIcon, FileCodeIcon, StageIcon, UnstageIcon, DiscardIcon, ListViewIcon, TreeViewIcon } from './icons';
 import { rpcClient } from '../rpc/rpcClient';
+import { useCopyFeedback } from '../hooks/useCopyFeedback';
 import { useGraphStore } from '../stores/graphStore';
 
 export function shouldShowChangeCounts(file: FileChange): boolean {
@@ -151,13 +151,11 @@ export function FileActionIcons({
   parentHash?: string;
   onDiscardClick?: (file: FileChange) => void;
 }) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyFeedback();
 
   const handleCopyPath = (e: React.MouseEvent) => {
     e.stopPropagation();
-    rpcClient.copyToClipboard(file.path);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 500);
+    copy(file.path);
   };
 
   const handleOpenAtCommit = (e: React.MouseEvent) => {
