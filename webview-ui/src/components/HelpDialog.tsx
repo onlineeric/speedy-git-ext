@@ -81,11 +81,6 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
               When reporting a bug, including the version below, your OS, and the steps to reproduce
               makes it much faster to fix.
             </p>
-            <p className="mt-2">
-              Tips: press <kbd className="font-mono">Ctrl+Shift+G</kbd> (
-              <kbd className="font-mono">Cmd+Shift+G</kbd> on macOS) to open Speedy Git, and
-              right-click any toolbar button to show or hide its labels.
-            </p>
           </div>
 
           <div className="mt-4 flex items-center justify-between">
