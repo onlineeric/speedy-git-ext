@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.7.0] - 2026-07-22
+
+### Added
+- **"Help & Feedback" toolbar button.** A new **Help** button at the right end of the toolbar (next to Settings) opens a dialog that points you at everything you might need: reporting a bug or requesting a feature, the documentation and source, the changelog, and the Marketplace listing. Everything is funnelled to GitHub Issues — the issues URL is shown in full so it can be read and copied with one click, as well as opened directly in your browser. The dialog also shows the running extension version, so it can be quoted in a bug report without hunting through the Extensions view.
+
 ## [5.6.1] - 2026-07-20
 
 ### Fixed
