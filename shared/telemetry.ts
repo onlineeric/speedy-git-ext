@@ -96,6 +96,7 @@ export const UI_ACTIONS = [
   'toggleLabels', 'toggleRemoteButton',
   // Help dialog links (which support surface the user chose)
   'helpReportIssue', 'helpOpenRepository', 'helpOpenChangelog', 'helpOpenMarketplace',
+  'helpCopyIssuesUrl',
   // Commit context menu
   'compareCommits', 'setCompareBase', 'compareWithBase',
   'checkoutCommit', 'createBranch', 'createTag', 'createWorktree',

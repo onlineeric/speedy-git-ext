@@ -3,14 +3,27 @@ import type { UiAction } from '@shared/telemetry';
 /**
  * Injected from package.json by the `define` block in both webview-ui/vite.config.ts
  * (the shipped bundle) and vitest.config.ts (unit tests), so the Help dialog can
- * show the running version without an extra RPC round-trip.
+ * show the running version without an extra RPC round-trip. Typed as possibly
+ * undefined because a bundler that forgets the define would otherwise turn this
+ * module — imported all the way up to App — into a load-time ReferenceError.
  */
-declare const __EXTENSION_VERSION__: string;
+declare const __EXTENSION_VERSION__: string | undefined;
 
 const REPOSITORY_URL = 'https://github.com/onlineeric/speedy-git-ext';
 
 /** The issues URL, shown verbatim in the dialog so it can be read and copied. */
 export const ISSUES_URL = `${REPOSITORY_URL}/issues`;
+
+/**
+ * The Help dialog's own slice of the closed telemetry catalog. `Extract` keeps
+ * it tied to `UiAction` (renaming an action there is a compile error here) while
+ * making it impossible to report an unrelated action — a git operation, say —
+ * from a help link.
+ */
+export type HelpLinkAction = Extract<
+  UiAction,
+  'helpReportIssue' | 'helpOpenRepository' | 'helpOpenChangelog' | 'helpOpenMarketplace'
+>;
 
 /** One row in the Help dialog's link list. */
 export interface HelpLink {
@@ -18,7 +31,7 @@ export interface HelpLink {
   description: string;
   url: string;
   /** Closed-catalog telemetry action reported when the link is opened; also the row key. */
-  telemetryAction: UiAction;
+  telemetryAction: HelpLinkAction;
 }
 
 /**
@@ -53,4 +66,6 @@ export const HELP_LINKS: readonly HelpLink[] = [
 ];
 
 /** Version line for the dialog footer. Fixed at build time, so it is a constant. */
-export const VERSION_LABEL = `Speedy Git v${__EXTENSION_VERSION__}`;
+export const VERSION_LABEL = `Speedy Git v${
+  typeof __EXTENSION_VERSION__ === 'string' ? __EXTENSION_VERSION__ : 'unknown'
+}`;

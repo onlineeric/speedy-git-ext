@@ -1,10 +1,10 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import type { UiAction } from '@shared/telemetry';
 import { rpcClient } from '../rpc/rpcClient';
+import { useCopyFeedback } from '../hooks/useCopyFeedback';
 import { trackUiInteraction } from '../utils/telemetry';
-import { HELP_LINKS, ISSUES_URL, VERSION_LABEL } from '../utils/helpLinks';
+import { HELP_LINKS, ISSUES_URL, VERSION_LABEL, type HelpLinkAction } from '../utils/helpLinks';
 import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
-import { CopyIcon } from './icons';
+import { CheckIcon, CopyIcon } from './icons';
 
 interface HelpDialogProps {
   open: boolean;
@@ -23,9 +23,16 @@ const linkRowClass =
  * RPC; the webview cannot navigate itself.
  */
 export function HelpDialog({ open, onClose }: HelpDialogProps) {
-  const handleOpenLink = (url: string, telemetryAction: UiAction) => {
+  const { copied, copy } = useCopyFeedback();
+
+  const handleOpenLink = (url: string, telemetryAction: HelpLinkAction) => {
     trackUiInteraction('helpDialog', telemetryAction);
     rpcClient.openExternal(url);
+  };
+
+  const handleCopyIssuesUrl = () => {
+    trackUiInteraction('helpDialog', 'helpCopyIssuesUrl');
+    copy(ISSUES_URL);
   };
 
   return (
@@ -47,12 +54,16 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
             </code>
             <button
               type="button"
-              onClick={() => rpcClient.copyToClipboard(ISSUES_URL)}
-              className="p-1 rounded text-[var(--vscode-icon-foreground)] opacity-70 hover:opacity-100 hover:bg-[var(--vscode-toolbar-hoverBackground)] focus:outline-none"
-              title="Copy link"
+              onClick={handleCopyIssuesUrl}
+              className="p-1 rounded text-[var(--vscode-icon-foreground)] opacity-70 hover:opacity-100 hover:bg-[var(--vscode-toolbar-hoverBackground)] focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]"
+              title={copied ? 'Copied!' : 'Copy link'}
               aria-label="Copy issues link"
             >
-              <CopyIcon className="w-3.5 h-3.5" />
+              {copied ? (
+                <CheckIcon className="w-3.5 h-3.5 text-green-400" />
+              ) : (
+                <CopyIcon className="w-3.5 h-3.5" />
+              )}
             </button>
           </div>
 
@@ -75,8 +86,8 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
           </div>
 
           <p className="mt-4 text-xs text-[var(--vscode-descriptionForeground)]">
-            When reporting a bug, including the version below, your OS, your IDE (VSCode / Cursor / etc), 
-            and the steps to reproduce makes it much faster to fix.
+            When reporting a bug, including the version below, your OS, your IDE
+            (VSCode / Cursor / etc), and the steps to reproduce makes it much faster to fix.
           </p>
 
           <div className="mt-4 flex items-center justify-between">

@@ -127,6 +127,7 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
 │   └── rpcClient.ts              # Singleton RPC client, webview↔extension via acquireVsCodeApi()
 ├── hooks/
 │   ├── useTooltipHover.ts        # Tooltip positioning logic
+│   ├── useCopyFeedback.ts        # copyToClipboard + short "copied" flash, shared by every copy button
 │   ├── useSignatureColumnLoader.ts # Async viewport-first signature verification loader (047)
 │   └── useDialogTelemetry.ts     # Reports one confirmed/cancelled outcome per dialog open cycle
 ├── types/

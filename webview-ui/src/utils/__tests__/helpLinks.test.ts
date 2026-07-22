@@ -3,6 +3,9 @@ import { HELP_LINKS, ISSUES_URL, VERSION_LABEL } from '../helpLinks';
 
 describe('HELP_LINKS', () => {
   it('leads with the GitHub issues page — the dialog exists to route people there', () => {
+    // Pinned to the literal URL: every link derives from one constant, so a typo
+    // there would keep the relative assertions green while sending users to a 404.
+    expect(ISSUES_URL).toBe('https://github.com/onlineeric/speedy-git-ext/issues');
     expect(HELP_LINKS[0].url).toBe(ISSUES_URL);
   });
 
