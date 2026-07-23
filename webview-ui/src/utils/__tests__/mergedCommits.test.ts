@@ -91,10 +91,11 @@ describe('mergeUncommittedIntoCommits', () => {
     expect(result.map(c => c.hash)).toEqual([UNCOMMITTED_HASH, 'head', 'older']);
   });
 
-  it('falls back to the first commit when no head ref is present', () => {
+  it('injects a standalone node (no parents) when HEAD commit is not in the loaded batch', () => {
     const commits = [commit({ hash: 'first' }), commit({ hash: 'second' })];
     const result = mergeUncommittedIntoCommits(commits, true, counts, []);
-    expect(result[0].parents).toEqual(['first']);
+    expect(result[0].hash).toBe(UNCOMMITTED_HASH);
+    expect(result[0].parents).toEqual([]);
   });
 
   it('does not inject when current branch is excluded by branch filter', () => {
@@ -137,5 +138,32 @@ describe('computeMergedTopology', () => {
     };
     const { mergedCommits } = computeMergedTopology(commits, [], undefined, undefined, uncommitted);
     expect(mergedCommits[0].hash).toBe(UNCOMMITTED_HASH);
+  });
+
+  it('draws no connection line from the uncommitted node when HEAD commit is not loaded', () => {
+    const commits = [commit({ hash: 'tip' }), commit({ hash: 'older', parents: ['tip'] })];
+    const uncommitted: UncommittedContext = {
+      hasUncommittedChanges: true,
+      counts: { stagedCount: 1, unstagedCount: 0, untrackedCount: 0 },
+      branches: [],
+    };
+    const { topology } = computeMergedTopology(commits, [], undefined, undefined, uncommitted);
+    expect(topology.nodes.get(UNCOMMITTED_HASH)?.parentConnections).toEqual([]);
+  });
+
+  it('connects the uncommitted node to HEAD when the HEAD commit is loaded', () => {
+    const commits = [
+      commit({ hash: 'tip' }),
+      commit({ hash: 'headCommit', refs: [{ name: 'HEAD', type: 'head' }] }),
+    ];
+    const uncommitted: UncommittedContext = {
+      hasUncommittedChanges: true,
+      counts: { stagedCount: 1, unstagedCount: 0, untrackedCount: 0 },
+      branches: [],
+    };
+    const { topology } = computeMergedTopology(commits, [], undefined, undefined, uncommitted);
+    const connections = topology.nodes.get(UNCOMMITTED_HASH)?.parentConnections;
+    expect(connections).toHaveLength(1);
+    expect(connections?.[0].parentHash).toBe('headCommit');
   });
 });

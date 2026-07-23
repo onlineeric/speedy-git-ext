@@ -1032,8 +1032,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     });
     // Auto-refresh details panel from the already-received data (avoids a redundant backend round-trip)
     if (selectedCommit === UNCOMMITTED_HASH && get().detailsPanelOpen) {
-      const headCommit = commits.find(c => c.refs.some(r => r.type === 'head'));
-      const headHash = headCommit?.hash ?? (commits.length > 0 ? commits[0].hash : '');
+      // No fallback when HEAD's commit is outside the loaded batch — better to
+      // show no parent than a wrong one (mirrors mergeUncommittedIntoCommits).
+      const headHash = commits.find(c => c.refs.some(r => r.type === 'head'))?.hash ?? '';
       const details: CommitDetails = {
         hash: UNCOMMITTED_HASH,
         abbreviatedHash: '---',
