@@ -81,16 +81,18 @@ export function mergeUncommittedIntoCommits(
     }
   }
 
-  const headCommitHash = commits.length > 0
-    ? (commits.find(c => c.refs.some(r => r.type === 'head'))?.hash ?? commits[0].hash)
-    : '';
+  if (commits.length === 0) return commits;
 
-  if (!headCommitHash) return commits;
+  // HEAD's commit may be outside the loaded batch (e.g. detached HEAD on an old
+  // commit). Inject a standalone node then — same as any commit whose parent is
+  // not loaded — instead of guessing a parent; the connection appears once
+  // HEAD's commit is loaded.
+  const headCommitHash = commits.find(c => c.refs.some(r => r.type === 'head'))?.hash;
 
   const syntheticCommit: Commit = {
     hash: UNCOMMITTED_HASH,
     abbreviatedHash: '---',
-    parents: [headCommitHash],
+    parents: headCommitHash ? [headCommitHash] : [],
     author: '---',
     authorEmail: '',
     authorDate: Date.now(),

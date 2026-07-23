@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.7.1] - 2026-07-23
+
+### Fixed
+- **The Uncommitted Changes node no longer draws a wrong connection line when HEAD's commit isn't loaded yet.** With a checkout far down the history — for example a detached HEAD on an old commit — HEAD's commit can be outside the currently loaded batch. The Uncommitted Changes node then incorrectly connected itself to the newest loaded commit, drawing a line to an unrelated branch tip. It now stands alone with no line — the same behavior as a commit whose parent isn't loaded — and the connection appears automatically once enough history is loaded to include HEAD's commit. The commit details panel for uncommitted changes likewise no longer reports the wrong parent in this situation.
+
 ## [5.7.0] - 2026-07-22
 
 ### Added
