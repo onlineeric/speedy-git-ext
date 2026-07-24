@@ -36,7 +36,16 @@ export class GitLogService {
    */
   private buildLogArgs(format: string, filters?: Partial<GraphFilters>): string[] {
     const maxCount = filters?.maxCount ?? 500;
+    // A freshly initialized repository has a symbolic HEAD but no commit yet.
+    // `git log HEAD` normally exits with "bad revision 'HEAD'" in that state;
+    // ignore that missing revision so the graph can load as an empty history.
+    // This still includes HEAD when it resolves (for example, detached HEAD).
+    // Branch-filtered queries do not include HEAD, so preserve normal errors for
+    // an explicitly requested branch that no longer exists.
     const args = ['log'];
+    if (!filters?.branches?.length) {
+      args.push('--ignore-missing');
+    }
 
     if (filters?.skip && filters.skip > 0) {
       args.push(`--skip=${filters.skip}`);
@@ -143,7 +152,7 @@ export class GitLogService {
   async getAuthors(): Promise<Result<Author[]>> {
     this.log.info('Fetching authors');
     const result = await this.executor.execute({
-      args: ['log', 'HEAD', '--branches', '--remotes', '--tags', '--format=%an%x00%ae'],
+      args: ['log', '--ignore-missing', 'HEAD', '--branches', '--remotes', '--tags', '--format=%an%x00%ae'],
       cwd: this.workspacePath,
     });
 

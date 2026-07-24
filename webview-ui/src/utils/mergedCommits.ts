@@ -81,8 +81,6 @@ export function mergeUncommittedIntoCommits(
     }
   }
 
-  if (commits.length === 0) return commits;
-
   // HEAD's commit may be outside the loaded batch (e.g. detached HEAD on an old
   // commit). Inject a standalone node then — same as any commit whose parent is
   // not loaded — instead of guessing a parent; the connection appears once
