@@ -113,8 +113,6 @@ export function ControlBar() {
   };
 
   const handleFetch = () => {
-    if (!hasConfiguredRemote) return;
-
     trackUiInteraction('toolbar', 'fetch');
     setFetching(true);
 

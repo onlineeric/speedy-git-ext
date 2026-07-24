@@ -247,7 +247,6 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
     <ContextMenu.Item
       className={loading || rebaseInProgress || !hasRemote ? menuItemDisabledClass : menuItemClass}
       onSelect={() => {
-        if (!hasRemote) return;
         track('fastForward');
         setFastForwardOpen(true);
       }}
@@ -305,7 +304,6 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
                 <ContextMenu.Item
                   className={hasRemote ? menuItemClass : menuItemDisabledClass}
                   onSelect={() => {
-                    if (!hasRemote) return;
                     track('push');
                     setPushDialogOpen(true);
                   }}
@@ -318,7 +316,6 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
                   <ContextMenu.Item
                     className={loading || !hasRemote ? menuItemDisabledClass : menuItemClass}
                     onSelect={() => {
-                      if (!hasRemote) return;
                       track('pull');
                       rpcClient.pull();
                     }}
@@ -368,7 +365,6 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
                 <ContextMenu.Item
                   className={hasRemote ? menuItemClass : menuItemDisabledClass}
                   onSelect={() => {
-                    if (!tagRemote) return;
                     track('pushTag');
                     setPushTagOpen(true);
                   }}

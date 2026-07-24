@@ -29,6 +29,18 @@ export class GitLogService {
   }
 
   /**
+   * A freshly initialized repository has a symbolic HEAD but no commit yet.
+   * `git log HEAD` normally exits with "bad revision 'HEAD'" in that state;
+   * `--ignore-missing` ignores that missing revision so callers can treat it
+   * as an empty history. HEAD still resolves normally when it exists (for
+   * example, detached HEAD). Omit this for an explicitly requested branch
+   * name so a genuinely missing branch still surfaces as an error.
+   */
+  private ignoreMissingHeadArgs(branches?: string[]): string[] {
+    return branches?.length ? [] : ['--ignore-missing'];
+  }
+
+  /**
    * Build the shared `git log` argument list used by every query that must
    * walk the exact same commit stream as the paginated graph (`getCommits`,
    * `getCommitPosition`). Keeping the ordering/filter arguments in one place
@@ -36,16 +48,7 @@ export class GitLogService {
    */
   private buildLogArgs(format: string, filters?: Partial<GraphFilters>): string[] {
     const maxCount = filters?.maxCount ?? 500;
-    // A freshly initialized repository has a symbolic HEAD but no commit yet.
-    // `git log HEAD` normally exits with "bad revision 'HEAD'" in that state;
-    // ignore that missing revision so the graph can load as an empty history.
-    // This still includes HEAD when it resolves (for example, detached HEAD).
-    // Branch-filtered queries do not include HEAD, so preserve normal errors for
-    // an explicitly requested branch that no longer exists.
-    const args = ['log'];
-    if (!filters?.branches?.length) {
-      args.push('--ignore-missing');
-    }
+    const args = ['log', ...this.ignoreMissingHeadArgs(filters?.branches)];
 
     if (filters?.skip && filters.skip > 0) {
       args.push(`--skip=${filters.skip}`);
@@ -152,7 +155,7 @@ export class GitLogService {
   async getAuthors(): Promise<Result<Author[]>> {
     this.log.info('Fetching authors');
     const result = await this.executor.execute({
-      args: ['log', '--ignore-missing', 'HEAD', '--branches', '--remotes', '--tags', '--format=%an%x00%ae'],
+      args: ['log', ...this.ignoreMissingHeadArgs(), 'HEAD', '--branches', '--remotes', '--tags', '--format=%an%x00%ae'],
       cwd: this.workspacePath,
     });
 
