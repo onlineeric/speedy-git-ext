@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.7.2] - 2026-07-24
+
+### Fixed
+- **Remote actions are disabled when no remotes are configured.** Fetch is now disabled and has no effect without a configured remote. Push, pull, fast-forward, and Push Tag actions remain visible in context menus but are disabled until a remote is available.
+
 ## [5.7.1] - 2026-07-23
 
 ### Fixed

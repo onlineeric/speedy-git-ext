@@ -47,6 +47,7 @@ export function ControlBar() {
   const { branches, filters, setFilters, mergedCommits, loading, totalLoadedWithoutFilter, setActiveToggleWidget, activeToggleWidget, isRefreshing } = useGraphStore();
   const graphFilters = useGraphStore((state) => state.filters);
   const isCurrentLinkedWorktree = useGraphStore((state) => state.worktreeList.some((wt) => wt.isCurrent && !wt.isMain));
+  const hasConfiguredRemote = useGraphStore((state) => state.remotes.length > 0);
   const showRemoteButton = useGraphStore((state) => state.userSettings.toolbarShowRemoteButton);
   const [remoteDialogOpen, setRemoteDialogOpen] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
@@ -112,6 +113,8 @@ export function ControlBar() {
   };
 
   const handleFetch = () => {
+    if (!hasConfiguredRemote) return;
+
     trackUiInteraction('toolbar', 'fetch');
     setFetching(true);
 
@@ -220,9 +223,9 @@ export function ControlBar() {
         label="Fetch"
         icon={<FetchIcon className={iconClass} />}
         onClick={handleFetch}
-        disabled={fetching || loading}
+        disabled={fetching || loading || !hasConfiguredRemote}
         className={fetching ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}
-        title="Fetch all remotes"
+        title={hasConfiguredRemote ? 'Fetch all remotes' : 'No remotes configured'}
       />
 
       <ToolbarSeparatorIcon className="h-6 w-4 text-[var(--vscode-panel-border)] opacity-90" />
