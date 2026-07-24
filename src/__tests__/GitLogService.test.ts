@@ -37,6 +37,7 @@ describe('GitLogService.getCommits', () => {
     expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({
       args: [
         'log',
+        '--ignore-missing',
         '--max-count=25',
         '--format=%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D',
         '--date-order',
@@ -58,7 +59,7 @@ describe('GitLogService.getCommits', () => {
 
     expect(result.success).toBe(true);
     expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({
-      args: ['log', 'HEAD', '--branches', '--remotes', '--tags', '--format=%an%x00%ae'],
+      args: ['log', '--ignore-missing', 'HEAD', '--branches', '--remotes', '--tags', '--format=%an%x00%ae'],
     }));
   });
 });
@@ -100,6 +101,7 @@ describe('GitLogService.getCommitPosition', () => {
     expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({
       args: [
         'log',
+        '--ignore-missing',
         '--max-count=100000',
         '--format=%H',
         '--date-order',

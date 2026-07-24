@@ -245,12 +245,12 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
   // remote-branch arms; the arms differ only in their surrounding guard.
   const fastForwardItem = (
     <ContextMenu.Item
-      className={menuItemClass}
+      className={loading || rebaseInProgress || !hasRemote ? menuItemDisabledClass : menuItemClass}
       onSelect={() => {
         track('fastForward');
         setFastForwardOpen(true);
       }}
-      disabled={loading || rebaseInProgress}
+      disabled={loading || rebaseInProgress || !hasRemote}
     >
       Fast-forward Local Branch from Remote
     </ContextMenu.Item>
@@ -301,18 +301,25 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
                 <ContextMenu.Item className={menuItemClass} onSelect={() => { track('renameBranch'); setRenameOpen(true); }}>
                   Rename Branch...
                 </ContextMenu.Item>
-                <ContextMenu.Item className={menuItemClass} onSelect={() => { track('push'); setPushDialogOpen(true); }}>
+                <ContextMenu.Item
+                  className={hasRemote ? menuItemClass : menuItemDisabledClass}
+                  onSelect={() => {
+                    track('push');
+                    setPushDialogOpen(true);
+                  }}
+                  disabled={!hasRemote}
+                >
                   Push Branch
                 </ContextMenu.Item>
                 {!isCurrentBranch && !isMergedBadge && fastForwardItem}
                 {isCurrentBranch && (
                   <ContextMenu.Item
-                    className={menuItemClass}
+                    className={loading || !hasRemote ? menuItemDisabledClass : menuItemClass}
                     onSelect={() => {
                       track('pull');
                       rpcClient.pull();
                     }}
-                    disabled={loading}
+                    disabled={loading || !hasRemote}
                   >
                     Pull Branch
                   </ContextMenu.Item>
@@ -356,12 +363,12 @@ function BranchContextMenuBody({ refInfo }: { refInfo: RefInfo }) {
             {isTag && (
               <>
                 <ContextMenu.Item
-                  className={menuItemClass}
+                  className={hasRemote ? menuItemClass : menuItemDisabledClass}
                   onSelect={() => {
                     track('pushTag');
-                    if (tagRemote) setPushTagOpen(true);
-                    else rpcClient.pushTag(refInfo.name);
+                    setPushTagOpen(true);
                   }}
+                  disabled={!hasRemote}
                 >
                   Push Tag
                 </ContextMenu.Item>

@@ -76,8 +76,11 @@ describe('mergeUncommittedIntoCommits', () => {
     expect(mergeUncommittedIntoCommits(commits, false, counts, [])).toBe(commits);
   });
 
-  it('returns commits unchanged when commits list is empty', () => {
-    expect(mergeUncommittedIntoCommits([], true, counts, [])).toEqual([]);
+  it('injects a standalone node when the repository has no commits yet', () => {
+    const result = mergeUncommittedIntoCommits([], true, counts, []);
+    expect(result).toHaveLength(1);
+    expect(result[0].hash).toBe(UNCOMMITTED_HASH);
+    expect(result[0].parents).toEqual([]);
   });
 
   it('injects a synthetic uncommitted node at index 0 pointing at HEAD', () => {
