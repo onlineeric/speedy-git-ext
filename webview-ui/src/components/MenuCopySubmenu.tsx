@@ -1,6 +1,6 @@
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import { MenuSubTrigger } from './MenuSubTrigger';
-import { menuContentClass } from './menuStyles';
+import { MENU_COLLISION_PADDING, menuContentClass } from './menuStyles';
 
 /**
  * The "Copy" submenu shared by the commit row menu and the ref badge menus.
@@ -15,7 +15,7 @@ export function MenuCopySubmenu({ children }: { children: React.ReactNode }) {
     <ContextMenu.Sub>
       <MenuSubTrigger>Copy</MenuSubTrigger>
       <ContextMenu.Portal>
-        <ContextMenu.SubContent className={`min-w-[180px] ${menuContentClass}`}>
+        <ContextMenu.SubContent className={`min-w-[180px] ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
           {children}
         </ContextMenu.SubContent>
       </ContextMenu.Portal>

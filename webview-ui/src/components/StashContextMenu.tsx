@@ -5,7 +5,7 @@ import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
 import { buildDropStashCommand } from '../utils/gitCommandBuilder';
 import { ConfirmDialog } from './ConfirmDialog';
-import { dangerItemClass, menuContentClass, menuItemClass } from './menuStyles';
+import { MENU_COLLISION_PADDING, dangerItemClass, menuContentClass, menuItemClass } from './menuStyles';
 import { LazyContextMenu } from './LazyContextMenu';
 import { MenuGroupSeparator } from './MenuGroupSeparator';
 
@@ -55,7 +55,7 @@ function StashContextMenuBody({ commit, stashIndex }: Omit<StashContextMenuProps
   return (
     <>
       <ContextMenu.Portal>
-        <ContextMenu.Content className={`min-w-[160px] ${menuContentClass}`}>
+        <ContextMenu.Content className={`min-w-[160px] ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
             <ContextMenu.Item className={menuItemClass} onSelect={handleApply} disabled={!isValidIndex}>
               Apply Stash
             </ContextMenu.Item>

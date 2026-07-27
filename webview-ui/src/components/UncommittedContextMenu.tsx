@@ -7,7 +7,7 @@ import { StashDialog } from './StashDialog';
 import { DiscardAllDialog } from './DiscardAllDialog';
 import { FilePickerDialog } from './FilePickerDialog';
 import { CompareMenuItems } from './CompareMenuItems';
-import { dangerItemClass, menuContentClass, menuItemClass, menuMinWidthClass } from './menuStyles';
+import { MENU_COLLISION_PADDING, dangerItemClass, menuContentClass, menuItemClass, menuMinWidthClass } from './menuStyles';
 import { LazyContextMenu } from './LazyContextMenu';
 import { MenuGroupSeparator } from './MenuGroupSeparator';
 
@@ -58,7 +58,7 @@ function UncommittedContextMenuBody() {
   return (
     <>
       <ContextMenu.Portal>
-        <ContextMenu.Content className={`${menuMinWidthClass} ${menuContentClass}`}>
+        <ContextMenu.Content className={`${menuMinWidthClass} ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
             {/* The working-tree changes themselves, ordered from staging through to discarding. */}
             {hasUnstagedChanges && (
               <ContextMenu.Item className={menuItemClass} onSelect={handleStageAll}>

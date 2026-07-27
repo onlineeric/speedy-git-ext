@@ -2,7 +2,7 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
-import { menuItemClass } from './menuStyles';
+import { MENU_COLLISION_PADDING, menuContentClass, menuItemClass } from './menuStyles';
 
 interface AuthorContextMenuProps {
   authorEmail: string;
@@ -24,7 +24,7 @@ export function AuthorContextMenu({ authorEmail, children }: AuthorContextMenuPr
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
         <ContextMenu.Portal>
-          <ContextMenu.Content className="min-w-[180px] py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50">
+          <ContextMenu.Content className={`min-w-[180px] ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
             <AuthorFilterMenuItems authorEmail={authorEmail} />
           </ContextMenu.Content>
         </ContextMenu.Portal>

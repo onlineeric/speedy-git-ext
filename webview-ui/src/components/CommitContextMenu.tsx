@@ -1,6 +1,6 @@
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { Commit } from '@shared/types';
-import { menuContentClass, menuMinWidthClass } from './menuStyles';
+import { MENU_COLLISION_PADDING, menuContentClass, menuMinWidthClass } from './menuStyles';
 import { LazyContextMenu } from './LazyContextMenu';
 import { MenuCopySubmenu } from './MenuCopySubmenu';
 import { MenuGroupSeparator } from './MenuGroupSeparator';
@@ -31,7 +31,7 @@ function CommitContextMenuBody({ commit }: { commit: Commit }) {
   return (
     <>
       <ContextMenu.Portal>
-        <ContextMenu.Content className={`${menuMinWidthClass} ${menuContentClass}`}>
+        <ContextMenu.Content className={`${menuMinWidthClass} ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
           <MenuGroupSeparator label="Commit" name={commit.abbreviatedHash} />
           {commitItems}
 

@@ -6,7 +6,7 @@
  * tokens live here once instead of being re-declared in each menu component.
  */
 export const menuItemClass =
-  'px-3 py-1.5 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
+  'px-3 py-1 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
 
 /**
  * Item that opens a submenu. Same shape as `menuItemClass` plus room for the
@@ -15,13 +15,13 @@ export const menuItemClass =
  * the chevron — a submenu item must never look like a plain command.
  */
 export const menuSubTriggerClass =
-  'flex items-center justify-between gap-3 px-3 py-1.5 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)] data-[state=open]:bg-[var(--vscode-menu-selectionBackground)] data-[state=open]:text-[var(--vscode-menu-selectionForeground)]';
+  'flex items-center justify-between gap-3 px-3 py-1 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)] data-[state=open]:bg-[var(--vscode-menu-selectionBackground)] data-[state=open]:text-[var(--vscode-menu-selectionForeground)]';
 
 export const menuItemDisabledClass =
-  'px-3 py-1.5 text-sm text-[var(--vscode-disabledForeground)] cursor-not-allowed outline-none';
+  'px-3 py-1 text-sm text-[var(--vscode-disabledForeground)] cursor-not-allowed outline-none';
 
 export const dangerItemClass =
-  'px-3 py-1.5 text-sm text-[var(--vscode-errorForeground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
+  'px-3 py-1 text-sm text-[var(--vscode-errorForeground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
 
 /**
  * Plain group divider. 1px rule + 5px margins = an 11px row, matching the
@@ -63,7 +63,19 @@ export const menuGroupNameClass = 'ml-1 min-w-0 truncate normal-case tracking-no
  * rounding, shadow, theme background/border, z-index) is shared.
  */
 export const menuContentClass =
-  'py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50';
+  'py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50 ' +
+  // Radix measures the room left between the menu's anchor and the viewport edge
+  // and publishes it as this variable. Capping the height against it and scrolling
+  // the overflow is what keeps a long menu — a branch badge's runs to ~20 items —
+  // usable in a short editor window instead of running off the bottom.
+  'max-h-[var(--radix-context-menu-content-available-height)] menu-scroll';
+
+/**
+ * Gap kept between a menu and the viewport edge. Also feeds the available-height
+ * measurement above, so a scrolling menu stops short of the edge rather than
+ * bleeding into it.
+ */
+export const MENU_COLLISION_PADDING = 8;
 
 /**
  * Floor for menus that caption their groups. A menu sizes itself to its longest

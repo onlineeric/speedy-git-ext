@@ -28,7 +28,7 @@ import { RevertDialog } from './RevertDialog';
 import { DropCommitDialog } from './DropCommitDialog';
 import { CreateWorktreeDialog } from './CreateWorktreeDialog';
 import { MenuSubTrigger } from './MenuSubTrigger';
-import { menuContentClass, menuItemClass, menuItemDisabledClass } from './menuStyles';
+import { MENU_COLLISION_PADDING, menuContentClass, menuItemClass, menuItemDisabledClass } from './menuStyles';
 
 /**
  * Where the commit items are being rendered.
@@ -425,7 +425,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
         <ContextMenu.Sub>
           <MenuSubTrigger>Reset Current Branch to Here</MenuSubTrigger>
           <ContextMenu.Portal>
-            <ContextMenu.SubContent className={`min-w-[160px] ${menuContentClass}`}>
+            <ContextMenu.SubContent className={`min-w-[160px] ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
               <ContextMenu.Item className={menuItemClass} onSelect={() => { track('resetSoft'); handleResetSelect('soft'); }}>
                 Soft (keep staged)
               </ContextMenu.Item>

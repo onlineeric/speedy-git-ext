@@ -26,7 +26,7 @@ import { PushDialog } from './PushDialog';
 import { CheckoutWithPullDialog } from './CheckoutWithPullDialog';
 import { CreateWorktreeDialog, type WorktreeSource } from './CreateWorktreeDialog';
 import { useRemoveWorktreeDialog, WorktreeMenuItems } from './WorktreeMenuItems';
-import { dangerItemClass, menuContentClass, menuItemClass, menuItemDisabledClass, menuMinWidthClass } from './menuStyles';
+import { MENU_COLLISION_PADDING, dangerItemClass, menuContentClass, menuItemClass, menuItemDisabledClass, menuMinWidthClass } from './menuStyles';
 import { LazyContextMenu } from './LazyContextMenu';
 import { MenuCopySubmenu } from './MenuCopySubmenu';
 import { MenuGroupSeparator } from './MenuGroupSeparator';
@@ -283,7 +283,7 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
   return (
     <>
       <ContextMenu.Portal>
-        <ContextMenu.Content className={`${menuMinWidthClass} ${menuContentClass}`}>
+        <ContextMenu.Content className={`${menuMinWidthClass} ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
             {/* The ref this badge names, ordered from navigating to it through to deleting it. */}
             {showRefGroup && (
               <>
