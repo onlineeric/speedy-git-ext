@@ -28,7 +28,7 @@ import { RevertDialog } from './RevertDialog';
 import { DropCommitDialog } from './DropCommitDialog';
 import { CreateWorktreeDialog } from './CreateWorktreeDialog';
 import { MenuSubTrigger } from './MenuSubTrigger';
-import { MENU_COLLISION_PADDING, menuContentClass, menuItemClass, menuItemDisabledClass } from './menuStyles';
+import { dangerItemClass, MENU_COLLISION_PADDING, menuContentClass, menuItemClass, menuItemDisabledClass } from './menuStyles';
 
 /**
  * Where the commit items are being rendered.
@@ -409,8 +409,10 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
       )}
 
       {availability.canDrop && (
+        // Dropping destroys a commit, so it carries the same danger styling as
+        // Delete Branch / Delete Tag rather than reading as an ordinary action.
         <ContextMenu.Item
-          className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
+          className={isOperationInProgress ? menuItemDisabledClass : dangerItemClass}
           disabled={isOperationInProgress}
           onSelect={() => {
             track('dropCommit');
