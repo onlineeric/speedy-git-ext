@@ -83,6 +83,33 @@ describe('parseRefs', () => {
     expect(parseRefs('HEAD -> main')).toEqual([{ type: 'head', name: 'main' }]);
   });
 
+  // We ask git for `--decorate=full`, so the checked-out branch arrives qualified.
+  // Leaving the `refs/heads/` prefix on made the badge's name differ from the name in
+  // the branch list, and the menu stopped recognising it as the current branch.
+  it('strips refs/heads/ from a fully-qualified "HEAD -> branch" pointer', () => {
+    expect(parseRefs('HEAD -> refs/heads/test/branch1')).toEqual([
+      { type: 'head', name: 'test/branch1' },
+    ]);
+  });
+
+  it('strips refs/tags/ from a fully-qualified tag decoration', () => {
+    expect(parseRefs('tag: refs/tags/v1.0')).toEqual([{ type: 'tag', name: 'v1.0' }]);
+  });
+
+  it('reads a full decoration line exactly as git emits it', () => {
+    expect(
+      parseRefs(
+        'HEAD -> refs/heads/test/branch1, tag: refs/tags/v2.0, refs/remotes/origin/test/branch1, refs/remotes/mycompany/eric/wip, refs/heads/eric/wip',
+      ),
+    ).toEqual([
+      { type: 'head', name: 'test/branch1' },
+      { type: 'tag', name: 'v2.0' },
+      { type: 'remote', name: 'test/branch1', remote: 'origin' },
+      { type: 'remote', name: 'eric/wip', remote: 'mycompany' },
+      { type: 'branch', name: 'eric/wip' },
+    ]);
+  });
+
   it('parses bare HEAD (detached) as head/HEAD', () => {
     expect(parseRefs('HEAD')).toEqual([{ type: 'head', name: 'HEAD' }]);
   });
@@ -189,7 +216,7 @@ describe('parseBranchLine', () => {
   }
 
   it('parses a local non-current branch', () => {
-    const result = parseBranchLine(branchLine('feature/login', ' ', 'a1b2c3d'));
+    const result = parseBranchLine(branchLine('refs/heads/feature/login', ' ', 'a1b2c3d'));
     expect(result).toEqual({
       name: 'feature/login',
       remote: undefined,
@@ -199,12 +226,12 @@ describe('parseBranchLine', () => {
   });
 
   it('marks branches as current when HEAD marker is "*"', () => {
-    const result = parseBranchLine(branchLine('main', '*', 'a1b2c3d'));
+    const result = parseBranchLine(branchLine('refs/heads/main', '*', 'a1b2c3d'));
     expect(result!.current).toBe(true);
   });
 
-  it('strips remotes/ prefix and returns remote tracking branch', () => {
-    const result = parseBranchLine(branchLine('remotes/origin/main', ' ', 'aaa1111'));
+  it('returns a remote tracking branch with its remote split off', () => {
+    const result = parseBranchLine(branchLine('refs/remotes/origin/main', ' ', 'aaa1111'));
     expect(result).toEqual({
       name: 'main',
       remote: 'origin',
@@ -213,16 +240,28 @@ describe('parseBranchLine', () => {
     });
   });
 
-  it('detects remote tracking branches like origin/main without remotes/ prefix', () => {
-    const result = parseBranchLine(branchLine('origin/main', ' ', 'aaa1111'));
+  it('keeps the full branch name for a slashed branch on a remote', () => {
+    const result = parseBranchLine(branchLine('refs/remotes/origin/feature/login', ' ', 'aaa1111'));
     expect(result!.remote).toBe('origin');
-    expect(result!.name).toBe('main');
+    expect(result!.name).toBe('feature/login');
   });
 
-  it('treats feature/login as local even though it contains a slash', () => {
-    const result = parseBranchLine(branchLine('feature/login', ' ', 'h'));
-    expect(result!.remote).toBeUndefined();
-    expect(result!.name).toBe('feature/login');
+  // Regression: a local branch whose name contains a slash used to be split into
+  // `<remote>/<branch>` by a prefix heuristic, so the checked-out branch appeared as a
+  // remote branch. `branches.find(b => b.current && !b.remote)` then found nothing and
+  // its own badge menu offered Checkout / Merge / Delete on the branch you were on.
+  it.each(['test/branch1', 'eric/wip', 'jira/PROJ-123', 'feature/login', 'release/1.0'])(
+    'keeps the local branch %s local, whatever its prefix looks like',
+    (name) => {
+      const result = parseBranchLine(branchLine(`refs/heads/${name}`, '*', 'h'));
+      expect(result).toEqual({ name, remote: undefined, current: true, hash: 'h' });
+    },
+  );
+
+  it('splits on the real remote name, not a guessed one', () => {
+    const result = parseBranchLine(branchLine('refs/remotes/mycompany/test/branch1', ' ', 'h'));
+    expect(result!.remote).toBe('mycompany');
+    expect(result!.name).toBe('test/branch1');
   });
 
   it('returns null for malformed lines', () => {
@@ -231,14 +270,27 @@ describe('parseBranchLine', () => {
   });
 
   it('trims surrounding whitespace from raw name and hash', () => {
-    const result = parseBranchLine(branchLine('  main ', ' ', '  hash123  '));
+    const result = parseBranchLine(branchLine('  refs/heads/main ', ' ', '  hash123  '));
     expect(result!.name).toBe('main');
     expect(result!.hash).toBe('hash123');
   });
 
   it('drops `<remote>/HEAD` entries from the branch list', () => {
-    expect(parseBranchLine(branchLine('origin/HEAD', ' ', 'aaa1111'))).toBeNull();
-    expect(parseBranchLine(branchLine('remotes/origin/HEAD', ' ', 'aaa1111'))).toBeNull();
+    expect(parseBranchLine(branchLine('refs/remotes/origin/HEAD', ' ', 'aaa1111'))).toBeNull();
+  });
+
+  it('drops malformed remote entries with no branch part', () => {
+    expect(parseBranchLine(branchLine('refs/remotes/origin', ' ', 'aaa1111'))).toBeNull();
+  });
+
+  it('passes the detached-HEAD pseudo-entry through so HEAD is still located', () => {
+    const result = parseBranchLine(branchLine('(HEAD detached at ad6b6d3)', '*', 'ad6b6d3'));
+    expect(result).toEqual({
+      name: '(HEAD detached at ad6b6d3)',
+      remote: undefined,
+      current: true,
+      hash: 'ad6b6d3',
+    });
   });
 });
 

@@ -56,6 +56,11 @@ export class GitLogService {
     args.push(
       `--max-count=${maxCount}`,
       `--format=${format}`,
+      // Ask for fully-qualified ref names in %D (refs/heads/x, refs/remotes/origin/x).
+      // The short form is ambiguous — "team/feature" could be a local branch or the
+      // branch "feature" on a remote named "team" — and it also varies with the user's
+      // `log.decorate` config. Qualified names remove the guesswork entirely.
+      '--decorate=full',
       '--date-order'
     );
 
@@ -185,7 +190,9 @@ export class GitLogService {
     this.log.info('Fetching branches');
     // Use null byte separators for reliable parsing
     const result = await this.executor.execute({
-      args: ['branch', '-a', '--format=%(refname:short)%00%(HEAD)%00%(objectname)'],
+      // `%(refname)` (not `:short`) so local branches with slashes are never
+      // mistaken for `<remote>/<branch>` — see parseBranchLine.
+      args: ['branch', '-a', '--format=%(refname)%00%(HEAD)%00%(objectname)'],
       cwd: this.workspacePath,
     });
 
