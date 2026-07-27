@@ -28,6 +28,7 @@ import { RevertDialog } from './RevertDialog';
 import { DropCommitDialog } from './DropCommitDialog';
 import { CreateWorktreeDialog } from './CreateWorktreeDialog';
 import { MenuGroupSeparator } from './MenuGroupSeparator';
+import { MenuSubTrigger } from './MenuSubTrigger';
 import { menuContentClass, menuItemClass, menuItemDisabledClass } from './menuStyles';
 
 /**
@@ -421,9 +422,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
 
       {availability.canReset && (
         <ContextMenu.Sub>
-          <ContextMenu.SubTrigger className={menuItemClass}>
-            Reset Current Branch to Here
-          </ContextMenu.SubTrigger>
+          <MenuSubTrigger>Reset Current Branch to Here</MenuSubTrigger>
           <ContextMenu.Portal>
             <ContextMenu.SubContent className={`min-w-[160px] ${menuContentClass}`}>
               <ContextMenu.Item className={menuItemClass} onSelect={() => { track('resetSoft'); handleResetSelect('soft'); }}>

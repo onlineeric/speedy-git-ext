@@ -29,6 +29,7 @@ import { useRemoveWorktreeDialog, WorktreeMenuItems } from './WorktreeMenuItems'
 import { dangerItemClass, menuContentClass, menuItemClass, menuItemDisabledClass } from './menuStyles';
 import { LazyContextMenu } from './LazyContextMenu';
 import { MenuGroupSeparator } from './MenuGroupSeparator';
+import { MenuSubTrigger } from './MenuSubTrigger';
 import { useCommitMenuItems } from './useCommitMenuItems';
 
 
@@ -343,9 +344,7 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
               <>
                 <MenuGroupSeparator label="Commit" />
                 <ContextMenu.Sub>
-                  <ContextMenu.SubTrigger className={menuItemClass}>
-                    Commit actions
-                  </ContextMenu.SubTrigger>
+                  <MenuSubTrigger>Commit actions</MenuSubTrigger>
                   <ContextMenu.Portal>
                     <ContextMenu.SubContent className={`min-w-[180px] ${menuContentClass}`}>
                       {commitMenu.items}

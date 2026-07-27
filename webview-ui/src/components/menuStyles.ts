@@ -8,6 +8,15 @@
 export const menuItemClass =
   'px-3 py-1.5 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
 
+/**
+ * Item that opens a submenu. Same shape as `menuItemClass` plus room for the
+ * trailing chevron, and it stays highlighted while its submenu is open so the
+ * path you came through is obvious. Use via `MenuSubTrigger`, which supplies
+ * the chevron — a submenu item must never look like a plain command.
+ */
+export const menuSubTriggerClass =
+  'flex items-center justify-between gap-3 px-3 py-1.5 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)] data-[state=open]:bg-[var(--vscode-menu-selectionBackground)] data-[state=open]:text-[var(--vscode-menu-selectionForeground)]';
+
 export const menuItemDisabledClass =
   'px-3 py-1.5 text-sm text-[var(--vscode-disabledForeground)] cursor-not-allowed outline-none';
 
