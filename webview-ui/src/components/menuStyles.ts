@@ -14,8 +14,19 @@ export const menuItemClass =
  * path you came through is obvious. Use via `MenuSubTrigger`, which supplies
  * the chevron — a submenu item must never look like a plain command.
  */
+const menuSubTriggerLayoutClass =
+  'flex items-center justify-between gap-3 px-3 py-1 text-sm cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)] data-[state=open]:bg-[var(--vscode-menu-selectionBackground)] data-[state=open]:text-[var(--vscode-menu-selectionForeground)]';
+
 export const menuSubTriggerClass =
-  'flex items-center justify-between gap-3 px-3 py-1 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)] data-[state=open]:bg-[var(--vscode-menu-selectionBackground)] data-[state=open]:text-[var(--vscode-menu-selectionForeground)]';
+  `${menuSubTriggerLayoutClass} text-[var(--vscode-menu-foreground)]`;
+
+/**
+ * Sub-trigger for a submenu whose actions rewrite or discard work (Reset). The
+ * colour warns before the submenu is even open; the individual entries inside
+ * are styled on their own merits, so only the genuinely destructive ones repeat it.
+ */
+export const dangerSubTriggerClass =
+  `${menuSubTriggerLayoutClass} text-[var(--vscode-errorForeground)]`;
 
 export const menuItemDisabledClass =
   'px-3 py-1 text-sm text-[var(--vscode-disabledForeground)] cursor-not-allowed outline-none';

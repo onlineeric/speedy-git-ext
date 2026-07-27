@@ -24,8 +24,12 @@ export interface CommitMenuContext {
   commit: Commit;
   /** Hash the checked-out local branch points at, or null when there is none. */
   currentBranchHash: string | null;
-  /** Whether the commit is reachable from the current branch's head. */
-  isOnCurrentBranch: boolean;
+  /**
+   * Whether the current branch's history is linear from its tip down to this
+   * commit — the commit is on the first-parent chain and no merge sits between.
+   * Anything less means the stretch cannot be rewritten commit-by-commit.
+   */
+  isOnFirstParentChain: boolean;
 }
 
 /** A stash entry rendered into the graph as a pseudo-commit. */
@@ -36,7 +40,7 @@ export function isStashPseudoCommit(commit: Commit): boolean {
 export function getCommitMenuAvailability({
   commit,
   currentBranchHash,
-  isOnCurrentBranch,
+  isOnFirstParentChain,
 }: CommitMenuContext): CommitMenuAvailability {
   const isStash = isStashPseudoCommit(commit);
   const isMergeCommit = commit.parents.length > 1;
@@ -57,8 +61,10 @@ export function getCommitMenuAvailability({
     canRebase: targetsOtherCommit,
     canReset: targetsOtherCommit,
     canRevert: !isRootCommit && !isStash,
-    // Dropping rewrites the current branch, so the commit has to be on it.
-    // Merge commits are excluded: dropping one is ambiguous, not a rewrite.
-    canDrop: !isRootCommit && !isMergeCommit && !isStash && isOnCurrentBranch,
+    // Dropping replays every commit above this one onto its parent, so it needs
+    // an unbroken linear stretch from the branch tip down to here. Merge commits
+    // are excluded on both counts: dropping one is ambiguous rather than a
+    // rewrite, and one sitting in between would be flattened by the replay.
+    canDrop: !isRootCommit && !isMergeCommit && !isStash && isOnFirstParentChain,
   };
 }

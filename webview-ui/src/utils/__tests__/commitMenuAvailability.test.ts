@@ -15,7 +15,7 @@ function makeCommit(hash: string, parents: string[] = ['parent'], refs: RefInfo[
   };
 }
 
-const ON_BRANCH = { currentBranchHash: 'head', isOnCurrentBranch: true };
+const ON_BRANCH = { currentBranchHash: 'head', isOnFirstParentChain: true };
 
 describe('isStashPseudoCommit', () => {
   it('detects a stash entry by its ref', () => {
@@ -54,7 +54,7 @@ describe('getCommitMenuAvailability', () => {
     const availability = getCommitMenuAvailability({
       commit: makeCommit('abc'),
       currentBranchHash: null,
-      isOnCurrentBranch: false,
+      isOnFirstParentChain: false,
     });
 
     expect(availability.isHeadCommit).toBe(false);
@@ -63,11 +63,11 @@ describe('getCommitMenuAvailability', () => {
     expect(availability.canDrop).toBe(false);
   });
 
-  it('cannot drop a commit that is not on the current branch', () => {
+  it('cannot drop a commit off the current branch\'s linear history', () => {
     const availability = getCommitMenuAvailability({
       commit: makeCommit('abc'),
       currentBranchHash: 'head',
-      isOnCurrentBranch: false,
+      isOnFirstParentChain: false,
     });
 
     expect(availability.canDrop).toBe(false);

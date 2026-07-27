@@ -212,6 +212,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
 
   const branches = useGraphStore((s) => s.branches);
   const selectedCommits = useGraphStore((s) => s.selectedCommits);
+  const commits = useGraphStore((s) => s.commits);
   const mergedCommits = useGraphStore((s) => s.mergedCommits);
   const clearSelectedCommits = useGraphStore((s) => s.clearSelectedCommits);
   const rebaseInProgress = useGraphStore((s) => s.rebaseInProgress);
@@ -232,17 +233,20 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
     currentLocalBranch !== null &&
     branches.some((b) => b.name === currentLocalBranch.name && !!b.remote);
 
-  // Memoize the reachability checker so the commit-by-hash map is built once per
-  // mergedCommits change instead of on every render of this per-row context menu.
-  const reachability = useMemo(() => createReachabilityChecker(mergedCommits), [mergedCommits]);
-  const isOnCurrentBranch = currentLocalBranch
-    ? reachability.isReachableFromHead(commit.hash, currentLocalBranch.hash)
+  // Built from the *unfiltered* commit list: which operations apply is a question
+  // about git history, not about what the author/text filters happen to be showing.
+  // Walking `mergedCommits` instead let a filter punch holes in the parent chain and
+  // silently hide Drop Commit. Memoized so the commit-by-hash map is built once per
+  // commits change instead of on every render of this per-row context menu.
+  const reachability = useMemo(() => createReachabilityChecker(commits), [commits]);
+  const isOnFirstParentChain = currentLocalBranch
+    ? reachability.isOnFirstParentChain(commit.hash, currentLocalBranch.hash)
     : false;
 
   const availability = getCommitMenuAvailability({
     commit,
     currentBranchHash: currentLocalBranch?.hash ?? null,
-    isOnCurrentBranch,
+    isOnFirstParentChain,
   });
 
   // Transient busy states only *disable* items — they stay visible so the user
@@ -425,7 +429,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
 
       {availability.canReset && (
         <ContextMenu.Sub>
-          <MenuSubTrigger>Reset Current Branch to Here</MenuSubTrigger>
+          <MenuSubTrigger danger>Reset Current Branch to Here</MenuSubTrigger>
           <ContextMenu.Portal>
             <ContextMenu.SubContent className={`min-w-[160px] ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
               <ContextMenu.Item className={menuItemClass} onSelect={() => { track('resetSoft'); handleResetSelect('soft'); }}>
@@ -434,7 +438,9 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
               <ContextMenu.Item className={menuItemClass} onSelect={() => { track('resetMixed'); handleResetSelect('mixed'); }}>
                 Mixed (keep unstaged)
               </ContextMenu.Item>
-              <ContextMenu.Item className={menuItemClass} onSelect={() => { track('resetHard'); handleResetSelect('hard'); }}>
+              {/* Soft and mixed keep your work in the tree; only hard throws it away,
+                  so it is the only entry that carries the destructive colour. */}
+              <ContextMenu.Item className={dangerItemClass} onSelect={() => { track('resetHard'); handleResetSelect('hard'); }}>
                 Hard (discard all)
               </ContextMenu.Item>
             </ContextMenu.SubContent>

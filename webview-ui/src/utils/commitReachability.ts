@@ -2,6 +2,18 @@ import type { Commit } from '@shared/types';
 
 export interface ReachabilityChecker {
   isReachableFromHead(commitHash: string, headHash: string): boolean;
+  /**
+   * Whether the commit sits on the head's *first-parent* chain with no merge
+   * commit in between — i.e. the stretch of history from the head down to the
+   * commit is linear.
+   *
+   * This is the question to ask before offering an operation that rewrites that
+   * stretch (dropping a commit runs `git rebase -i <hash>~1`, which flattens any
+   * merge it replays over). Plain reachability is too permissive: a commit
+   * merged in from a side branch is reachable, but rewriting down to it would
+   * silently linearize the merge.
+   */
+  isOnFirstParentChain(commitHash: string, headHash: string): boolean;
 }
 
 /**
@@ -46,6 +58,25 @@ export function createReachabilityChecker(commits: Commit[]): ReachabilityChecke
         for (const parent of current.parents) {
           queue.push(parent);
         }
+      }
+
+      return false;
+    },
+
+    isOnFirstParentChain(commitHash, headHash) {
+      const resolvedTarget = resolve(commitHash);
+      let hash: string | undefined = resolve(headHash);
+      const seen = new Set<string>();
+
+      while (hash && !seen.has(hash)) {
+        if (hash === resolvedTarget) return true;
+        seen.add(hash);
+
+        const current: Commit | undefined = commitByHash.get(hash);
+        // A merge between the tip and the target means history there cannot be
+        // rewritten commit-by-commit, so stop rather than walking past it.
+        if (!current || current.parents.length > 1) return false;
+        hash = current.parents[0];
       }
 
       return false;
