@@ -304,7 +304,7 @@ function renderColumn({
                     <RefLabel displayRef={displayRef} laneColorStyle={laneColorStyle} className="whitespace-nowrap" />
                   </StashContextMenu>
                 ) : (
-                  <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)}>
+                  <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)} commit={commit}>
                     <RefLabel
                       displayRef={displayRef}
                       laneColorStyle={laneColorStyle}
@@ -315,7 +315,7 @@ function renderColumn({
                   </BranchContextMenu>
                 )
               )}
-              <OverflowRefsBadge hiddenRefs={overflowRefs} laneColorStyle={laneColorStyle} worktreeByBranch={worktreeByBranch} tagMetadata={tagMetadata} />
+              <OverflowRefsBadge hiddenRefs={overflowRefs} commit={commit} laneColorStyle={laneColorStyle} worktreeByBranch={worktreeByBranch} tagMetadata={tagMetadata} />
               {showDetachedWorktrees && <DetachedWorktreeBadge worktrees={detachedWorktrees} laneColorStyle={laneColorStyle} />}
             </div>
           )}

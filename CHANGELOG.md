@@ -4,6 +4,15 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.8.0] - 2026-07-28
+
+### Added
+- **Commit actions are now reachable from branch and tag badges.** Right-clicking a branch, remote-branch, or tag badge used to open a menu with only ref actions, so the commit's own actions could be reached only by aiming at empty row space — and nothing on screen said so. Every badge menu now carries a **Commit actions** submenu with the actions of the commit it sits on: checkout, cherry-pick, interactive rebase, revert, drop, reset, create branch/tag here, and the copy items. Badges hidden behind the **+N** overflow badge get the same menu. Items the badge menu already covers better in ref form — compare, rebase onto, create worktree — aren't repeated inside the submenu.
+
+### Changed
+- **Context menus are grouped by what each action acts on, and the groups are now named.** Menu items are organised into groups for the object they act on — the ref itself, the commit under it, the remote, the worktree, compare, and copy — and each group's name is printed on its separator line as a small caption. Previously a branch menu put checkout, merge, rename, push and fast-forward in one undifferentiated block, and the commit menu spread fifteen items across eight unnamed groups. The captions sit on the existing separator lines, so no menu got taller. Menus small enough to read at a glance (stash, author, date) are unchanged.
+- **"Discard All Unstaged Changes" is now styled as a destructive action**, matching Drop Stash and Delete Branch. It was the last irreversible item still shown as an ordinary menu entry.
+
 ## [5.7.2] - 2026-07-24
 
 ### Fixed

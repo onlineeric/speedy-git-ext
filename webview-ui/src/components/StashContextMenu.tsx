@@ -5,8 +5,9 @@ import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
 import { buildDropStashCommand } from '../utils/gitCommandBuilder';
 import { ConfirmDialog } from './ConfirmDialog';
-import { dangerItemClass, menuContentClass, menuItemClass, menuSeparatorClass } from './menuStyles';
+import { dangerItemClass, menuContentClass, menuItemClass } from './menuStyles';
 import { LazyContextMenu } from './LazyContextMenu';
+import { MenuGroupSeparator } from './MenuGroupSeparator';
 
 interface StashContextMenuProps {
   commit: Commit;
@@ -61,11 +62,10 @@ function StashContextMenuBody({ commit, stashIndex }: Omit<StashContextMenuProps
             <ContextMenu.Item className={menuItemClass} onSelect={handlePop} disabled={!isValidIndex}>
               Pop Stash
             </ContextMenu.Item>
-            <ContextMenu.Separator className={menuSeparatorClass} />
             <ContextMenu.Item className={dangerItemClass} onSelect={handleDrop} disabled={!isValidIndex}>
               Drop Stash
             </ContextMenu.Item>
-            <ContextMenu.Separator className={menuSeparatorClass} />
+            <MenuGroupSeparator />
             <ContextMenu.Item className={menuItemClass} onSelect={handleCopyHash}>
               Copy Commit Hash
             </ContextMenu.Item>

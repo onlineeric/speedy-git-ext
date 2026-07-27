@@ -1,0 +1,64 @@
+import type { Commit } from '@shared/types';
+
+/**
+ * Which commit operations apply to a given commit.
+ *
+ * The same set drives the commit row menu and the "Commit actions" submenu on
+ * ref badges, so the rules live here instead of inside either menu component.
+ */
+export interface CommitMenuAvailability {
+  /** The commit the current branch already points at. */
+  isHeadCommit: boolean;
+  isMergeCommit: boolean;
+  isRootCommit: boolean;
+  /** Stash entries are rendered as pseudo-commits but are not rewritable. */
+  isStash: boolean;
+  canCherryPick: boolean;
+  canRebase: boolean;
+  canRevert: boolean;
+  canDrop: boolean;
+  canReset: boolean;
+}
+
+export interface CommitMenuContext {
+  commit: Commit;
+  /** Hash the checked-out local branch points at, or null when there is none. */
+  currentBranchHash: string | null;
+  /** Whether the commit is reachable from the current branch's head. */
+  isOnCurrentBranch: boolean;
+}
+
+/** A stash entry rendered into the graph as a pseudo-commit. */
+export function isStashPseudoCommit(commit: Commit): boolean {
+  return commit.refs.some((ref) => ref.type === 'stash');
+}
+
+export function getCommitMenuAvailability({
+  commit,
+  currentBranchHash,
+  isOnCurrentBranch,
+}: CommitMenuContext): CommitMenuAvailability {
+  const isStash = isStashPseudoCommit(commit);
+  const isMergeCommit = commit.parents.length > 1;
+  const isRootCommit = commit.parents.length === 0;
+  const isHeadCommit = currentBranchHash !== null && commit.hash === currentBranchHash;
+
+  // Rebasing onto, and resetting to, both mean "move the current branch here",
+  // so they become available under exactly the same condition: a branch exists
+  // to move, and it isn't already here.
+  const targetsOtherCommit = currentBranchHash !== null && !isHeadCommit;
+
+  return {
+    isHeadCommit,
+    isMergeCommit,
+    isRootCommit,
+    isStash,
+    canCherryPick: !isHeadCommit,
+    canRebase: targetsOtherCommit,
+    canReset: targetsOtherCommit,
+    canRevert: !isRootCommit && !isStash,
+    // Dropping rewrites the current branch, so the commit has to be on it.
+    // Merge commits are excluded: dropping one is ambiguous, not a rewrite.
+    canDrop: !isRootCommit && !isMergeCommit && !isStash && isOnCurrentBranch,
+  };
+}

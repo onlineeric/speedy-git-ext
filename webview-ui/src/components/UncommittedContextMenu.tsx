@@ -7,8 +7,9 @@ import { StashDialog } from './StashDialog';
 import { DiscardAllDialog } from './DiscardAllDialog';
 import { FilePickerDialog } from './FilePickerDialog';
 import { CompareMenuItems } from './CompareMenuItems';
-import { menuContentClass, menuItemClass, menuSeparatorClass } from './menuStyles';
+import { dangerItemClass, menuContentClass, menuItemClass } from './menuStyles';
 import { LazyContextMenu } from './LazyContextMenu';
+import { MenuGroupSeparator } from './MenuGroupSeparator';
 
 interface UncommittedContextMenuProps {
   children: React.ReactNode;
@@ -58,14 +59,7 @@ function UncommittedContextMenuBody() {
     <>
       <ContextMenu.Portal>
         <ContextMenu.Content className={`min-w-[200px] ${menuContentClass}`}>
-            {/* Compare-refs (042-compare-refs) — Working Tree sentinel */}
-            <CompareMenuItems slot={{ kind: 'workingTree' }} surface="uncommittedMenu" />
-            <ContextMenu.Separator className={menuSeparatorClass} />
-            {hasAnyChanges && (
-              <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('uncommittedMenu', 'stash'); setStashDialogOpen(true); }}>
-                Stash Everything…
-              </ContextMenu.Item>
-            )}
+            {/* The working-tree changes themselves, ordered from staging through to discarding. */}
             {hasUnstagedChanges && (
               <ContextMenu.Item className={menuItemClass} onSelect={handleStageAll}>
                 Stage All Changes
@@ -76,20 +70,28 @@ function UncommittedContextMenuBody() {
                 Unstage All Changes
               </ContextMenu.Item>
             )}
-            {hasUnstagedChanges && (
-              <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('uncommittedMenu', 'discardAll'); setDiscardAllDialogOpen(true); }}>
-                Discard All Unstaged Changes
+            {hasAnyChanges && (
+              <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('uncommittedMenu', 'selectFiles'); setFilePickerOpen(true); }}>
+                Select files for...
               </ContextMenu.Item>
             )}
             {hasAnyChanges && (
-              <>
-                <ContextMenu.Separator className={menuSeparatorClass} />
-                <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('uncommittedMenu', 'selectFiles'); setFilePickerOpen(true); }}>
-                  Select files for...
-                </ContextMenu.Item>
-              </>
+              <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('uncommittedMenu', 'stash'); setStashDialogOpen(true); }}>
+                Stash Everything…
+              </ContextMenu.Item>
             )}
-            <ContextMenu.Separator className={menuSeparatorClass} />
+            {hasUnstagedChanges && (
+              <ContextMenu.Item className={dangerItemClass} onSelect={() => { trackUiInteraction('uncommittedMenu', 'discardAll'); setDiscardAllDialogOpen(true); }}>
+                Discard All Unstaged Changes
+              </ContextMenu.Item>
+            )}
+
+            {/* Compare-refs (042-compare-refs) — Working Tree sentinel. With a clean
+               working tree there is no group above, so compare leads the menu unheaded. */}
+            {hasAnyChanges && <MenuGroupSeparator label="Compare" />}
+            <CompareMenuItems slot={{ kind: 'workingTree' }} surface="uncommittedMenu" />
+
+            <MenuGroupSeparator />
             <ContextMenu.Item className={menuItemClass} onSelect={handleRefresh}>
               Refresh
             </ContextMenu.Item>

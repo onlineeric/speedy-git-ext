@@ -117,7 +117,9 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
 │   ├── *ContextMenu.tsx          # Context menus (Commit, Branch, Stash, Author, Date, Uncommitted) via Radix UI
 │   ├── LazyContextMenu.tsx       # Wraps a Radix context menu so its heavy body (items/dialogs/store subscriptions) mounts only on first right-click — keeps virtualized rows cheap during fast scrolling
 │   ├── CompareMenuItems.tsx      # Shared "Set as Compare Base" / "Compare with Base" item pair (042), reused across Commit/Branch/Uncommitted menus
-│   ├── menuStyles.ts             # Shared Tailwind class strings for context-menu items (enabled/disabled/separator)
+│   ├── useCommitMenuItems.tsx    # All commit actions as `{ items, dialogs }` — feeds both the commit row menu (`variant: 'row'`) and the "Commit actions" submenu on ref badges (`variant: 'badge'`, drops the items the ref menu covers better)
+│   ├── MenuGroupSeparator.tsx    # Divider between menu groups, optionally captioned with the group name; same 11px height labelled or not
+│   ├── menuStyles.ts             # Shared Tailwind class strings for context-menu items (enabled/disabled/separator/group label)
 │   ├── HelpDialog.tsx            # "Help & Feedback" dialog (toolbar Help button): GitHub Issues link + docs/changelog/marketplace links + version
 │   ├── FieldError.tsx            # Validation message under form inputs (pairs with aria-invalid/aria-describedby)
 │   └── CommandPreview.tsx        # Live git command preview shown in dialogs
@@ -137,6 +139,7 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
     ├── graphPaths.ts             # SVG "rounded elbow" path builders for lane-changing connection lines — lines cross row boundaries perfectly vertically so per-row SVG cells join without kinks (5.4.0)
     ├── gitCommandBuilder.ts      # Constructs git command strings for preview display
     ├── commitReachability.ts     # Determines branch reachability for commits
+    ├── commitMenuAvailability.ts # Which commit actions apply (rebase/reset/revert/drop/cherry-pick) — shared by the commit row menu and the badge "Commit actions" submenu
     ├── commitVisibility.ts       # Visibility/filter predicates for the virtualized row list
     ├── compareSlot.ts            # Compare panel slot model (Base/Target, commit-ish parsing)
     ├── compareDefaults.ts        # Default slot seeding for the Compare panel
