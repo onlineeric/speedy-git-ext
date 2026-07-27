@@ -26,7 +26,7 @@ import { PushDialog } from './PushDialog';
 import { CheckoutWithPullDialog } from './CheckoutWithPullDialog';
 import { CreateWorktreeDialog, type WorktreeSource } from './CreateWorktreeDialog';
 import { useRemoveWorktreeDialog, WorktreeMenuItems } from './WorktreeMenuItems';
-import { dangerItemClass, menuContentClass, menuItemClass, menuItemDisabledClass } from './menuStyles';
+import { dangerItemClass, menuContentClass, menuItemClass, menuItemDisabledClass, menuMinWidthClass } from './menuStyles';
 import { LazyContextMenu } from './LazyContextMenu';
 import { MenuCopySubmenu } from './MenuCopySubmenu';
 import { MenuGroupSeparator } from './MenuGroupSeparator';
@@ -37,8 +37,8 @@ interface BranchContextMenuProps {
   refInfo: RefInfo;
   /**
    * The commit the badge sits on. A ref badge is always attached to a commit,
-   * so its menu offers that commit's actions too — under "Commit actions" —
-   * rather than making the user re-aim at bare row space to reach them.
+   * so its menu offers that commit's actions too — under its own "Commit"
+   * group — rather than making the user re-aim at bare row space to reach them.
    */
   commit: Commit;
   children: React.ReactNode;
@@ -108,7 +108,7 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
   const menuSurface: UiSurface = isTag ? 'tagMenu' : isRemoteBranch ? 'remoteBranchMenu' : 'branchMenu';
   const track = (action: UiAction) => trackUiInteraction(menuSurface, action);
 
-  // The commit this badge points at, rendered as the "Commit actions" submenu.
+  // The commit this badge points at, supplying the Commit / Create / Copy groups.
   const commitMenu = useCommitMenuItems({ commit, surface: menuSurface, variant: 'badge' });
 
   // Tag push/delete-from-remote target: the configured default remote, or undefined
@@ -283,7 +283,7 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
   return (
     <>
       <ContextMenu.Portal>
-        <ContextMenu.Content className={`min-w-[160px] ${menuContentClass}`}>
+        <ContextMenu.Content className={`${menuMinWidthClass} ${menuContentClass}`}>
             {/* The ref this badge names, ordered from navigating to it through to deleting it. */}
             {showRefGroup && (
               <>

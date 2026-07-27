@@ -64,3 +64,12 @@ export const menuGroupNameClass = 'ml-1 min-w-0 truncate normal-case tracking-no
  */
 export const menuContentClass =
   'py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50';
+
+/**
+ * Floor for menus that caption their groups. A menu sizes itself to its longest
+ * item, so one whose items are all short (the current branch's, for instance)
+ * would collapse to a width where the group captions leave no room for the rules
+ * either side of them. This keeps those menus legible without affecting the ones
+ * that are already wider.
+ */
+export const menuMinWidthClass = 'min-w-[240px]';
