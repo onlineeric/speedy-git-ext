@@ -2,6 +2,8 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { Commit } from '@shared/types';
 import { menuContentClass } from './menuStyles';
 import { LazyContextMenu } from './LazyContextMenu';
+import { MenuCopySubmenu } from './MenuCopySubmenu';
+import { MenuGroupSeparator } from './MenuGroupSeparator';
 import { useCommitMenuItems } from './useCommitMenuItems';
 
 interface CommitContextMenuProps {
@@ -19,17 +21,31 @@ export function CommitContextMenu({ commit, children }: CommitContextMenuProps) 
 
 /**
  * The commit row's menu. Every item it offers also appears — minus the ones the
- * ref menus cover better — under "Commit actions" on branch and tag badges, so
- * both are built from the same `useCommitMenuItems` hook.
+ * ref menus cover better — under the "Commit" group of branch and tag badge
+ * menus, so both are built from the same `useCommitMenuItems` hook.
  */
 function CommitContextMenuBody({ commit }: { commit: Commit }) {
-  const { items, dialogs } = useCommitMenuItems({ commit, surface: 'commitMenu', variant: 'row' });
+  const { commitItems, compareItems, createItems, worktreeItem, copyItems, dialogs } =
+    useCommitMenuItems({ commit, surface: 'commitMenu', variant: 'row' });
 
   return (
     <>
       <ContextMenu.Portal>
         <ContextMenu.Content className={`min-w-[180px] ${menuContentClass}`}>
-          {items}
+          <MenuGroupSeparator label="Commit" name={commit.abbreviatedHash} />
+          {commitItems}
+
+          <MenuGroupSeparator label="Compare" />
+          {compareItems}
+
+          <MenuGroupSeparator label="Create" />
+          {createItems}
+
+          <MenuGroupSeparator label="Worktree" />
+          {worktreeItem}
+
+          <MenuGroupSeparator />
+          <MenuCopySubmenu>{copyItems}</MenuCopySubmenu>
         </ContextMenu.Content>
       </ContextMenu.Portal>
       {dialogs}

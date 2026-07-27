@@ -27,7 +27,6 @@ import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 import { RevertDialog } from './RevertDialog';
 import { DropCommitDialog } from './DropCommitDialog';
 import { CreateWorktreeDialog } from './CreateWorktreeDialog';
-import { MenuGroupSeparator } from './MenuGroupSeparator';
 import { MenuSubTrigger } from './MenuSubTrigger';
 import { menuContentClass, menuItemClass, menuItemDisabledClass } from './menuStyles';
 
@@ -35,11 +34,12 @@ import { menuContentClass, menuItemClass, menuItemDisabledClass } from './menuSt
  * Where the commit items are being rendered.
  *
  * - `row`   — the commit row's own menu: everything applies.
- * - `badge` — the "Commit actions" submenu of a branch/tag badge menu. The
- *   parent menu already offers ref-flavoured compare, rebase-onto and
- *   create-worktree items, so the commit-flavoured twins are dropped rather
- *   than shown twice under near-identical labels. Multi-select actions go too:
- *   right-clicking a badge is not a selection gesture.
+ * - `badge` — a branch/tag badge menu, which shows the same commit actions
+ *   under its own "Commit" group. The badge menu already offers ref-flavoured
+ *   compare, rebase-onto and create-worktree items, so the commit-flavoured
+ *   twins are dropped rather than shown twice under near-identical labels.
+ *   Multi-select actions go too: right-clicking a badge is not a selection
+ *   gesture.
  */
 export type CommitMenuVariant = 'row' | 'badge';
 
@@ -188,15 +188,16 @@ function useDropCommit(commit: Commit) {
 }
 
 /**
- * Every action that applies to a commit, as menu items plus the dialogs they
- * drive.
+ * Every action that applies to a commit, grouped the way menus present them,
+ * plus the dialogs they drive.
  *
- * Both the commit row menu and the "Commit actions" submenu on ref badges are
- * built from this one hook: a branch badge sits *on* a commit, so right-clicking
- * it must not lose access to that commit's actions. Returning `{ items, dialogs }`
- * lets the caller place the items inside `ContextMenu.Content` (or a
- * `SubContent`) while the dialogs render outside the portal, which is where
- * they have to live.
+ * Both the commit row menu and the ref badge menus are built from this one
+ * hook: a branch badge sits *on* a commit, so right-clicking it must not lose
+ * access to that commit's actions. The groups come back separately rather than
+ * as one blob because callers interleave them with their own — a badge menu
+ * puts its ref group above the commit group and folds its "Copy <ref> Name"
+ * item in with the commit's copy items. Dialogs are returned apart from the
+ * items because they must render outside the menu portal.
  */
 export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuItemsOptions) {
   const [checkoutCommitConfirmOpen, setCheckoutCommitConfirmOpen] = useState(false);
@@ -312,9 +313,9 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
     clearSelectedCommits();
   };
 
-  const items = (
+  /** The commit itself — ordered from navigating to it through to rewriting it away. */
+  const commitItems = (
     <>
-      {/* The commit itself — ordered from navigating to it through to rewriting it away. */}
       <ContextMenu.Item
         className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
         disabled={isOperationInProgress}
@@ -439,41 +440,51 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
         </ContextMenu.Sub>
       )}
 
-      {/* Compare (042-compare-refs) — badges compare by ref in their parent menu. */}
-      {isRowMenu && (
-        <>
-          <MenuGroupSeparator label="Compare" />
-          {isMultiSelectActive ? (
-            <ContextMenu.Item
-              className={menuItemClass}
-              onSelect={() => {
-                track('compareCommits');
-                handleCompareRange();
-              }}
-            >
-              Compare these commits
-            </ContextMenu.Item>
-          ) : (
-            <CompareMenuItems slot={{ kind: 'commit', hash: commit.hash }} surface={surface} resolvedHash={commit.hash} />
-          )}
-        </>
-      )}
+    </>
+  );
 
-      <MenuGroupSeparator label="Create" />
+  /**
+   * Compare (042-compare-refs). Badge menus compare by ref instead, in their own
+   * Compare group, so this is the row menu's alone.
+   */
+  const compareItems = isRowMenu ? (
+    isMultiSelectActive ? (
+      <ContextMenu.Item
+        className={menuItemClass}
+        onSelect={() => {
+          track('compareCommits');
+          handleCompareRange();
+        }}
+      >
+        Compare these commits
+      </ContextMenu.Item>
+    ) : (
+      <CompareMenuItems slot={{ kind: 'commit', hash: commit.hash }} surface={surface} resolvedHash={commit.hash} />
+    )
+  ) : null;
+
+  /** Refs created *at* this commit. Worktrees are a group of their own. */
+  const createItems = (
+    <>
       <ContextMenu.Item className={menuItemClass} onSelect={() => { track('createBranch'); setCreateBranchOpen(true); }}>
         Create Branch Here...
       </ContextMenu.Item>
       <ContextMenu.Item className={menuItemClass} onSelect={() => { track('createTag'); setCreateTagOpen(true); }}>
         Create Tag Here...
       </ContextMenu.Item>
-      {/* A badge's parent menu creates worktrees from the ref, which is the better default. */}
-      {isRowMenu && (
-        <ContextMenu.Item className={menuItemClass} onSelect={() => { track('createWorktree'); setCreateWorktreeOpen(true); }}>
-          Create worktree…
-        </ContextMenu.Item>
-      )}
+    </>
+  );
 
-      <MenuGroupSeparator label="Copy" />
+  /** A badge menu creates worktrees from its ref, which is the better default. */
+  const worktreeItem = isRowMenu ? (
+    <ContextMenu.Item className={menuItemClass} onSelect={() => { track('createWorktree'); setCreateWorktreeOpen(true); }}>
+      Create worktree…
+    </ContextMenu.Item>
+  ) : null;
+
+  /** Rendered inside the shared Copy submenu, alongside any ref-name item. */
+  const copyItems = (
+    <>
       <ContextMenu.Item className={menuItemClass} onSelect={() => { track('copyHash'); rpcClient.copyToClipboard(commit.hash); }}>
         Copy Commit Hash
       </ContextMenu.Item>
@@ -564,5 +575,5 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
     </>
   );
 
-  return { items, dialogs };
+  return { commitItems, compareItems, createItems, worktreeItem, copyItems, dialogs };
 }

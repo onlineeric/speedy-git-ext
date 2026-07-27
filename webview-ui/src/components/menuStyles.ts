@@ -45,7 +45,17 @@ export const menuGroupRuleClass = 'h-px flex-1 bg-[var(--vscode-menu-separatorBa
  * rather than hardcoded, so it stays subtle in light and dark themes alike.
  */
 export const menuGroupLabelClass =
-  'px-[5px] rounded-sm text-[10px] uppercase leading-[11px] tracking-[0.11em] whitespace-nowrap text-[var(--vscode-descriptionForeground)] bg-[color-mix(in_srgb,var(--vscode-menu-foreground)_8%,transparent)]';
+  'flex min-w-0 max-w-[220px] items-center px-[5px] rounded-sm text-[10px] uppercase leading-[11px] tracking-[0.11em] whitespace-nowrap text-[var(--vscode-descriptionForeground)] bg-[color-mix(in_srgb,var(--vscode-menu-foreground)_8%,transparent)]';
+
+/**
+ * The ref name appended to a group label ("Branch  my-feature").
+ *
+ * Deliberately *not* uppercased: the surrounding label is a caption and reads
+ * better in caps, but a branch or tag name is a literal git identifier and git
+ * treats case as significant — showing `Feature/X` as `FEATURE/X` would be a
+ * lie. Long names truncate rather than widening the menu.
+ */
+export const menuGroupNameClass = 'ml-1 min-w-0 truncate normal-case tracking-normal';
 
 /**
  * Shell styling for `ContextMenu.Content` / `ContextMenu.SubContent`. The

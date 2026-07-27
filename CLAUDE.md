@@ -117,9 +117,10 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
 │   ├── *ContextMenu.tsx          # Context menus (Commit, Branch, Stash, Author, Date, Uncommitted) via Radix UI
 │   ├── LazyContextMenu.tsx       # Wraps a Radix context menu so its heavy body (items/dialogs/store subscriptions) mounts only on first right-click — keeps virtualized rows cheap during fast scrolling
 │   ├── CompareMenuItems.tsx      # Shared "Set as Compare Base" / "Compare with Base" item pair (042), reused across Commit/Branch/Uncommitted menus
-│   ├── useCommitMenuItems.tsx    # All commit actions as `{ items, dialogs }` — feeds both the commit row menu (`variant: 'row'`) and the "Commit actions" submenu on ref badges (`variant: 'badge'`, drops the items the ref menu covers better)
-│   ├── MenuGroupSeparator.tsx    # Divider between menu groups, optionally captioned with the group name; same 11px height labelled or not
+│   ├── useCommitMenuItems.tsx    # All commit actions as `{ commitItems, compareItems, createItems, worktreeItem, copyItems, dialogs }` — feeds the commit row menu (`variant: 'row'`) and the Commit/Create groups of ref badge menus (`variant: 'badge'`, drops the items the ref menu covers better). Groups are returned separately so callers can interleave them with their own
+│   ├── MenuGroupSeparator.tsx    # Divider between menu groups, optionally captioned `label` + `name` (ref name kept in its original case, truncated); same 11px height labelled or not
 │   ├── MenuSubTrigger.tsx        # Menu item that opens a submenu — trailing chevron + stays highlighted while the submenu is open
+│   ├── MenuCopySubmenu.tsx       # The shared "Copy" submenu; badge menus pass their Copy <ref> Name item in beside the commit's copy items
 │   ├── menuStyles.ts             # Shared Tailwind class strings for context-menu items (enabled/disabled/separator/group label)
 │   ├── HelpDialog.tsx            # "Help & Feedback" dialog (toolbar Help button): GitHub Issues link + docs/changelog/marketplace links + version
 │   ├── FieldError.tsx            # Validation message under form inputs (pairs with aria-invalid/aria-describedby)

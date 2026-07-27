@@ -28,8 +28,8 @@ import { CreateWorktreeDialog, type WorktreeSource } from './CreateWorktreeDialo
 import { useRemoveWorktreeDialog, WorktreeMenuItems } from './WorktreeMenuItems';
 import { dangerItemClass, menuContentClass, menuItemClass, menuItemDisabledClass } from './menuStyles';
 import { LazyContextMenu } from './LazyContextMenu';
+import { MenuCopySubmenu } from './MenuCopySubmenu';
 import { MenuGroupSeparator } from './MenuGroupSeparator';
-import { MenuSubTrigger } from './MenuSubTrigger';
 import { useCommitMenuItems } from './useCommitMenuItems';
 
 
@@ -273,84 +273,99 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
   const forceDeleteConfirmOpen = pendingForceDeleteBranch !== null && pendingForceDeleteBranch.name === refInfo.name;
 
   // Groups are organised by the object each item acts on, so a menu that mixes
-  // ref and commit actions stays unambiguous. Only the tag arm has no
-  // remote-side group of its own — "Push Tag" belongs with the tag itself.
-  const showRemoteGroup = isLocalBranch || (isRemoteBranch && !!refInfo.remote);
-  const showCommitGroup = !isStash;
+  // ref and commit actions stays unambiguous. The tag arm has no remote-side
+  // group of its own — "Push Tag" belongs with the tag itself. Stash badges get
+  // nothing: a stash is not a ref you can act on from here (FR-017).
+  const showRefGroup = !isStash;
+  const showRemoteGroup = isLocalBranch || (isRemoteBranch && !!refInfo.remote && !isMergedBadge);
   const showCompareGroup = !isStash && compareSlotForThisRef !== null;
 
   return (
     <>
       <ContextMenu.Portal>
         <ContextMenu.Content className={`min-w-[160px] ${menuContentClass}`}>
-            {/* The ref itself, ordered from navigating to it through to deleting it. */}
-            {isBranch && !isCurrentBranch && (
-              <ContextMenu.Item className={menuItemClass} onSelect={handleCheckout}>
-                Checkout {refInfo.name}
-              </ContextMenu.Item>
-            )}
-
-            {isLocalBranch && !isCurrentBranch && (
-              <ContextMenu.Item className={menuItemClass} onSelect={() => { track('merge'); setMergeDialogOpen(true); }}>
-                Merge into Current Branch
-              </ContextMenu.Item>
-            )}
-
-            {canRebaseOnto && (
-              <ContextMenu.Item
-                className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
-                disabled={isOperationInProgress}
-                onSelect={() => {
-                  track('rebase');
-                  setRebaseConfirmOpen(true);
-                }}
-              >
-                Rebase Current Branch onto This
-              </ContextMenu.Item>
-            )}
-
-            {isLocalBranch && (
-              <ContextMenu.Item className={menuItemClass} onSelect={() => { track('renameBranch'); setRenameOpen(true); }}>
-                Rename Branch...
-              </ContextMenu.Item>
-            )}
-
-            {isLocalBranch && !isCurrentBranch && (
-              <ContextMenu.Item className={dangerItemClass} onSelect={() => { track('deleteBranch'); setDeleteConfirmOpen(true); }}>
-                Delete Branch
-              </ContextMenu.Item>
-            )}
-
-            {isTag && (
+            {/* The ref this badge names, ordered from navigating to it through to deleting it. */}
+            {showRefGroup && (
               <>
-                <ContextMenu.Item
-                  className={hasRemote ? menuItemClass : menuItemDisabledClass}
-                  onSelect={() => {
-                    track('pushTag');
-                    setPushTagOpen(true);
-                  }}
-                  disabled={!hasRemote}
-                >
-                  Push Tag
-                </ContextMenu.Item>
-                <ContextMenu.Item className={dangerItemClass} onSelect={() => { track('deleteTag'); setDeleteConfirmOpen(true); }}>
-                  Delete Tag
-                </ContextMenu.Item>
+                <MenuGroupSeparator label={isTag ? 'Tag' : 'Branch'} name={displayName} />
+
+                {isBranch && !isCurrentBranch && (
+                  <ContextMenu.Item className={menuItemClass} onSelect={handleCheckout}>
+                    Checkout {refInfo.name}
+                  </ContextMenu.Item>
+                )}
+
+                {isLocalBranch && !isCurrentBranch && (
+                  <ContextMenu.Item className={menuItemClass} onSelect={() => { track('merge'); setMergeDialogOpen(true); }}>
+                    Merge into Current Branch
+                  </ContextMenu.Item>
+                )}
+
+                {canRebaseOnto && (
+                  <ContextMenu.Item
+                    className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
+                    disabled={isOperationInProgress}
+                    onSelect={() => {
+                      track('rebase');
+                      setRebaseConfirmOpen(true);
+                    }}
+                  >
+                    Rebase Current Branch onto This
+                  </ContextMenu.Item>
+                )}
+
+                {isLocalBranch && (
+                  <ContextMenu.Item className={menuItemClass} onSelect={() => { track('renameBranch'); setRenameOpen(true); }}>
+                    Rename Branch...
+                  </ContextMenu.Item>
+                )}
+
+                {isTag && (
+                  <ContextMenu.Item
+                    className={hasRemote ? menuItemClass : menuItemDisabledClass}
+                    onSelect={() => {
+                      track('pushTag');
+                      setPushTagOpen(true);
+                    }}
+                    disabled={!hasRemote}
+                  >
+                    Push Tag
+                  </ContextMenu.Item>
+                )}
+
+                {/* Filtering the graph by this branch is a view action, but it reads as
+                   "something I do to this branch", so it sits with the branch. It stays
+                   above the deletions, which are always last in their group. */}
+                {isBranch && <BranchFilterMenuItem refInfo={refInfo} surface={menuSurface} />}
+
+                {isLocalBranch && !isCurrentBranch && (
+                  <ContextMenu.Item className={dangerItemClass} onSelect={() => { track('deleteBranch'); setDeleteConfirmOpen(true); }}>
+                    Delete Branch
+                  </ContextMenu.Item>
+                )}
+
+                {isRemoteBranch && refInfo.remote && (
+                  <ContextMenu.Item className={dangerItemClass} onSelect={() => { track('deleteRemoteBranch'); setDeleteConfirmOpen(true); }}>
+                    Delete Remote Branch
+                  </ContextMenu.Item>
+                )}
+
+                {isTag && (
+                  <ContextMenu.Item className={dangerItemClass} onSelect={() => { track('deleteTag'); setDeleteConfirmOpen(true); }}>
+                    Delete Tag
+                  </ContextMenu.Item>
+                )}
               </>
             )}
 
-            {/* The commit under the badge — everything the row's own menu offers. */}
-            {showCommitGroup && (
+            {/* The commit under the badge — the same actions the row's own menu offers. */}
+            {!isStash && (
               <>
-                <MenuGroupSeparator label="Commit" />
-                <ContextMenu.Sub>
-                  <MenuSubTrigger>Commit actions</MenuSubTrigger>
-                  <ContextMenu.Portal>
-                    <ContextMenu.SubContent className={`min-w-[180px] ${menuContentClass}`}>
-                      {commitMenu.items}
-                    </ContextMenu.SubContent>
-                  </ContextMenu.Portal>
-                </ContextMenu.Sub>
+                <MenuGroupSeparator label="Commit" name={commit.abbreviatedHash} />
+                {commitMenu.commitItems}
+
+                <MenuGroupSeparator label="Create" />
+                {commitMenu.createItems}
               </>
             )}
 
@@ -382,11 +397,6 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
                   </ContextMenu.Item>
                 )}
                 {!isMergedBadge && (isRemoteBranch || !isCurrentBranch) && fastForwardItem}
-                {isRemoteBranch && refInfo.remote && (
-                  <ContextMenu.Item className={dangerItemClass} onSelect={() => { track('deleteRemoteBranch'); setDeleteConfirmOpen(true); }}>
-                    Delete Remote Branch
-                  </ContextMenu.Item>
-                )}
               </>
             )}
 
@@ -411,10 +421,12 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
             {!isStash && (
               <>
                 <MenuGroupSeparator />
-                <ContextMenu.Item className={menuItemClass} onSelect={handleCopyName}>
-                  Copy {isTag ? 'Tag' : 'Branch'} Name
-                </ContextMenu.Item>
-                {isBranch && <BranchFilterMenuItem refInfo={refInfo} surface={menuSurface} />}
+                <MenuCopySubmenu>
+                  {commitMenu.copyItems}
+                  <ContextMenu.Item className={menuItemClass} onSelect={handleCopyName}>
+                    Copy {isTag ? 'Tag' : 'Branch'} Name
+                  </ContextMenu.Item>
+                </MenuCopySubmenu>
               </>
             )}
           </ContextMenu.Content>
