@@ -4,7 +4,7 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [5.8.0] - 2026-07-28
+## [5.8.0] - pre-release - 2026-07-28
 
 ### Added
 - **Commit actions are now reachable from branch and tag badges.** Right-clicking a branch, remote-branch, or tag badge used to open a menu with only ref actions, so the commit's own actions could be reached only by aiming at empty row space — and nothing on screen said so. Every badge menu now has a **Commit** group with the actions of the commit it sits on: checkout, cherry-pick, interactive rebase, revert, drop and reset, plus a **Create** group for creating a branch or tag there. Badges hidden behind the **+N** overflow badge get the same menu. Items the badge menu already covers better in ref form — compare, rebase onto, create worktree — aren't repeated.
