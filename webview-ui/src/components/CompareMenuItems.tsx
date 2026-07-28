@@ -1,11 +1,10 @@
-import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { SlotValue } from '@shared/types';
 import type { UiSurface } from '@shared/telemetry';
 import { useGraphStore } from '../stores/graphStore';
 import { ensureComparePanelOpen, setSlotsAndCompare } from '../utils/compareDispatch';
 import { slotsEqual } from '../utils/compareSlot';
 import { trackUiInteraction } from '../utils/telemetry';
-import { menuItemClass, menuItemDisabledClass } from './menuStyles';
+import { MenuItem } from './MenuItem';
 
 interface CompareMenuItemsProps {
   /** The compare slot this row represents (commit, branch, tag, or working-tree sentinel). */
@@ -53,17 +52,11 @@ export function CompareMenuItems({ slot, surface, resolvedHash }: CompareMenuIte
 
   return (
     <>
-      <ContextMenu.Item className={menuItemClass} onSelect={handleSetAsBase}>
-        Set as Compare Base
-      </ContextMenu.Item>
+      <MenuItem onSelect={handleSetAsBase}>Set as Compare Base</MenuItem>
       {aSet && (
-        <ContextMenu.Item
-          className={sameAsA ? menuItemDisabledClass : menuItemClass}
-          disabled={sameAsA}
-          onSelect={handleCompareWithBase}
-        >
+        <MenuItem disabled={sameAsA} onSelect={handleCompareWithBase}>
           Compare with Base
-        </ContextMenu.Item>
+        </MenuItem>
       )}
     </>
   );

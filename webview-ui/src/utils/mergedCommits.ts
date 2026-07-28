@@ -1,6 +1,7 @@
 import type { Branch, Commit, GraphFilters, StashEntry } from '@shared/types';
 import { UNCOMMITTED_HASH } from '@shared/types';
 import { calculateTopology, type GraphTopology } from './graphTopology';
+import { findHeadCommitHash } from './commitRefs';
 import { buildUncommittedSubject } from './uncommittedUtils';
 
 export interface UncommittedContext {
@@ -85,7 +86,7 @@ export function mergeUncommittedIntoCommits(
   // commit). Inject a standalone node then — same as any commit whose parent is
   // not loaded — instead of guessing a parent; the connection appears once
   // HEAD's commit is loaded.
-  const headCommitHash = commits.find(c => c.refs.some(r => r.type === 'head'))?.hash;
+  const headCommitHash = findHeadCommitHash(commits);
 
   const syntheticCommit: Commit = {
     hash: UNCOMMITTED_HASH,

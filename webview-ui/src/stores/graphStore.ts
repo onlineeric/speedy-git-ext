@@ -51,6 +51,7 @@ import type { InitialDataPayload } from '@shared/messages';
 import { type GraphTopology } from '../utils/graphTopology';
 import { computeHiddenCommitHashes } from '../utils/commitVisibility';
 import { computeMergedTopology, type UncommittedContext } from '../utils/mergedCommits';
+import { findHeadCommitHash } from '../utils/commitRefs';
 import { toCommitCountBucket } from '@shared/telemetry';
 import { trackUi } from '../utils/telemetry';
 import { joinRepoPath } from '../utils/repoPath';
@@ -352,8 +353,11 @@ function retainByHash<T>(map: Record<string, T>, hashes: Set<string>): Record<st
 /** One-shot: the `perf topology` telemetry event fires once per webview session (049-usage-telemetry). */
 let topologyPerfSent = false;
 
+/** Stops the "Go to HEAD" navigation, leaving any active flash to finish. */
+const GO_TO_HEAD_IDLE = { goToHeadState: 'idle', pendingHead: null } as const;
+
 /** Full reset of the "Go to HEAD" navigation, including any active flash. */
-const GO_TO_HEAD_RESET = { goToHeadState: 'idle', pendingHead: null, flashCommitHash: null } as const;
+const GO_TO_HEAD_RESET = { ...GO_TO_HEAD_IDLE, flashCommitHash: null } as const;
 
 export const useGraphStore = create<GraphStore>((set, get) => ({
   commits: [],
@@ -594,20 +598,19 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   navigateToCommit: (hash) => {
     const index = get().mergedCommits.findIndex((commit) => commit.hash === hash);
     if (index < 0) {
-      set({ goToHeadState: 'idle', pendingHead: null });
+      set(GO_TO_HEAD_IDLE);
       return false;
     }
     // Reuse the canonical single-commit selection, then layer on the flash.
     get().selectCommit(index);
     set({
+      ...GO_TO_HEAD_IDLE,
       flashCommitHash: hash,
       flashToken: get().flashToken + 1,
-      goToHeadState: 'idle',
-      pendingHead: null,
     });
     return true;
   },
-  resetGoToHead: () => set({ goToHeadState: 'idle', pendingHead: null }),
+  resetGoToHead: () => set(GO_TO_HEAD_IDLE),
   clearCommitFlash: () => set({ flashCommitHash: null }),
   moveSelection: (delta) => {
     const commits = get().mergedCommits;
@@ -1049,7 +1052,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     if (selectedCommit === UNCOMMITTED_HASH && get().detailsPanelOpen) {
       // No fallback when HEAD's commit is outside the loaded batch — better to
       // show no parent than a wrong one (mirrors mergeUncommittedIntoCommits).
-      const headHash = commits.find(c => c.refs.some(r => r.type === 'head'))?.hash ?? '';
+      const headHash = findHeadCommitHash(commits);
       const details: CommitDetails = {
         hash: UNCOMMITTED_HASH,
         abbreviatedHash: '---',

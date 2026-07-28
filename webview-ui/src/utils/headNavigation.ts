@@ -14,7 +14,7 @@ export interface HeadLocationContext {
   /**
    * HEAD's 0-based position in the filtered log stream; -1 when absent, and
    * null when the backend skipped the position walk because the row the
-   * webview displays as HEAD is current (see `findDisplayedHeadHash`).
+   * webview displays as HEAD is current (see `findHeadCommitHash`).
    */
   index: number | null;
   /** Number of raw commits currently loaded in the store. */
@@ -61,20 +61,6 @@ export function decideHeadNavigation(context: HeadLocationContext): HeadNavigati
   // Located within the loaded range yet absent from it (history changed since
   // the last load), or nothing more to load — a refresh is the way out.
   return { kind: 'notInView' };
-}
-
-/**
- * The commit the webview currently displays as HEAD, or null when HEAD is not
- * on screen (deeper than the loaded batches, or hidden by a filter).
- *
- * Sent with `locateHead` so the backend can confirm it with a single
- * `rev-parse` instead of walking the entire log for a position the webview
- * already holds.
- */
-export function findDisplayedHeadHash(
-  displayedCommits: readonly { hash: string; refs?: readonly { type: string }[] }[],
-): string | null {
-  return displayedCommits.find((commit) => commit.refs?.some((ref) => ref.type === 'head'))?.hash ?? null;
 }
 
 /** User-facing toast messages for the non-navigating outcomes. */

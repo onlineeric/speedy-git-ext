@@ -121,12 +121,14 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
 │   ├── MenuGroupSeparator.tsx    # Divider between menu groups, optionally captioned `label` + `name` (ref name kept in its original case, truncated); same 11px height labelled or not
 │   ├── MenuSubTrigger.tsx        # Menu item that opens a submenu — trailing chevron + stays highlighted while the submenu is open
 │   ├── MenuCopySubmenu.tsx       # The shared "Copy" submenu; badge menus pass their Copy <ref> Name item in beside the commit's copy items
-│   ├── menuStyles.ts             # Shared Tailwind class strings for context-menu items (enabled/disabled/separator/group label)
+│   ├── MenuItem.tsx              # A context-menu command — one `disabled`/`danger` prop drives both Radix's behaviour and the styling. Prefer this over applying menuStyles strings by hand
+│   ├── menuStyles.ts             # Shared Tailwind class strings for context-menu items (enabled/disabled/separator/group label), composed from one geometry + hover base
 │   ├── HelpDialog.tsx            # "Help & Feedback" dialog (toolbar Help button): GitHub Issues link + docs/changelog/marketplace links + version
 │   ├── FieldError.tsx            # Validation message under form inputs (pairs with aria-invalid/aria-describedby)
 │   └── CommandPreview.tsx        # Live git command preview shown in dialogs
 ├── stores/
-│   └── graphStore.ts             # Zustand store: commits, branches, topology, filters, UI state (~1250 lines). 044-code-refactor replaced whole-store subscriptions with selectors rather than splitting the file
+│   ├── graphStore.ts             # Zustand store: commits, branches, topology, filters, UI state (~1250 lines). 044-code-refactor replaced whole-store subscriptions with selectors rather than splitting the file
+│   └── graphSelectors.ts         # Derived store reads shared by several components (`useOperationInProgress`, `useCurrentLocalBranch`) — one selector each, so callers can't disagree on the derivation
 ├── rpc/
 │   └── rpcClient.ts              # Singleton RPC client, webview↔extension via acquireVsCodeApi()
 ├── hooks/
@@ -140,8 +142,11 @@ webview-ui/src/                   # Frontend — Vite + React → dist/webview/
     ├── graphTopology.ts          # Core graph algorithm (~700 lines): lanes, colors, connections
     ├── graphPaths.ts             # SVG "rounded elbow" path builders for lane-changing connection lines — lines cross row boundaries perfectly vertically so per-row SVG cells join without kinks (5.4.0)
     ├── gitCommandBuilder.ts      # Constructs git command strings for preview display
-    ├── commitReachability.ts     # Determines branch reachability for commits
+    ├── commitReachability.ts     # Determines branch reachability for commits; checkers cached by commit-list identity (WeakMap)
+    ├── commitRefs.ts             # Predicates identifying a row by its ref decorations (`findHeadCommit`/`findHeadCommitHash`, `isStashPseudoCommit`) — used by topology, the uncommitted node's parent, the tooltip and Go to HEAD
     ├── commitMenuAvailability.ts # Which commit actions apply (rebase/reset/revert/drop/cherry-pick) — shared by the commit row menu and the badge "Commit actions" submenu
+    ├── headNavigation.ts         # Pure decision logic for the toolbar "Go to HEAD" (scrollTo/loadMore/hiddenByFilter/notInView/unresolved) + its toast messages
+    ├── rowVisibility.ts          # Scroll-offset maths for revealing a row when the details panel resizes the viewport
     ├── commitVisibility.ts       # Visibility/filter predicates for the virtualized row list
     ├── compareSlot.ts            # Compare panel slot model (Base/Target, commit-ish parsing)
     ├── compareDefaults.ts        # Default slot seeding for the Compare panel
@@ -264,10 +269,3 @@ esbuild.config.mjs                # Production-only telemetry destination inject
 - React 18 + Zustand + Radix UI + Tailwind CSS (webview); esbuild (extension host), Vite (frontend); VS Code Extension API 1.80+
 - `@vscode/extension-telemetry` with a backend-only `TelemetryService`; closed shared catalogs and fire-and-forget webview reports
 - App state is transient (Zustand, session-only); persistent settings via VS Code config (e.g. `speedyGit.worktree.basePath`) and `context.globalState`
-
-## Recent Changes
-- 049-usage-telemetry (v5.5.0): anonymous aggregate usage telemetry through a single backend `TelemetryService`; router middleware records allowlisted user-operation outcome/duration, the webview reports cataloged UI/dialog/topology events through a validated one-way RPC, and activation/settings/initial-load/error signals use fixed properties and coarse buckets. Dual consent (`telemetry.telemetryLevel` + `speedyGit.telemetry.enabled`), production/no-destination no-op behavior, dedicated output logging, `telemetry.json`, and strict never-collect rules are mandatory for future features.
-
-<!-- SPECKIT START -->
-Active feature: 049-usage-telemetry (anonymous usage statistics via @vscode/extension-telemetry). Plan: specs/049-usage-telemetry/plan.md (spec.md, research.md, data-model.md, contracts/telemetry-events.md, quickstart.md alongside).
-<!-- SPECKIT END -->

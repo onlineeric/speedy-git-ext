@@ -13,7 +13,8 @@ import { RefLabel } from './RefLabel';
 import { HeadIcon } from './icons';
 import { parseExternalRefs } from '../utils/externalRefParser';
 import { DEFAULT_GRAPH_PALETTE, getColor, getLaneColorStyle } from '../utils/colorUtils';
-import { createReachabilityChecker } from '../utils/commitReachability';
+import { getReachabilityChecker } from '../utils/commitReachability';
+import { findHeadCommit } from '../utils/commitRefs';
 
 interface CommitTooltipProps {
   commit: Commit | undefined;
@@ -166,12 +167,9 @@ function ReferencesSection({ hash, isHead }: ReferencesSectionProps) {
     }
   }, [hash, containingResult]);
 
-  const headCommit = useMemo(
-    () => mergedCommits.find((commit) => commit.refs.some((ref) => ref.type === 'head')),
-    [mergedCommits]
-  );
+  const headCommit = useMemo(() => findHeadCommit(mergedCommits), [mergedCommits]);
 
-  const reachability = useMemo(() => createReachabilityChecker(mergedCommits), [mergedCommits]);
+  const reachability = useMemo(() => getReachabilityChecker(mergedCommits), [mergedCommits]);
 
   // Convert containing branches to display refs
   const branchDisplayRefs = useMemo(() => {

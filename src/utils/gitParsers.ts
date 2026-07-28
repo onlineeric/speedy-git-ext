@@ -208,28 +208,15 @@ export function parseBranchLine(line: string): Branch | null {
   // branch `branch1` on a remote named `test`, and guessing between them made local
   // branches with a slash in the name masquerade as remote branches — which in turn
   // hid the fact that one of them was the checked-out branch.
-  if (trimmedName.startsWith('refs/heads/')) {
-    return {
-      name: trimmedName.slice('refs/heads/'.length),
-      remote: undefined,
-      current: isCurrent,
-      hash: hash.trim(),
-    };
-  }
-
-  if (trimmedName.startsWith('refs/remotes/')) {
-    const remoteRef = trimmedName.slice('refs/remotes/'.length);
-    const slashIndex = remoteRef.indexOf('/');
-    if (slashIndex <= 0) return null;
-
-    const branchName = remoteRef.slice(slashIndex + 1);
-    // Drop `<remote>/HEAD` — symbolic ref pointing at the remote's default branch,
-    // not a branch we should let users act on.
-    if (!branchName || branchName === 'HEAD') return null;
+  if (trimmedName.startsWith('refs/')) {
+    // parseQualifiedRef owns the ref grammar, including dropping `<remote>/HEAD`
+    // (a symbolic ref for the remote's default branch, not a branch to act on).
+    const ref = parseQualifiedRef(trimmedName);
+    if (ref?.type !== 'branch' && ref?.type !== 'remote') return null;
 
     return {
-      name: branchName,
-      remote: remoteRef.slice(0, slashIndex),
+      name: ref.name,
+      remote: ref.type === 'remote' ? ref.remote : undefined,
       current: isCurrent,
       hash: hash.trim(),
     };

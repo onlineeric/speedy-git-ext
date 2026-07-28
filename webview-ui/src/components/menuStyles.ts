@@ -4,9 +4,25 @@
  * Every context menu (Commit, Branch, Stash, Author, Date, Uncommitted, Worktree)
  * renders the same item / disabled-item / danger-item / separator styling, so the
  * tokens live here once instead of being re-declared in each menu component.
+ *
+ * Most call sites should reach for the `MenuItem` component rather than these
+ * strings directly — it picks the right one from a single `disabled`/`danger`.
  */
-export const menuItemClass =
-  'px-3 py-1 text-sm text-[var(--vscode-menu-foreground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
+
+/**
+ * Row geometry shared by every menu item, enabled or not. Kept in one place so
+ * item height stays uniform — a plain command, a disabled one and a sub-trigger
+ * sitting next to each other must measure the same.
+ */
+const itemBaseClass = 'px-3 py-1 text-sm outline-none';
+
+const itemHoverClass =
+  'hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
+
+/** Geometry + hover affordance, for the items the user can actually invoke. */
+const interactiveItemClass = `${itemBaseClass} cursor-pointer ${itemHoverClass}`;
+
+export const menuItemClass = `${interactiveItemClass} text-[var(--vscode-menu-foreground)]`;
 
 /**
  * Item that opens a submenu. Same shape as `menuItemClass` plus room for the
@@ -15,7 +31,8 @@ export const menuItemClass =
  * the chevron — a submenu item must never look like a plain command.
  */
 const menuSubTriggerLayoutClass =
-  'flex items-center justify-between gap-3 px-3 py-1 text-sm cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)] data-[state=open]:bg-[var(--vscode-menu-selectionBackground)] data-[state=open]:text-[var(--vscode-menu-selectionForeground)]';
+  `flex items-center justify-between gap-3 ${interactiveItemClass} ` +
+  'data-[state=open]:bg-[var(--vscode-menu-selectionBackground)] data-[state=open]:text-[var(--vscode-menu-selectionForeground)]';
 
 export const menuSubTriggerClass =
   `${menuSubTriggerLayoutClass} text-[var(--vscode-menu-foreground)]`;
@@ -29,10 +46,9 @@ export const dangerSubTriggerClass =
   `${menuSubTriggerLayoutClass} text-[var(--vscode-errorForeground)]`;
 
 export const menuItemDisabledClass =
-  'px-3 py-1 text-sm text-[var(--vscode-disabledForeground)] cursor-not-allowed outline-none';
+  `${itemBaseClass} text-[var(--vscode-disabledForeground)] cursor-not-allowed`;
 
-export const dangerItemClass =
-  'px-3 py-1 text-sm text-[var(--vscode-errorForeground)] cursor-pointer outline-none hover:bg-[var(--vscode-menu-selectionBackground)] hover:text-[var(--vscode-menu-selectionForeground)]';
+export const dangerItemClass = `${interactiveItemClass} text-[var(--vscode-errorForeground)]`;
 
 /**
  * Plain group divider. 1px rule + 5px margins = an 11px row, matching the

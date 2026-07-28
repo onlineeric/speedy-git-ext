@@ -41,6 +41,18 @@ export class GitLogService {
   }
 
   /**
+   * Revisions walked when the user has not filtered to specific branches.
+   * Show user-facing Git history only. `--all` also includes tool-owned
+   * namespaces such as refs/jj/keep/*, which can surface internal commits as
+   * blank side branches in the graph. HEAD is listed explicitly so a detached
+   * checkout remains visible even when no branch/tag names it. Stashes are
+   * fetched separately.
+   */
+  private defaultRevisionArgs(): string[] {
+    return ['HEAD', '--branches', '--remotes', '--tags'];
+  }
+
+  /**
    * Build the shared `git log` argument list used by every query that must
    * walk the exact same commit stream as the paginated graph (`getCommits`,
    * `getCommitPosition`). Keeping the ordering/filter arguments in one place
@@ -81,12 +93,7 @@ export class GitLogService {
     if (filters?.branches && filters.branches.length > 0) {
       args.push(...filters.branches);
     } else {
-      // Show user-facing Git history only. `--all` also includes tool-owned
-      // namespaces such as refs/jj/keep/*, which can surface internal commits
-      // as blank side branches in the graph. Include HEAD explicitly so a
-      // detached checkout remains visible even when no branch/tag names it.
-      // Stashes are fetched separately.
-      args.push('HEAD', '--branches', '--remotes', '--tags');
+      args.push(...this.defaultRevisionArgs());
     }
 
     // Separate revisions from paths to avoid ambiguous argument errors
@@ -171,7 +178,12 @@ export class GitLogService {
   async getAuthors(): Promise<Result<Author[]>> {
     this.log.info('Fetching authors');
     const result = await this.executor.execute({
-      args: ['log', ...this.ignoreMissingHeadArgs(), 'HEAD', '--branches', '--remotes', '--tags', '--format=%an%x00%ae'],
+      args: [
+        'log',
+        ...this.ignoreMissingHeadArgs(),
+        ...this.defaultRevisionArgs(),
+        '--format=%an%x00%ae',
+      ],
       cwd: this.workspacePath,
     });
 

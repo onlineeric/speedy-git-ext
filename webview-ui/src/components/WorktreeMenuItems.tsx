@@ -5,7 +5,8 @@ import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
 import { WORKTREE_FOLDER_MISSING_TOOLTIP, worktreeFolderName } from '../utils/worktreeDisplay';
 import { RemoveWorktreeDialog } from './RemoveWorktreeDialog';
-import { dangerItemClass, menuItemClass, menuItemDisabledClass, menuSeparatorClass } from './menuStyles';
+import { MenuGroupSeparator } from './MenuGroupSeparator';
+import { MenuItem } from './MenuItem';
 
 export function useRemoveWorktreeDialog() {
   const [removeTarget, setRemoveTarget] = useState<WorktreeInfo | null>(null);
@@ -36,8 +37,7 @@ export function WorktreeMenuItems({
 
   return (
     <>
-      <ContextMenu.Item
-        className={openDisabled ? menuItemDisabledClass : menuItemClass}
+      <MenuItem
         disabled={openDisabled}
         title={openDisabled ? WORKTREE_FOLDER_MISSING_TOOLTIP : worktree.path}
         onSelect={() => {
@@ -46,9 +46,9 @@ export function WorktreeMenuItems({
         }}
       >
         Open Worktree in New Window
-      </ContextMenu.Item>
-      <ContextMenu.Item
-        className={removeDisabled ? menuItemDisabledClass : dangerItemClass}
+      </MenuItem>
+      <MenuItem
+        danger
         disabled={removeDisabled}
         title={removeDisabled ? 'The current worktree cannot be removed.' : worktree.path}
         onSelect={() => {
@@ -57,7 +57,7 @@ export function WorktreeMenuItems({
         }}
       >
         Remove Worktree…
-      </ContextMenu.Item>
+      </MenuItem>
     </>
   );
 }
@@ -77,7 +77,7 @@ export function WorktreeMenuGroup({
     <>
       {worktrees.map((worktree, index) => (
         <div key={worktree.path}>
-          {index > 0 && <ContextMenu.Separator className={menuSeparatorClass} />}
+          {index > 0 && <MenuGroupSeparator />}
           <ContextMenu.Label className="px-3 py-1 text-xs text-[var(--vscode-descriptionForeground)]">
             <span className="font-mono">{worktreeFolderName(worktree.path)}</span>
             <span className="block max-w-64 truncate" title={worktree.path}>{worktree.path}</span>

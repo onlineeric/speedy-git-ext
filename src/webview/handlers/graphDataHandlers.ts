@@ -5,13 +5,6 @@ import { MAX_BATCH_COMMIT_SIZE, UNCOMMITTED_HASH } from '../../../shared/types.j
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 import { postUncommittedCommitDetails } from './workingTreeHandlers.js';
 
-/**
- * Upper bound for a single targeted `loadMoreCommits` batch (Go to HEAD).
- * Shares the batch-size ceiling, so a targeted batch is never smaller than a
- * regular one however `speedyGit.batchCommitSize` is configured.
- */
-const MAX_TARGETED_BATCH = MAX_BATCH_COMMIT_SIZE;
-
 export const graphDataHandlers = {
   getAuthors: async (_message, context) => {
     const result = await context.services.current().gitLogService.getAuthors();
@@ -47,11 +40,12 @@ export const graphDataHandlers = {
     const batchSize = context.getBatchSize();
     const { skip, generation, filters, targetIndex } = message.payload;
     // Targeted loads (Go to HEAD) grow the batch to reach a known log position
-    // in one request, rounded up to whole batches and capped so a single
-    // response never carries an unbounded commit payload; the webview keeps
-    // requesting until the target commit is loaded.
+    // in one request, rounded up to whole batches and capped at the same ceiling
+    // a configured batch size gets — so a single response never carries an
+    // unbounded commit payload, and a targeted batch is never smaller than a
+    // regular one. The webview keeps requesting until the target is loaded.
     const maxCount = targetIndex !== undefined && targetIndex >= skip
-      ? Math.min(Math.ceil((targetIndex - skip + 1) / batchSize) * batchSize, MAX_TARGETED_BATCH)
+      ? Math.min(Math.ceil((targetIndex - skip + 1) / batchSize) * batchSize, MAX_BATCH_COMMIT_SIZE)
       : batchSize;
     const result = await context.services.current().gitLogService.getCommits({ ...filters, maxCount, skip });
     const postAppended = (value: Extract<typeof result, { success: true }>['value']) => {

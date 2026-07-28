@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Commit, RefInfo } from '@shared/types';
-import { getCommitMenuAvailability, isStashPseudoCommit } from '../commitMenuAvailability';
+import { getCommitMenuAvailability } from '../commitMenuAvailability';
 
 function makeCommit(hash: string, parents: string[] = ['parent'], refs: RefInfo[] = []): Commit {
   return {
@@ -16,13 +16,6 @@ function makeCommit(hash: string, parents: string[] = ['parent'], refs: RefInfo[
 }
 
 const ON_BRANCH = { currentBranchHash: 'head', isOnFirstParentChain: true };
-
-describe('isStashPseudoCommit', () => {
-  it('detects a stash entry by its ref', () => {
-    expect(isStashPseudoCommit(makeCommit('abc', ['parent'], [{ name: 'stash@{0}', type: 'stash' }]))).toBe(true);
-    expect(isStashPseudoCommit(makeCommit('abc'))).toBe(false);
-  });
-});
 
 describe('getCommitMenuAvailability', () => {
   it('offers the full set for an ordinary commit on the current branch', () => {

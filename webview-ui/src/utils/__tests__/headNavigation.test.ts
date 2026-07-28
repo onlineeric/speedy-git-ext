@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { decideHeadNavigation, findDisplayedHeadHash, type HeadLocationContext } from '../headNavigation';
+import { decideHeadNavigation, type HeadLocationContext } from '../headNavigation';
 
 function context(overrides: Partial<HeadLocationContext> = {}): HeadLocationContext {
   return {
@@ -70,24 +70,5 @@ describe('decideHeadNavigation', () => {
   it('reports notInView when the position walk was skipped but the row has since gone', () => {
     // Raced with a refresh that dropped the row the backend confirmed.
     expect(decideHeadNavigation(context({ index: null, mergedIndex: -1 }))).toEqual({ kind: 'notInView' });
-  });
-});
-
-describe('findDisplayedHeadHash', () => {
-  it('returns the hash of the row carrying the HEAD ref', () => {
-    const commits = [
-      { hash: 'aaa', refs: [{ type: 'branch' }] },
-      { hash: 'bbb', refs: [{ type: 'head' }, { type: 'remote' }] },
-    ];
-    expect(findDisplayedHeadHash(commits)).toBe('bbb');
-  });
-
-  it('returns null when no displayed row is HEAD', () => {
-    expect(findDisplayedHeadHash([{ hash: 'aaa', refs: [{ type: 'tag' }] }])).toBeNull();
-  });
-
-  it('tolerates rows without refs (uncommitted node, stashes)', () => {
-    expect(findDisplayedHeadHash([{ hash: 'uncommitted' }])).toBeNull();
-    expect(findDisplayedHeadHash([])).toBeNull();
   });
 });

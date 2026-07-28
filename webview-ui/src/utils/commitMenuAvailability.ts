@@ -1,4 +1,5 @@
 import type { Commit } from '@shared/types';
+import { isStashPseudoCommit } from './commitRefs';
 
 /**
  * Which commit operations apply to a given commit.
@@ -30,11 +31,6 @@ export interface CommitMenuContext {
    * Anything less means the stretch cannot be rewritten commit-by-commit.
    */
   isOnFirstParentChain: boolean;
-}
-
-/** A stash entry rendered into the graph as a pseudo-commit. */
-export function isStashPseudoCommit(commit: Commit): boolean {
-  return commit.refs.some((ref) => ref.type === 'stash');
 }
 
 export function getCommitMenuAvailability({

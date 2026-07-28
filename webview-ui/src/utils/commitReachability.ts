@@ -24,12 +24,21 @@ export interface ReachabilityChecker {
  */
 export function createReachabilityChecker(commits: Commit[]): ReachabilityChecker {
   const commitByHash = new Map<string, Commit>();
+  let fullHashLength = 0;
   for (const commit of commits) {
     commitByHash.set(commit.hash, commit);
+    fullHashLength = Math.max(fullHashLength, commit.hash.length);
   }
 
   function resolve(hash: string): string {
     if (commitByHash.has(hash)) return hash;
+    // Only an abbreviation can need the scan below. A hash already at full
+    // length can only `startsWith`-match a commit it equals, which the map
+    // lookup just ruled out — so scanning would walk the whole list to return
+    // `hash` unchanged. That is the common case here: callers pass HEAD's full
+    // hash, and HEAD is frequently outside the loaded window.
+    if (hash.length >= fullHashLength) return hash;
+
     let unique: string | null = null;
     for (const commit of commits) {
       if (!commit.hash.startsWith(hash)) continue;

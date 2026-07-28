@@ -1,7 +1,21 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, CompareMode, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting } from '@shared/types';
+import type { CherryPickOptions, CompareMode, GraphFilters, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
-import { decideHeadNavigation, findDisplayedHeadHash, HEAD_NAVIGATION_MESSAGES, MAX_GO_TO_HEAD_LOADS, type HeadNavigationDecision } from '../utils/headNavigation';
+import { decideHeadNavigation, HEAD_NAVIGATION_MESSAGES, MAX_GO_TO_HEAD_LOADS, type HeadNavigationDecision } from '../utils/headNavigation';
+import { findHeadCommitHash } from '../utils/commitRefs';
+
+/**
+ * The subset of the active filters that may reach git.
+ *
+ * Author and text filtering stay client-side: the webview needs the full commit
+ * ancestry to compute topology, and handing those to `git log` would punch holes
+ * in the stream. Every request that walks the log shares this one rule, so a new
+ * backend-side filter is added here rather than at three call sites.
+ */
+function backendFilters(filters: GraphFilters): Pick<GraphFilters, 'branches' | 'afterDate' | 'beforeDate'> {
+  const { branches, afterDate, beforeDate } = filters;
+  return { branches, afterDate, beforeDate };
+}
 
 declare const acquireVsCodeApi: () => {
   postMessage: (message: unknown) => void;
@@ -755,14 +769,12 @@ class RpcClient {
     const store = useGraphStore.getState();
     if (store.goToHeadState !== 'idle' || store.loading) return;
     store.setGoToHeadState('locating');
-    // Author/text filtering is client-side; only backend filters shape the log stream.
-    const { branches, afterDate, beforeDate } = store.filters;
     this.send({
       type: 'locateHead',
       payload: {
-        filters: { branches, afterDate, beforeDate },
+        filters: backendFilters(store.filters),
         // Lets the backend confirm an on-screen HEAD without walking the log.
-        displayedHeadHash: findDisplayedHeadHash(store.mergedCommits),
+        displayedHeadHash: findHeadCommitHash(store.mergedCommits),
       },
     });
   }
@@ -816,8 +828,7 @@ class RpcClient {
     const store = useGraphStore.getState();
     if (store.prefetching) return;
     store.setPrefetching(true);
-    const { branches, afterDate, beforeDate } = store.filters;
-    this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branches, afterDate, beforeDate }, targetIndex);
+    this.loadMoreCommits(store.commits.length, store.fetchGeneration, backendFilters(store.filters), targetIndex);
   }
 
   /**
@@ -935,9 +946,7 @@ class RpcClient {
     const store = useGraphStore.getState();
     if (!store.hasMore || store.prefetching) return;
     store.setPrefetching(true);
-    // Author filtering is done client-side — never pass author/authors to backend
-    const { branches, afterDate, beforeDate } = store.filters;
-    this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branches, afterDate, beforeDate });
+    this.loadMoreCommits(store.commits.length, store.fetchGeneration, backendFilters(store.filters));
   }
 }
 

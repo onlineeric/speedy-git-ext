@@ -12,11 +12,13 @@ import type {
 import type { UiAction, UiSurface } from '@shared/telemetry';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
+import { useCurrentLocalBranch, useOperationInProgress } from '../stores/graphSelectors';
 import { trackUiInteraction } from '../utils/telemetry';
 import { buildCheckoutCommand, buildResetCommand } from '../utils/gitCommandBuilder';
 import { setSlotsAndCompare } from '../utils/compareDispatch';
 import { getReachabilityChecker } from '../utils/commitReachability';
-import { getCommitMenuAvailability, isStashPseudoCommit } from '../utils/commitMenuAvailability';
+import { getCommitMenuAvailability } from '../utils/commitMenuAvailability';
+import { isStashPseudoCommit } from '../utils/commitRefs';
 import { CompareMenuItems } from './CompareMenuItems';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CreateBranchDialog } from './CreateBranchDialog';
@@ -27,8 +29,9 @@ import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 import { RevertDialog } from './RevertDialog';
 import { DropCommitDialog } from './DropCommitDialog';
 import { CreateWorktreeDialog } from './CreateWorktreeDialog';
+import { MenuItem } from './MenuItem';
 import { MenuSubTrigger } from './MenuSubTrigger';
-import { dangerItemClass, MENU_COLLISION_PADDING, menuContentClass, menuItemClass, menuItemDisabledClass } from './menuStyles';
+import { MENU_COLLISION_PADDING, menuContentClass } from './menuStyles';
 
 /**
  * Where the commit items are being rendered.
@@ -213,12 +216,12 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   const branches = useGraphStore((s) => s.branches);
   const selectedCommits = useGraphStore((s) => s.selectedCommits);
   const commits = useGraphStore((s) => s.commits);
-  const mergedCommits = useGraphStore((s) => s.mergedCommits);
   const clearSelectedCommits = useGraphStore((s) => s.clearSelectedCommits);
-  const rebaseInProgress = useGraphStore((s) => s.rebaseInProgress);
   const revertInProgress = useGraphStore((s) => s.revertInProgress);
-  const cherryPickInProgress = useGraphStore((s) => s.cherryPickInProgress);
-  const loading = useGraphStore((s) => s.loading);
+  // Transient busy states only *disable* items — they stay visible so the user
+  // can still see the option exists.
+  const isOperationInProgress = useOperationInProgress();
+  const currentLocalBranch = useCurrentLocalBranch();
 
   // Self-contained dialog clusters (state + async handler + dialog) live in hooks.
   const interactiveRebase = useInteractiveRebase(commit.hash);
@@ -228,7 +231,6 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   const track = (action: UiAction) => trackUiInteraction(surface, action);
 
   const isRowMenu = variant === 'row';
-  const currentLocalBranch = branches.find((b) => b.current && !b.remote) ?? null;
   const hasRemoteUpstream =
     currentLocalBranch !== null &&
     branches.some((b) => b.name === currentLocalBranch.name && !!b.remote);
@@ -239,28 +241,32 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   // silently hide Drop Commit. The checker is cached by commit-list identity, so the
   // commit-by-hash map is built once per commits change no matter how many menus
   // (row menu plus one per opened ref badge) are asking.
-  const reachability = useMemo(() => getReachabilityChecker(commits), [commits]);
-  const isOnFirstParentChain = currentLocalBranch
-    ? reachability.isOnFirstParentChain(commit.hash, currentLocalBranch.hash)
-    : false;
+  // Memoized on the inputs that can change the answer, so the first-parent walk
+  // is not repeated on renders driven by local state (a dialog opening, `loading`
+  // toggling) — a menu body stays mounted for its row's lifetime once opened.
+  const currentBranchHash = currentLocalBranch?.hash ?? null;
+  const isOnFirstParentChain = useMemo(
+    () =>
+      currentBranchHash !== null &&
+      getReachabilityChecker(commits).isOnFirstParentChain(commit.hash, currentBranchHash),
+    [commits, commit.hash, currentBranchHash]
+  );
 
-  const availability = getCommitMenuAvailability({
-    commit,
-    currentBranchHash: currentLocalBranch?.hash ?? null,
-    isOnFirstParentChain,
-  });
-
-  // Transient busy states only *disable* items — they stay visible so the user
-  // can still see the option exists. Hiding them on `loading` used to make items
-  // disappear during the brief refresh any filter change triggers, which read as
-  // an intermittent bug.
-  const isOperationInProgress = loading || rebaseInProgress || cherryPickInProgress || revertInProgress;
+  const availability = getCommitMenuAvailability({ commit, currentBranchHash, isOnFirstParentChain });
 
   const isMultiSelectActive =
     isRowMenu && selectedCommits.length > 1 && selectedCommits.includes(commit.hash);
 
-  const hasSelectedMergeCommit = isMultiSelectActive &&
-    mergedCommits.some((item) => selectedCommits.includes(item.hash) && item.parents.length > 1);
+  // Read from the store lazily (not via a render subscription) for the same reason
+  // as `handleCompareRange` below: the answer only moves when the selection does.
+  const hasSelectedMergeCommit = useMemo(
+    () =>
+      isMultiSelectActive &&
+      useGraphStore
+        .getState()
+        .mergedCommits.some((item) => selectedCommits.includes(item.hash) && item.parents.length > 1),
+    [isMultiSelectActive, selectedCommits]
+  );
 
   const handleRebaseOntoCommitConfirm = (ignoreDate: boolean) => {
     setRebaseOntoConfirmOpen(false);
@@ -310,8 +316,9 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   const handleCherryPickConfirm = (options: CherryPickOptions) => {
     setCherryPickOpen(false);
     const hashSet = new Set(cherryPickCommits.map((item) => item.hash));
-    const orderedHashes = mergedCommits
-      .filter((item) => hashSet.has(item.hash) && !isStashPseudoCommit(item))
+    const orderedHashes = useGraphStore
+      .getState()
+      .mergedCommits.filter((item) => hashSet.has(item.hash) && !isStashPseudoCommit(item))
       .map((item) => item.hash)
       .reverse();
     rpcClient.cherryPick(orderedHashes, options);
@@ -321,8 +328,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   /** The commit itself — ordered from navigating to it through to rewriting it away. */
   const commitItems = (
     <>
-      <ContextMenu.Item
-        className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
+      <MenuItem
         disabled={isOperationInProgress}
         onSelect={() => {
           track('checkoutCommit');
@@ -330,34 +336,31 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
         }}
       >
         Checkout this commit
-      </ContextMenu.Item>
+      </MenuItem>
 
       {/* Merge commits cherry-pick individually; a multi-select cherry-picks the
          whole selection (disabled if it contains a merge commit); otherwise the
          single commit, clearing any stale selection that doesn't include it. */}
       {availability.canCherryPick && (
         availability.isMergeCommit ? (
-          <ContextMenu.Item className={menuItemClass} onSelect={() => openCherryPickDialog([commit])}>
-            Cherry-Pick Commit
-          </ContextMenu.Item>
+          <MenuItem onSelect={() => openCherryPickDialog([commit])}>Cherry-Pick Commit</MenuItem>
         ) : isMultiSelectActive ? (
-          <ContextMenu.Item
-            className={hasSelectedMergeCommit ? menuItemDisabledClass : menuItemClass}
+          <MenuItem
             disabled={hasSelectedMergeCommit}
             title={hasSelectedMergeCommit ? 'Selection contains merge commits. Cherry-pick merge commits individually.' : undefined}
             onSelect={() => {
-              openCherryPickDialog(mergedCommits.filter((item) => selectedCommits.includes(item.hash)));
+              const selected = useGraphStore
+                .getState()
+                .mergedCommits.filter((item) => selectedCommits.includes(item.hash));
+              openCherryPickDialog(selected);
             }}
           >
             Cherry-Pick Selected Commits ({selectedCommits.length})
-          </ContextMenu.Item>
+          </MenuItem>
         ) : (
-          <ContextMenu.Item
-            className={menuItemClass}
-            onSelect={() => openCherryPickDialog([commit], selectedCommits.length > 1)}
-          >
+          <MenuItem onSelect={() => openCherryPickDialog([commit], selectedCommits.length > 1)}>
             Cherry-Pick Commit
-          </ContextMenu.Item>
+          </MenuItem>
         )
       )}
 
@@ -365,8 +368,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
         <>
           {/* The badge menu's parent already offers the ref-flavoured rebase. */}
           {isRowMenu && (
-            <ContextMenu.Item
-              className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
+            <MenuItem
               disabled={isOperationInProgress}
               onSelect={() => {
                 track('rebase');
@@ -374,10 +376,9 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
               }}
             >
               Rebase Current Branch onto This Commit
-            </ContextMenu.Item>
+            </MenuItem>
           )}
-          <ContextMenu.Item
-            className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
+          <MenuItem
             disabled={isOperationInProgress}
             onSelect={() => {
               track('interactiveRebase');
@@ -385,24 +386,23 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
             }}
           >
             Start Interactive Rebase from Here
-          </ContextMenu.Item>
+          </MenuItem>
         </>
       )}
 
       {revertInProgress && (
         <>
-          <ContextMenu.Item className={menuItemClass} onSelect={() => { track('continueRevert'); rpcClient.continueRevert(); }}>
+          <MenuItem onSelect={() => { track('continueRevert'); rpcClient.continueRevert(); }}>
             Continue Revert
-          </ContextMenu.Item>
-          <ContextMenu.Item className={menuItemClass} onSelect={() => { track('abortRevert'); rpcClient.abortRevert(); }}>
+          </MenuItem>
+          <MenuItem onSelect={() => { track('abortRevert'); rpcClient.abortRevert(); }}>
             Abort Revert
-          </ContextMenu.Item>
+          </MenuItem>
         </>
       )}
 
       {availability.canRevert && (
-        <ContextMenu.Item
-          className={isOperationInProgress ? menuItemDisabledClass : menuItemClass}
+        <MenuItem
           disabled={isOperationInProgress}
           onSelect={() => {
             track('revert');
@@ -410,14 +410,14 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
           }}
         >
           Revert Commit
-        </ContextMenu.Item>
+        </MenuItem>
       )}
 
       {availability.canDrop && (
         // Dropping destroys a commit, so it carries the same danger styling as
         // Delete Branch / Delete Tag rather than reading as an ordinary action.
-        <ContextMenu.Item
-          className={isOperationInProgress ? menuItemDisabledClass : dangerItemClass}
+        <MenuItem
+          danger
           disabled={isOperationInProgress}
           onSelect={() => {
             track('dropCommit');
@@ -425,7 +425,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
           }}
         >
           Drop Commit
-        </ContextMenu.Item>
+        </MenuItem>
       )}
 
       {availability.canReset && (
@@ -433,17 +433,17 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
           <MenuSubTrigger danger>Reset Current Branch to Here</MenuSubTrigger>
           <ContextMenu.Portal>
             <ContextMenu.SubContent className={`min-w-[160px] ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
-              <ContextMenu.Item className={menuItemClass} onSelect={() => { track('resetSoft'); handleResetSelect('soft'); }}>
+              <MenuItem onSelect={() => { track('resetSoft'); handleResetSelect('soft'); }}>
                 Soft (keep staged)
-              </ContextMenu.Item>
-              <ContextMenu.Item className={menuItemClass} onSelect={() => { track('resetMixed'); handleResetSelect('mixed'); }}>
+              </MenuItem>
+              <MenuItem onSelect={() => { track('resetMixed'); handleResetSelect('mixed'); }}>
                 Mixed (keep unstaged)
-              </ContextMenu.Item>
+              </MenuItem>
               {/* Soft and mixed keep your work in the tree; only hard throws it away,
                   so it is the only entry that carries the destructive colour. */}
-              <ContextMenu.Item className={dangerItemClass} onSelect={() => { track('resetHard'); handleResetSelect('hard'); }}>
+              <MenuItem danger onSelect={() => { track('resetHard'); handleResetSelect('hard'); }}>
                 Hard (discard all)
-              </ContextMenu.Item>
+              </MenuItem>
             </ContextMenu.SubContent>
           </ContextMenu.Portal>
         </ContextMenu.Sub>
@@ -458,15 +458,14 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
    */
   const compareItems = isRowMenu ? (
     isMultiSelectActive ? (
-      <ContextMenu.Item
-        className={menuItemClass}
+      <MenuItem
         onSelect={() => {
           track('compareCommits');
           handleCompareRange();
         }}
       >
         Compare these commits
-      </ContextMenu.Item>
+      </MenuItem>
     ) : (
       <CompareMenuItems slot={{ kind: 'commit', hash: commit.hash }} surface={surface} resolvedHash={commit.hash} />
     )
@@ -475,34 +474,34 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   /** Refs created *at* this commit. Worktrees are a group of their own. */
   const createItems = (
     <>
-      <ContextMenu.Item className={menuItemClass} onSelect={() => { track('createBranch'); setCreateBranchOpen(true); }}>
+      <MenuItem onSelect={() => { track('createBranch'); setCreateBranchOpen(true); }}>
         Create Branch Here...
-      </ContextMenu.Item>
-      <ContextMenu.Item className={menuItemClass} onSelect={() => { track('createTag'); setCreateTagOpen(true); }}>
+      </MenuItem>
+      <MenuItem onSelect={() => { track('createTag'); setCreateTagOpen(true); }}>
         Create Tag Here...
-      </ContextMenu.Item>
+      </MenuItem>
     </>
   );
 
   /** A badge menu creates worktrees from its ref, which is the better default. */
   const worktreeItem = isRowMenu ? (
-    <ContextMenu.Item className={menuItemClass} onSelect={() => { track('createWorktree'); setCreateWorktreeOpen(true); }}>
+    <MenuItem onSelect={() => { track('createWorktree'); setCreateWorktreeOpen(true); }}>
       Create worktree…
-    </ContextMenu.Item>
+    </MenuItem>
   ) : null;
 
   /** Rendered inside the shared Copy submenu, alongside any ref-name item. */
   const copyItems = (
     <>
-      <ContextMenu.Item className={menuItemClass} onSelect={() => { track('copyHash'); rpcClient.copyToClipboard(commit.hash); }}>
+      <MenuItem onSelect={() => { track('copyHash'); rpcClient.copyToClipboard(commit.hash); }}>
         Copy Commit Hash
-      </ContextMenu.Item>
-      <ContextMenu.Item className={menuItemClass} onSelect={() => { track('copyShortHash'); rpcClient.copyToClipboard(commit.abbreviatedHash); }}>
+      </MenuItem>
+      <MenuItem onSelect={() => { track('copyShortHash'); rpcClient.copyToClipboard(commit.abbreviatedHash); }}>
         Copy Short Hash
-      </ContextMenu.Item>
-      <ContextMenu.Item className={menuItemClass} onSelect={() => { track('copyMessage'); rpcClient.copyToClipboard(commit.subject); }}>
+      </MenuItem>
+      <MenuItem onSelect={() => { track('copyMessage'); rpcClient.copyToClipboard(commit.subject); }}>
         Copy Commit Message
-      </ContextMenu.Item>
+      </MenuItem>
     </>
   );
 

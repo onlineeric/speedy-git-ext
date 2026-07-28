@@ -36,7 +36,10 @@ const TRACKED_OPERATION_LIST = [
   'updateSubmodule', 'initSubmodule',
   'addWorktree', 'removeWorktree', 'pruneWorktree', 'openWorktree',
   'stageFiles', 'unstageFiles', 'stageAll', 'unstageAll', 'discardFiles', 'discardAllUnstaged',
-  'compareRefs',
+  // Read-only, but user-initiated from a single click and potentially expensive
+  // (Go to HEAD may walk the whole log), so its outcome and duration are worth
+  // the same signal as the mutating operations.
+  'compareRefs', 'locateHead',
 ] as const satisfies readonly RequestMessage['type'][];
 
 /** A user-initiated git operation eligible for `operation` events. */
