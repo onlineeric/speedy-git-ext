@@ -89,5 +89,23 @@ export function createReachabilityChecker(commits: Commit[]): ReachabilityChecke
  * `createReachabilityChecker` when asking multiple questions against the same commit set.
  */
 export function isReachableFromHead(commitHash: string, headHash: string, commits: Commit[]): boolean {
-  return createReachabilityChecker(commits).isReachableFromHead(commitHash, headHash);
+  return getReachabilityChecker(commits).isReachableFromHead(commitHash, headHash);
+}
+
+/**
+ * Cached by commit-list identity, so the O(n) map build is paid once per commit
+ * list rather than once per caller. Several components ask reachability
+ * questions about the same list at the same time — every context menu the user
+ * has opened keeps one alive — and the list can run to tens of thousands of
+ * commits after a "Go to HEAD" navigation. Entries die with their array.
+ */
+const checkerByCommits = new WeakMap<Commit[], ReachabilityChecker>();
+
+export function getReachabilityChecker(commits: Commit[]): ReachabilityChecker {
+  const cached = checkerByCommits.get(commits);
+  if (cached) return cached;
+
+  const checker = createReachabilityChecker(commits);
+  checkerByCommits.set(commits, checker);
+  return checker;
 }

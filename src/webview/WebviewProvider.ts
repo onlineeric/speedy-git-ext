@@ -17,7 +17,7 @@ import type { GitSubmoduleService } from '../services/GitSubmoduleService.js';
 import type { GitTagService } from '../services/GitTagService.js';
 import type { GitWorktreeService } from '../services/GitWorktreeService.js';
 import type { TelemetryService } from '../services/TelemetryService.js';
-import { DEFAULT_USER_SETTINGS } from '../../shared/types.js';
+import { clampBatchCommitSize, DEFAULT_USER_SETTINGS } from '../../shared/types.js';
 import { EditorCommandService } from './EditorCommandService.js';
 import { GitServiceRegistry, type GitServiceSet } from './GitServiceRegistry.js';
 import { OperationGuard } from './OperationGuard.js';
@@ -263,8 +263,12 @@ export class WebviewProvider {
   }
 
   private getBatchSize(): number {
+    // Settings from the handler are already normalized; the direct-config
+    // fallback is raw, so clamp here too.
     return this.getSettingsHandler?.().batchCommitSize
-      ?? vscode.workspace.getConfiguration('speedyGit').get<number>('batchCommitSize', DEFAULT_USER_SETTINGS.batchCommitSize);
+      ?? clampBatchCommitSize(
+        vscode.workspace.getConfiguration('speedyGit').get<number>('batchCommitSize', DEFAULT_USER_SETTINGS.batchCommitSize)
+      );
   }
 }
 

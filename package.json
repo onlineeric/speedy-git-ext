@@ -106,7 +106,8 @@
           "type": "number",
           "default": 500,
           "minimum": 1,
-          "markdownDescription": "Number of commits to load per batch in the Git graph panel. Lower values give faster initial load; higher values reduce scroll-triggered fetches for large repositories."
+          "maximum": 10000,
+          "markdownDescription": "Number of commits to load per batch in the Git graph panel. Lower values give faster initial load; higher values reduce scroll-triggered fetches for large repositories. Values above 10000 are capped."
         },
         "speedyGit.statusBarText": {
           "type": "string",

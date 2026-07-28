@@ -15,7 +15,7 @@ import { useGraphStore } from '../stores/graphStore';
 import { trackUiInteraction } from '../utils/telemetry';
 import { buildCheckoutCommand, buildResetCommand } from '../utils/gitCommandBuilder';
 import { setSlotsAndCompare } from '../utils/compareDispatch';
-import { createReachabilityChecker } from '../utils/commitReachability';
+import { getReachabilityChecker } from '../utils/commitReachability';
 import { getCommitMenuAvailability, isStashPseudoCommit } from '../utils/commitMenuAvailability';
 import { CompareMenuItems } from './CompareMenuItems';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -236,9 +236,10 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   // Built from the *unfiltered* commit list: which operations apply is a question
   // about git history, not about what the author/text filters happen to be showing.
   // Walking `mergedCommits` instead let a filter punch holes in the parent chain and
-  // silently hide Drop Commit. Memoized so the commit-by-hash map is built once per
-  // commits change instead of on every render of this per-row context menu.
-  const reachability = useMemo(() => createReachabilityChecker(commits), [commits]);
+  // silently hide Drop Commit. The checker is cached by commit-list identity, so the
+  // commit-by-hash map is built once per commits change no matter how many menus
+  // (row menu plus one per opened ref badge) are asking.
+  const reachability = useMemo(() => getReachabilityChecker(commits), [commits]);
   const isOnFirstParentChain = currentLocalBranch
     ? reachability.isOnFirstParentChain(commit.hash, currentLocalBranch.hash)
     : false;

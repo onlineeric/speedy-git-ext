@@ -93,11 +93,18 @@ export type RequestMessage =
   // Pagination & settings
   | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string }; targetIndex?: number } }
   /**
-   * Resolve the HEAD commit hash and its position in the paginated log stream
-   * under the given backend filters. Answered with a `headLocation` response;
-   * used by the toolbar "Go to HEAD" navigation.
+   * Resolve the HEAD commit hash and, when needed, its position in the
+   * paginated log stream under the given backend filters. Answered with a
+   * `headLocation` (or `headLocationFailed`) response; used by the toolbar
+   * "Go to HEAD" navigation.
+   *
+   * `displayedHeadHash` is the commit the webview currently shows as HEAD, or
+   * null when HEAD is not on screen. When it matches the repository's actual
+   * HEAD the backend skips the position walk entirely — the webview can scroll
+   * to a row it already holds — which keeps the common case a single
+   * `rev-parse` instead of a full log traversal.
    */
-  | { type: 'locateHead'; payload: { filters: { branches?: string[]; afterDate?: string; beforeDate?: string } } }
+  | { type: 'locateHead'; payload: { filters: { branches?: string[]; afterDate?: string; beforeDate?: string }; displayedHeadHash: string | null } }
   | { type: 'openSettings'; payload: { query?: string } }
   | { type: 'switchRepo'; payload: { repoPath: string } }
   /**
@@ -190,9 +197,17 @@ export type ResponseMessage =
   /**
    * Answer to `locateHead`. `hash` is null when HEAD cannot be resolved (e.g.
    * unborn branch in a fresh repo); `index` is HEAD's 0-based position in the
-   * filtered log stream, or -1 when HEAD is not part of that stream.
+   * filtered log stream, -1 when HEAD is not part of that stream, and null when
+   * the position was not computed because the webview's displayed HEAD was
+   * confirmed to be current (it already knows where the row is).
    */
-  | { type: 'headLocation'; payload: { hash: string | null; index: number } }
+  | { type: 'headLocation'; payload: { hash: string | null; index: number | null } }
+  /**
+   * `locateHead` failed in git. Separate from the generic `error` response so
+   * the webview can end the Go to HEAD flow on its own failures only, and never
+   * on an unrelated request's error that happens to arrive mid-navigation.
+   */
+  | { type: 'headLocationFailed'; payload: { error: GitError | { message: string } } }
   | { type: 'repoList'; payload: { repos: RepoInfo[]; activeRepoPath: string } }
   | { type: 'checkoutNeedsStash'; payload: { name: string; pull?: boolean } }
   | { type: 'checkoutCommitNeedsStash'; payload: { hash: string } }
@@ -265,7 +280,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   rebaseState: true, rebaseCommits: true, signatureInfo: true,
   signaturePresence: true, signaturePresenceFailed: true, signaturesVerified: true,
   commitPushedResult: true, commitParents: true,
-  commitsAppended: true, prefetchError: true, headLocation: true, repoList: true,
+  commitsAppended: true, prefetchError: true, headLocation: true, headLocationFailed: true, repoList: true,
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
   pushResult: true, avatarUrls: true, tagMetadata: true, worktreeList: true, worktreePathResolved: true, worktreeEnvFiles: true, containingBranches: true,

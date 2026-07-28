@@ -404,7 +404,8 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
               <>
                 <MenuGroupSeparator label="Worktree" />
                 {createWorktreeItem}
-                {isLocalBranch && branchWorktree && (
+                {/* `branchWorktree` is only ever resolved for local-branch badges. */}
+                {branchWorktree && (
                   <WorktreeMenuItems worktree={branchWorktree} onRemove={openRemoveWorktreeDialog} />
                 )}
               </>

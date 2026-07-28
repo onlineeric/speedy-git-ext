@@ -46,23 +46,26 @@ export class GitLogService {
    * `getCommitPosition`). Keeping the ordering/filter arguments in one place
    * guarantees positions computed by one query match the other's pagination.
    */
-  private buildLogArgs(format: string, filters?: Partial<GraphFilters>): string[] {
+  private buildLogArgs(
+    format: string,
+    filters?: Partial<GraphFilters>,
+    options: { decorate: boolean } = { decorate: true }
+  ): string[] {
     const maxCount = filters?.maxCount ?? 500;
     const args = ['log', ...this.ignoreMissingHeadArgs(filters?.branches)];
 
     if (filters?.skip && filters.skip > 0) {
       args.push(`--skip=${filters.skip}`);
     }
-    args.push(
-      `--max-count=${maxCount}`,
-      `--format=${format}`,
+    args.push(`--max-count=${maxCount}`, `--format=${format}`);
+    if (options.decorate) {
       // Ask for fully-qualified ref names in %D (refs/heads/x, refs/remotes/origin/x).
       // The short form is ambiguous — "team/feature" could be a local branch or the
       // branch "feature" on a remote named "team" — and it also varies with the user's
       // `log.decorate` config. Qualified names remove the guesswork entirely.
-      '--decorate=full',
-      '--date-order'
-    );
+      args.push('--decorate=full');
+    }
+    args.push('--date-order');
 
     // Author filtering is handled client-side (visibility filter) — never pass --author to git.
     // This ensures the frontend has full commit ancestry for topology computation.
@@ -140,10 +143,18 @@ export class GitLogService {
    * paginates through (hash-only listing, so this stays cheap even for large
    * repositories). Returns -1 when the commit is not in the stream — filtered
    * out by branch/date filters or deeper than the search cap.
+   *
+   * This walks the whole history, so callers should reach for it only when the
+   * commit's position is not already known client-side.
    */
   async getCommitPosition(hash: string, filters?: Partial<GraphFilters>): Promise<Result<number>> {
     this.log.info('Locating commit position in log stream');
-    const args = this.buildLogArgs('%H', { ...filters, maxCount: COMMIT_POSITION_SEARCH_CAP, skip: 0 });
+    // No decoration: the %H format emits no ref names for it to appear in.
+    const args = this.buildLogArgs(
+      '%H',
+      { ...filters, maxCount: COMMIT_POSITION_SEARCH_CAP, skip: 0 },
+      { decorate: false }
+    );
 
     const result = await this.executor.execute({
       args,

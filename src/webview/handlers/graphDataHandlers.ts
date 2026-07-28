@@ -1,11 +1,16 @@
 import * as vscode from 'vscode';
 import { GitExecutor } from '../../services/GitExecutor.js';
-import { UNCOMMITTED_HASH } from '../../../shared/types.js';
+import { parseBranchRefName } from '../../utils/gitParsers.js';
+import { MAX_BATCH_COMMIT_SIZE, UNCOMMITTED_HASH } from '../../../shared/types.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 import { postUncommittedCommitDetails } from './workingTreeHandlers.js';
 
-/** Upper bound for a single targeted `loadMoreCommits` batch (Go to HEAD). */
-const MAX_TARGETED_BATCH = 10_000;
+/**
+ * Upper bound for a single targeted `loadMoreCommits` batch (Go to HEAD).
+ * Shares the batch-size ceiling, so a targeted batch is never smaller than a
+ * regular one however `speedyGit.batchCommitSize` is configured.
+ */
+const MAX_TARGETED_BATCH = MAX_BATCH_COMMIT_SIZE;
 
 export const graphDataHandlers = {
   getAuthors: async (_message, context) => {
@@ -87,9 +92,18 @@ export const graphDataHandlers = {
       return;
     }
 
+    // Fast path: the webview already displays this exact commit as HEAD, and
+    // `rev-parse` just confirmed it against the repository. Its row position is
+    // known client-side, so the log walk below would be pure overhead — and on
+    // a large repository that walk dominates the whole click.
+    if (headResult.value === message.payload.displayedHeadHash) {
+      context.postMessage({ type: 'headLocation', payload: { hash: headResult.value, index: null } });
+      return;
+    }
+
     const positionResult = await gitLogService.getCommitPosition(headResult.value, message.payload.filters);
     if (!positionResult.success) {
-      context.postMessage({ type: 'error', payload: { error: positionResult.error } });
+      context.postMessage({ type: 'headLocationFailed', payload: { error: positionResult.error } });
       return;
     }
 
@@ -125,7 +139,9 @@ export const graphDataHandlers = {
   getContainingBranches: async (message, context) => {
     const executor = new GitExecutor(context.log);
     const result = await executor.execute({
-      args: ['branch', '-a', '--contains', message.payload.hash, '--format=%(refname:short)'],
+      // `%(refname)` (not `:short`) so a local branch with a slash is never read
+      // as `<remote>/<branch>` — see parseBranchRefName.
+      args: ['branch', '-a', '--contains', message.payload.hash, '--format=%(refname)'],
       cwd: context.runtime.currentRepoPath,
     });
     let branches: string[] = [];
@@ -133,10 +149,8 @@ export const graphDataHandlers = {
     if (result.success) {
       branches = result.value.stdout
         .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0)
-        .map((name) => name.startsWith('remotes/') ? name.slice('remotes/'.length) : name)
-        .filter((name) => name !== 'HEAD' && !name.endsWith('/HEAD'));
+        .map(parseBranchRefName)
+        .filter((name): name is string => name !== null);
     } else {
       status = 'error';
     }

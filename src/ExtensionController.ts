@@ -21,7 +21,7 @@ import { GitWatcherService } from './services/GitWatcherService.js';
 import type { SettingsSnapshotProperties, TelemetryService } from './services/TelemetryService.js';
 import { PersistedUIStateStore } from './webview/PersistedUIStateStore.js';
 import { GitError } from '../shared/errors.js';
-import { DEFAULT_GRAPH_COLORS, DEFAULT_USER_SETTINGS, type SubmoduleNavEntry, type UserDateFormat, type UserSettings } from '../shared/types.js';
+import { clampBatchCommitSize, DEFAULT_GRAPH_COLORS, DEFAULT_USER_SETTINGS, type SubmoduleNavEntry, type UserDateFormat, type UserSettings } from '../shared/types.js';
 
 export class ExtensionController {
   private webviewProvider: WebviewProvider | undefined;
@@ -400,7 +400,7 @@ export class ExtensionController {
       config.get<string>('dateFormat', DEFAULT_USER_SETTINGS.dateFormat)
     );
     const dateFormatCustom = config.get<string>('dateFormatCustom', DEFAULT_USER_SETTINGS.dateFormatCustom) ?? '';
-    const batchCommitSize = this.normalizeBatchCommitSize(
+    const batchCommitSize = clampBatchCommitSize(
       config.get<number>('batchCommitSize', DEFAULT_USER_SETTINGS.batchCommitSize)
     );
     const overScan = this.normalizeOverScan(
@@ -447,9 +447,6 @@ export class ExtensionController {
     }
   }
 
-  private normalizeBatchCommitSize(value: number): number {
-    return Number.isFinite(value) && value >= 1 ? value : DEFAULT_USER_SETTINGS.batchCommitSize;
-  }
 
   private normalizeWorktreeBasePath(value: string): string {
     const trimmed = (value ?? '').trim();

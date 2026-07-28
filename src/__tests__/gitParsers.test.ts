@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   isConflictStderr,
   parseBranchLine,
+  parseBranchRefName,
   parseCommitLine,
   parseRefs,
   parseTagMetadata,
@@ -349,5 +350,34 @@ describe('parseTagMetadata', () => {
 
   it('returns an empty array for empty output', () => {
     expect(parseTagMetadata('')).toEqual([]);
+  });
+});
+
+describe('parseBranchRefName', () => {
+  it('renders a local branch by its full name', () => {
+    expect(parseBranchRefName('refs/heads/main')).toBe('main');
+    expect(parseBranchRefName('refs/heads/eric/wip')).toBe('eric/wip');
+  });
+
+  it('renders a remote-tracking branch as <remote>/<branch>', () => {
+    expect(parseBranchRefName('refs/remotes/origin/eric/wip')).toBe('origin/eric/wip');
+  });
+
+  it('keeps a local branch named release/HEAD', () => {
+    expect(parseBranchRefName('refs/heads/release/HEAD')).toBe('release/HEAD');
+  });
+
+  it('drops the remote HEAD pointer', () => {
+    expect(parseBranchRefName('refs/remotes/origin/HEAD')).toBeNull();
+  });
+
+  it('drops tags and non-ref lines', () => {
+    expect(parseBranchRefName('refs/tags/v1.0')).toBeNull();
+    expect(parseBranchRefName('(HEAD detached at abc1234)')).toBeNull();
+    expect(parseBranchRefName('')).toBeNull();
+  });
+
+  it('tolerates surrounding whitespace', () => {
+    expect(parseBranchRefName('  refs/heads/main  ')).toBe('main');
   });
 });

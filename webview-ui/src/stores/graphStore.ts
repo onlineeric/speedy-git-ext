@@ -141,6 +141,13 @@ interface GraphStore {
   pendingHead: { hash: string; targetIndex: number; attempts: number } | null;
   /** Row briefly highlighted (and centered) after a Go to HEAD navigation. */
   flashCommitHash: string | null;
+  /**
+   * Bumped on every completed Go to HEAD navigation. Navigating to the row that
+   * is already flashed leaves `flashCommitHash` unchanged, so listeners keyed on
+   * the hash alone would not react — repeat clicks would do nothing. The token
+   * gives each navigation its own identity.
+   */
+  flashToken: number;
   totalLoadedWithoutFilter: number | null;
   pendingCheckout: { name: string; pull?: boolean } | null;
   pendingCommitCheckout: { hash: string } | null;
@@ -386,6 +393,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   fetchGeneration: 0,
   lastBatchStartIndex: 0,
   ...GO_TO_HEAD_RESET,
+  // Monotonic across the session — never reset with the rest of the flash state,
+  // so two navigations to the same row are always distinguishable.
+  flashToken: 0,
   totalLoadedWithoutFilter: null,
   pendingCheckout: null,
   pendingCommitCheckout: null,
@@ -589,7 +599,12 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     }
     // Reuse the canonical single-commit selection, then layer on the flash.
     get().selectCommit(index);
-    set({ flashCommitHash: hash, goToHeadState: 'idle', pendingHead: null });
+    set({
+      flashCommitHash: hash,
+      flashToken: get().flashToken + 1,
+      goToHeadState: 'idle',
+      pendingHead: null,
+    });
     return true;
   },
   resetGoToHead: () => set({ goToHeadState: 'idle', pendingHead: null }),

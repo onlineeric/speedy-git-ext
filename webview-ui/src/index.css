@@ -11,10 +11,12 @@
   to { opacity: 0; transform: translateX(16px); }
 }
 
-/* Flash highlight for the row targeted by "Go to HEAD" (animations override
-   the row's normal background classes for their duration, then fall away). */
+/* Flash highlight for the row targeted by "Go to HEAD". Only the mid-point is
+   declared on purpose: the missing 0%/100% stops are filled from the element's
+   own computed background, so the flash pulses out of and back into the row's
+   normal styling. Pinning them to `transparent` instead would blank the
+   selection highlight that "Go to HEAD" just applied for the whole animation. */
 @keyframes head-flash {
-  0%, 100% { background-color: transparent; }
   50% { background-color: var(--vscode-editor-findMatchHighlightBackground); }
 }
 

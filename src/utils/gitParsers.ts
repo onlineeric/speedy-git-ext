@@ -133,6 +133,24 @@ function parseQualifiedRef(refName: string): RefInfo | null {
 }
 
 /**
+ * Display name for one line of `git branch --format=%(refname)` output.
+ *
+ * The qualified form is what makes this unambiguous: `%(refname:short)` prints
+ * `team/feature` for both a local branch of that name and the branch `feature`
+ * on a remote named `team`. Local branches keep their full name (a branch
+ * literally called `release/HEAD` survives); remote-tracking branches render as
+ * `<remote>/<branch>`; `<remote>/HEAD`, tags and non-ref lines (the
+ * `(HEAD detached at …)` pseudo-entry) are dropped.
+ */
+export function parseBranchRefName(refName: string): string | null {
+  const ref = parseQualifiedRef(refName.trim());
+  if (!ref) return null;
+  if (ref.type === 'branch') return ref.name;
+  if (ref.type === 'remote') return `${ref.remote}/${ref.name}`;
+  return null;
+}
+
+/**
  * Parse `git for-each-ref refs/tags` output using the null-byte field format:
  *   `%(refname:short)%00%(objecttype)%00%(contents)%00%(taggername)%00%(taggerdate:unix)%00`
  * `%(contents)` can contain newlines, so records are parsed as fixed-width NUL

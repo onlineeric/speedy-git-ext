@@ -98,6 +98,21 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   toolbarShowRemoteButton: true,
 };
 
+/**
+ * Upper bound for `speedyGit.batchCommitSize`, and for the grown batch a
+ * targeted "Go to HEAD" load may request. One response never carries more
+ * commits than this, however the setting is configured.
+ */
+export const MAX_BATCH_COMMIT_SIZE = 10_000;
+
+/** Coerce a configured `speedyGit.batchCommitSize` into the supported range. */
+export function clampBatchCommitSize(value: number): number {
+  if (!Number.isFinite(value) || value < 1) {
+    return DEFAULT_USER_SETTINGS.batchCommitSize;
+  }
+  return Math.min(value, MAX_BATCH_COMMIT_SIZE);
+}
+
 export interface Commit {
   hash: string;
   abbreviatedHash: string;
