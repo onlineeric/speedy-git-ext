@@ -360,11 +360,11 @@ export function ChevronDownIcon({ className }: IconProps) {
   );
 }
 
-/** Chevron right — 12×12, inherits text color via currentColor */
-export function ChevronRightIcon({ className }: IconProps) {
+/** Chevron right — 12×12 by default, inherits text color via currentColor */
+export function ChevronRightIcon({ className, size = 12, strokeWidth = 1.3 }: IconProps & { size?: number; strokeWidth?: number }) {
   return (
-    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
-      <path d="M 4.5 3 L 7.5 6 L 4.5 9" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path d="M 4.5 3 L 7.5 6 L 4.5 9" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

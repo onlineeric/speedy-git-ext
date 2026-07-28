@@ -1,7 +1,21 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, CompareMode, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting } from '@shared/types';
+import type { CherryPickOptions, CompareMode, GraphFilters, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { decideHeadNavigation, HEAD_NAVIGATION_MESSAGES, MAX_GO_TO_HEAD_LOADS, type HeadNavigationDecision } from '../utils/headNavigation';
+import { findHeadCommitHash } from '../utils/commitRefs';
+
+/**
+ * The subset of the active filters that may reach git.
+ *
+ * Author and text filtering stay client-side: the webview needs the full commit
+ * ancestry to compute topology, and handing those to `git log` would punch holes
+ * in the stream. Every request that walks the log shares this one rule, so a new
+ * backend-side filter is added here rather than at three call sites.
+ */
+function backendFilters(filters: GraphFilters): Pick<GraphFilters, 'branches' | 'afterDate' | 'beforeDate'> {
+  const { branches, afterDate, beforeDate } = filters;
+  return { branches, afterDate, beforeDate };
+}
 
 declare const acquireVsCodeApi: () => {
   postMessage: (message: unknown) => void;
@@ -116,6 +130,13 @@ class RpcClient {
         this.applyHeadNavigation(decision, hash);
         break;
       }
+      case 'headLocationFailed':
+        // Only this response — never the generic `error` below — ends the flow
+        // on a failure, because only this one is known to belong to it.
+        if (store.goToHeadState !== 'locating') break;
+        store.resetGoToHead();
+        store.setError(message.payload.error.message);
+        break;
       case 'repoList':
         store.setRepos(message.payload.repos, message.payload.activeRepoPath);
         break;
@@ -136,9 +157,13 @@ class RpcClient {
         store.setError(errorMessage);
         store.setIsRefreshing(false);
         store.setWorktreeListLoading(false);
-        // A failed locateHead (or any interleaved failure) must not leave the
-        // Go to HEAD button stuck in its busy state.
-        store.resetGoToHead();
+        // Deliberately does NOT reset Go to HEAD: this generic error belongs to
+        // some other request (a failing background getCommitDetails, signature
+        // lookup, …) and aborting an in-flight navigation over it left the user
+        // with an unrelated toast and a graph that never moved. Every phase of
+        // the flow has its own terminal response — headLocation,
+        // headLocationFailed, commitsAppended, prefetchError — so it always ends
+        // on a message that is actually its own.
         // Clear the author-fetch guard so a failed getAuthors() can be retried.
         // Author fetch failures arrive here (not as an `authorList` message), so
         // without this the FilterWidget's `authorListLoading` guard stays true and
@@ -744,9 +769,14 @@ class RpcClient {
     const store = useGraphStore.getState();
     if (store.goToHeadState !== 'idle' || store.loading) return;
     store.setGoToHeadState('locating');
-    // Author/text filtering is client-side; only backend filters shape the log stream.
-    const { branches, afterDate, beforeDate } = store.filters;
-    this.send({ type: 'locateHead', payload: { filters: { branches, afterDate, beforeDate } } });
+    this.send({
+      type: 'locateHead',
+      payload: {
+        filters: backendFilters(store.filters),
+        // Lets the backend confirm an on-screen HEAD without walking the log.
+        displayedHeadHash: findHeadCommitHash(store.mergedCommits),
+      },
+    });
   }
 
   /** Execute the decided next step of a Go to HEAD navigation. */
@@ -798,8 +828,7 @@ class RpcClient {
     const store = useGraphStore.getState();
     if (store.prefetching) return;
     store.setPrefetching(true);
-    const { branches, afterDate, beforeDate } = store.filters;
-    this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branches, afterDate, beforeDate }, targetIndex);
+    this.loadMoreCommits(store.commits.length, store.fetchGeneration, backendFilters(store.filters), targetIndex);
   }
 
   /**
@@ -917,9 +946,7 @@ class RpcClient {
     const store = useGraphStore.getState();
     if (!store.hasMore || store.prefetching) return;
     store.setPrefetching(true);
-    // Author filtering is done client-side — never pass author/authors to backend
-    const { branches, afterDate, beforeDate } = store.filters;
-    this.loadMoreCommits(store.commits.length, store.fetchGeneration, { branches, afterDate, beforeDate });
+    this.loadMoreCommits(store.commits.length, store.fetchGeneration, backendFilters(store.filters));
   }
 }
 

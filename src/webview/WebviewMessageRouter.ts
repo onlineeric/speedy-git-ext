@@ -64,6 +64,7 @@ function classifyFailureResponse(response: ResponseMessage): GitErrorCode | unde
     case 'error':
     case 'compareError':
     case 'checkoutPullFailed':
+    case 'headLocationFailed':
       return extractGitCode(response.payload.error);
     case 'pushResult':
       return response.payload.success

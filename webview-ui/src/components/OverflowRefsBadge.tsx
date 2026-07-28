@@ -1,5 +1,5 @@
 import * as Popover from '@radix-ui/react-popover';
-import type { TagMetadata, WorktreeInfo } from '@shared/types';
+import type { Commit, TagMetadata, WorktreeInfo } from '@shared/types';
 import type { DisplayRef } from '../types/displayRefs';
 import { BranchContextMenu } from './BranchContextMenu';
 import { RefLabel } from './RefLabel';
@@ -8,12 +8,14 @@ import { worktreeForDisplayRef } from '../utils/worktreeDisplay';
 
 interface OverflowRefsBadgeProps {
   hiddenRefs: DisplayRef[];
+  /** The row's commit — badges in here get the same menu as badges on the row. */
+  commit: Commit;
   laneColorStyle?: React.CSSProperties;
   worktreeByBranch?: Map<string, WorktreeInfo>;
   tagMetadata?: Record<string, TagMetadata>;
 }
 
-export function OverflowRefsBadge({ hiddenRefs, laneColorStyle, worktreeByBranch, tagMetadata }: OverflowRefsBadgeProps) {
+export function OverflowRefsBadge({ hiddenRefs, commit, laneColorStyle, worktreeByBranch, tagMetadata }: OverflowRefsBadgeProps) {
   if (hiddenRefs.length === 0) return null;
 
   return (
@@ -46,7 +48,7 @@ export function OverflowRefsBadge({ hiddenRefs, laneColorStyle, worktreeByBranch
           }}
         >
           {hiddenRefs.map((displayRef) => (
-            <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)}>
+            <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)} commit={commit}>
               <RefLabel
                 displayRef={displayRef}
                 laneColorStyle={laneColorStyle}

@@ -207,9 +207,11 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
 
   // Go to HEAD: center the flashed row (overriding the minimal 'auto' scroll
   // above — this effect runs after it) and clear the flash once it has played.
-  // Keyed on the hash only: `navigateToCommit` already placed the row in the
-  // loaded list, so re-running on every later append would just reset the timer.
+  // Keyed on the hash plus the navigation token, never on the commit list: the
+  // token makes a second navigation to the row that is already flashed re-center
+  // it, while later appends leave both deps alone and so don't reset the timer.
   const flashCommitHash = useGraphStore((state) => state.flashCommitHash);
+  const flashToken = useGraphStore((state) => state.flashToken);
   useEffect(() => {
     if (!flashCommitHash) return;
     const flashIndex = useGraphStore.getState().mergedCommits.findIndex((commit) => commit.hash === flashCommitHash);
@@ -218,7 +220,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
     }
     const timer = setTimeout(() => useGraphStore.getState().clearCommitFlash(), 2000);
     return () => clearTimeout(timer);
-  }, [flashCommitHash, virtualizer]);
+  }, [flashCommitHash, flashToken, virtualizer]);
 
   useEffect(() => {
     const currentMatch = searchState.matchIndices[searchState.currentMatchIndex];

@@ -41,23 +41,43 @@ export class GitLogService {
   }
 
   /**
+   * Revisions walked when the user has not filtered to specific branches.
+   * Show user-facing Git history only. `--all` also includes tool-owned
+   * namespaces such as refs/jj/keep/*, which can surface internal commits as
+   * blank side branches in the graph. HEAD is listed explicitly so a detached
+   * checkout remains visible even when no branch/tag names it. Stashes are
+   * fetched separately.
+   */
+  private defaultRevisionArgs(): string[] {
+    return ['HEAD', '--branches', '--remotes', '--tags'];
+  }
+
+  /**
    * Build the shared `git log` argument list used by every query that must
    * walk the exact same commit stream as the paginated graph (`getCommits`,
    * `getCommitPosition`). Keeping the ordering/filter arguments in one place
    * guarantees positions computed by one query match the other's pagination.
    */
-  private buildLogArgs(format: string, filters?: Partial<GraphFilters>): string[] {
+  private buildLogArgs(
+    format: string,
+    filters?: Partial<GraphFilters>,
+    options: { decorate: boolean } = { decorate: true }
+  ): string[] {
     const maxCount = filters?.maxCount ?? 500;
     const args = ['log', ...this.ignoreMissingHeadArgs(filters?.branches)];
 
     if (filters?.skip && filters.skip > 0) {
       args.push(`--skip=${filters.skip}`);
     }
-    args.push(
-      `--max-count=${maxCount}`,
-      `--format=${format}`,
-      '--date-order'
-    );
+    args.push(`--max-count=${maxCount}`, `--format=${format}`);
+    if (options.decorate) {
+      // Ask for fully-qualified ref names in %D (refs/heads/x, refs/remotes/origin/x).
+      // The short form is ambiguous — "team/feature" could be a local branch or the
+      // branch "feature" on a remote named "team" — and it also varies with the user's
+      // `log.decorate` config. Qualified names remove the guesswork entirely.
+      args.push('--decorate=full');
+    }
+    args.push('--date-order');
 
     // Author filtering is handled client-side (visibility filter) — never pass --author to git.
     // This ensures the frontend has full commit ancestry for topology computation.
@@ -73,12 +93,7 @@ export class GitLogService {
     if (filters?.branches && filters.branches.length > 0) {
       args.push(...filters.branches);
     } else {
-      // Show user-facing Git history only. `--all` also includes tool-owned
-      // namespaces such as refs/jj/keep/*, which can surface internal commits
-      // as blank side branches in the graph. Include HEAD explicitly so a
-      // detached checkout remains visible even when no branch/tag names it.
-      // Stashes are fetched separately.
-      args.push('HEAD', '--branches', '--remotes', '--tags');
+      args.push(...this.defaultRevisionArgs());
     }
 
     // Separate revisions from paths to avoid ambiguous argument errors
@@ -135,10 +150,18 @@ export class GitLogService {
    * paginates through (hash-only listing, so this stays cheap even for large
    * repositories). Returns -1 when the commit is not in the stream — filtered
    * out by branch/date filters or deeper than the search cap.
+   *
+   * This walks the whole history, so callers should reach for it only when the
+   * commit's position is not already known client-side.
    */
   async getCommitPosition(hash: string, filters?: Partial<GraphFilters>): Promise<Result<number>> {
     this.log.info('Locating commit position in log stream');
-    const args = this.buildLogArgs('%H', { ...filters, maxCount: COMMIT_POSITION_SEARCH_CAP, skip: 0 });
+    // No decoration: the %H format emits no ref names for it to appear in.
+    const args = this.buildLogArgs(
+      '%H',
+      { ...filters, maxCount: COMMIT_POSITION_SEARCH_CAP, skip: 0 },
+      { decorate: false }
+    );
 
     const result = await this.executor.execute({
       args,
@@ -155,7 +178,12 @@ export class GitLogService {
   async getAuthors(): Promise<Result<Author[]>> {
     this.log.info('Fetching authors');
     const result = await this.executor.execute({
-      args: ['log', ...this.ignoreMissingHeadArgs(), 'HEAD', '--branches', '--remotes', '--tags', '--format=%an%x00%ae'],
+      args: [
+        'log',
+        ...this.ignoreMissingHeadArgs(),
+        ...this.defaultRevisionArgs(),
+        '--format=%an%x00%ae',
+      ],
       cwd: this.workspacePath,
     });
 
@@ -185,7 +213,9 @@ export class GitLogService {
     this.log.info('Fetching branches');
     // Use null byte separators for reliable parsing
     const result = await this.executor.execute({
-      args: ['branch', '-a', '--format=%(refname:short)%00%(HEAD)%00%(objectname)'],
+      // `%(refname)` (not `:short`) so local branches with slashes are never
+      // mistaken for `<remote>/<branch>` — see parseBranchLine.
+      args: ['branch', '-a', '--format=%(refname)%00%(HEAD)%00%(objectname)'],
       cwd: this.workspacePath,
     });
 

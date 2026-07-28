@@ -11,8 +11,12 @@
 export interface HeadLocationContext {
   /** HEAD commit hash from the backend; null when HEAD could not be resolved. */
   hash: string | null;
-  /** HEAD's 0-based position in the filtered log stream; -1 when absent. */
-  index: number;
+  /**
+   * HEAD's 0-based position in the filtered log stream; -1 when absent, and
+   * null when the backend skipped the position walk because the row the
+   * webview displays as HEAD is current (see `findHeadCommitHash`).
+   */
+  index: number | null;
   /** Number of raw commits currently loaded in the store. */
   loadedCount: number;
   /** HEAD's index in the displayed (merged) row list; -1 when not displayed. */
@@ -45,7 +49,10 @@ export function decideHeadNavigation(context: HeadLocationContext): HeadNavigati
   if (context.isHiddenClientSide) {
     return { kind: 'hiddenByFilter' };
   }
-  if (context.index < 0) {
+  // No usable position: either HEAD is not in the filtered stream (-1), or the
+  // position walk was skipped for a displayed row that has since gone (null,
+  // raced with a refresh). Both leave a refresh as the way forward.
+  if (context.index === null || context.index < 0) {
     return { kind: 'notInView' };
   }
   if (context.index >= context.loadedCount && context.hasMore) {

@@ -62,4 +62,13 @@ describe('decideHeadNavigation', () => {
       decideHeadNavigation(context({ index: 100, loadedCount: 500 })),
     ).toEqual({ kind: 'notInView' });
   });
+
+  it('scrolls to the confirmed displayed row when the backend skipped the position walk', () => {
+    expect(decideHeadNavigation(context({ index: null, mergedIndex: 7 }))).toEqual({ kind: 'scrollTo' });
+  });
+
+  it('reports notInView when the position walk was skipped but the row has since gone', () => {
+    // Raced with a refresh that dropped the row the backend confirmed.
+    expect(decideHeadNavigation(context({ index: null, mergedIndex: -1 }))).toEqual({ kind: 'notInView' });
+  });
 });

@@ -10,3 +10,4 @@ test-repo-submodules/
 .DS_Store
 Thumbs.db
 .worktrees/
+.claude/.gitignore/

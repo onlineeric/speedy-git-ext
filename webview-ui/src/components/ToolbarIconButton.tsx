@@ -3,7 +3,7 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
-import { menuContentClass, menuItemClass } from './menuStyles';
+import { MENU_COLLISION_PADDING, menuContentClass, menuItemClass } from './menuStyles';
 
 interface ToolbarIconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Text shown under the icon when `speedyGit.toolbar.showLabels` is enabled. */
@@ -52,7 +52,7 @@ export const ToolbarIconButton = forwardRef<HTMLButtonElement, ToolbarIconButton
           </button>
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
-          <ContextMenu.Content className={`min-w-[140px] ${menuContentClass}`}>
+          <ContextMenu.Content className={`min-w-[140px] ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
             <ContextMenu.Item
               className={menuItemClass}
               onSelect={() => {

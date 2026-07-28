@@ -1,4 +1,5 @@
 import type { Commit } from '@shared/types';
+import { isStashPseudoCommit } from './commitRefs';
 
 /**
  * Graph topology calculation for git commit visualization.
@@ -161,7 +162,7 @@ export function calculateTopology(commits: Commit[], hiddenHashes?: Set<string>,
 
     // Stash and uncommitted commits are dead-end leaf nodes — skip parent processing so they
     // don't pull their parent onto their lane. Connections are resolved post-loop.
-    const isStash = commit.refs.some(r => r.type === 'stash');
+    const isStash = isStashPseudoCommit(commit);
     const isUncommitted = commit.refs.some(r => r.type === 'uncommitted');
 
     if (isStash || isUncommitted) {

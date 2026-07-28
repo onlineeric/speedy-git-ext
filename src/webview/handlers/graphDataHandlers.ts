@@ -1,11 +1,9 @@
 import * as vscode from 'vscode';
 import { GitExecutor } from '../../services/GitExecutor.js';
-import { UNCOMMITTED_HASH } from '../../../shared/types.js';
+import { parseBranchRefName } from '../../utils/gitParsers.js';
+import { MAX_BATCH_COMMIT_SIZE, UNCOMMITTED_HASH } from '../../../shared/types.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 import { postUncommittedCommitDetails } from './workingTreeHandlers.js';
-
-/** Upper bound for a single targeted `loadMoreCommits` batch (Go to HEAD). */
-const MAX_TARGETED_BATCH = 10_000;
 
 export const graphDataHandlers = {
   getAuthors: async (_message, context) => {
@@ -42,11 +40,12 @@ export const graphDataHandlers = {
     const batchSize = context.getBatchSize();
     const { skip, generation, filters, targetIndex } = message.payload;
     // Targeted loads (Go to HEAD) grow the batch to reach a known log position
-    // in one request, rounded up to whole batches and capped so a single
-    // response never carries an unbounded commit payload; the webview keeps
-    // requesting until the target commit is loaded.
+    // in one request, rounded up to whole batches and capped at the same ceiling
+    // a configured batch size gets — so a single response never carries an
+    // unbounded commit payload, and a targeted batch is never smaller than a
+    // regular one. The webview keeps requesting until the target is loaded.
     const maxCount = targetIndex !== undefined && targetIndex >= skip
-      ? Math.min(Math.ceil((targetIndex - skip + 1) / batchSize) * batchSize, MAX_TARGETED_BATCH)
+      ? Math.min(Math.ceil((targetIndex - skip + 1) / batchSize) * batchSize, MAX_BATCH_COMMIT_SIZE)
       : batchSize;
     const result = await context.services.current().gitLogService.getCommits({ ...filters, maxCount, skip });
     const postAppended = (value: Extract<typeof result, { success: true }>['value']) => {
@@ -87,9 +86,18 @@ export const graphDataHandlers = {
       return;
     }
 
+    // Fast path: the webview already displays this exact commit as HEAD, and
+    // `rev-parse` just confirmed it against the repository. Its row position is
+    // known client-side, so the log walk below would be pure overhead — and on
+    // a large repository that walk dominates the whole click.
+    if (headResult.value === message.payload.displayedHeadHash) {
+      context.postMessage({ type: 'headLocation', payload: { hash: headResult.value, index: null } });
+      return;
+    }
+
     const positionResult = await gitLogService.getCommitPosition(headResult.value, message.payload.filters);
     if (!positionResult.success) {
-      context.postMessage({ type: 'error', payload: { error: positionResult.error } });
+      context.postMessage({ type: 'headLocationFailed', payload: { error: positionResult.error } });
       return;
     }
 
@@ -125,7 +133,9 @@ export const graphDataHandlers = {
   getContainingBranches: async (message, context) => {
     const executor = new GitExecutor(context.log);
     const result = await executor.execute({
-      args: ['branch', '-a', '--contains', message.payload.hash, '--format=%(refname:short)'],
+      // `%(refname)` (not `:short`) so a local branch with a slash is never read
+      // as `<remote>/<branch>` — see parseBranchRefName.
+      args: ['branch', '-a', '--contains', message.payload.hash, '--format=%(refname)'],
       cwd: context.runtime.currentRepoPath,
     });
     let branches: string[] = [];
@@ -133,10 +143,8 @@ export const graphDataHandlers = {
     if (result.success) {
       branches = result.value.stdout
         .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0)
-        .map((name) => name.startsWith('remotes/') ? name.slice('remotes/'.length) : name)
-        .filter((name) => name !== 'HEAD' && !name.endsWith('/HEAD'));
+        .map(parseBranchRefName)
+        .filter((name): name is string => name !== null);
     } else {
       status = 'error';
     }

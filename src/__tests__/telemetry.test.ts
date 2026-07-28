@@ -32,6 +32,13 @@ describe('TRACKED_OPERATIONS', () => {
     expect(TRACKED_OPERATIONS.has('interactiveRebase')).toBe(true);
   });
 
+  it('includes the read-only operations a single click triggers', () => {
+    // Read-only but user-initiated and potentially slow — the router's
+    // `headLocationFailed` failure classification depends on this membership.
+    expect(TRACKED_OPERATIONS.has('compareRefs')).toBe(true);
+    expect(TRACKED_OPERATIONS.has('locateHead')).toBe(true);
+  });
+
   it('excludes chatty/read/high-frequency request types', () => {
     expect(TRACKED_OPERATIONS.has('getCommits')).toBe(false);
     expect(TRACKED_OPERATIONS.has('loadMoreCommits')).toBe(false);

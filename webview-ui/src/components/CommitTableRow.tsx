@@ -18,6 +18,7 @@ import { AuthorContextMenu } from './AuthorContextMenu';
 import { DateContextMenu } from './DateContextMenu';
 import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils';
 import { slotMatchesCommitRow } from '../utils/compareMarker';
+import { isStashPseudoCommit } from '../utils/commitRefs';
 import type { ResolvedCommitTableLayout } from '../utils/commitTableLayout';
 import { SignatureColumnCell } from './SignatureColumnCell';
 import { DetachedWorktreeBadge } from './DetachedWorktreeBadge';
@@ -85,7 +86,7 @@ export const CommitTableRow = memo(function CommitTableRow({
 }: CommitTableRowProps) {
   const { avatarsEnabled, dateFormat, dateFormatCustom, showRemoteBranches, showTags, graphColors } = userSettings;
   const dateFormatter = getDateFormatter(dateFormat, dateFormatCustom);
-  const isStash = commit.refs.some((ref) => ref.type === 'stash');
+  const isStash = isStashPseudoCommit(commit);
   const isUncommitted = commit.refs.some((ref) => ref.type === 'uncommitted');
   const stashIndex = isStash ? parseStashIndex(commit.refs) : -1;
   const graphColumn = layout.columns.find((column) => column.id === 'graph');
@@ -304,7 +305,7 @@ function renderColumn({
                     <RefLabel displayRef={displayRef} laneColorStyle={laneColorStyle} className="whitespace-nowrap" />
                   </StashContextMenu>
                 ) : (
-                  <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)}>
+                  <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)} commit={commit}>
                     <RefLabel
                       displayRef={displayRef}
                       laneColorStyle={laneColorStyle}
@@ -315,7 +316,7 @@ function renderColumn({
                   </BranchContextMenu>
                 )
               )}
-              <OverflowRefsBadge hiddenRefs={overflowRefs} laneColorStyle={laneColorStyle} worktreeByBranch={worktreeByBranch} tagMetadata={tagMetadata} />
+              <OverflowRefsBadge hiddenRefs={overflowRefs} commit={commit} laneColorStyle={laneColorStyle} worktreeByBranch={worktreeByBranch} tagMetadata={tagMetadata} />
               {showDetachedWorktrees && <DetachedWorktreeBadge worktrees={detachedWorktrees} laneColorStyle={laneColorStyle} />}
             </div>
           )}
