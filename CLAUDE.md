@@ -35,161 +35,30 @@ To debug: use VS Code launch configs "Run Extension" or "Run Extension (Watch)" 
 
 VS Code extension with **backend** (Node.js extension host) and **frontend** (React webview), communicating via VS Code's message passing API (`postMessage`/`onDidReceiveMessage`).
 
-```
-src/                              # Backend — esbuild → dist/extension.js (CJS, node18)
-├── extension.ts                  # Entry point; creates telemetry service, registers speedyGit.showGraph
-├── ExtensionController.ts        # Orchestrates services, repo discovery, settings, session telemetry
-├── WebviewProvider.ts            # Compatibility re-export of webview/WebviewProvider
-├── GitShowContentProvider.ts     # git-show:// URI protocol for diffs
-├── webview/                      # Backend webview subsystem (refactored from the old ~2400-line WebviewProvider)
-│   ├── WebviewProvider.ts        # Thin public facade used by ExtensionController; composes the objects below
-│   ├── WebviewPanelHost.ts       # VS Code panel lifecycle, HTML/CSP/nonce, postMessage, visibility
-│   ├── WebviewRuntime.ts         # Mutable non-service state: repo path, filters, fetch generation, flags
-│   ├── GitServiceRegistry.ts     # Holds repo-bound git services; atomic replacement on repo switch
-│   ├── WebviewMessageRouter.ts   # Exhaustive typed RPC dispatch + allowlisted operation telemetry middleware
-│   ├── WebviewRequestContext.ts  # Narrow per-request handler API, including TelemetryService
-│   ├── PersistedUIStateStore.ts  # Load/save/validate UI state + per-repo table layout (column-width healing)
-│   ├── RepoDataLoader.ts         # Initial + deferred data, avatars, submodules, initial-load perf/error telemetry
-│   ├── RefreshCoordinator.ts     # When to load: initial/manual/auto, hidden-panel deferral, loading lifecycle
-│   ├── EditorCommandService.ts   # VS Code diff/file/compare editors, worktree folder/reveal, signature help
-│   ├── OperationGuard.ts         # In-progress checks (rebase/cherry-pick/revert/merge) → GitError | null
-│   └── handlers/                 # Domain RPC handlers, grouped by feature; fetch services from registry at call time
-│       ├── graphDataHandlers.ts  # getCommits/loadMore/getBranches/getCommitDetails/getAuthors/refresh
-│       ├── branchHandlers.ts     # checkout/create/rename/delete/merge/fast-forward branch
-│       ├── remoteHandlers.ts     # fetch/push/pull, add/edit/remove remote
-│       ├── tagHandlers.ts        # create/delete/push tag (optional chained push, remote delete, force — 048)
-│       ├── stashHandlers.ts      # get/apply/pop/drop/create stash
-│       ├── historyHandlers.ts    # reset/cherry-pick/revert/rebase + continue/abort, dropCommit
-│       ├── signatureHandlers.ts  # presence detection, verification, signature help
-│       ├── submoduleHandlers.ts  # submodule ops + switchRepo/displayRepo navigation
-│       ├── worktreeHandlers.ts   # list/resolve/add/remove/prune/open/reveal worktree
-│       ├── workingTreeHandlers.ts# uncommitted changes, stage/unstage/discard, diff editors
-│       ├── compareHandlers.ts    # compareRefs/cancelCompare/openCompareDiff (latest-wins by request id)
-│       ├── telemetryHandlers.ts  # Validates one-way webview telemetry against closed catalogs
-│       └── vscodeCommandHandlers.ts # settings, clipboard, openExternal, updatePersistedUIState
-├── services/
-│   ├── index.ts                  # Barrel export for all services
-│   ├── GitExecutor.ts            # Spawns git processes, 30s timeout, returns Result<T, GitError>
-│   ├── GitLogService.ts          # Parses git log (null-byte format), branches. Default 500 commits
-│   ├── GitDiffService.ts         # Commit details, file changes, file content at revision
-│   ├── GitBranchService.ts       # Checkout, create, rename, delete, fast-forward branches
-│   ├── GitRemoteService.ts       # Fetch, pull, remote management
-│   ├── GitHistoryService.ts      # Rebase, reset operations
-│   ├── GitRebaseService.ts       # Interactive rebase with drag-drop reordering
-│   ├── GitCherryPickService.ts   # Cherry-pick with conflict handling
-│   ├── GitRevertService.ts       # Revert commits
-│   ├── GitTagService.ts          # Create/delete/push tags (incl. remote delete, force push), tag metadata from refs/tags (048)
-│   ├── GitStashService.ts        # Apply, pop, drop stash entries
-│   ├── GitIndexService.ts        # Stage/unstage, discard, commit (uncommitted-node operations)
-│   ├── GitWorktreeService.ts     # Worktree list/add/remove
-│   ├── GitSignatureService.ts    # GPG/SSH signature verification
-│   ├── GitSubmoduleService.ts    # Submodule status, init, update
-│   ├── GitWatcherService.ts      # File system watcher for auto-refresh
-│   ├── GitRepoDiscoveryService.ts # Multi-root workspace scanning
-│   ├── GitHubAvatarService.ts    # Avatar URL fetching (GitHub/Gravatar)
-│   ├── GitConfigService.ts       # Git config reading
-│   └── TelemetryService.ts       # Single consent-aware backend telemetry funnel; real + no-op implementations
-└── utils/
-    ├── gitParsers.ts             # Parse git log lines, refs (%D), branch list
-    ├── gitQueries.ts             # Shared read-only git queries (e.g., isDirtyWorkingTree)
-    ├── gitValidation.ts          # Input validation for git operations (backend wrappers over shared/gitRefValidation)
-    └── worktreeErrors.ts         # Map raw git worktree failures → friendly messages
+| Path | Role |
+| --- | --- |
+| `src/` | Backend — esbuild → `dist/extension.js` (CJS, node18) |
+| `src/services/` | One `Git<Domain>Service` per git area; all repo-bound, all returning `Result<T, GitError>`. `GitExecutor` is the only place git is actually spawned (30s timeout) |
+| `src/webview/` | Backend webview subsystem (see below) |
+| `webview-ui/src/` | Frontend — Vite + React → `dist/webview/` |
+| `shared/` | Types shared across the boundary: `types.ts`, `messages.ts` (RPC unions), `errors.ts` (`Result`/`GitError`), `gitRefValidation.ts`, `telemetry.ts` |
 
-webview-ui/src/                   # Frontend — Vite + React → dist/webview/
-├── App.tsx                       # Root: ControlBar + TogglePanel + GraphContainer + CommitDetailsPanel
-├── components/
-│   ├── GraphContainer.tsx        # Virtual scrolling (@tanstack/react-virtual, ROW_HEIGHT: 28px)
-│   ├── CommitRow.tsx             # Graph cell + commit metadata (memoized)
-│   ├── CommitTableRow.tsx        # Table-style commit row with resizable columns
-│   ├── CommitTableHeader.tsx     # Draggable/resizable column headers (@dnd-kit)
-│   ├── GraphCell.tsx             # SVG graph rendering (LANE_WIDTH: 16px, 8 cycling colors); lane-changing lines drawn via utils/graphPaths.ts
-│   ├── CommitDetailsPanel.tsx    # Resizable bottom/right panel, commit metadata + file changes
-│   ├── ControlBar.tsx            # Top toolbar with actions
-│   ├── ToolbarIconButton.tsx     # Shared toolbar button: icon + optional text label (speedyGit.toolbar.showLabels); right-click menu toggles labels / Remote button, extensible via extraMenuItems
-│   ├── TogglePanel.tsx           # Collapsible panel for Filter/Search/Compare widgets
-│   ├── FilterWidget.tsx          # Author/date filter panel (react-datepicker)
-│   ├── SearchWidget.tsx          # Text search across commits
-│   ├── CompareWidget.tsx         # Branch comparison
-│   ├── WorktreeWidget.tsx        # Worktree list + create/remove (046-git-worktrees)
-│   ├── *Worktree*.tsx            # CreateWorktreeDialog, RemoveWorktreeDialog, WorktreeMenuItems, DetachedWorktreeBadge
-│   ├── SignatureColumnCell.tsx   # Renders grouped signature glyphs in the optional "Signature" column (047)
-│   ├── *Dialog.tsx               # ~20 operation dialogs (Merge, Push, Rebase, CherryPick, Revert, Worktree, etc.)
-│   ├── *ContextMenu.tsx          # Context menus (Commit, Branch, Stash, Author, Date, Uncommitted) via Radix UI
-│   ├── LazyContextMenu.tsx       # Wraps a Radix context menu so its heavy body (items/dialogs/store subscriptions) mounts only on first right-click — keeps virtualized rows cheap during fast scrolling
-│   ├── CompareMenuItems.tsx      # Shared "Set as Compare Base" / "Compare with Base" item pair (042), reused across Commit/Branch/Uncommitted menus
-│   ├── useCommitMenuItems.tsx    # All commit actions as `{ commitItems, compareItems, createItems, worktreeItem, copyItems, dialogs }` — feeds the commit row menu (`variant: 'row'`) and the Commit/Create groups of ref badge menus (`variant: 'badge'`, drops the items the ref menu covers better). Groups are returned separately so callers can interleave them with their own
-│   ├── MenuGroupSeparator.tsx    # Divider between menu groups, optionally captioned `label` + `name` (ref name kept in its original case, truncated); same 11px height labelled or not
-│   ├── MenuSubTrigger.tsx        # Menu item that opens a submenu — trailing chevron + stays highlighted while the submenu is open
-│   ├── MenuCopySubmenu.tsx       # The shared "Copy" submenu; badge menus pass their Copy <ref> Name item in beside the commit's copy items
-│   ├── MenuItem.tsx              # A context-menu command — one `disabled`/`danger` prop drives both Radix's behaviour and the styling. Prefer this over applying menuStyles strings by hand
-│   ├── menuStyles.ts             # Shared Tailwind class strings for context-menu items (enabled/disabled/separator/group label), composed from one geometry + hover base
-│   ├── HelpDialog.tsx            # "Help & Feedback" dialog (toolbar Help button): GitHub Issues link + docs/changelog/marketplace links + version
-│   ├── FieldError.tsx            # Validation message under form inputs (pairs with aria-invalid/aria-describedby)
-│   └── CommandPreview.tsx        # Live git command preview shown in dialogs
-├── stores/
-│   ├── graphStore.ts             # Zustand store: commits, branches, topology, filters, UI state (~1250 lines). 044-code-refactor replaced whole-store subscriptions with selectors rather than splitting the file
-│   └── graphSelectors.ts         # Derived store reads shared by several components (`useOperationInProgress`, `useCurrentLocalBranch`) — one selector each, so callers can't disagree on the derivation
-├── rpc/
-│   └── rpcClient.ts              # Singleton RPC client, webview↔extension via acquireVsCodeApi()
-├── hooks/
-│   ├── useTooltipHover.ts        # Tooltip positioning logic
-│   ├── useCopyFeedback.ts        # copyToClipboard + short "copied" flash, shared by every copy button
-│   ├── useSignatureColumnLoader.ts # Async viewport-first signature verification loader (047)
-│   └── useDialogTelemetry.ts     # Reports one confirmed/cancelled outcome per dialog open cycle
-├── types/
-│   └── displayRefs.ts            # Discriminated union for ref-label rendering (local-branch/remote-branch/tag/HEAD/…)
-└── utils/
-    ├── graphTopology.ts          # Core graph algorithm (~700 lines): lanes, colors, connections
-    ├── graphPaths.ts             # SVG "rounded elbow" path builders for lane-changing connection lines — lines cross row boundaries perfectly vertically so per-row SVG cells join without kinks (5.4.0)
-    ├── gitCommandBuilder.ts      # Constructs git command strings for preview display
-    ├── commitReachability.ts     # Determines branch reachability for commits; checkers cached by commit-list identity (WeakMap)
-    ├── commitRefs.ts             # Predicates identifying a row by its ref decorations (`findHeadCommit`/`findHeadCommitHash`, `isStashPseudoCommit`) — used by topology, the uncommitted node's parent, the tooltip and Go to HEAD
-    ├── commitMenuAvailability.ts # Which commit actions apply (rebase/reset/revert/drop/cherry-pick) — shared by the commit row menu and the badge "Commit actions" submenu
-    ├── headNavigation.ts         # Pure decision logic for the toolbar "Go to HEAD" (scrollTo/loadMore/hiddenByFilter/notInView/unresolved) + its toast messages
-    ├── rowVisibility.ts          # Scroll-offset maths for revealing a row when the details panel resizes the viewport
-    ├── commitVisibility.ts       # Visibility/filter predicates for the virtualized row list
-    ├── compareSlot.ts            # Compare panel slot model (Base/Target, commit-ish parsing)
-    ├── compareDefaults.ts        # Default slot seeding for the Compare panel
-    ├── compareDispatch.ts        # Resolve compare request → backend RPC
-    ├── compareMarker.ts          # Per-row "B"ase / "T"arget badge derivation
-    ├── externalRefParser.ts      # Parse typed commit-ish expressions (HEAD~3, origin/main^2, …)
-    ├── resolveDefaultRemote.ts   # Pick `origin` else first-alpha remote (fast-forward, push, etc.)
-    ├── mergedCommits.ts          # Detect merged-branch commit grouping for badges
-    ├── refNameField.ts           # Live-validation state for ref-name inputs (error suppressed while field is pristine), shared by Create Tag/Branch/Worktree/Remote dialogs
-    ├── helpLinks.ts              # Help dialog link catalog + build-time extension version (`__EXTENSION_VERSION__`, injected by the vite.config/vitest.config define)
-    ├── refStyle.ts               # Per-ref-kind badge styling
-    ├── repoPath.ts               # Repo path normalization
-    ├── stashMessage.ts           # Format stash entries for display
-    ├── uncommittedUtils.ts       # Helpers for the uncommitted-node row
-    ├── radioAvailability.ts      # Enable/disable logic for mutually-exclusive options
-    ├── filterUtils.ts            # Author/date filter logic
-    ├── searchFilter.ts           # Client-side search by message, hash, author
-    ├── fileTreeBuilder.ts        # Flat file list → tree structure
-    ├── commitTableLayout.ts      # Column layout persistence & manipulation
-    ├── colorUtils.ts             # Graph color cycling + theme helpers
-    ├── formatDate.ts             # Commit-date formatting
-    ├── gravatar.ts               # Gravatar URL builder
-    ├── inlineCodeRenderer.tsx    # Renders inline-code spans in commit messages
-    ├── mergeRefs.ts              # Merges local/remote refs into DisplayRef[] for display
-    ├── signatureGlyph.ts         # Maps SignatureStatus enum → glyph/color for the signature column (047)
-    ├── telemetry.ts              # Fire-and-forget webview telemetry helpers
-    ├── worktreeBadgeStyle.ts     # Styling for worktree badges on graph rows (046)
-    └── worktreeDisplay.ts        # Worktree list formatting/derivation helpers (046)
+**`@shared/*` → `shared/*`** (configured in webview tsconfig, Vite, and vitest).
 
-shared/                           # Shared types between backend & frontend
-├── types.ts                      # Domain types: Commit, Branch, RefInfo, GraphFilters, CommitDetails, etc.
-├── messages.ts                   # RequestMessage/ResponseMessage union types for RPC
-├── errors.ts                     # Result<T,E> monad, GitError class, GitErrorCode enum
-├── gitRefValidation.ts           # git check-ref-format validator with tag/branch/remote wrappers — same rules drive live dialog validation (frontend) and creation-path guards (backend, defense in depth)
-└── telemetry.ts                  # Closed telemetry catalogs, payload types, buckets, runtime validator
+> **Full annotated file map: `docs/architecture.md`.** Not loaded into sessions — read it when you
+> need to locate something by responsibility rather than by name. Prefer `Glob`/`Grep` for
+> existence checks; the map can lag the filesystem.
 
-telemetry.json                    # Machine-readable event manifest used by VS Code telemetry inspection
-esbuild.config.mjs                # Production-only telemetry destination injection; empty in dev/test builds
-```
+**Keeping the map current (required).** `docs/architecture.md` only stays useful if it is updated in
+the same change that moves the code. Whenever you **add, rename, delete, or repurpose** a file, update
+its entry in `docs/architecture.md` before finishing the task — treat it like updating a test, not like
+optional docs work. Also refresh the "last reconciled" date at the top of that file.
 
-### Path Alias
-
-`@shared/*` → `shared/*` (configured in webview tsconfig, Vite, and vitest)
+Additionally update **this** file when the change affects something an agent needs *before* reading any
+code: a new `src/webview/` subsystem object, a new RPC convention, a new shared util or menu/dialog
+primitive worth reusing (add it to *Shared Logic — Reuse, Don't Reimplement*), or a change to telemetry
+policy, performance invariants, or the tech stack. Routine feature files belong only in
+`docs/architecture.md` — keep this file about rules and orientation, not inventory.
 
 ### Data Flow
 
@@ -201,10 +70,50 @@ esbuild.config.mjs                # Production-only telemetry destination inject
 
 ### Webview Backend Conventions
 
+The `src/webview/` subsystem was split out of a former ~2400-line `WebviewProvider`. Ownership is deliberate — put new state in the object that owns that concern:
+
+- `WebviewProvider` — thin facade used by `ExtensionController`; composes everything below
+- `WebviewPanelHost` — panel lifecycle, HTML/CSP/nonce, postMessage, visibility
+- `WebviewRuntime` — mutable non-service state: repo path, filters, fetch generation, flags
+- `GitServiceRegistry` — repo-bound git services, atomically replaced on repo switch
+- `WebviewMessageRouter` — typed RPC dispatch + operation telemetry middleware
+- `RefreshCoordinator` — *when* to load: initial/manual/auto, hidden-panel deferral
+- `RepoDataLoader` — initial + deferred data, avatars, submodules
+- `PersistedUIStateStore` — UI state + per-repo table layout (column-width healing)
+- `OperationGuard` — in-progress checks (rebase/cherry-pick/revert/merge) → `GitError | null`
+- `EditorCommandService` — VS Code diff/file/compare editors, worktree folder/reveal
+
+Rules:
+
 - **Add a new RPC**: add the type to `shared/messages.ts`, then register a handler in `WebviewMessageRouter`'s map — the `satisfies RequestHandlerMap` makes a missing handler a compile error (exhaustive dispatch).
 - **Handlers must stay stateless about repos**: resolve git services via `context.services` (the `GitServiceRegistry`) *at request time*. Never capture a service instance at construction — repo switching and submodule navigation atomically replace the registry, so captured references go stale.
 - **Don't pass the provider to handlers**: give them only what they need through `WebviewRequestContext`.
-- **State ownership**: generation guards / mutable runtime flags live in `WebviewRuntime`; refresh timing lives in `RefreshCoordinator`; per-repo table layout (with column-width healing) is persisted by `PersistedUIStateStore`. Table layout is per-repo; other UI state is global.
+- **State ownership**: table layout is per-repo; other UI state is global.
+
+### Shared Logic — Reuse, Don't Reimplement
+
+These exist because the rule they encode is subtle or shared across several call sites. Their names don't reveal that, so check here before writing similar logic:
+
+- `utils/refNameField.ts` — live ref-name validation state, error suppressed while the field is pristine. Used by Create Tag/Branch/Worktree/Remote dialogs
+- `utils/commitMenuAvailability.ts` — which commit actions apply (rebase/reset/revert/drop/cherry-pick); shared by the commit row menu and the badge "Commit actions" submenu
+- `utils/commitRefs.ts` — identify a row by its ref decorations (`findHeadCommit`, `isStashPseudoCommit`); used by topology, the uncommitted node's parent, the tooltip and Go to HEAD
+- `utils/headNavigation.ts` — pure "Go to HEAD" decision logic (scrollTo/loadMore/hiddenByFilter/notInView/unresolved) + its toast messages
+- `utils/commitReachability.ts` — branch reachability; checkers cached by commit-list identity (WeakMap)
+- `utils/graphPaths.ts` — SVG elbow paths that cross row boundaries perfectly vertically, so per-row SVG cells join without kinks
+- `utils/compareSlot.ts` / `compareDefaults.ts` / `compareDispatch.ts` / `compareMarker.ts` — the Compare panel's slot model, seeding, dispatch and per-row B/T badges
+- `utils/branchSelection.ts` — `getBranchKey` (bare name vs `remote/name`) + additive select-all-local
+- `utils/resolveDefaultRemote.ts` — pick `origin` else first-alpha remote
+- `stores/graphSelectors.ts` — derived store reads (`useOperationInProgress`, `useCurrentLocalBranch`), one selector each so callers can't disagree on the derivation
+
+Menu/dialog composition:
+
+- `components/MenuItem.tsx` — a menu command; one `disabled`/`danger` prop drives both Radix behaviour and styling. **Prefer this over applying `menuStyles` strings by hand**
+- `components/useCommitMenuItems.tsx` — every commit action as `{ commitItems, compareItems, createItems, worktreeItem, copyItems, dialogs }`. Feeds the commit row menu (`variant: 'row'`) and the Commit/Create groups of ref badge menus (`variant: 'badge'`). Groups are returned separately so callers can interleave their own
+- `components/LazyContextMenu.tsx` — mounts a menu's heavy body only on first right-click; keeps virtualized rows cheap during fast scrolling. Wrap new row menus in it
+- `components/dialogStyles.ts` — shared dialog sizing; every `Dialog.Content` uses it
+- `components/CompareMenuItems.tsx`, `MenuCopySubmenu.tsx`, `MenuGroupSeparator.tsx`, `MenuSubTrigger.tsx` — shared menu fragments
+- `hooks/useDialogTelemetry.ts` — one confirmed/cancelled outcome per dialog open cycle
+- `hooks/useCopyFeedback.ts` — `copyToClipboard` + short "copied" flash, used by every copy button
 
 ### Telemetry Requirements
 
@@ -218,7 +127,7 @@ esbuild.config.mjs                # Production-only telemetry destination inject
 - Virtual scrolling: 28px rows, configurable overscan (default 50, range 0-200)
 - Batch prefetch: 500 commits default (configurable via `speedyGit.batchCommitSize`)
 - Graph topology pre-computed once; passing lanes stored for O(1) render lookup
-- `CommitRow`/`CommitTableRow` memoized to prevent unnecessary re-renders
+- `CommitTableRow` memoized to prevent unnecessary re-renders
 
 ## Key Design Decisions
 
@@ -227,45 +136,21 @@ esbuild.config.mjs                # Production-only telemetry destination inject
 - Graph topology computed in webview, not backend
 - TypeScript **strict mode** with `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`
 - Uses **`Result<T, E>`** pattern instead of throwing exceptions in git operations
-- UI state persisted via VS Code `context.globalState`; application state is transient (Zustand)
+- UI state persisted via VS Code `context.globalState`; application state is transient (Zustand, session-only). Persistent settings via VS Code config (e.g. `speedyGit.worktree.basePath`)
 - Telemetry is privacy-first and allowlist-only: fixed catalogs, backend-only transmission, dual consent, fire-and-forget, and no repository/user content
 
 ## Tech Stack
 
 - **TypeScript 5.x** (strict) — both backend and frontend
-- **React 18** + **Zustand** + **Tailwind CSS** — webview UI
+- **React 18** + **Zustand** + **Tailwind CSS** — webview UI; VS Code Extension API 1.80+
 - **Radix UI** — context menus, dialogs, popovers, alert dialogs
 - **@tanstack/react-virtual** — virtual scrolling
 - **@dnd-kit** — drag-and-drop (column reorder, interactive rebase)
 - **react-datepicker 9.x** + **date-fns 4.x** — date range filtering
-- **@vscode/extension-telemetry** — consent-aware telemetry transport to Azure Application Insights
-- **Vitest** — unit testing
+- **@vscode/extension-telemetry** — consent-aware transport to Azure Application Insights
+- **Vitest** — unit testing; tests live in `__tests__/` beside the code they cover
 
-## Coding Preferences / Guidelines
-
-### Code Quality
-
-- Write clean, readable, self-documenting code with clear naming, human-readaable, easy to understand, easy to maintain.
-- Follow single responsibility principle; keep classes, functions and files small and focused
-- DRY: extract reusable logic into shared functions, components, or libraries
-- Prefer explicit over implicit; avoid clever or cryptic solutions
-- Use purpose-built libraries (e.g., `cheerio` for HTML, `date-fns` for dates) instead of manual implementations.
-- Refactor when needed to improve structure and readability
-- Use TypeScript types to document intent and catch errors early
-
-### Package Selection
-
-- Prefer popular, battle-tested packages over manual implementations
-- Avoid regex for parsing structured data (HTML, JSON, XML), use purpose-built libraries instead.
-- When choosing packages, prefer: active maintenance, TypeScript support, readable API
-
-### Restrictions
+## Restrictions
 
 - **Packages**: NEVER auto-install; provide install commands for me to run manually
 - **Git**: NEVER commit or merge; only readonly operations (`git log`, `git status`, `git diff`) and create PR, create branch only if I ask you to do so, or if speckit workflow requires it.
-
-## Active Technologies
-- TypeScript 5.x (strict: `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`) — both backend and frontend
-- React 18 + Zustand + Radix UI + Tailwind CSS (webview); esbuild (extension host), Vite (frontend); VS Code Extension API 1.80+
-- `@vscode/extension-telemetry` with a backend-only `TelemetryService`; closed shared catalogs and fire-and-forget webview reports
-- App state is transient (Zustand, session-only); persistent settings via VS Code config (e.g. `speedyGit.worktree.basePath`) and `context.globalState`
