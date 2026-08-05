@@ -72,7 +72,8 @@ src/
 │   └── TelemetryService.ts       # Consent-aware backend telemetry funnel; real + no-op implementations
 └── utils/
     ├── gitParsers.ts             # Parse git log lines, refs (%D), branch list
-    ├── gitQueries.ts             # Shared read-only git queries (e.g., isDirtyWorkingTree)
+    ├── gitQueries.ts             # Shared read-only git queries. isDirtyWorkingTree counts untracked
+    │                             #   files — for `worktree remove` only; never gate rebase/pick/revert on it
     ├── gitValidation.ts          # Input validation (backend wrappers over shared/gitRefValidation)
     └── worktreeErrors.ts         # Map raw git worktree failures → friendly messages
 ```

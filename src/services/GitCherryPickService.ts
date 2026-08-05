@@ -6,7 +6,6 @@ import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { CherryPickOptions, CherryPickState } from '../../shared/types.js';
 import { validateHash } from '../utils/gitValidation.js';
 import { isConflictStderr } from '../utils/gitParsers.js';
-import { isDirtyWorkingTree } from '../utils/gitQueries.js';
 
 export class GitCherryPickService {
   private executor: GitExecutor;
@@ -20,10 +19,6 @@ export class GitCherryPickService {
     this.cherryPickHeadPath = path.join(workspacePath, '.git', 'CHERRY_PICK_HEAD');
   }
 
-  isDirtyWorkingTree(): Promise<Result<boolean>> {
-    return isDirtyWorkingTree(this.executor, this.workspacePath);
-  }
-
   getCherryPickState(): Result<CherryPickState> {
     const state: CherryPickState = fs.existsSync(this.cherryPickHeadPath) ? 'in-progress' : 'idle';
     return ok(state);
@@ -35,19 +30,10 @@ export class GitCherryPickService {
       if (!hashCheck.success) return hashCheck;
     }
 
-    // `--no-commit` can be used on top of existing local changes, so only enforce
-    // a clean tree for the default commit-producing cherry-pick flow.
-    if (!options.noCommit) {
-      const dirtyCheck = await this.isDirtyWorkingTree();
-      if (!dirtyCheck.success) return dirtyCheck;
-      if (dirtyCheck.value) {
-        return err(new GitError(
-          'Working tree has uncommitted changes. Commit, stash, or discard them before cherry-picking.',
-          'COMMAND_FAILED'
-        ));
-      }
-    }
-
+    // No working-tree pre-check: `git cherry-pick` accepts untracked files and tracked
+    // edits that the patch does not touch, and refuses — naming the files — only when it
+    // would overwrite a locally modified one. It leaves no CHERRY_PICK_HEAD behind when
+    // it refuses, so that failure cannot be mistaken for a paused cherry-pick below.
     const args = ['cherry-pick'];
     if (options.mainlineParent !== undefined) {
       args.push('-m', String(options.mainlineParent));

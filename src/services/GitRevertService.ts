@@ -4,7 +4,6 @@ import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { RevertState, RevertOptions } from '../../shared/types.js';
 import { validateHash } from '../utils/gitValidation.js';
 import { isConflictStderr } from '../utils/gitParsers.js';
-import { isDirtyWorkingTree } from '../utils/gitQueries.js';
 
 export class GitRevertService {
   private executor: GitExecutor;
@@ -14,10 +13,6 @@ export class GitRevertService {
     private readonly log: LogOutputChannel
   ) {
     this.executor = new GitExecutor(log);
-  }
-
-  isDirtyWorkingTree(): Promise<Result<boolean>> {
-    return isDirtyWorkingTree(this.executor, this.workspacePath);
   }
 
   async getRevertState(): Promise<Result<RevertState>> {
@@ -52,15 +47,9 @@ export class GitRevertService {
       }
     }
 
-    const dirtyCheck = await this.isDirtyWorkingTree();
-    if (!dirtyCheck.success) return dirtyCheck;
-    if (dirtyCheck.value) {
-      return err(new GitError(
-        'Working tree has uncommitted changes. Commit, stash, or discard them before reverting.',
-        'COMMAND_FAILED'
-      ));
-    }
-
+    // No working-tree pre-check: `git revert` accepts untracked files and tracked edits
+    // the patch does not touch, and refuses — naming the files — only when it would
+    // overwrite a locally modified one, leaving no REVERT_HEAD behind when it does.
     if (await this.isRevertInProgress()) {
       return err(new GitError(
         'A revert is already in progress. Continue or abort it before starting another revert.',

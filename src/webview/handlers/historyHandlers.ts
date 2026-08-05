@@ -1,7 +1,10 @@
 import type { RebaseAction } from '../../../shared/types.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 
-const dirtyRebaseMessage = 'Working tree has uncommitted changes. Commit, stash, or discard them before rebasing.';
+// No pre-flight working-tree check guards the rebase paths below. `git rebase` enforces
+// its own precondition (any staged or unstaged tracked change; untracked files are fine)
+// and its error names what is in the way, so a check here could only be wrong in one
+// direction — refusing work git would have done.
 
 export const historyHandlers = {
   resetBranch: async (message, context) => {
@@ -111,19 +114,18 @@ export const historyHandlers = {
   },
 
   rebase: async (message, context) => {
-    if (!(await ensureCleanForRebase(context))) return;
     const rebaseResult = await context.services.current().gitRebaseService.rebase(message.payload.targetRef, message.payload.ignoreDate);
     await postRebaseResult(context, rebaseResult);
   },
 
   interactiveRebase: async (message, context) => {
-    if (!(await ensureCleanForRebase(context))) return;
     const result = await context.services.current().gitRebaseService.interactiveRebase(message.payload.config);
     await postRebaseResult(context, result);
   },
 
   getRebaseCommits: async (message, context) => {
-    if (!(await ensureCleanForRebase(context, false))) return;
+    // A plain `git log` read with no precondition of its own — never gate opening the
+    // interactive rebase dialog on working-tree state.
     const commitsResult = await context.services.current().gitRebaseService.getRebaseCommits(message.payload.baseHash);
     if (commitsResult.success) {
       context.postMessage({ type: 'rebaseCommits', payload: { entries: commitsResult.value } });
@@ -177,16 +179,6 @@ export const historyHandlers = {
       return;
     }
 
-    const dirtyCheck = await context.services.current().gitRebaseService.isDirtyWorkingTree();
-    if (!dirtyCheck.success) {
-      context.postMessage({ type: 'error', payload: { error: dirtyCheck.error } });
-      return;
-    }
-    if (dirtyCheck.value) {
-      context.postMessage({ type: 'error', payload: { error: { message: 'Working tree has uncommitted changes. Commit, stash, or discard them before dropping a commit.' } } });
-      return;
-    }
-
     const dropBaseHash = `${message.payload.hash}~1`;
     const commitsResult = await context.services.current().gitRebaseService.getRebaseCommits(dropBaseHash);
     if (!commitsResult.success) {
@@ -233,28 +225,6 @@ export const historyHandlers = {
   | 'isCommitPushed'
   | 'dropCommit'
 >;
-
-async function ensureCleanForRebase(
-  context: Parameters<typeof historyHandlers.rebase>[1],
-  postIdleState = true,
-): Promise<boolean> {
-  const dirtyCheck = await context.services.current().gitRebaseService.isDirtyWorkingTree();
-  if (!dirtyCheck.success) {
-    context.postMessage({ type: 'error', payload: { error: dirtyCheck.error } });
-    if (postIdleState) {
-      context.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
-    }
-    return false;
-  }
-  if (dirtyCheck.value) {
-    context.postMessage({ type: 'error', payload: { error: { message: dirtyRebaseMessage } } });
-    if (postIdleState) {
-      context.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
-    }
-    return false;
-  }
-  return true;
-}
 
 async function postRebaseResult(
   context: Parameters<typeof historyHandlers.rebase>[1],
