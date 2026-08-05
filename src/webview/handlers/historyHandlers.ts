@@ -1,10 +1,10 @@
 import type { RebaseAction } from '../../../shared/types.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 
-// No pre-flight working-tree check guards the rebase paths below. `git rebase` enforces
-// its own precondition (any staged or unstaged tracked change; untracked files are fine)
-// and its error names what is in the way, so a check here could only be wrong in one
-// direction — refusing work git would have done.
+// None of the handlers below pre-check the working tree. Git enforces its own
+// preconditions and its error names what is in the way, so a check here could only be
+// wrong in one direction — refusing work git would have done. Full rationale lives with
+// `isDirtyWorkingTree` in src/utils/gitQueries.ts.
 
 export const historyHandlers = {
   resetBranch: async (message, context) => {
@@ -126,8 +126,8 @@ export const historyHandlers = {
   },
 
   getRebaseCommits: async (message, context) => {
-    // A plain `git log` read with no precondition of its own — never gate opening the
-    // interactive rebase dialog on working-tree state.
+    // Unguarded on purpose: a plain `git log` read that only fills the interactive
+    // rebase dialog. It starts nothing, so nothing can be in its way.
     const commitsResult = await context.services.current().gitRebaseService.getRebaseCommits(message.payload.baseHash);
     if (commitsResult.success) {
       context.postMessage({ type: 'rebaseCommits', payload: { entries: commitsResult.value } });
@@ -175,11 +175,8 @@ export const historyHandlers = {
   },
 
   dropCommit: async (message, context) => {
-    const operationError = await context.operationGuard.getOperationInProgressError();
-    if (operationError) {
-      context.postMessage({ type: 'error', payload: { error: operationError } });
-      return;
-    }
+    // Drops by rewriting history with an interactive rebase, so the same guard applies.
+    if (await postOperationInProgress(context)) return;
 
     const dropBaseHash = `${message.payload.hash}~1`;
     const commitsResult = await context.services.current().gitRebaseService.getRebaseCommits(dropBaseHash);
@@ -229,8 +226,8 @@ export const historyHandlers = {
 >;
 
 /**
- * Refuse to *start* a rebase while another sequencer operation is already running,
- * the same way `revert` and `dropCommit` do — this is git's own rule, not one of ours.
+ * Refuse to *start* a rebase while another sequencer operation is already running.
+ * This is git's own rule, not one of ours.
  *
  * Without it, `git rebase` fails with "there is already a rebase-merge directory",
  * which `GitRebaseService.isRebaseConflict` reads as a conflict because that directory
@@ -247,7 +244,7 @@ async function postOperationInProgress(
   if (!operationError) return false;
   // Error only — no `rebaseState: idle`. The guard fires precisely when an operation
   // is still running, so declaring the rebase idle here would tear down the
-  // conflict-resolution UI the user still needs. `dropCommit` does the same.
+  // conflict-resolution UI the user still needs.
   context.postMessage({ type: 'error', payload: { error: operationError } });
   return true;
 }

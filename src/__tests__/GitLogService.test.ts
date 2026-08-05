@@ -109,6 +109,41 @@ describe('GitLogService.getCommits', () => {
     }));
   });
 
+  it('resolves the stash bases once per load, not once per page', async () => {
+    // `git stash list` sits ahead of the log it widens, so spawning it per page would
+    // add a process to every scroll prefetch — and pages walking different revision
+    // sets would shift the `--skip` offsets under the user mid-scroll.
+    const service = new GitLogService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockImplementation(async ({ args }) => stubStashList(args, 'orphanedTip idx un\n'));
+
+    await service.getCommits({ maxCount: 25 });
+    await service.getCommits({ maxCount: 25, skip: 25 });
+    await service.getCommitPosition('orphanedTip');
+    await service.getAuthors();
+
+    const stashCalls = executeSpy.mock.calls.filter(([options]) => options.args[0] === 'stash');
+    expect(stashCalls).toHaveLength(1);
+    // Every one of those walks still carries the base — the cache widens them all.
+    const logCalls = executeSpy.mock.calls.filter(([options]) => options.args[0] === 'log');
+    expect(logCalls).toHaveLength(4);
+    for (const [options] of logCalls) {
+      expect(options.args).toContain('orphanedTip');
+    }
+  });
+
+  it('re-resolves the stash bases on the next load from the top', async () => {
+    // A stash created or dropped between refreshes has to reach the next graph.
+    const service = new GitLogService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockImplementation(async ({ args }) => stubStashList(args, 'orphanedTip idx un\n'));
+
+    await service.getCommits({ maxCount: 25 });
+    await service.getCommits({ maxCount: 25 });
+
+    expect(executeSpy.mock.calls.filter(([options]) => options.args[0] === 'stash')).toHaveLength(2);
+  });
+
   it('still returns commits when the stash listing fails', async () => {
     const service = new GitLogService('/repo', mockLog);
     vi.spyOn(service['executor'], 'execute').mockImplementation(async ({ args }) =>

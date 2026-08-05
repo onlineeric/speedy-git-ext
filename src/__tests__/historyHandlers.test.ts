@@ -8,10 +8,9 @@ vi.mock('vscode', () => ({
 }));
 
 /**
- * These cases exist to keep one rule in place: Speedy Git must not invent preconditions
- * that git itself does not impose. `git rebase` refuses on tracked changes and tolerates
- * untracked files; deciding that here once blocked rebases over nothing but untracked
- * directories. The operations must reach git, and git's refusal must reach the user.
+ * Builds a context whose `gitRebaseService` exposes *only* the methods passed in, so a
+ * handler that reaches for anything else — a re-added working-tree pre-check, say —
+ * throws instead of quietly passing.
  */
 function makeContext(gitRebaseService: Record<string, unknown>, operationInProgress: GitError | null = null) {
   const postMessage = vi.fn();
@@ -26,12 +25,15 @@ function makeContext(gitRebaseService: Record<string, unknown>, operationInProgr
   return { context, postMessage };
 }
 
+/**
+ * These cases exist to keep one rule in place: Speedy Git must not invent preconditions
+ * that git itself does not impose. `git rebase` refuses on tracked changes and tolerates
+ * untracked files; deciding that here once blocked rebases over nothing but untracked
+ * directories. The operations must reach git, and git's refusal must reach the user.
+ */
 describe('historyHandlers — no working-tree preconditions of our own', () => {
   it('rebases without pre-checking the working tree', async () => {
-    const gitRebaseService = {
-      isDirtyWorkingTree: vi.fn(),
-      rebase: vi.fn().mockResolvedValue(ok('Rebased onto main.')),
-    };
+    const gitRebaseService = { rebase: vi.fn().mockResolvedValue(ok('Rebased onto main.')) };
     const { context } = makeContext(gitRebaseService);
 
     await historyHandlers.rebase(
@@ -39,7 +41,6 @@ describe('historyHandlers — no working-tree preconditions of our own', () => {
       context,
     );
 
-    expect(gitRebaseService.isDirtyWorkingTree).not.toHaveBeenCalled();
     expect(gitRebaseService.rebase).toHaveBeenCalledWith('main', false);
   });
 
@@ -61,10 +62,7 @@ describe('historyHandlers — no working-tree preconditions of our own', () => {
 
   it('opens the interactive rebase dialog regardless of working-tree state', async () => {
     // getRebaseCommits is a plain `git log` read with no precondition of its own.
-    const gitRebaseService = {
-      isDirtyWorkingTree: vi.fn(),
-      getRebaseCommits: vi.fn().mockResolvedValue(ok([])),
-    };
+    const gitRebaseService = { getRebaseCommits: vi.fn().mockResolvedValue(ok([])) };
     const { context, postMessage } = makeContext(gitRebaseService);
 
     await historyHandlers.getRebaseCommits(
@@ -72,13 +70,11 @@ describe('historyHandlers — no working-tree preconditions of our own', () => {
       context,
     );
 
-    expect(gitRebaseService.isDirtyWorkingTree).not.toHaveBeenCalled();
     expect(postMessage).toHaveBeenCalledWith({ type: 'rebaseCommits', payload: { entries: [] } });
   });
 
   it('drops a commit without pre-checking the working tree', async () => {
     const gitRebaseService = {
-      isDirtyWorkingTree: vi.fn(),
       getRebaseCommits: vi.fn().mockResolvedValue(ok([{ hash: 'abc1234', abbreviatedHash: 'abc1234', subject: 'x' }])),
       interactiveRebase: vi.fn().mockResolvedValue(ok('done')),
     };
@@ -86,7 +82,6 @@ describe('historyHandlers — no working-tree preconditions of our own', () => {
 
     await historyHandlers.dropCommit({ type: 'dropCommit', payload: { hash: 'abc1234' } }, context);
 
-    expect(gitRebaseService.isDirtyWorkingTree).not.toHaveBeenCalled();
     expect(gitRebaseService.interactiveRebase).toHaveBeenCalled();
   });
 });
@@ -124,5 +119,18 @@ describe('historyHandlers — git preconditions we do keep', () => {
 
     expect(gitRebaseService.interactiveRebase).not.toHaveBeenCalled();
     expect(postMessage).toHaveBeenCalledWith({ type: 'error', payload: { error: inProgress } });
+  });
+
+  it('refuses to drop a commit while another operation is in progress', async () => {
+    // Dropping rewrites history through the same interactive rebase, so it shares the guard.
+    const gitRebaseService = { getRebaseCommits: vi.fn(), interactiveRebase: vi.fn() };
+    const { context, postMessage } = makeContext(gitRebaseService, inProgress);
+
+    await historyHandlers.dropCommit({ type: 'dropCommit', payload: { hash: 'abc1234' } }, context);
+
+    expect(gitRebaseService.getRebaseCommits).not.toHaveBeenCalled();
+    expect(gitRebaseService.interactiveRebase).not.toHaveBeenCalled();
+    expect(postMessage).toHaveBeenCalledWith({ type: 'error', payload: { error: inProgress } });
+    expect(postMessage.mock.calls.some(([m]) => m.type === 'rebaseState')).toBe(false);
   });
 });
