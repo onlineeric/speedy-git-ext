@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.8.2] - 2026-08-05
+
+### Fixed
+- **Stashes no longer disappear when the branch they were taken from is rebased.** A stash is drawn against the commit it was taken on top of, and that commit is often held in place by nothing but the stash itself. Once the branch moved away — a rebase, a reset, an amend — and no branch, tag or remote-tracking branch still reached the old commit, it dropped out of the graph and took the stash and the whole original branch path with it. This was easy to mistake for the stash being lost, and it could appear to happen long after the rebase: the stash survived for as long as a remote-tracking branch still pointed at the old tip, then vanished the moment that branch was deleted. The commits stashes were taken on top of are now always part of the graph, so the original path and the stash stay visible for as long as the stash exists.
+
 ## [5.8.1] - 2026-07-29
 - Just update version and publish as release version.
 

@@ -50,7 +50,8 @@ src/
 ├── services/                     # All repo-bound; every method returns Result<T, GitError>
 │   ├── index.ts                  # Barrel export for all services
 │   ├── GitExecutor.ts            # Spawns git processes, 30s timeout — the only place git is invoked
-│   ├── GitLogService.ts          # Parses git log (null-byte format), branches. Default 500 commits
+│   ├── GitLogService.ts          # Parses git log (null-byte format), branches. Default 500 commits.
+│   │                             #   Also walks stash base commits, so a stash survives its branch moving
 │   ├── GitDiffService.ts         # Commit details, file changes, file content at revision
 │   ├── GitBranchService.ts       # Checkout, create, rename, delete, fast-forward branches
 │   ├── GitRemoteService.ts       # Fetch, pull, remote management
