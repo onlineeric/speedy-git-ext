@@ -1,6 +1,6 @@
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
-import { parseCommitLine, parseBranchLine } from '../utils/gitParsers.js';
+import { parseCommitLine, parseBranchLine, parseStashBaseHash } from '../utils/gitParsers.js';
 import { type Result, ok } from '../../shared/errors.js';
 import type { Author, Commit, Branch, GraphFilters } from '../../shared/types.js';
 
@@ -79,7 +79,7 @@ export class GitLogService {
 
     const bases = new Set<string>();
     for (const line of result.value.stdout.trim().split('\n')) {
-      const base = line.split(' ')[0].trim();
+      const base = parseStashBaseHash(line);
       if (base) bases.add(base);
     }
     return [...bases];
@@ -100,13 +100,16 @@ export class GitLogService {
    * walk the exact same commit stream as the paginated graph (`getCommits`,
    * `getCommitPosition`). Keeping the ordering/filter arguments in one place
    * guarantees positions computed by one query match the other's pagination.
+   *
+   * The stash base revisions are resolved *here* rather than passed in, so a
+   * caller cannot accidentally walk a narrower stream than the graph does —
+   * that mismatch would make "Go to HEAD" scroll to the wrong row.
    */
-  private buildLogArgs(
+  private async buildLogArgs(
     format: string,
     filters?: Partial<GraphFilters>,
-    options: { decorate: boolean } = { decorate: true },
-    extraRevisions: string[] = []
-  ): string[] {
+    options: { decorate: boolean } = { decorate: true }
+  ): Promise<string[]> {
     const maxCount = filters?.maxCount ?? 500;
     const args = ['log', ...this.ignoreMissingHeadArgs(filters?.branches)];
 
@@ -137,7 +140,7 @@ export class GitLogService {
     if (filters?.branches && filters.branches.length > 0) {
       args.push(...filters.branches);
     } else {
-      args.push(...this.defaultRevisionArgs(), ...extraRevisions);
+      args.push(...this.defaultRevisionArgs(), ...(await this.stashRevisionArgs(filters)));
     }
 
     // Separate revisions from paths to avoid ambiguous argument errors
@@ -147,7 +150,7 @@ export class GitLogService {
 
   async getCommits(filters?: Partial<GraphFilters>): Promise<Result<CommitsResult>> {
     this.log.info('Fetching commits');
-    const args = this.buildLogArgs(LOG_FORMAT, filters, { decorate: true }, await this.stashRevisionArgs(filters));
+    const args = await this.buildLogArgs(LOG_FORMAT, filters);
 
     const result = await this.executor.execute({
       args,
@@ -201,11 +204,10 @@ export class GitLogService {
   async getCommitPosition(hash: string, filters?: Partial<GraphFilters>): Promise<Result<number>> {
     this.log.info('Locating commit position in log stream');
     // No decoration: the %H format emits no ref names for it to appear in.
-    const args = this.buildLogArgs(
+    const args = await this.buildLogArgs(
       '%H',
       { ...filters, maxCount: COMMIT_POSITION_SEARCH_CAP, skip: 0 },
-      { decorate: false },
-      await this.stashRevisionArgs(filters)
+      { decorate: false }
     );
 
     const result = await this.executor.execute({
@@ -222,11 +224,14 @@ export class GitLogService {
 
   async getAuthors(): Promise<Result<Author[]>> {
     this.log.info('Fetching authors');
+    // Same revision set as the graph, stash bases included — otherwise a commit
+    // visible only because a stash holds it has an author the filter never offers.
     const result = await this.executor.execute({
       args: [
         'log',
         ...this.ignoreMissingHeadArgs(),
         ...this.defaultRevisionArgs(),
+        ...(await this.stashRevisionArgs()),
         '--format=%an%x00%ae',
       ],
       cwd: this.workspacePath,

@@ -133,6 +133,18 @@ describe('GitLogService.getCommits', () => {
       args: ['log', '--ignore-missing', 'HEAD', '--branches', '--remotes', '--tags', '--format=%an%x00%ae'],
     }));
   });
+
+  it('walks stash bases too, so every author the graph shows is offered as a filter', async () => {
+    const service = new GitLogService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockImplementation(async ({ args }) => stubStashList(args, 'orphanedTip idx un\n'));
+
+    await service.getAuthors();
+
+    expect(logArgsOf(executeSpy)).toEqual([
+      'log', '--ignore-missing', 'HEAD', '--branches', '--remotes', '--tags', 'orphanedTip', '--format=%an%x00%ae',
+    ]);
+  });
 });
 
 describe('GitLogService.getHeadCommitHash', () => {

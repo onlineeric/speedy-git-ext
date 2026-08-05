@@ -32,8 +32,11 @@ export class GitCherryPickService {
 
     // No working-tree pre-check: `git cherry-pick` accepts untracked files and tracked
     // edits that the patch does not touch, and refuses — naming the files — only when it
-    // would overwrite a locally modified one. It leaves no CHERRY_PICK_HEAD behind when
-    // it refuses, so that failure cannot be mistaken for a paused cherry-pick below.
+    // would overwrite a locally modified one (or when the index differs from HEAD, for
+    // the commit-producing form). It leaves no CHERRY_PICK_HEAD behind when it refuses,
+    // so that failure cannot be mistaken for a paused cherry-pick below. A refused
+    // *multi-commit* pick does leave `.git/sequencer/` behind, but nothing here reads
+    // it and the next pick overwrites it, so it is inert.
     const args = ['cherry-pick'];
     if (options.mainlineParent !== undefined) {
       args.push('-m', String(options.mainlineParent));

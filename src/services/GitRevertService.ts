@@ -73,6 +73,23 @@ export class GitRevertService {
     message: string,
     mainlineParent?: number
   ): Promise<Result<string>> {
+    // This mode produces a commit, so it must hold to the rule git holds every
+    // commit-producing revert to: the index must match HEAD. Git enforces that
+    // itself for `git revert <hash>` ("your local changes would be overwritten by
+    // revert"), but not for the `--no-commit` step this mode builds on — and step 2
+    // commits the whole index, so anything the user had staged would be swept into
+    // the revert commit. `diff --cached --quiet` exits 0 when the index is clean.
+    const stagedCheck = await this.executor.execute({
+      args: ['diff', '--cached', '--quiet'],
+      cwd: this.workspacePath,
+    });
+    if (!stagedCheck.success) {
+      return err(new GitError(
+        'You have staged changes. Reverting with a custom message commits the whole index, so those changes would be swept into the revert commit. Commit or unstage them first.',
+        'COMMAND_FAILED'
+      ));
+    }
+
     // Step 1: stage the inverse changes without committing.
     const step1Args = ['revert'];
     if (mainlineParent !== undefined) {
@@ -146,9 +163,15 @@ export class GitRevertService {
           'COMMAND_FAILED'
         ));
       }
-      // git revert --no-commit does NOT set REVERT_HEAD, so we cannot use the
-      // Continue/Abort recovery path. Surface a distinct code so the webview
-      // routes the toast without entering the revert-in-progress UI state.
+      // Surface a distinct code so the webview routes the toast without entering
+      // the revert-in-progress UI state.
+      //
+      // KNOWN GAP (verified on git 2.43): `git revert --no-commit` *does* write
+      // `.git/REVERT_HEAD`, both on success and on conflict, and `git revert
+      // --continue` works once the conflict is resolved — so "no recovery" is not
+      // actually true, and `getRevertState()` will report in-progress on the next
+      // refresh even after this mode succeeds. Correcting that means changing what
+      // `revertState` means for the whole UI, so it is left as-is here.
       if (isConflictStderr(errorDetail)) {
         return err(new GitError(
           'Revert paused due to conflict. Resolve conflicts in the Source Control panel, then commit the result manually (this mode does not enter git\'s revert state machine, so there is no Continue/Abort step).',

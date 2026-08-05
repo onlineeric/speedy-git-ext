@@ -222,6 +222,7 @@ describe('GitRevertService', () => {
     it('T023: mode: edit-message runs revert --no-commit then commit -m with the user message', async () => {
       const executeSpy = vi.spyOn(service['executor'], 'execute')
         .mockResolvedValueOnce({ success: false, error: new GitError('not found', 'COMMAND_FAILED') }) // REVERT_HEAD
+        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })  // pre-check: index clean
         .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })  // step 1: revert --no-commit
         .mockResolvedValueOnce({ success: false, error: new GitError('staged', 'COMMAND_FAILED') }) // diff --cached --quiet (non-zero → something staged)
         .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } }); // step 2: commit -m
@@ -231,20 +232,40 @@ describe('GitRevertService', () => {
 
       expect(result.success).toBe(true);
       // Validate ordered calls: revert --no-commit, then diff --cached --quiet, then commit -m
-      expect(executeSpy.mock.calls[1][0]).toEqual(
+      expect(executeSpy.mock.calls[2][0]).toEqual(
         expect.objectContaining({ args: ['revert', '--no-commit', 'abc1234'] })
       );
-      expect(executeSpy.mock.calls[2][0]).toEqual(
+      expect(executeSpy.mock.calls[3][0]).toEqual(
         expect.objectContaining({ args: ['diff', '--cached', '--quiet'] })
       );
-      expect(executeSpy.mock.calls[3][0]).toEqual(
+      expect(executeSpy.mock.calls[4][0]).toEqual(
         expect.objectContaining({ args: ['commit', '--cleanup=verbatim', '-m', message] })
       );
+    });
+
+    it('T023b: mode: edit-message refuses a dirty index instead of sweeping it into the revert commit', async () => {
+      // Step 2 commits the whole index, so staged work would silently land in the
+      // revert commit. Git refuses every other commit-producing revert in this
+      // state ("your local changes would be overwritten by revert") — this keeps parity.
+      const executeSpy = vi.spyOn(service['executor'], 'execute')
+        .mockResolvedValueOnce({ success: false, error: new GitError('not found', 'COMMAND_FAILED') }) // REVERT_HEAD
+        .mockResolvedValueOnce({ success: false, error: new GitError('staged', 'COMMAND_FAILED') }); // index differs from HEAD
+
+      const result = await service.revert('abc1234', { mode: 'edit-message', message: 'msg' });
+
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error.message).toContain('staged changes');
+      // Nothing was run against the working tree.
+      expect(executeSpy).toHaveBeenCalledTimes(2);
+      const calledArgs = executeSpy.mock.calls.map((c) => c[0].args);
+      expect(calledArgs.some((a) => a[0] === 'revert')).toBe(false);
+      expect(calledArgs.some((a) => a[0] === 'commit')).toBe(false);
     });
 
     it('mode: edit-message disables git cleanup and trims only final-line trailing whitespace', async () => {
       const executeSpy = vi.spyOn(service['executor'], 'execute')
         .mockResolvedValueOnce({ success: false, error: new GitError('not found', 'COMMAND_FAILED') })
+        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
         .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
         .mockResolvedValueOnce({ success: false, error: new GitError('staged', 'COMMAND_FAILED') })
         .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } });
@@ -253,7 +274,7 @@ describe('GitRevertService', () => {
       const result = await service.revert('abc1234', { mode: 'edit-message', message });
 
       expect(result.success).toBe(true);
-      expect(executeSpy.mock.calls[3][0]).toEqual(
+      expect(executeSpy.mock.calls[4][0]).toEqual(
         expect.objectContaining({
           args: [
             'commit',
@@ -268,6 +289,7 @@ describe('GitRevertService', () => {
     it('T024: mode: edit-message — diff --cached --quiet exits 0 (nothing staged) → "already present", commit step NEVER called', async () => {
       const executeSpy = vi.spyOn(service['executor'], 'execute')
         .mockResolvedValueOnce({ success: false, error: new GitError('not found', 'COMMAND_FAILED') })
+        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })  // pre-check: index clean
         .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })  // revert --no-commit OK
         .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } }); // diff --cached --quiet → exit 0
 
@@ -277,8 +299,8 @@ describe('GitRevertService', () => {
       if (!result.success) {
         expect(result.error.message).toContain('already present');
       }
-      // Only 3 invocations: no `git commit` call.
-      expect(executeSpy).toHaveBeenCalledTimes(3);
+      // Only 4 invocations: no `git commit` call.
+      expect(executeSpy).toHaveBeenCalledTimes(4);
       const calledArgs = executeSpy.mock.calls.map((c) => c[0].args);
       expect(calledArgs.some((a) => a[0] === 'commit')).toBe(false);
     });
@@ -286,6 +308,7 @@ describe('GitRevertService', () => {
     it('T025: mode: edit-message — step-1 CONFLICT → REVERT_CONFLICT_NO_RECOVERY, commit step NEVER called', async () => {
       const executeSpy = vi.spyOn(service['executor'], 'execute')
         .mockResolvedValueOnce({ success: false, error: new GitError('not found', 'COMMAND_FAILED') })
+        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } }) // pre-check: index clean
         .mockResolvedValueOnce({
           success: false,
           error: new GitError('CONFLICT', 'COMMAND_FAILED', 'git revert --no-commit abc1234', 'CONFLICT (content): Merge conflict in file.txt'),
@@ -297,16 +320,18 @@ describe('GitRevertService', () => {
       if (!result.success) {
         expect(result.error.code).toBe('REVERT_CONFLICT_NO_RECOVERY');
       }
-      // 2 invocations: REVERT_HEAD check, step 1. No diff, no commit.
-      expect(executeSpy).toHaveBeenCalledTimes(2);
+      // 3 invocations: REVERT_HEAD check, index pre-check, step 1. No post-step diff, no commit.
+      expect(executeSpy).toHaveBeenCalledTimes(3);
       const calledArgs = executeSpy.mock.calls.map((c) => c[0].args);
       expect(calledArgs.some((a) => a[0] === 'commit')).toBe(false);
-      expect(calledArgs.some((a) => a[0] === 'diff')).toBe(false);
+      // Only the up-front index pre-check — the post-step-1 "anything staged?" diff never runs.
+      expect(calledArgs.filter((a) => a[0] === 'diff')).toHaveLength(1);
     });
 
-    it('T026: mode: edit-message — step-2 hook failure → COMMAND_FAILED, NO cleanup, executor called exactly 4 times', async () => {
+    it('T026: mode: edit-message — step-2 hook failure → COMMAND_FAILED, NO cleanup, executor called exactly 5 times', async () => {
       const executeSpy = vi.spyOn(service['executor'], 'execute')
         .mockResolvedValueOnce({ success: false, error: new GitError('not found', 'COMMAND_FAILED') })
+        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })  // pre-check: index clean
         .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })  // step 1 OK
         .mockResolvedValueOnce({ success: false, error: new GitError('staged', 'COMMAND_FAILED') }) // diff --cached --quiet non-zero
         .mockResolvedValueOnce({
@@ -321,8 +346,8 @@ describe('GitRevertService', () => {
         expect(result.error.code).toBe('COMMAND_FAILED');
         expect((result.error.stderr ?? '') + result.error.message).toContain('pre-commit hook failed');
       }
-      // 4 calls total: REVERT_HEAD, revert, diff, commit. No follow-up reset/stash.
-      expect(executeSpy).toHaveBeenCalledTimes(4);
+      // 5 calls total: REVERT_HEAD, index pre-check, revert, diff, commit. No follow-up reset/stash.
+      expect(executeSpy).toHaveBeenCalledTimes(5);
       const calledArgs = executeSpy.mock.calls.map((c) => c[0].args);
       expect(calledArgs.some((a) => a[0] === 'reset')).toBe(false);
       expect(calledArgs.some((a) => a[0] === 'stash')).toBe(false);

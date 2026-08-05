@@ -13,12 +13,12 @@ vi.mock('vscode', () => ({
  * untracked files; deciding that here once blocked rebases over nothing but untracked
  * directories. The operations must reach git, and git's refusal must reach the user.
  */
-function makeContext(gitRebaseService: Record<string, unknown>) {
+function makeContext(gitRebaseService: Record<string, unknown>, operationInProgress: GitError | null = null) {
   const postMessage = vi.fn();
   const context = {
     services: { current: () => ({ gitRebaseService }) },
     postMessage,
-    operationGuard: { getOperationInProgressError: vi.fn().mockResolvedValue(null) },
+    operationGuard: { getOperationInProgressError: vi.fn().mockResolvedValue(operationInProgress) },
     refreshCoordinator: { reload: vi.fn().mockResolvedValue(undefined) },
     runtime: { currentRepoPath: '/repo' },
     log: {},
@@ -88,5 +88,41 @@ describe('historyHandlers — no working-tree preconditions of our own', () => {
 
     expect(gitRebaseService.isDirtyWorkingTree).not.toHaveBeenCalled();
     expect(gitRebaseService.interactiveRebase).toHaveBeenCalled();
+  });
+});
+
+describe('historyHandlers — git preconditions we do keep', () => {
+  // Starting a rebase while another sequencer operation runs is refused by git too.
+  // Letting it through makes git fail with "there is already a rebase-merge directory",
+  // which the service reads as a conflict (that directory exists), and an interactive
+  // rebase would overwrite the paused rebase's temp scripts on the way past.
+  const inProgress = new GitError('Another git operation is already in progress (rebase).', 'OPERATION_IN_PROGRESS');
+
+  it('refuses to start a rebase while another operation is in progress', async () => {
+    const gitRebaseService = { rebase: vi.fn() };
+    const { context, postMessage } = makeContext(gitRebaseService, inProgress);
+
+    await historyHandlers.rebase(
+      { type: 'rebase', payload: { targetRef: 'main', ignoreDate: false } },
+      context,
+    );
+
+    expect(gitRebaseService.rebase).not.toHaveBeenCalled();
+    expect(postMessage).toHaveBeenCalledWith({ type: 'error', payload: { error: inProgress } });
+    // Never claim idle here — the paused operation's UI must stay up.
+    expect(postMessage.mock.calls.some(([m]) => m.type === 'rebaseState')).toBe(false);
+  });
+
+  it('refuses to start an interactive rebase while another operation is in progress', async () => {
+    const gitRebaseService = { interactiveRebase: vi.fn() };
+    const { context, postMessage } = makeContext(gitRebaseService, inProgress);
+
+    await historyHandlers.interactiveRebase(
+      { type: 'interactiveRebase', payload: { config: { baseHash: 'abc1234', entries: [], squashMessages: [] } } },
+      context,
+    );
+
+    expect(gitRebaseService.interactiveRebase).not.toHaveBeenCalled();
+    expect(postMessage).toHaveBeenCalledWith({ type: 'error', payload: { error: inProgress } });
   });
 });

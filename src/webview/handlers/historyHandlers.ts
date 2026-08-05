@@ -114,11 +114,13 @@ export const historyHandlers = {
   },
 
   rebase: async (message, context) => {
+    if (await postOperationInProgress(context)) return;
     const rebaseResult = await context.services.current().gitRebaseService.rebase(message.payload.targetRef, message.payload.ignoreDate);
     await postRebaseResult(context, rebaseResult);
   },
 
   interactiveRebase: async (message, context) => {
+    if (await postOperationInProgress(context)) return;
     const result = await context.services.current().gitRebaseService.interactiveRebase(message.payload.config);
     await postRebaseResult(context, result);
   },
@@ -225,6 +227,30 @@ export const historyHandlers = {
   | 'isCommitPushed'
   | 'dropCommit'
 >;
+
+/**
+ * Refuse to *start* a rebase while another sequencer operation is already running,
+ * the same way `revert` and `dropCommit` do — this is git's own rule, not one of ours.
+ *
+ * Without it, `git rebase` fails with "there is already a rebase-merge directory",
+ * which `GitRebaseService.isRebaseConflict` reads as a conflict because that directory
+ * exists — so the user is told to resolve conflicts and continue, and an interactive
+ * rebase additionally overwrites the paused rebase's temp script directory, breaking
+ * its reword/squash messages on Continue.
+ *
+ * Returns true when the operation was refused and the caller must stop.
+ */
+async function postOperationInProgress(
+  context: Parameters<typeof historyHandlers.rebase>[1],
+): Promise<boolean> {
+  const operationError = await context.operationGuard.getOperationInProgressError();
+  if (!operationError) return false;
+  // Error only — no `rebaseState: idle`. The guard fires precisely when an operation
+  // is still running, so declaring the rebase idle here would tear down the
+  // conflict-resolution UI the user still needs. `dropCommit` does the same.
+  context.postMessage({ type: 'error', payload: { error: operationError } });
+  return true;
+}
 
 async function postRebaseResult(
   context: Parameters<typeof historyHandlers.rebase>[1],
