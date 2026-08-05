@@ -1,6 +1,6 @@
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
-import { parseCommitLine, parseBranchLine } from '../utils/gitParsers.js';
+import { parseCommitLine, parseBranchLine, parseStashBaseHash } from '../utils/gitParsers.js';
 import { type Result, ok } from '../../shared/errors.js';
 import type { Author, Commit, Branch, GraphFilters } from '../../shared/types.js';
 
@@ -20,6 +20,12 @@ const COMMIT_POSITION_SEARCH_CAP = 100_000;
 
 export class GitLogService {
   private executor: GitExecutor;
+  /**
+   * Stash base commits for the load in progress, or null when they must be
+   * re-resolved. Every page of one load has to walk the same revisions — a set
+   * that changed between pages would shift the `--skip` offsets under the user.
+   */
+  private stashBaseHashes: string[] | null = null;
 
   constructor(
     private readonly workspacePath: string,
@@ -53,16 +59,57 @@ export class GitLogService {
   }
 
   /**
+   * The commits each stash was taken on top of (`git stash list` first parents),
+   * resolved at most once per graph load — see `getCommits`.
+   *
+   * A stash's base commit can be reachable through `refs/stash` and nothing else:
+   * once the branch it was taken from moves away (rebase, reset, amend) and no
+   * remaining branch, tag or remote-tracking ref reaches that commit, it falls out
+   * of `defaultRevisionArgs`'s walk. The stash row is then unplaceable in the graph
+   * — it is drawn against its parent commit — so the stash silently disappears
+   * along with the original branch path it belonged to. Listing the bases as
+   * explicit revisions keeps that path visible for as long as the stash exists.
+   *
+   * Only the first parent is a real history commit; a stash's other two parents are
+   * its internal index and untracked-file snapshots, which are not part of history.
+   *
+   * A failure here degrades to "no extra revisions" rather than propagating: an
+   * unreadable stash reflog must never take the whole graph down with it. Stale
+   * hashes are equally harmless, because the default walk carries `--ignore-missing`.
+   */
+  private async getStashBaseHashes(): Promise<string[]> {
+    if (this.stashBaseHashes) return this.stashBaseHashes;
+
+    const result = await this.executor.execute({
+      args: ['stash', 'list', '--format=%P'],
+      cwd: this.workspacePath,
+    });
+    if (!result.success) return [];
+
+    const bases = new Set<string>();
+    for (const line of result.value.stdout.trim().split('\n')) {
+      const base = parseStashBaseHash(line);
+      if (base) bases.add(base);
+    }
+    this.stashBaseHashes = [...bases];
+    return this.stashBaseHashes;
+  }
+
+  /**
    * Build the shared `git log` argument list used by every query that must
    * walk the exact same commit stream as the paginated graph (`getCommits`,
    * `getCommitPosition`). Keeping the ordering/filter arguments in one place
    * guarantees positions computed by one query match the other's pagination.
+   *
+   * The stash base revisions are resolved *here* rather than passed in, so a
+   * caller cannot accidentally walk a narrower stream than the graph does —
+   * that mismatch would make "Go to HEAD" scroll to the wrong row.
    */
-  private buildLogArgs(
+  private async buildLogArgs(
     format: string,
     filters?: Partial<GraphFilters>,
     options: { decorate: boolean } = { decorate: true }
-  ): string[] {
+  ): Promise<string[]> {
     const maxCount = filters?.maxCount ?? 500;
     const args = ['log', ...this.ignoreMissingHeadArgs(filters?.branches)];
 
@@ -90,10 +137,12 @@ export class GitLogService {
     }
 
     // Add branch filter(s) or default ref namespaces after options so refs are parsed as revisions.
+    // An explicit branch filter is the user narrowing the graph to chosen refs, so it is not
+    // widened with stash bases — commits reachable only from a stash are outside what they asked for.
     if (filters?.branches && filters.branches.length > 0) {
       args.push(...filters.branches);
     } else {
-      args.push(...this.defaultRevisionArgs());
+      args.push(...this.defaultRevisionArgs(), ...(await this.getStashBaseHashes()));
     }
 
     // Separate revisions from paths to avoid ambiguous argument errors
@@ -103,7 +152,11 @@ export class GitLogService {
 
   async getCommits(filters?: Partial<GraphFilters>): Promise<Result<CommitsResult>> {
     this.log.info('Fetching commits');
-    const args = this.buildLogArgs(LOG_FORMAT, filters);
+    // A load starting from the top re-resolves the stash bases; the `--skip` pages
+    // that follow it — and any position/author query alongside them — reuse that set,
+    // so one `git stash list` runs per load instead of one per page.
+    if (!filters?.skip) this.stashBaseHashes = null;
+    const args = await this.buildLogArgs(LOG_FORMAT, filters);
 
     const result = await this.executor.execute({
       args,
@@ -157,7 +210,7 @@ export class GitLogService {
   async getCommitPosition(hash: string, filters?: Partial<GraphFilters>): Promise<Result<number>> {
     this.log.info('Locating commit position in log stream');
     // No decoration: the %H format emits no ref names for it to appear in.
-    const args = this.buildLogArgs(
+    const args = await this.buildLogArgs(
       '%H',
       { ...filters, maxCount: COMMIT_POSITION_SEARCH_CAP, skip: 0 },
       { decorate: false }
@@ -177,11 +230,14 @@ export class GitLogService {
 
   async getAuthors(): Promise<Result<Author[]>> {
     this.log.info('Fetching authors');
+    // Same revision set as the graph, stash bases included — otherwise a commit
+    // visible only because a stash holds it has an author the filter never offers.
     const result = await this.executor.execute({
       args: [
         'log',
         ...this.ignoreMissingHeadArgs(),
         ...this.defaultRevisionArgs(),
+        ...(await this.getStashBaseHashes()),
         '--format=%an%x00%ae',
       ],
       cwd: this.workspacePath,

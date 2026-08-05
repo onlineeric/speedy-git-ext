@@ -1,6 +1,7 @@
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { type Result, ok, err, GitError } from '../../shared/errors.js';
+import { parseStashBaseHash } from '../utils/gitParsers.js';
 import type { StashEntry } from '../../shared/types.js';
 
 export class GitStashService {
@@ -36,7 +37,7 @@ export class GitStashService {
       stashes.push({
         index: parseInt(indexMatch[1], 10),
         hash,
-        parentHash: parentHash.split(' ')[0], // First parent only
+        parentHash: parseStashBaseHash(parentHash),
         message,
         date: new Date(dateStr).getTime(),
         author,

@@ -6,6 +6,18 @@ export function isConflictStderr(stderr: string): boolean {
   return stderr.includes('CONFLICT') || stderr.toLowerCase().includes('merge conflict');
 }
 
+/**
+ * The commit a stash was taken on top of, from a `%P` (parent hashes) field.
+ *
+ * A stash commit has two or three parents: the base commit, the index snapshot
+ * and — with `-u` — the untracked snapshot. Only the first is real history; the
+ * other two are stash internals that must never reach the graph. Both readers of
+ * `git stash list` need this rule, so it lives here rather than twice inline.
+ */
+export function parseStashBaseHash(parentField: string): string {
+  return parentField.trim().split(' ')[0];
+}
+
 export function parseCommitLine(line: string): Commit | null {
   const parts = line.split(NULL_CHAR);
   if (parts.length < 7) {

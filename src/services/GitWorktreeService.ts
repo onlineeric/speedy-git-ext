@@ -400,13 +400,16 @@ export class GitWorktreeService {
     if (!pathCheck.success) return pathCheck;
 
     // Without force, refuse a dirty worktree up-front with a readable message
-    // rather than letting git surface raw stderr (research R9, SC-005).
+    // rather than letting git surface raw stderr (research R9, SC-005). This check
+    // mirrors git's own rule for `worktree remove` — it refuses on "modified or
+    // untracked files" and needs --force for either — so it does not block anything
+    // git would have done.
     if (!opts?.force) {
       const dirty = await isDirtyWorkingTree(this.executor, pathCheck.value);
       if (dirty.success && dirty.value) {
         return err(
           new GitError(
-            'This worktree has uncommitted changes. Enable "force" to remove it and discard those changes.',
+            'This worktree has uncommitted changes or untracked files. Enable "force" to remove it and discard them.',
             'COMMAND_FAILED'
           )
         );

@@ -1,7 +1,10 @@
 import type { RebaseAction } from '../../../shared/types.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 
-const dirtyRebaseMessage = 'Working tree has uncommitted changes. Commit, stash, or discard them before rebasing.';
+// None of the handlers below pre-check the working tree. Git enforces its own
+// preconditions and its error names what is in the way, so a check here could only be
+// wrong in one direction — refusing work git would have done. Full rationale lives with
+// `isDirtyWorkingTree` in src/utils/gitQueries.ts.
 
 export const historyHandlers = {
   resetBranch: async (message, context) => {
@@ -111,19 +114,20 @@ export const historyHandlers = {
   },
 
   rebase: async (message, context) => {
-    if (!(await ensureCleanForRebase(context))) return;
+    if (await postOperationInProgress(context)) return;
     const rebaseResult = await context.services.current().gitRebaseService.rebase(message.payload.targetRef, message.payload.ignoreDate);
     await postRebaseResult(context, rebaseResult);
   },
 
   interactiveRebase: async (message, context) => {
-    if (!(await ensureCleanForRebase(context))) return;
+    if (await postOperationInProgress(context)) return;
     const result = await context.services.current().gitRebaseService.interactiveRebase(message.payload.config);
     await postRebaseResult(context, result);
   },
 
   getRebaseCommits: async (message, context) => {
-    if (!(await ensureCleanForRebase(context, false))) return;
+    // Unguarded on purpose: a plain `git log` read that only fills the interactive
+    // rebase dialog. It starts nothing, so nothing can be in its way.
     const commitsResult = await context.services.current().gitRebaseService.getRebaseCommits(message.payload.baseHash);
     if (commitsResult.success) {
       context.postMessage({ type: 'rebaseCommits', payload: { entries: commitsResult.value } });
@@ -171,21 +175,8 @@ export const historyHandlers = {
   },
 
   dropCommit: async (message, context) => {
-    const operationError = await context.operationGuard.getOperationInProgressError();
-    if (operationError) {
-      context.postMessage({ type: 'error', payload: { error: operationError } });
-      return;
-    }
-
-    const dirtyCheck = await context.services.current().gitRebaseService.isDirtyWorkingTree();
-    if (!dirtyCheck.success) {
-      context.postMessage({ type: 'error', payload: { error: dirtyCheck.error } });
-      return;
-    }
-    if (dirtyCheck.value) {
-      context.postMessage({ type: 'error', payload: { error: { message: 'Working tree has uncommitted changes. Commit, stash, or discard them before dropping a commit.' } } });
-      return;
-    }
+    // Drops by rewriting history with an interactive rebase, so the same guard applies.
+    if (await postOperationInProgress(context)) return;
 
     const dropBaseHash = `${message.payload.hash}~1`;
     const commitsResult = await context.services.current().gitRebaseService.getRebaseCommits(dropBaseHash);
@@ -234,25 +225,27 @@ export const historyHandlers = {
   | 'dropCommit'
 >;
 
-async function ensureCleanForRebase(
+/**
+ * Refuse to *start* a rebase while another sequencer operation is already running.
+ * This is git's own rule, not one of ours.
+ *
+ * Without it, `git rebase` fails with "there is already a rebase-merge directory",
+ * which `GitRebaseService.isRebaseConflict` reads as a conflict because that directory
+ * exists — so the user is told to resolve conflicts and continue, and an interactive
+ * rebase additionally overwrites the paused rebase's temp script directory, breaking
+ * its reword/squash messages on Continue.
+ *
+ * Returns true when the operation was refused and the caller must stop.
+ */
+async function postOperationInProgress(
   context: Parameters<typeof historyHandlers.rebase>[1],
-  postIdleState = true,
 ): Promise<boolean> {
-  const dirtyCheck = await context.services.current().gitRebaseService.isDirtyWorkingTree();
-  if (!dirtyCheck.success) {
-    context.postMessage({ type: 'error', payload: { error: dirtyCheck.error } });
-    if (postIdleState) {
-      context.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
-    }
-    return false;
-  }
-  if (dirtyCheck.value) {
-    context.postMessage({ type: 'error', payload: { error: { message: dirtyRebaseMessage } } });
-    if (postIdleState) {
-      context.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
-    }
-    return false;
-  }
+  const operationError = await context.operationGuard.getOperationInProgressError();
+  if (!operationError) return false;
+  // Error only — no `rebaseState: idle`. The guard fires precisely when an operation
+  // is still running, so declaring the rebase idle here would tear down the
+  // conflict-resolution UI the user still needs.
+  context.postMessage({ type: 'error', payload: { error: operationError } });
   return true;
 }
 

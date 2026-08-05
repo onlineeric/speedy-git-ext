@@ -7,7 +7,6 @@ import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { InteractiveRebaseConfig, RebaseConflictInfo, RebaseEntry, RebaseState } from '../../shared/types.js';
 import { validateHash, validateRefName } from '../utils/gitValidation.js';
-import { isDirtyWorkingTree } from '../utils/gitQueries.js';
 import { isConflictStderr } from '../utils/gitParsers.js';
 
 /** Convert Windows backslash paths to forward slashes for Git shell compatibility */
@@ -55,10 +54,6 @@ export class GitRebaseService {
     } catch {
       return err(new GitError('No stopped-sha file found', 'COMMAND_FAILED'));
     }
-  }
-
-  isDirtyWorkingTree(): Promise<Result<boolean>> {
-    return isDirtyWorkingTree(this.executor, this.workspacePath);
   }
 
   async getRebaseCommits(baseHash: string): Promise<Result<RebaseEntry[]>> {

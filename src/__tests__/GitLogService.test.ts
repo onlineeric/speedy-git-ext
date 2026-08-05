@@ -4,6 +4,20 @@ import { GitLogService } from '../services/GitLogService.js';
 
 const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as LogOutputChannel;
 
+/** Answer `git stash list` with `stashOutput`; every other command with empty output. */
+async function stubStashList(args: readonly string[], stashOutput: string) {
+  return { success: true as const, value: { stdout: args[0] === 'stash' ? stashOutput : '', stderr: '' } };
+}
+
+/** Arguments of the `git log` call recorded by an `execute` spy. */
+function logArgsOf(spy: { mock: { calls: unknown[][] } }): string[] {
+  for (const [options] of spy.mock.calls) {
+    const args = (options as { args?: string[] }).args ?? [];
+    if (args[0] === 'log') return args;
+  }
+  return [];
+}
+
 describe('GitLogService.getCommits', () => {
   it('passes selected branches as revisions before the revision-path separator', async () => {
     const service = new GitLogService('/repo', mockLog);
@@ -52,6 +66,96 @@ describe('GitLogService.getCommits', () => {
     }));
   });
 
+  it('walks stash base commits so a stash outlives the branch it was taken from', async () => {
+    // After a rebase the old branch tip can be reachable only through refs/stash.
+    // Without it in the walk its row vanishes, and the stash drawn against it with it.
+    const service = new GitLogService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockImplementation(async ({ args }) => stubStashList(args, 'orphanedTip indexSnapshot untrackedSnapshot\n'));
+
+    await service.getCommits({ maxCount: 25 });
+
+    expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({
+      args: expect.arrayContaining(['HEAD', '--branches', '--remotes', '--tags', 'orphanedTip']),
+    }));
+    // Index and untracked snapshots are stash internals, not history.
+    expect(logArgsOf(executeSpy)).not.toContain('indexSnapshot');
+    expect(logArgsOf(executeSpy)).not.toContain('untrackedSnapshot');
+  });
+
+  it('lists each stash base once when several stashes share one base', async () => {
+    const service = new GitLogService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockImplementation(async ({ args }) =>
+        stubStashList(args, 'sharedBase idxA unA\nsharedBase idxB unB\notherBase idxC unC\n'));
+
+    await service.getCommits({ maxCount: 25 });
+
+    const revisions = logArgsOf(executeSpy);
+    expect(revisions.filter((arg) => arg === 'sharedBase')).toHaveLength(1);
+    expect(revisions).toContain('otherBase');
+  });
+
+  it('omits stash bases when a branch filter narrows the graph to chosen refs', async () => {
+    const service = new GitLogService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockImplementation(async ({ args }) => stubStashList(args, 'orphanedTip idx un\n'));
+
+    await service.getCommits({ branches: ['main'], maxCount: 25 });
+
+    expect(logArgsOf(executeSpy)).not.toContain('orphanedTip');
+    expect(executeSpy).not.toHaveBeenCalledWith(expect.objectContaining({
+      args: ['stash', 'list', '--format=%P'],
+    }));
+  });
+
+  it('resolves the stash bases once per load, not once per page', async () => {
+    // `git stash list` sits ahead of the log it widens, so spawning it per page would
+    // add a process to every scroll prefetch — and pages walking different revision
+    // sets would shift the `--skip` offsets under the user mid-scroll.
+    const service = new GitLogService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockImplementation(async ({ args }) => stubStashList(args, 'orphanedTip idx un\n'));
+
+    await service.getCommits({ maxCount: 25 });
+    await service.getCommits({ maxCount: 25, skip: 25 });
+    await service.getCommitPosition('orphanedTip');
+    await service.getAuthors();
+
+    const stashCalls = executeSpy.mock.calls.filter(([options]) => options.args[0] === 'stash');
+    expect(stashCalls).toHaveLength(1);
+    // Every one of those walks still carries the base — the cache widens them all.
+    const logCalls = executeSpy.mock.calls.filter(([options]) => options.args[0] === 'log');
+    expect(logCalls).toHaveLength(4);
+    for (const [options] of logCalls) {
+      expect(options.args).toContain('orphanedTip');
+    }
+  });
+
+  it('re-resolves the stash bases on the next load from the top', async () => {
+    // A stash created or dropped between refreshes has to reach the next graph.
+    const service = new GitLogService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockImplementation(async ({ args }) => stubStashList(args, 'orphanedTip idx un\n'));
+
+    await service.getCommits({ maxCount: 25 });
+    await service.getCommits({ maxCount: 25 });
+
+    expect(executeSpy.mock.calls.filter(([options]) => options.args[0] === 'stash')).toHaveLength(2);
+  });
+
+  it('still returns commits when the stash listing fails', async () => {
+    const service = new GitLogService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute').mockImplementation(async ({ args }) =>
+      args[0] === 'stash'
+        ? { success: false as const, error: { message: 'no stash reflog', code: 'UNKNOWN' } as never }
+        : { success: true as const, value: { stdout: '', stderr: '' } });
+
+    const result = await service.getCommits({ maxCount: 25 });
+
+    expect(result.success).toBe(true);
+  });
+
   it('fetches authors from user-facing ref namespaces', async () => {
     const service = new GitLogService('/repo', mockLog);
     const executeSpy = vi.spyOn(service['executor'], 'execute')
@@ -63,6 +167,18 @@ describe('GitLogService.getCommits', () => {
     expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({
       args: ['log', '--ignore-missing', 'HEAD', '--branches', '--remotes', '--tags', '--format=%an%x00%ae'],
     }));
+  });
+
+  it('walks stash bases too, so every author the graph shows is offered as a filter', async () => {
+    const service = new GitLogService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockImplementation(async ({ args }) => stubStashList(args, 'orphanedTip idx un\n'));
+
+    await service.getAuthors();
+
+    expect(logArgsOf(executeSpy)).toEqual([
+      'log', '--ignore-missing', 'HEAD', '--branches', '--remotes', '--tags', 'orphanedTip', '--format=%an%x00%ae',
+    ]);
   });
 });
 
@@ -94,8 +210,10 @@ describe('GitLogService.getHeadCommitHash', () => {
 describe('GitLogService.getCommitPosition', () => {
   it('walks the same ordered stream as getCommits (hash-only format, capped depth)', async () => {
     const service = new GitLogService('/repo', mockLog);
+    // Command-specific: an empty `stash list` keeps this case about the base walk alone.
     const executeSpy = vi.spyOn(service['executor'], 'execute')
-      .mockResolvedValue({ success: true, value: { stdout: 'aaa\nbbb\nccc\n', stderr: '' } });
+      .mockImplementation(async ({ args }) =>
+        ({ success: true as const, value: { stdout: args[0] === 'stash' ? '' : 'aaa\nbbb\nccc\n', stderr: '' } }));
 
     const result = await service.getCommitPosition('ccc');
 
@@ -135,6 +253,28 @@ describe('GitLogService.getCommitPosition', () => {
         '--',
       ],
     }));
+  });
+
+  it('includes stash bases too, so positions match the paginated log exactly', async () => {
+    const service = new GitLogService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockImplementation(async ({ args }) => stubStashList(args, 'orphanedTip idx un\n'));
+
+    await service.getCommitPosition('orphanedTip');
+
+    expect(logArgsOf(executeSpy)).toEqual([
+      'log',
+      '--ignore-missing',
+      '--max-count=100000',
+      '--format=%H',
+      '--date-order',
+      'HEAD',
+      '--branches',
+      '--remotes',
+      '--tags',
+      'orphanedTip',
+      '--',
+    ]);
   });
 
   it('returns -1 when the commit is not in the stream', async () => {

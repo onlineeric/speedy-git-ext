@@ -32,22 +32,10 @@ function makeEditorCommandService(options: {
   const headHash = options.headHash ?? 'abc123456789';
   const services = new GitServiceRegistry({
     gitLogService: {
-      getCommits: vi.fn().mockResolvedValue({
-        success: true,
-        value: {
-          commits: [{
-            hash: headHash,
-            abbreviatedHash: headHash.slice(0, 7),
-            parents: [],
-            author: 'Test',
-            authorEmail: 'test@example.com',
-            authorDate: 0,
-            subject: 'HEAD',
-            refs: [],
-          }],
-          totalLoadedWithoutFilter: 1,
-        },
-      }),
+      // HEAD comes from `rev-parse HEAD`, never from the first row of the graph walk:
+      // that walk is date-ordered across every ref (and stash bases), so its newest
+      // commit is only HEAD by coincidence.
+      getHeadCommitHash: vi.fn().mockResolvedValue({ success: true, value: headHash }),
     },
     gitWorktreeService: {
       listWorktrees: vi.fn().mockResolvedValue({

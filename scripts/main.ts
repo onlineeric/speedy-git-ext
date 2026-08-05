@@ -437,7 +437,9 @@ async function main(): Promise<void> {
     config.lastCommitTs = Math.floor(Date.now() / 1000);
   }
 
-  const testRepoDir = resolve(__dirname, '../test-repo');
+  // Test repos live outside the source tree, as siblings of the project folder,
+  // so they stay separate from the source. __dirname is scripts/, so '../..' is ~/repos.
+  const testRepoDir = resolve(__dirname, '../../test-repo');
 
   console.log('Generating deterministic test repo...');
   console.log(`Target: ${testRepoDir}`);

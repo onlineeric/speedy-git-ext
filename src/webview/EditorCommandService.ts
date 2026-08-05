@@ -14,11 +14,17 @@ export class EditorCommandService {
     private readonly services: GitServiceRegistry,
   ) {}
 
+  /**
+   * The commit HEAD points at — the left-hand side of every uncommitted/staged diff.
+   *
+   * Must be `rev-parse HEAD`, not "newest commit in the graph walk": the walk is
+   * ordered by commit date across every ref (and now across stash base commits too),
+   * so its first row is only HEAD by coincidence. Empty string on an unborn branch,
+   * which callers already treat as "cannot resolve HEAD".
+   */
   async getHeadHash(): Promise<string> {
-    const result = await this.services.current().gitLogService.getCommits({ maxCount: 1 });
-    return result.success && result.value.commits.length > 0
-      ? result.value.commits[0].hash
-      : '';
+    const result = await this.services.current().gitLogService.getHeadCommitHash();
+    return result.success ? result.value : '';
   }
 
   async openDiffEditor(hash: string, filePath: string, parentHash?: string, status?: FileChangeStatus): Promise<void> {

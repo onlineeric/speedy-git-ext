@@ -4,7 +4,25 @@ import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { RevertState, RevertOptions } from '../../shared/types.js';
 import { validateHash } from '../utils/gitValidation.js';
 import { isConflictStderr } from '../utils/gitParsers.js';
-import { isDirtyWorkingTree } from '../utils/gitQueries.js';
+
+/** Git reverted nothing because the branch already contains the inverse of the commit. */
+const ALREADY_REVERTED_MESSAGE =
+  'This commit introduces no changes relative to the current branch. The revert is already present.';
+
+/**
+ * Shown by both modes built on `git revert --no-commit`, which pair it with the
+ * `REVERT_CONFLICT_NO_RECOVERY` code so the webview raises a toast without entering
+ * the revert-in-progress UI state.
+ *
+ * KNOWN GAP (verified on git 2.43): `git revert --no-commit` *does* write
+ * `.git/REVERT_HEAD`, on success and on conflict alike, and `git revert --continue`
+ * works once the conflict is resolved — so this message's "no Continue/Abort step" is
+ * not strictly true, and `getRevertState()` reports in-progress on the next refresh
+ * even after these modes succeed. Correcting it means changing what `revertState`
+ * means for the whole UI, so it is left as-is.
+ */
+const NO_COMMIT_CONFLICT_MESSAGE =
+  'Revert paused due to conflict. Resolve conflicts in the Source Control panel, then commit the result manually (this mode does not enter git\'s revert state machine, so there is no Continue/Abort step).';
 
 export class GitRevertService {
   private executor: GitExecutor;
@@ -16,10 +34,6 @@ export class GitRevertService {
     this.executor = new GitExecutor(log);
   }
 
-  isDirtyWorkingTree(): Promise<Result<boolean>> {
-    return isDirtyWorkingTree(this.executor, this.workspacePath);
-  }
-
   async getRevertState(): Promise<Result<RevertState>> {
     const result = await this.executor.execute({
       args: ['rev-parse', '--verify', 'REVERT_HEAD'],
@@ -27,6 +41,19 @@ export class GitRevertService {
     });
     const state: RevertState = result.success ? 'in-progress' : 'idle';
     return ok(state);
+  }
+
+  /**
+   * True when the index differs from HEAD. `git diff --cached --quiet` exits 0 when
+   * the index is clean, so any non-zero exit — including a failure to run the probe
+   * at all — reads as dirty, which is the safe direction for every caller here.
+   */
+  private async isIndexDirty(): Promise<boolean> {
+    const result = await this.executor.execute({
+      args: ['diff', '--cached', '--quiet'],
+      cwd: this.workspacePath,
+    });
+    return !result.success;
   }
 
   private async isRevertInProgress(): Promise<boolean> {
@@ -52,15 +79,11 @@ export class GitRevertService {
       }
     }
 
-    const dirtyCheck = await this.isDirtyWorkingTree();
-    if (!dirtyCheck.success) return dirtyCheck;
-    if (dirtyCheck.value) {
-      return err(new GitError(
-        'Working tree has uncommitted changes. Commit, stash, or discard them before reverting.',
-        'COMMAND_FAILED'
-      ));
-    }
-
+    // No working-tree pre-check: `git revert` accepts untracked files and tracked edits
+    // the patch does not touch. It refuses — naming the files — when it would overwrite a
+    // locally modified one, and (for its commit-producing form) when the index differs
+    // from HEAD. Either way it leaves no REVERT_HEAD behind, so the refusal below cannot
+    // be mistaken for a paused revert.
     if (await this.isRevertInProgress()) {
       return err(new GitError(
         'A revert is already in progress. Continue or abort it before starting another revert.',
@@ -84,6 +107,19 @@ export class GitRevertService {
     message: string,
     mainlineParent?: number
   ): Promise<Result<string>> {
+    // This mode produces a commit, so it must hold to the rule git holds every
+    // commit-producing revert to: the index must match HEAD. Git enforces that
+    // itself for `git revert <hash>` ("your local changes would be overwritten by
+    // revert"), but not for the `--no-commit` step this mode builds on — and step 2
+    // commits the whole index, so anything the user had staged would be swept into
+    // the revert commit.
+    if (await this.isIndexDirty()) {
+      return err(new GitError(
+        'You have staged changes. Reverting with a custom message commits the whole index, so those changes would be swept into the revert commit. Commit or unstage them first.',
+        'COMMAND_FAILED'
+      ));
+    }
+
     // Step 1: stage the inverse changes without committing.
     const step1Args = ['revert'];
     if (mainlineParent !== undefined) {
@@ -96,32 +132,19 @@ export class GitRevertService {
     if (!step1.success) {
       const errorDetail = step1.error.stderr || step1.error.message || '';
       if (errorDetail.includes('nothing to commit') || errorDetail.includes('nothing to revert')) {
-        return err(new GitError(
-          'This commit introduces no changes relative to the current branch. The revert is already present.',
-          'COMMAND_FAILED'
-        ));
+        return err(new GitError(ALREADY_REVERTED_MESSAGE, 'COMMAND_FAILED'));
       }
       if (isConflictStderr(errorDetail)) {
-        return err(new GitError(
-          'Revert paused due to conflict. Resolve conflicts in the Source Control panel, then commit the result manually (this mode does not enter git\'s revert state machine, so there is no Continue/Abort step).',
-          'REVERT_CONFLICT_NO_RECOVERY'
-        ));
+        return err(new GitError(NO_COMMIT_CONFLICT_MESSAGE, 'REVERT_CONFLICT_NO_RECOVERY'));
       }
       return step1;
     }
 
-    // Between steps: detect "no net change" before creating an empty commit.
-    // `git diff --cached --quiet` exits 0 when nothing is staged.
-    const diffCheck = await this.executor.execute({
-      args: ['diff', '--cached', '--quiet'],
-      cwd: this.workspacePath,
-    });
-    if (diffCheck.success) {
-      // exit 0 → nothing staged → abort before step 2
-      return err(new GitError(
-        'This commit introduces no changes relative to the current branch. The revert is already present.',
-        'COMMAND_FAILED'
-      ));
+    // Between steps: the index was clean before step 1, so anything staged now is the
+    // inverse patch. Nothing staged means there was no net change to revert — stop
+    // before creating an empty commit.
+    if (!(await this.isIndexDirty())) {
+      return err(new GitError(ALREADY_REVERTED_MESSAGE, 'COMMAND_FAILED'));
     }
 
     // Step 2: commit with the user's message. Git's default cleanup would
@@ -152,19 +175,10 @@ export class GitRevertService {
     if (!result.success) {
       const errorDetail = result.error.stderr || result.error.message || '';
       if (errorDetail.includes('nothing to commit') || errorDetail.includes('nothing to revert')) {
-        return err(new GitError(
-          'This commit introduces no changes relative to the current branch. The revert is already present.',
-          'COMMAND_FAILED'
-        ));
+        return err(new GitError(ALREADY_REVERTED_MESSAGE, 'COMMAND_FAILED'));
       }
-      // git revert --no-commit does NOT set REVERT_HEAD, so we cannot use the
-      // Continue/Abort recovery path. Surface a distinct code so the webview
-      // routes the toast without entering the revert-in-progress UI state.
       if (isConflictStderr(errorDetail)) {
-        return err(new GitError(
-          'Revert paused due to conflict. Resolve conflicts in the Source Control panel, then commit the result manually (this mode does not enter git\'s revert state machine, so there is no Continue/Abort step).',
-          'REVERT_CONFLICT_NO_RECOVERY'
-        ));
+        return err(new GitError(NO_COMMIT_CONFLICT_MESSAGE, 'REVERT_CONFLICT_NO_RECOVERY'));
       }
       return result;
     }
@@ -184,10 +198,7 @@ export class GitRevertService {
     if (!result.success) {
       const errorDetail = result.error.stderr || result.error.message || '';
       if (errorDetail.includes('nothing to commit') || errorDetail.includes('nothing to revert')) {
-        return err(new GitError(
-          'This commit introduces no changes relative to the current branch. The revert is already present.',
-          'COMMAND_FAILED'
-        ));
+        return err(new GitError(ALREADY_REVERTED_MESSAGE, 'COMMAND_FAILED'));
       }
       if (await this.isRevertInProgress() || isConflictStderr(errorDetail)) {
         return err(new GitError(

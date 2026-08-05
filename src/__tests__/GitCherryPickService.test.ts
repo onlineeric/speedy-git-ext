@@ -23,26 +23,6 @@ describe('GitCherryPickService', () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
   });
 
-  describe('isDirtyWorkingTree', () => {
-    it('returns false when working tree is clean', async () => {
-      vi.spyOn(service['executor'], 'execute')
-        .mockResolvedValue({ success: true, value: { stdout: '', stderr: '' } });
-
-      const result = await service.isDirtyWorkingTree();
-      expect(result.success).toBe(true);
-      if (result.success) expect(result.value).toBe(false);
-    });
-
-    it('returns true when working tree is dirty', async () => {
-      vi.spyOn(service['executor'], 'execute')
-        .mockResolvedValue({ success: true, value: { stdout: ' M file.txt\n', stderr: '' } });
-
-      const result = await service.isDirtyWorkingTree();
-      expect(result.success).toBe(true);
-      if (result.success) expect(result.value).toBe(true);
-    });
-  });
-
   describe('getCherryPickState', () => {
     it('returns idle when CHERRY_PICK_HEAD does not exist', () => {
       vi.mocked(fs.existsSync).mockReturnValue(false);
@@ -66,20 +46,40 @@ describe('GitCherryPickService', () => {
       if (!result.success) expect(result.error.code).toBe('VALIDATION_ERROR');
     });
 
-    it('returns error when working tree is dirty', async () => {
-      vi.spyOn(service['executor'], 'execute')
-        .mockResolvedValueOnce({ success: true, value: { stdout: ' M file.txt\n', stderr: '' } });
+    it('runs cherry-pick without pre-checking the working tree', async () => {
+      // git accepts untracked files and tracked edits the patch does not touch, so
+      // deciding here could only refuse work git would have done.
+      const executeSpy = vi.spyOn(service['executor'], 'execute')
+        .mockResolvedValue({ success: true, value: { stdout: '', stderr: '' } });
 
       const result = await service.cherryPick(['abc1234'], defaultOptions);
+
+      expect(result.success).toBe(true);
+      expect(executeSpy).toHaveBeenCalledTimes(1);
+      expect(executeSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ args: ['cherry-pick', 'abc1234'] })
+      );
+    });
+
+    it("surfaces git's own refusal verbatim, naming the files in the way", async () => {
+      const gitRefusal = 'error: Your local changes to the following files would be overwritten by merge:\n\ta.txt';
+      vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+        success: false,
+        error: new GitError(gitRefusal, 'COMMAND_FAILED', 'git cherry-pick abc1234', gitRefusal),
+      });
+
+      const result = await service.cherryPick(['abc1234'], defaultOptions);
+
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.message).toContain('uncommitted changes');
+        expect(result.error.message).toContain('a.txt');
+        // Git bails before starting the sequencer, so this is not a paused cherry-pick.
+        expect(result.error.code).not.toBe('CHERRY_PICK_CONFLICT');
       }
     });
 
     it('executes cherry-pick with correct args for basic case', async () => {
       const executeSpy = vi.spyOn(service['executor'], 'execute')
-        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } }) // isDirtyWorkingTree
         .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } }); // cherry-pick
 
       const result = await service.cherryPick(['abc1234'], defaultOptions);
@@ -91,7 +91,6 @@ describe('GitCherryPickService', () => {
 
     it('adds -x flag when appendSourceRef is true and noCommit is false', async () => {
       const executeSpy = vi.spyOn(service['executor'], 'execute')
-        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
         .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } });
 
       await service.cherryPick(['abc1234'], { appendSourceRef: true, noCommit: false });
@@ -113,7 +112,6 @@ describe('GitCherryPickService', () => {
 
     it('passes -m flag before hash when mainlineParent is set', async () => {
       const executeSpy = vi.spyOn(service['executor'], 'execute')
-        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
         .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } });
 
       await service.cherryPick(['abc1234'], { appendSourceRef: false, noCommit: false, mainlineParent: 1 });
@@ -124,7 +122,6 @@ describe('GitCherryPickService', () => {
 
     it('detects conflict via CHERRY_PICK_HEAD file existence', async () => {
       vi.spyOn(service['executor'], 'execute')
-        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } }) // isDirtyWorkingTree
         .mockResolvedValueOnce({
           success: false,
           error: new GitError('Git command failed with code 1', 'COMMAND_FAILED', 'git cherry-pick abc1234', 'CONFLICT'),
@@ -138,7 +135,6 @@ describe('GitCherryPickService', () => {
 
     it('detects conflict via stderr fallback when CHERRY_PICK_HEAD is not yet visible', async () => {
       vi.spyOn(service['executor'], 'execute')
-        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } }) // isDirtyWorkingTree
         .mockResolvedValueOnce({
           success: false,
           error: new GitError('Git command failed with code 1', 'COMMAND_FAILED', 'git cherry-pick abc1234', 'CONFLICT (content): Merge conflict in file.txt'),
@@ -152,7 +148,6 @@ describe('GitCherryPickService', () => {
 
     it('detects empty cherry-pick from stderr', async () => {
       vi.spyOn(service['executor'], 'execute')
-        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
         .mockResolvedValueOnce({
           success: false,
           error: new GitError('failed', 'COMMAND_FAILED', 'git cherry-pick abc1234', 'nothing to commit'),
@@ -165,7 +160,6 @@ describe('GitCherryPickService', () => {
 
     it('returns success message with count for multiple commits', async () => {
       vi.spyOn(service['executor'], 'execute')
-        .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
         .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } });
 
       const result = await service.cherryPick(['abc1234', 'def5678'], defaultOptions);

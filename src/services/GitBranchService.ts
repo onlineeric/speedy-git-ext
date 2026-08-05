@@ -2,7 +2,6 @@ import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, err, ok } from '../../shared/errors.js';
 import { validateLocalBranchName, validateRefName } from '../utils/gitValidation.js';
-import { isDirtyWorkingTree } from '../utils/gitQueries.js';
 import { mapWorktreeConflictError } from '../utils/worktreeErrors.js';
 
 function isBranchNotFullyMerged(stderr: string | undefined): boolean {
@@ -228,11 +227,6 @@ export class GitBranchService {
     });
     if (!result.success) return result;
     return ok(`Deleted remote branch '${remote}/${name}'`);
-  }
-
-  isDirtyWorkingTree(): Promise<Result<boolean>> {
-    this.log.info('Check dirty working tree');
-    return isDirtyWorkingTree(this.executor, this.workspacePath);
   }
 
   async merge(branch: string, noFastForward?: boolean, squash?: boolean, noCommit?: boolean): Promise<Result<string>> {

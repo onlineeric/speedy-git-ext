@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-07-28**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-08-05**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -50,7 +50,8 @@ src/
 ├── services/                     # All repo-bound; every method returns Result<T, GitError>
 │   ├── index.ts                  # Barrel export for all services
 │   ├── GitExecutor.ts            # Spawns git processes, 30s timeout — the only place git is invoked
-│   ├── GitLogService.ts          # Parses git log (null-byte format), branches. Default 500 commits
+│   ├── GitLogService.ts          # Parses git log (null-byte format), branches. Default 500 commits.
+│   │                             #   Also walks stash base commits, so a stash survives its branch moving
 │   ├── GitDiffService.ts         # Commit details, file changes, file content at revision
 │   ├── GitBranchService.ts       # Checkout, create, rename, delete, fast-forward branches
 │   ├── GitRemoteService.ts       # Fetch, pull, remote management
@@ -70,8 +71,9 @@ src/
 │   ├── GitConfigService.ts       # Git config reading
 │   └── TelemetryService.ts       # Consent-aware backend telemetry funnel; real + no-op implementations
 └── utils/
-    ├── gitParsers.ts             # Parse git log lines, refs (%D), branch list
-    ├── gitQueries.ts             # Shared read-only git queries (e.g., isDirtyWorkingTree)
+    ├── gitParsers.ts             # Parse git log lines, refs (%D), branch list, stash base (%P)
+    ├── gitQueries.ts             # Shared read-only git queries. isDirtyWorkingTree counts untracked
+    │                             #   files — for `worktree remove` only; never gate rebase/pick/revert on it
     ├── gitValidation.ts          # Input validation (backend wrappers over shared/gitRefValidation)
     └── worktreeErrors.ts         # Map raw git worktree failures → friendly messages
 ```
