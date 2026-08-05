@@ -1,7 +1,7 @@
 /**
  * Generates 2 simple sub-repos and wires them into test-repo as submodules.
  *
- * Output layout (relative to project root):
+ * Output layout (siblings of the project folder, i.e. ~/repos/):
  *   test-repo-submodules/repo-a/   — standalone repo, ~200 commits, main + dev + 2 work branches
  *   test-repo-submodules/repo-b/   — standalone repo, ~200 commits, main + dev + 1 work branch
  *   test-repo/.gitmodules          — registers both submodules
@@ -24,9 +24,11 @@ import { SeededRandom } from './config.js';
 // Constants
 // ---------------------------------------------------------------------------
 
-const ROOT = resolve(__dirname, '..');
-const TEST_REPO = join(ROOT, 'test-repo');
-const SUBMODULE_SOURCES = join(ROOT, 'test-repo-submodules');
+// Test repos live outside the source tree, as siblings of the project folder,
+// so they stay separate from the source. __dirname is scripts/, so '../..' is ~/repos.
+const REPOS_ROOT = resolve(__dirname, '../..');
+const TEST_REPO = join(REPOS_ROOT, 'test-repo');
+const SUBMODULE_SOURCES = join(REPOS_ROOT, 'test-repo-submodules');
 
 const AUTHORS = [
   { name: 'Alice Chen',    email: 'alice@example.com'   },

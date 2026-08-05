@@ -15,11 +15,33 @@ pnpm watch              # Watch mode for both (uses concurrently)
 pnpm lint               # ESLint (flat config) over the whole repo
 pnpm typecheck          # TypeScript type checking (tsc --noEmit)
 pnpm test               # Run unit tests (Vitest, run mode)
-pnpm generate-test-repo # Generate deterministic test repo at test-repo/
+pnpm generate-test-repo # Generate deterministic test repo (see "Test Repository Location" below)
 pnpm generate-submodule-repos # Generate test repos with submodules
 pnpm ext:package        # Create .vsix package
 pnpm ext:publish        # Publish to VS Code Marketplace (vsce) + Open VSX (ovsx)
 ```
+
+### Test Repository Location
+
+The test repos live **outside** this source tree, as siblings of it under `~/repos/`, deliberately
+kept separate from the source folder:
+
+| Path | Contents |
+| --- | --- |
+| `~/repos/test-repo` | Main deterministic test repo (`main`, `dev`, `feature-*`, `repro/*`) |
+| `~/repos/test-repo-submodules` | Standalone source repos wired in as submodules (`repo-a`, `repo-b`, `test-repo`) |
+| `~/repos/test-repo.worktrees` | Worktrees of the main test repo |
+
+`.vscode/launch.json` already points at the correct location (`${workspaceFolder}/../test-repo`), so
+"Run Extension" opens the right repo.
+
+The generators resolve their output via `resolve(__dirname, '../..')` — `__dirname` is `scripts/`,
+so this lands in `~/repos/`, not the project root. Do not assume `test-repo/` exists inside this
+project — it does not.
+
+> **Destructive:** `pnpm generate-test-repo` deletes and recreates the target repo. The current
+> `~/repos/test-repo` contains hand-made state the generator does not reproduce (`repro-*.txt`,
+> `stash-test-file.txt`, the `repro/feature` branch, worktrees). Back it up before regenerating.
 
 Run a single test file or pattern with Vitest directly:
 
