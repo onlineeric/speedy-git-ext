@@ -1,15 +1,16 @@
 import type * as vscode from 'vscode';
 import {
   AVATAR_CACHE_MAX_ENTRIES,
-  AVATAR_MAX_CANDIDATE_HASHES,
   createPendingRecord,
   evictLeastRecentlySeen,
   isAvatarRecordExpired,
   type AvatarCache,
   type AvatarCacheRecord,
+  type AvatarLookupTask,
 } from './avatarCachePolicy.js';
 
-const CACHE_KEY = 'speedyGit.avatarCache.v1';
+/** Bumped only when the record shape changes; old data is then ignored. */
+const CACHE_KEY = 'speedyGit.avatarCache.v2';
 
 /**
  * Writes are batched behind this delay. The queue resolves at most one avatar
@@ -17,9 +18,6 @@ const CACHE_KEY = 'speedyGit.avatarCache.v1';
  * of avatar handling with a measurable cost — so it happens on a timer instead.
  */
 const WRITE_DEBOUNCE_MS = 5_000;
-
-/** Smallest `lastSeenAt` movement worth persisting. See `touch`. */
-const LAST_SEEN_WRITE_GRANULARITY_MS = 60 * 60 * 1000;
 
 /**
  * Persistent email → avatar cache backed by `globalState`.
@@ -29,6 +27,9 @@ const LAST_SEEN_WRITE_GRANULARITY_MS = 60 * 60 * 1000;
  * the entry survives repo switches, window reloads and workspace changes. That
  * persistence is the whole point — the previous in-memory map was discarded on
  * every reload, so each restart re-spent the API budget from zero.
+ *
+ * Only durable answers live here. How to *perform* a lookup travels with the
+ * queue task instead, since it is re-derived from the loaded commits each time.
  *
  * The in-memory copy is authoritative during a session; `globalState` is written
  * behind a debounce and flushed on dispose.
@@ -56,62 +57,36 @@ export class AvatarCacheStore {
     return this.load()[email];
   }
 
-  snapshot(): AvatarCache {
-    return this.load();
-  }
-
   /**
    * Record that these emails appeared in a loaded commit batch, creating
-   * entries for ones we have never seen. Returns the emails that need a
-   * background refresh, so the caller does not have to re-scan the cache.
-   *
-   * A failed lookup recipe is replaced when the same email turns up in another
-   * repo — that repo may be one we can actually read.
+   * entries for ones we have never seen. Returns the tasks that need a
+   * background lookup, so the caller does not have to re-scan the cache.
    */
-  touch(
-    sightings: Array<{ email: string; owner: string; repo: string; hashes: string[] }>,
-    refreshDays: number,
-    now: number,
-  ): string[] {
+  touch(sightings: AvatarLookupTask[], refreshDays: number, today: number): AvatarLookupTask[] {
     const cache = this.load();
-    const due: string[] = [];
+    const due: AvatarLookupTask[] = [];
 
     for (const sighting of sightings) {
       const existing = cache[sighting.email];
 
       if (!existing) {
-        cache[sighting.email] = createPendingRecord(sighting, now);
+        cache[sighting.email] = createPendingRecord(today);
         this.dirty = true;
-        due.push(sighting.email);
+        due.push(sighting);
         continue;
       }
 
-      const needsRefresh = existing.pendingRefresh || isAvatarRecordExpired(existing, refreshDays, now);
-      // Refresh the candidate commits whenever we are going to retry: this load
-      // may be showing pushed commits where the last one only had local ones.
-      // A resolved entry keeps whatever worked last time.
-      const recipe = needsRefresh
-        ? {
-            owner: sighting.owner,
-            repo: sighting.repo,
-            hashes: sighting.hashes.slice(0, AVATAR_MAX_CANDIDATE_HASHES),
-          }
-        : { owner: existing.owner, repo: existing.repo, hashes: existing.hashes };
+      if (isAvatarRecordExpired(existing, refreshDays, today)) {
+        due.push(sighting);
+      }
 
-      // `lastSeenAt` only feeds LRU eviction, so hour-granularity is plenty.
-      // Bumping it on every load would mark the cache dirty on every auto-refresh
-      // and rewrite the entire map to globalState on a timer forever.
-      const seenMovedMaterially = now - existing.lastSeenAt >= LAST_SEEN_WRITE_GRANULARITY_MS;
-
-      cache[sighting.email] = {
-        ...existing,
-        ...recipe,
-        pendingRefresh: needsRefresh,
-        lastSeenAt: seenMovedMaterially ? now : existing.lastSeenAt,
-      };
-      if (needsRefresh || seenMovedMaterially) this.dirty = true;
-
-      if (needsRefresh) due.push(sighting.email);
+      // `seenOn` only feeds eviction, so a same-day sighting changes nothing.
+      // Rewriting it on every load would mark the cache dirty on every
+      // auto-refresh and re-serialize the whole map on a timer forever.
+      if (existing.seenOn !== today) {
+        cache[sighting.email] = { ...existing, seenOn: today };
+        this.dirty = true;
+      }
     }
 
     this.scheduleWrite();
@@ -119,18 +94,18 @@ export class AvatarCacheStore {
   }
 
   /**
-   * Re-open every record that still has no avatar and hand them back for
-   * requeueing. Called when the user authorizes GitHub: anything that failed or
-   * ran out of candidates while unauthenticated deserves an immediate retry
-   * rather than sitting out the full refresh window.
+   * Re-open every record that has no avatar, so the caller can queue them again.
+   * Called when the user authorizes GitHub: anything that failed while
+   * unauthenticated deserves an immediate retry rather than sitting out the full
+   * refresh window. Clearing `refreshedOn` is what makes them expired again.
    */
   reopenUnresolved(): string[] {
     const cache = this.load();
     const reopened: string[] = [];
 
     for (const [email, record] of Object.entries(cache)) {
-      if (record.avatarUrl !== null || record.pendingRefresh) continue;
-      cache[email] = { ...record, pendingRefresh: true, attempts: 0 };
+      if (record.accountId !== null || record.url || record.refreshedOn === 0) continue;
+      cache[email] = { ...record, refreshedOn: 0 };
       reopened.push(email);
     }
 
@@ -202,15 +177,10 @@ function isAvatarCache(value: unknown): value is AvatarCache {
     if (typeof entry !== 'object' || entry === null) return false;
     const record = entry as Partial<AvatarCacheRecord>;
     return (
-      (typeof record.avatarUrl === 'string' || record.avatarUrl === null)
-      && (typeof record.lastRefreshAt === 'number' || record.lastRefreshAt === null)
-      && typeof record.pendingRefresh === 'boolean'
-      && typeof record.attempts === 'number'
-      && typeof record.owner === 'string'
-      && typeof record.repo === 'string'
-      && Array.isArray(record.hashes)
-      && record.hashes.every((hash) => typeof hash === 'string')
-      && typeof record.lastSeenAt === 'number'
+      (typeof record.accountId === 'number' || record.accountId === null)
+      && (record.url === undefined || typeof record.url === 'string')
+      && typeof record.refreshedOn === 'number'
+      && typeof record.seenOn === 'number'
     );
   });
 }

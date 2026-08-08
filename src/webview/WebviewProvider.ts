@@ -256,8 +256,10 @@ export class WebviewProvider {
 
     const reopened = this.avatarCache.reopenUnresolved();
     if (reopened.length > 0) {
-      this.log.info(`GitHub avatars: retrying ${reopened.length} unresolved email(s) after authorization`);
-      this.avatarQueue.enqueue(reopened);
+      // Cleared their `refreshedOn`, so they are expired again — the next load
+      // supplies fresh lookup recipes and re-queues them.
+      this.log.info(`GitHub avatars: ${reopened.length} unresolved email(s) will retry after authorization`);
+      void this.refreshCoordinator.reload();
     }
   }
 

@@ -7,6 +7,7 @@ import { toCommitCountBucket } from '../../shared/telemetry.js';
 import { GitHubAvatarService } from '../services/GitHubAvatarService.js';
 import type { AvatarCacheStore } from '../services/AvatarCacheStore.js';
 import type { AvatarRefreshQueue } from '../services/AvatarRefreshQueue.js';
+import { avatarUrlFromRecord, toDayNumber, type AvatarLookupTask } from '../services/avatarCachePolicy.js';
 import type { TelemetryService } from '../services/TelemetryService.js';
 import type { GitServiceRegistry } from './GitServiceRegistry.js';
 import type { PersistedUIStateStore } from './PersistedUIStateStore.js';
@@ -356,7 +357,7 @@ export class RepoDataLoader {
       return;
     }
 
-    const now = Date.now();
+    const today = toDayNumber(Date.now());
     const refreshDays = (this.deps.getSettings() ?? DEFAULT_USER_SETTINGS).avatarRefreshDays;
 
     // Dedupe by email, keeping the author's oldest and newest commit in this
@@ -375,7 +376,7 @@ export class RepoDataLoader {
     }
 
     const urls: AvatarUrlMap = {};
-    const sightings: Array<{ email: string; owner: string; repo: string; hashes: string[] }> = [];
+    const sightings: AvatarLookupTask[] = [];
 
     for (const [email, { newest, oldest }] of emailToHashes) {
       const hashes = newest === oldest ? [oldest] : [oldest, newest];
@@ -390,7 +391,8 @@ export class RepoDataLoader {
       // Show whatever we have straight away, even if it is past its window —
       // the refresh happens behind the picture that is already on screen.
       const cached = this.deps.avatarCache.get(email);
-      if (cached?.avatarUrl) urls[email] = cached.avatarUrl;
+      const cachedUrl = cached ? avatarUrlFromRecord(cached) : null;
+      if (cachedUrl) urls[email] = cachedUrl;
 
       sightings.push({ email, owner: repo.owner, repo: repo.repo, hashes });
     }
@@ -408,7 +410,7 @@ export class RepoDataLoader {
       this.deps.postMessage({ type: 'avatarUrls', payload: { urls } });
     }
 
-    const due = this.deps.avatarCache.touch(sightings, refreshDays, now);
+    const due = this.deps.avatarCache.touch(sightings, refreshDays, today);
 
     // Per-load accounting, at debug so auto-refresh does not flood the channel.
     const noreplyCount = emailToHashes.size - sightings.length;

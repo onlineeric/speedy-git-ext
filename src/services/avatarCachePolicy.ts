@@ -6,44 +6,78 @@
  * *when* a record is stale, *what* an attempt did to it, and *which* record goes
  * next are all decided here.
  *
- * The central rule is that a record is never written off. Every attempt —
- * resolved, not on GitHub, or given up on — stamps `lastRefreshAt`, so the
- * record simply comes back around one refresh window later. That bounds the
- * worst case at (known authors ÷ refresh days) requests per day and means an
- * email that joins GitHub later is picked up on its next cycle.
+ * Two rules shape the record format, because VS Code keeps an extension's whole
+ * `globalState` as a single JSON blob and warns past 512 KB:
+ *
+ * 1. **Only durable answers are stored.** How to perform a lookup (repo, candidate
+ *    commits) lives on the in-memory queue task, not on the record — it is
+ *    re-derived from the loaded commits every time and is worthless after a
+ *    restart.
+ * 2. **Nothing derivable is stored.** No queue flag, no retry counter: both are
+ *    recomputed from `refreshedOn` and the queue's own in-memory state.
+ *
+ * The central behavioural rule is that a record is never written off. Every
+ * completed lookup stamps `refreshedOn`, so the record comes back around one
+ * refresh window later and an email that joins GitHub later is picked up then.
  */
 
-/** One cached avatar lookup, keyed by lowercase author email. */
+/**
+ * One cached lookup, keyed by lowercase author email.
+ *
+ * Deliberately tiny — roughly 55-70 bytes serialized. Field names stay readable
+ * rather than being shortened to one letter: the difference is ~19 KB across a
+ * full cache, which is not worth an encode/decode layer between the stored shape
+ * and the code that reads it.
+ */
 export interface AvatarCacheRecord {
-  /** Resolved avatar URL, or null when the last attempt found no GitHub account. */
-  avatarUrl: string | null;
-  /** Unix ms of the last completed attempt; null when never attempted. */
-  lastRefreshAt: number | null;
-  /** True while this record is queued for a background refresh. */
-  pendingRefresh: boolean;
-  /** Consecutive failed attempts this cycle; cleared once an attempt lands. */
-  attempts: number;
   /**
-   * How to look this email up. The cache key is the email (a GitHub avatar is
-   * account-level, so a hit in one repo serves every other), but the API call
-   * needs a repo and a commit hash authored by that email. Capturing the recipe
-   * lets the queue keep draining after the user switches repos.
+   * GitHub account id behind this email, or null when GitHub has no account for
+   * it. Stored as the id rather than the full URL because every GitHub avatar
+   * URL is `https://avatars.githubusercontent.com/u/<id>?v=4` — keeping the id
+   * alone saves ~50 bytes per record over storing the string.
+   *
+   * `null` means two different things depending on {@link refreshedOn}: never
+   * looked up (0) versus looked up and genuinely not on GitHub.
    */
-  owner: string;
-  repo: string;
+  accountId: number | null;
+
   /**
-   * Candidate commits to look this author up by, first one next. More than one
-   * because GitHub only knows commits that have been **pushed** — asking about a
-   * local-only commit answers 422, which says nothing about the author. Trying
-   * the oldest sighting before the newest makes a pushed commit far more likely
-   * on the first attempt.
+   * Escape hatch for an avatar URL that does not match the canonical form.
+   * Absent in the normal case, so it costs nothing for almost every record.
    */
-  hashes: string[];
-  /** Unix ms this email was last seen in a loaded commit batch; drives eviction. */
-  lastSeenAt: number;
+  url?: string;
+
+  /**
+   * Day number (days since the Unix epoch) of the last completed lookup;
+   * `0` when never looked up. Days rather than milliseconds because the refresh
+   * window is measured in days — 5 digits instead of 13.
+   */
+  refreshedOn: number;
+
+  /**
+   * Day number this email was last seen in a loaded commit batch. Drives
+   * eviction only, so day granularity is ample.
+   */
+  seenOn: number;
 }
 
 export type AvatarCache = Record<string, AvatarCacheRecord>;
+
+/**
+ * A queued lookup. Lives only in memory: the repo and candidate commits come
+ * from the commits currently loaded, and are meaningless once those change.
+ */
+export interface AvatarLookupTask {
+  email: string;
+  owner: string;
+  repo: string;
+  /**
+   * Candidate commits, first one next. More than one because GitHub only knows
+   * commits that have been **pushed** — asking about a local-only commit answers
+   * 422, which says nothing about the author.
+   */
+  hashes: string[];
+}
 
 /** What a single lookup attempt learned. */
 export type AvatarLookupOutcome =
@@ -53,13 +87,13 @@ export type AvatarLookupOutcome =
   | { kind: 'noAccount' }
   /**
    * The repo or commit is not there: 404 (no repo, or no access) or 422 (the
-   * commit is not on GitHub, typically because it was never pushed). Says
-   * nothing about the author, so the next candidate commit is worth trying.
+   * commit is not on GitHub, typically never pushed). Says nothing about the
+   * author, so the next candidate commit is worth trying.
    */
   | { kind: 'notFound' }
   /** Transport failure: offline, DNS, timeout. */
   | { kind: 'networkError' }
-  /** Rate limited. Never the record's fault, so it costs no attempt. */
+  /** Rate limited. Never the record's fault. */
   | { kind: 'rateLimited'; resetAt: number | null };
 
 /**
@@ -68,18 +102,13 @@ export type AvatarLookupOutcome =
  */
 export const AVATAR_REFRESH_INTERVAL_MS = 1000;
 
-/** Consecutive transport/404 failures before a record waits out a full window. */
-export const AVATAR_MAX_ATTEMPTS = 3;
-
 /**
  * Cache ceiling; least-recently-seen entries are dropped past this.
  *
- * Sized against VS Code's storage budget, not against taste. VS Code keeps an
- * extension's entire `globalState` as one JSON blob and warns at 512 KB
- * ("large extension state detected… consider to use 'globalStorageUri'"). A
- * record costs roughly 300-340 bytes, so 1000 entries lands near 330 KB and
- * leaves room for the persisted UI state and per-repo table layouts that share
- * the same blob. 2000 would have exceeded the threshold on its own.
+ * Sized against VS Code's storage budget. VS Code keeps an extension's entire
+ * `globalState` as one JSON blob and warns at 512 KB. At ~70 bytes per record
+ * this lands near 70 KB, leaving ample room for the persisted UI state and
+ * per-repo table layouts sharing the same blob.
  */
 export const AVATAR_CACHE_MAX_ENTRIES = 1000;
 
@@ -94,6 +123,33 @@ export const MAX_AVATAR_REFRESH_DAYS = 365;
 
 const MS_PER_DAY = 86_400_000;
 
+/** Canonical GitHub avatar URL for an account id. */
+export function avatarUrlForAccount(accountId: number): string {
+  return `https://avatars.githubusercontent.com/u/${accountId}?v=4`;
+}
+
+/**
+ * Pull the account id out of a GitHub avatar URL, or null when it is not the
+ * canonical `/u/<id>` form (in which case the caller keeps the whole string).
+ */
+export function accountIdFromAvatarUrl(avatarUrl: string): number | null {
+  const match = avatarUrl.match(/\/u\/(\d+)\b/);
+  if (!match) return null;
+  const id = Number.parseInt(match[1], 10);
+  return Number.isSafeInteger(id) ? id : null;
+}
+
+/** The displayable avatar URL for a record, or null when there is none. */
+export function avatarUrlFromRecord(record: AvatarCacheRecord): string | null {
+  if (record.accountId !== null) return avatarUrlForAccount(record.accountId);
+  return record.url ?? null;
+}
+
+/** Days since the Unix epoch. */
+export function toDayNumber(timestampMs: number): number {
+  return Math.floor(timestampMs / MS_PER_DAY);
+}
+
 /** Clamp a user-supplied refresh window to the supported range. */
 export function clampAvatarRefreshDays(days: number, fallback: number): number {
   if (!Number.isFinite(days)) return fallback;
@@ -102,86 +158,67 @@ export function clampAvatarRefreshDays(days: number, fallback: number): number {
 
 /**
  * Whether a record is due for a refresh. Expiry is derived from
- * `lastRefreshAt + refreshDays` at read time and never stored, so lowering the
+ * `refreshedOn + refreshDays` at read time and never stored, so lowering the
  * setting immediately expires everything already cached.
  */
 export function isAvatarRecordExpired(
   record: AvatarCacheRecord,
   refreshDays: number,
-  now: number,
+  today: number,
 ): boolean {
-  if (record.lastRefreshAt === null) return true;
-  return now - record.lastRefreshAt >= refreshDays * MS_PER_DAY;
+  if (record.refreshedOn === 0) return true;
+  return today - record.refreshedOn >= refreshDays;
 }
 
-/** Candidate commits kept per author. Two covers "oldest and newest in view". */
-export const AVATAR_MAX_CANDIDATE_HASHES = 2;
-
 /** A brand-new record for an email seen for the first time. */
-export function createPendingRecord(
-  recipe: { owner: string; repo: string; hashes: string[] },
-  now: number,
-): AvatarCacheRecord {
-  return {
-    avatarUrl: null,
-    lastRefreshAt: null,
-    pendingRefresh: true,
-    attempts: 0,
-    owner: recipe.owner,
-    repo: recipe.repo,
-    hashes: recipe.hashes.slice(0, AVATAR_MAX_CANDIDATE_HASHES),
-    lastSeenAt: now,
-  };
+export function createPendingRecord(today: number): AvatarCacheRecord {
+  return { accountId: null, refreshedOn: 0, seenOn: today };
 }
 
 /**
  * Fold a lookup result into a record.
  *
- * `found` and `noAccount` are both definitive answers and close the cycle.
- * `notFound`/`networkError` retry a few times before giving up *for this cycle
- * only* — the record still returns after the refresh window. `rateLimited`
- * leaves the record untouched and still queued; the queue pauses instead.
+ * `found` and `noAccount` are both definitive answers about the author and stamp
+ * `refreshedOn`, closing the cycle until the window elapses.
  *
- * An existing avatar URL is never cleared by a failure, so a stale picture keeps
- * showing rather than blanking out while we retry.
+ * `notFound` is a verdict on the *commit*, not the author — the caller tries the
+ * next candidate, and only stamps once candidates run out (`exhausted`).
+ *
+ * `networkError` and `rateLimited` deliberately return the record unchanged:
+ * stamping would cost a full refresh window for being briefly offline, and a
+ * never-stamped record stays expired, so the next load simply re-queues it. That
+ * is what removed the need for a persisted retry counter.
  */
 export function applyAvatarLookupOutcome(
   record: AvatarCacheRecord,
   outcome: AvatarLookupOutcome,
-  now: number,
+  today: number,
+  options: { candidatesExhausted?: boolean } = {},
 ): AvatarCacheRecord {
   switch (outcome.kind) {
-    case 'found':
-      return { ...record, avatarUrl: outcome.avatarUrl, lastRefreshAt: now, pendingRefresh: false, attempts: 0 };
+    case 'found': {
+      const accountId = accountIdFromAvatarUrl(outcome.avatarUrl);
+      const next: AvatarCacheRecord = { ...record, accountId, refreshedOn: today };
+      // Keep the raw URL only when it is not the canonical /u/<id> form.
+      if (accountId === null) next.url = outcome.avatarUrl;
+      else delete next.url;
+      return next;
+    }
 
-    case 'noAccount':
-      return { ...record, avatarUrl: null, lastRefreshAt: now, pendingRefresh: false, attempts: 0 };
+    case 'noAccount': {
+      const next: AvatarCacheRecord = { ...record, accountId: null, refreshedOn: today };
+      delete next.url;
+      return next;
+    }
 
+    case 'notFound':
+      // Out of candidates: wait for the window, by which point a later load may
+      // have supplied pushed commits to try.
+      return options.candidatesExhausted ? { ...record, refreshedOn: today } : record;
+
+    case 'networkError':
     case 'rateLimited':
-      // Not this record's failure — stay queued, keep the attempt budget intact.
       return record;
-
-    case 'notFound': {
-      // The candidate commit is not on GitHub (unpushed, or no access). That is
-      // a verdict on the commit, not the author, so move to the next candidate
-      // rather than spending one of the record's retries.
-      const hashes = record.hashes.slice(1);
-      if (hashes.length > 0) {
-        return { ...record, hashes, pendingRefresh: true };
-      }
-      // Out of candidates: wait for the refresh window, by which point a later
-      // load may well have supplied pushed commits to try.
-      return { ...record, hashes, lastRefreshAt: now, pendingRefresh: false, attempts: 0 };
-    }
-
-    case 'networkError': {
-      const attempts = record.attempts + 1;
-      if (attempts >= AVATAR_MAX_ATTEMPTS) {
-        // Give up for now; the refresh window brings it back on its own.
-        return { ...record, lastRefreshAt: now, pendingRefresh: false, attempts: 0 };
-      }
-      return { ...record, attempts, pendingRefresh: true };
-    }
   }
 }
 
@@ -189,44 +226,23 @@ export function applyAvatarLookupOutcome(
  * Refresh priority, lowest first.
  *
  * 0 — never looked up: the row shows initials, so this is a visible gap.
- * 1 — looked up, no account, now expired: also a visible gap, but we already
- *     know it is likely to stay empty, so it yields to genuinely new emails.
+ * 1 — looked up, no account, now expired: also a gap, but likely to stay empty,
+ *     so it yields to genuinely new emails.
  * 2 — has an avatar, just stale: something is already on screen.
  */
 export function avatarRefreshTier(record: AvatarCacheRecord): 0 | 1 | 2 {
-  if (record.avatarUrl !== null) return 2;
-  return record.lastRefreshAt === null ? 0 : 1;
+  if (avatarUrlFromRecord(record) !== null) return 2;
+  return record.refreshedOn === 0 ? 0 : 1;
 }
 
 /**
  * Queue order: visible gaps before stale pictures, and within a tier the most
- * recently seen author first — which is the top of the graph, where the user is
- * actually looking.
+ * recently seen author first — the top of the graph, where the user is looking.
  */
 export function compareAvatarRefreshPriority(a: AvatarCacheRecord, b: AvatarCacheRecord): number {
   const tierDelta = avatarRefreshTier(a) - avatarRefreshTier(b);
   if (tierDelta !== 0) return tierDelta;
-  return b.lastSeenAt - a.lastSeenAt;
-}
-
-/**
- * Select the emails due for a refresh, in the order the queue should take them.
- * A record already marked `pendingRefresh` stays selected even if it is not yet
- * expired — that flag means an earlier pass queued it and it has not landed.
- */
-export function selectAvatarRefreshQueue(
-  cache: AvatarCache,
-  refreshDays: number,
-  now: number,
-): string[] {
-  const due: Array<{ email: string; record: AvatarCacheRecord }> = [];
-  for (const [email, record] of Object.entries(cache)) {
-    if (record.pendingRefresh || isAvatarRecordExpired(record, refreshDays, now)) {
-      due.push({ email, record });
-    }
-  }
-  due.sort((a, b) => compareAvatarRefreshPriority(a.record, b.record));
-  return due.map((entry) => entry.email);
+  return b.seenOn - a.seenOn;
 }
 
 /**
@@ -238,7 +254,7 @@ export function evictLeastRecentlySeen(cache: AvatarCache, maxEntries: number): 
   if (emails.length <= maxEntries) return cache;
 
   const keep = emails
-    .sort((a, b) => cache[b].lastSeenAt - cache[a].lastSeenAt)
+    .sort((a, b) => cache[b].seenOn - cache[a].seenOn)
     .slice(0, maxEntries);
 
   const next: AvatarCache = {};

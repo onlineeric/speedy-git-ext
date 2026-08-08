@@ -6,9 +6,20 @@ import type { GitHubAvatarService } from './GitHubAvatarService.js';
 import {
   AVATAR_REFRESH_INTERVAL_MS,
   applyAvatarLookupOutcome,
+  avatarUrlFromRecord,
   compareAvatarRefreshPriority,
+  toDayNumber,
   type AvatarLookupOutcome,
+  type AvatarLookupTask,
 } from './avatarCachePolicy.js';
+
+/**
+ * Resolved avatars are posted in batches on this interval rather than one
+ * message per result. A message per avatar would mean a store write and a React
+ * render per avatar — the one way background avatar work could be felt while
+ * scrolling the commit table.
+ */
+const RESULT_FLUSH_MS = 1_000;
 
 /** Plain-English outcome for the log; the union's `kind` alone reads as jargon. */
 function describeOutcome(outcome: AvatarLookupOutcome): string {
@@ -22,14 +33,6 @@ function describeOutcome(outcome: AvatarLookupOutcome): string {
 }
 
 /**
- * Resolved avatars are posted in batches on this interval rather than one
- * message per result. A message per avatar would mean a store write and a React
- * render per avatar — the one way background avatar work could be felt while
- * scrolling the commit table.
- */
-const RESULT_FLUSH_MS = 1_000;
-
-/**
  * Background drain for pending avatar lookups.
  *
  * Runs entirely in the extension host, which is a separate process from the
@@ -38,14 +41,17 @@ const RESULT_FLUSH_MS = 1_000;
  * its life awaiting a timer or an in-flight `fetch`, neither of which occupies
  * the event loop.
  *
+ * Owns the lookup recipe — repo and candidate commits — because that is derived
+ * from the commits currently loaded and is worthless once they change. Only the
+ * answer reaches the cache.
+ *
  * Pacing is one lookup per {@link AVATAR_REFRESH_INTERVAL_MS}. When GitHub says
  * the budget is spent the whole queue parks until the reset rather than
- * hammering — and the record that hit the wall keeps its retry budget, since
- * being rate limited says nothing about that record.
+ * hammering.
  */
 export class AvatarRefreshQueue {
-  /** Emails waiting to be looked up, best candidate first. */
-  private queue: string[] = [];
+  /** Tasks waiting to be looked up, best candidate first. */
+  private queue: AvatarLookupTask[] = [];
   private queued = new Set<string>();
   private running = false;
   private disposed = false;
@@ -68,17 +74,17 @@ export class AvatarRefreshQueue {
   ) {}
 
   /**
-   * Add emails due for a refresh. Re-sorts so the best candidate is next:
-   * visible gaps before stale pictures, most recently seen first.
+   * Add lookups. Re-sorts so the best candidate is next: visible gaps before
+   * stale pictures, most recently seen first.
    */
-  enqueue(emails: string[]): void {
+  enqueue(tasks: AvatarLookupTask[]): void {
     if (this.disposed) return;
 
     let added = false;
-    for (const email of emails) {
-      if (this.queued.has(email)) continue;
-      this.queued.add(email);
-      this.queue.push(email);
+    for (const task of tasks) {
+      if (this.queued.has(task.email)) continue;
+      this.queued.add(task.email);
+      this.queue.push(task);
       added = true;
     }
     if (!added) return;
@@ -90,8 +96,8 @@ export class AvatarRefreshQueue {
   private sortQueue(): void {
     const cache = this.deps.cache;
     this.queue.sort((a, b) => {
-      const recordA = cache.get(a);
-      const recordB = cache.get(b);
+      const recordA = cache.get(a.email);
+      const recordB = cache.get(b.email);
       if (!recordA || !recordB) return 0;
       return compareAvatarRefreshPriority(recordA, recordB);
     });
@@ -116,11 +122,11 @@ export class AvatarRefreshQueue {
           continue;
         }
 
-        const email = this.queue.shift();
-        if (email === undefined) break;
-        this.queued.delete(email);
+        const task = this.queue.shift();
+        if (task === undefined) break;
+        this.queued.delete(task.email);
 
-        await this.processOne(email);
+        await this.processOne(task);
       }
 
       if (!this.disposed) {
@@ -131,15 +137,15 @@ export class AvatarRefreshQueue {
     }
   }
 
-  private async processOne(email: string): Promise<void> {
-    const record = this.deps.cache.get(email);
+  private async processOne(task: AvatarLookupTask): Promise<void> {
+    const record = this.deps.cache.get(task.email);
     if (!record) return;
 
-    const hash = record.hashes[0];
+    const hash = task.hashes[0];
     if (hash === undefined) return;
 
     const outcome = await this.deps.avatarService.lookupCommitAuthorAvatar(
-      { owner: record.owner, repo: record.repo, hash },
+      { owner: task.owner, repo: task.repo, hash },
       this.deps.auth.getToken(),
     );
 
@@ -148,44 +154,51 @@ export class AvatarRefreshQueue {
     // must never reach telemetry.
     const remaining = this.deps.avatarService.getRateLimit().remaining;
     this.deps.log.debug(
-      `Avatar lookup ${email} @ ${hash.slice(0, 8)} → ${describeOutcome(outcome)} `
+      `Avatar lookup ${task.email} @ ${hash.slice(0, 8)} → ${describeOutcome(outcome)} `
       + `(${remaining} lookups left this hour, ${this.queue.length} still queued)`,
     );
 
     if (outcome.kind === 'rateLimited') {
       // Put it back untouched — the pause happens at the top of the loop.
-      this.requeue(email);
+      this.requeue(task);
       this.deps.onRateLimitChanged();
       return;
     }
 
     if (outcome.kind === 'networkError') {
+      // Deliberately leaves the record unstamped, so it stays expired and the
+      // next load re-queues it. Stamping would cost a full refresh window for
+      // being briefly offline.
       this.deps.onLookupFailed();
+      return;
     }
 
-    const updated = applyAvatarLookupOutcome(record, outcome, Date.now());
-    this.deps.cache.update(email, updated);
+    const remainingHashes = outcome.kind === 'notFound' ? task.hashes.slice(1) : [];
+    const candidatesExhausted = outcome.kind === 'notFound' && remainingHashes.length === 0;
 
-    if (updated.pendingRefresh && outcome.kind === 'notFound') {
+    const updated = applyAvatarLookupOutcome(record, outcome, toDayNumber(Date.now()), {
+      candidatesExhausted,
+    });
+    this.deps.cache.update(task.email, updated);
+
+    if (outcome.kind === 'notFound' && remainingHashes.length > 0) {
       this.deps.log.debug(
-        `Avatar lookup ${email}: trying next candidate commit ${updated.hashes[0]?.slice(0, 8) ?? '(none)'}`,
+        `Avatar lookup ${task.email}: trying next candidate commit ${remainingHashes[0].slice(0, 8)}`,
       );
+      this.requeue({ ...task, hashes: remainingHashes });
+      return;
     }
 
-    if (updated.pendingRefresh) {
-      // Still has attempts left; try again later in this same drain.
-      this.requeue(email);
-    }
-
-    if (updated.avatarUrl && updated.avatarUrl !== record.avatarUrl) {
-      this.bufferResult(email, updated.avatarUrl);
+    const url = avatarUrlFromRecord(updated);
+    if (url && url !== avatarUrlFromRecord(record)) {
+      this.bufferResult(task.email, url);
     }
   }
 
-  private requeue(email: string): void {
-    if (this.queued.has(email) || this.disposed) return;
-    this.queued.add(email);
-    this.queue.push(email);
+  private requeue(task: AvatarLookupTask): void {
+    if (this.queued.has(task.email) || this.disposed) return;
+    this.queued.add(task.email);
+    this.queue.push(task);
   }
 
   /** Hold a result briefly so several land in the webview as one update. */

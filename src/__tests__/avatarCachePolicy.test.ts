@@ -1,35 +1,66 @@
 import { describe, expect, it } from 'vitest';
 import {
   AVATAR_CACHE_MAX_ENTRIES,
-  AVATAR_MAX_ATTEMPTS,
+  accountIdFromAvatarUrl,
   applyAvatarLookupOutcome,
   avatarRefreshTier,
+  avatarUrlForAccount,
+  avatarUrlFromRecord,
   clampAvatarRefreshDays,
   compareAvatarRefreshPriority,
   createPendingRecord,
   evictLeastRecentlySeen,
   isAvatarRecordExpired,
-  selectAvatarRefreshQueue,
+  toDayNumber,
   type AvatarCache,
   type AvatarCacheRecord,
 } from '../services/avatarCachePolicy.js';
 
-const NOW = 1_700_000_000_000;
-const MS_PER_DAY = 86_400_000;
+/** Day number roughly corresponding to 2026. */
+const TODAY = 20_304;
 
 function record(overrides: Partial<AvatarCacheRecord> = {}): AvatarCacheRecord {
-  return {
-    avatarUrl: 'https://avatars.githubusercontent.com/u/1?v=4',
-    lastRefreshAt: NOW,
-    pendingRefresh: false,
-    attempts: 0,
-    owner: 'acme',
-    repo: 'app',
-    hashes: ['abc123'],
-    lastSeenAt: NOW,
-    ...overrides,
-  };
+  return { accountId: 93807819, refreshedOn: TODAY, seenOn: TODAY, ...overrides };
 }
+
+describe('record footprint', () => {
+  it('stays small enough that a full cache fits the extension-state budget', () => {
+    // VS Code warns past 512 KB for an extension's whole globalState, and the
+    // UI state shares that blob. Guarding the per-record size here is what keeps
+    // a future field addition from silently blowing the budget.
+    const serialized = JSON.stringify({ 'firstname.lastname@somecompany.com': record() });
+    expect(serialized.length).toBeLessThan(100);
+    expect((serialized.length * AVATAR_CACHE_MAX_ENTRIES) / 1024).toBeLessThan(150);
+  });
+});
+
+describe('avatar URL <-> account id', () => {
+  it('round-trips the canonical GitHub avatar URL', () => {
+    const url = avatarUrlForAccount(93807819);
+    expect(url).toBe('https://avatars.githubusercontent.com/u/93807819?v=4');
+    expect(accountIdFromAvatarUrl(url)).toBe(93807819);
+  });
+
+  it('returns null for a non-canonical URL so the caller keeps the string', () => {
+    expect(accountIdFromAvatarUrl('https://example.test/avatars/alice.png')).toBeNull();
+  });
+
+  it('reads the URL from a record, preferring the account id', () => {
+    expect(avatarUrlFromRecord(record())).toBe('https://avatars.githubusercontent.com/u/93807819?v=4');
+    expect(avatarUrlFromRecord(record({ accountId: null, url: 'https://example.test/a.png' })))
+      .toBe('https://example.test/a.png');
+    expect(avatarUrlFromRecord(record({ accountId: null }))).toBeNull();
+  });
+});
+
+describe('toDayNumber', () => {
+  it('collapses a millisecond timestamp to whole days', () => {
+    const day = toDayNumber(Date.UTC(2026, 7, 8, 13, 45));
+    expect(day).toBe(Math.floor(Date.UTC(2026, 7, 8, 13, 45) / 86_400_000));
+    // Same day, different time of day → same number.
+    expect(toDayNumber(Date.UTC(2026, 7, 8, 1, 0))).toBe(day);
+  });
+});
 
 describe('clampAvatarRefreshDays', () => {
   it('keeps values inside the supported range', () => {
@@ -52,166 +83,118 @@ describe('clampAvatarRefreshDays', () => {
 });
 
 describe('isAvatarRecordExpired', () => {
-  it('treats a never-attempted record as expired', () => {
-    expect(isAvatarRecordExpired(record({ lastRefreshAt: null }), 30, NOW)).toBe(true);
+  it('treats a never-looked-up record as expired', () => {
+    expect(isAvatarRecordExpired(record({ refreshedOn: 0 }), 30, TODAY)).toBe(true);
   });
 
   it('is fresh inside the window and expired at the boundary', () => {
-    const stamped = record({ lastRefreshAt: NOW });
-    expect(isAvatarRecordExpired(stamped, 30, NOW + 29 * MS_PER_DAY)).toBe(false);
-    expect(isAvatarRecordExpired(stamped, 30, NOW + 30 * MS_PER_DAY)).toBe(true);
+    const stamped = record({ refreshedOn: TODAY });
+    expect(isAvatarRecordExpired(stamped, 30, TODAY + 29)).toBe(false);
+    expect(isAvatarRecordExpired(stamped, 30, TODAY + 30)).toBe(true);
   });
 
   it('derives expiry at read time so a shorter window applies retroactively', () => {
-    // Cached 10 days ago: fresh under a 30-day window, stale under a 7-day one.
-    const stamped = record({ lastRefreshAt: NOW - 10 * MS_PER_DAY });
-    expect(isAvatarRecordExpired(stamped, 30, NOW)).toBe(false);
-    expect(isAvatarRecordExpired(stamped, 7, NOW)).toBe(true);
+    const stamped = record({ refreshedOn: TODAY - 10 });
+    expect(isAvatarRecordExpired(stamped, 30, TODAY)).toBe(false);
+    expect(isAvatarRecordExpired(stamped, 7, TODAY)).toBe(true);
   });
 });
 
 describe('applyAvatarLookupOutcome', () => {
-  it('stores the URL and closes the cycle on success', () => {
+  it('stores the account id, not the URL, on success', () => {
     const next = applyAvatarLookupOutcome(
-      record({ avatarUrl: null, lastRefreshAt: null, pendingRefresh: true, attempts: 2 }),
-      { kind: 'found', avatarUrl: 'https://avatars.githubusercontent.com/u/9?v=4' },
-      NOW,
+      createPendingRecord(TODAY),
+      { kind: 'found', avatarUrl: 'https://avatars.githubusercontent.com/u/42?v=4' },
+      TODAY,
     );
 
-    expect(next.avatarUrl).toBe('https://avatars.githubusercontent.com/u/9?v=4');
-    expect(next.lastRefreshAt).toBe(NOW);
-    expect(next.pendingRefresh).toBe(false);
-    expect(next.attempts).toBe(0);
+    expect(next.accountId).toBe(42);
+    expect(next.url).toBeUndefined();
+    expect(next.refreshedOn).toBe(TODAY);
   });
 
-  it('records "no GitHub account" as a definitive answer, not a failure', () => {
+  it('falls back to the raw URL when it is not the canonical form', () => {
     const next = applyAvatarLookupOutcome(
-      record({ avatarUrl: null, lastRefreshAt: null, pendingRefresh: true }),
+      createPendingRecord(TODAY),
+      { kind: 'found', avatarUrl: 'https://example.test/custom.png' },
+      TODAY,
+    );
+
+    expect(next.accountId).toBeNull();
+    expect(next.url).toBe('https://example.test/custom.png');
+  });
+
+  it('records "no GitHub account" as a definitive answer and drops any stale URL', () => {
+    const next = applyAvatarLookupOutcome(
+      record({ accountId: null, url: 'https://example.test/old.png', refreshedOn: 0 }),
       { kind: 'noAccount' },
-      NOW,
+      TODAY,
     );
 
-    expect(next.avatarUrl).toBeNull();
-    expect(next.lastRefreshAt).toBe(NOW);
-    expect(next.pendingRefresh).toBe(false);
-    expect(next.attempts).toBe(0);
+    expect(next.accountId).toBeNull();
+    expect(next.url).toBeUndefined();
+    expect(next.refreshedOn).toBe(TODAY);
   });
 
-  it('retries transport failures a few times before waiting out the window', () => {
-    let current = record({ avatarUrl: null, lastRefreshAt: null, pendingRefresh: true });
-
-    for (let attempt = 1; attempt < AVATAR_MAX_ATTEMPTS; attempt += 1) {
-      current = applyAvatarLookupOutcome(current, { kind: 'networkError' }, NOW);
-      expect(current.attempts).toBe(attempt);
-      expect(current.pendingRefresh).toBe(true);
-      expect(current.lastRefreshAt).toBeNull();
-    }
-
-    current = applyAvatarLookupOutcome(current, { kind: 'networkError' }, NOW);
-    expect(current.pendingRefresh).toBe(false);
-    expect(current.attempts).toBe(0);
-    expect(current.lastRefreshAt).toBe(NOW);
-  });
-
-  it('advances to the next candidate commit on notFound without spending a retry', () => {
-    // GitHub answers 404/422 for a commit it does not have (typically unpushed),
-    // which says nothing about the author — so try the next candidate instead.
-    const next = applyAvatarLookupOutcome(
-      record({ avatarUrl: null, lastRefreshAt: null, pendingRefresh: true, hashes: ['unpushed', 'pushed'] }),
-      { kind: 'notFound' },
-      NOW,
-    );
-
-    expect(next.hashes).toEqual(['pushed']);
-    expect(next.attempts).toBe(0);
-    expect(next.pendingRefresh).toBe(true);
-    expect(next.lastRefreshAt).toBeNull();
-  });
-
-  it('waits out the window once every candidate commit is exhausted', () => {
-    const next = applyAvatarLookupOutcome(
-      record({ avatarUrl: null, lastRefreshAt: null, pendingRefresh: true, hashes: ['only'] }),
-      { kind: 'notFound' },
-      NOW,
-    );
-
-    expect(next.hashes).toEqual([]);
-    expect(next.pendingRefresh).toBe(false);
-    expect(next.lastRefreshAt).toBe(NOW);
-  });
-
-  it('leaves the record untouched when rate limited so no attempt is burned', () => {
-    const before = record({ avatarUrl: null, lastRefreshAt: null, pendingRefresh: true, attempts: 1 });
-    const next = applyAvatarLookupOutcome(before, { kind: 'rateLimited', resetAt: NOW + 60_000 }, NOW);
+  it('leaves the record untouched while candidate commits remain', () => {
+    const before = record({ accountId: null, refreshedOn: 0 });
+    const next = applyAvatarLookupOutcome(before, { kind: 'notFound' }, TODAY, {
+      candidatesExhausted: false,
+    });
+    // Still unstamped, so it stays expired and gets retried.
     expect(next).toEqual(before);
   });
 
-  it('keeps a stale avatar visible while a refresh keeps failing', () => {
-    const stale = record({ avatarUrl: 'https://avatars.githubusercontent.com/u/4?v=4', pendingRefresh: true });
-    let current = stale;
-    for (let i = 0; i < AVATAR_MAX_ATTEMPTS; i += 1) {
-      current = applyAvatarLookupOutcome(current, { kind: 'networkError' }, NOW);
-    }
-    expect(current.avatarUrl).toBe('https://avatars.githubusercontent.com/u/4?v=4');
+  it('stamps only once every candidate commit is exhausted', () => {
+    const next = applyAvatarLookupOutcome(
+      record({ accountId: null, refreshedOn: 0 }),
+      { kind: 'notFound' },
+      TODAY,
+      { candidatesExhausted: true },
+    );
+
+    expect(next.refreshedOn).toBe(TODAY);
+    expect(isAvatarRecordExpired(next, 30, TODAY + 29)).toBe(false);
+    expect(isAvatarRecordExpired(next, 30, TODAY + 31)).toBe(true);
   });
 
-  it('re-queues a given-up record once the next window elapses', () => {
-    let current = record({ avatarUrl: null, lastRefreshAt: null, pendingRefresh: true });
-    for (let i = 0; i < AVATAR_MAX_ATTEMPTS; i += 1) {
-      current = applyAvatarLookupOutcome(current, { kind: 'networkError' }, NOW);
-    }
+  it('never stamps a transport failure, so being offline costs no refresh window', () => {
+    const before = record({ accountId: null, refreshedOn: 0 });
+    expect(applyAvatarLookupOutcome(before, { kind: 'networkError' }, TODAY)).toEqual(before);
+    // Still expired → the next load re-queues it. This is what removed the
+    // need for a persisted retry counter.
+    expect(isAvatarRecordExpired(before, 30, TODAY)).toBe(true);
+  });
 
-    expect(isAvatarRecordExpired(current, 30, NOW + 29 * MS_PER_DAY)).toBe(false);
-    expect(isAvatarRecordExpired(current, 30, NOW + 31 * MS_PER_DAY)).toBe(true);
+  it('leaves the record untouched when rate limited', () => {
+    const before = record({ accountId: null, refreshedOn: 0 });
+    expect(applyAvatarLookupOutcome(before, { kind: 'rateLimited', resetAt: null }, TODAY)).toEqual(before);
+  });
+
+  it('keeps a stale avatar visible while a refresh keeps failing', () => {
+    const stale = record({ accountId: 7, refreshedOn: TODAY - 40 });
+    const next = applyAvatarLookupOutcome(stale, { kind: 'networkError' }, TODAY);
+    expect(avatarUrlFromRecord(next)).toBe('https://avatars.githubusercontent.com/u/7?v=4');
   });
 });
 
 describe('avatarRefreshTier / compareAvatarRefreshPriority', () => {
   it('ranks never-looked-up above known-empty above merely stale', () => {
-    expect(avatarRefreshTier(record({ avatarUrl: null, lastRefreshAt: null }))).toBe(0);
-    expect(avatarRefreshTier(record({ avatarUrl: null, lastRefreshAt: NOW }))).toBe(1);
-    expect(avatarRefreshTier(record({ avatarUrl: 'https://example.test/a.png' }))).toBe(2);
+    expect(avatarRefreshTier(record({ accountId: null, refreshedOn: 0 }))).toBe(0);
+    expect(avatarRefreshTier(record({ accountId: null, refreshedOn: TODAY }))).toBe(1);
+    expect(avatarRefreshTier(record({ accountId: 5 }))).toBe(2);
   });
 
   it('breaks ties by most recently seen', () => {
-    const older = record({ avatarUrl: null, lastRefreshAt: null, lastSeenAt: NOW - 5_000 });
-    const newer = record({ avatarUrl: null, lastRefreshAt: null, lastSeenAt: NOW });
+    const older = record({ accountId: null, refreshedOn: 0, seenOn: TODAY - 5 });
+    const newer = record({ accountId: null, refreshedOn: 0, seenOn: TODAY });
     expect(compareAvatarRefreshPriority(newer, older)).toBeLessThan(0);
   });
 
   it('puts a visible gap ahead of a stale picture even if the gap is older', () => {
-    const staleButRecent = record({ lastSeenAt: NOW });
-    const gapButOld = record({ avatarUrl: null, lastRefreshAt: null, lastSeenAt: NOW - 100_000 });
+    const staleButRecent = record({ seenOn: TODAY });
+    const gapButOld = record({ accountId: null, refreshedOn: 0, seenOn: TODAY - 100 });
     expect(compareAvatarRefreshPriority(gapButOld, staleButRecent)).toBeLessThan(0);
-  });
-});
-
-describe('selectAvatarRefreshQueue', () => {
-  it('returns due records in priority order and skips fresh ones', () => {
-    const cache: AvatarCache = {
-      'fresh@test.dev': record({ lastRefreshAt: NOW, lastSeenAt: NOW }),
-      'stale@test.dev': record({ lastRefreshAt: NOW - 40 * MS_PER_DAY, lastSeenAt: NOW }),
-      'new@test.dev': record({ avatarUrl: null, lastRefreshAt: null, pendingRefresh: true, lastSeenAt: NOW - 1_000 }),
-      'empty@test.dev': record({ avatarUrl: null, lastRefreshAt: NOW - 40 * MS_PER_DAY, lastSeenAt: NOW }),
-    };
-
-    expect(selectAvatarRefreshQueue(cache, 30, NOW)).toEqual([
-      'new@test.dev',
-      'empty@test.dev',
-      'stale@test.dev',
-    ]);
-  });
-
-  it('keeps an unlanded pending record queued even when it is not expired', () => {
-    const cache: AvatarCache = {
-      'pending@test.dev': record({ lastRefreshAt: NOW, pendingRefresh: true }),
-    };
-    expect(selectAvatarRefreshQueue(cache, 30, NOW)).toEqual(['pending@test.dev']);
-  });
-
-  it('returns nothing when every record is fresh', () => {
-    const cache: AvatarCache = { 'a@test.dev': record(), 'b@test.dev': record() };
-    expect(selectAvatarRefreshQueue(cache, 30, NOW)).toEqual([]);
   });
 });
 
@@ -223,28 +206,17 @@ describe('evictLeastRecentlySeen', () => {
 
   it('drops the least recently seen entries first', () => {
     const cache: AvatarCache = {
-      'old@test.dev': record({ lastSeenAt: NOW - 10_000 }),
-      'mid@test.dev': record({ lastSeenAt: NOW - 5_000 }),
-      'new@test.dev': record({ lastSeenAt: NOW }),
+      'old@test.dev': record({ seenOn: TODAY - 10 }),
+      'mid@test.dev': record({ seenOn: TODAY - 5 }),
+      'new@test.dev': record({ seenOn: TODAY }),
     };
 
-    const evicted = evictLeastRecentlySeen(cache, 2);
-    expect(Object.keys(evicted).sort()).toEqual(['mid@test.dev', 'new@test.dev']);
+    expect(Object.keys(evictLeastRecentlySeen(cache, 2)).sort()).toEqual(['mid@test.dev', 'new@test.dev']);
   });
 });
 
 describe('createPendingRecord', () => {
-  it('starts queued with the lookup recipe attached', () => {
-    const created = createPendingRecord({ owner: 'acme', repo: 'app', hashes: ['deadbeef'] }, NOW);
-    expect(created).toEqual({
-      avatarUrl: null,
-      lastRefreshAt: null,
-      pendingRefresh: true,
-      attempts: 0,
-      owner: 'acme',
-      repo: 'app',
-      hashes: ['deadbeef'],
-      lastSeenAt: NOW,
-    });
+  it('starts unresolved and unstamped, carrying no lookup recipe', () => {
+    expect(createPendingRecord(TODAY)).toEqual({ accountId: null, refreshedOn: 0, seenOn: TODAY });
   });
 });
