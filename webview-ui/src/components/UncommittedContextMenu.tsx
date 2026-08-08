@@ -7,9 +7,10 @@ import { StashDialog } from './StashDialog';
 import { DiscardAllDialog } from './DiscardAllDialog';
 import { FilePickerDialog } from './FilePickerDialog';
 import { CompareMenuItems } from './CompareMenuItems';
-import { MENU_COLLISION_PADDING, dangerItemClass, menuContentClass, menuItemClass, menuMinWidthClass } from './menuStyles';
 import { LazyContextMenu } from './LazyContextMenu';
 import { MenuGroupSeparator } from './MenuGroupSeparator';
+import { MenuItem } from './MenuItem';
+import { MenuContent } from './MenuContent';
 
 interface UncommittedContextMenuProps {
   children: React.ReactNode;
@@ -58,32 +59,24 @@ function UncommittedContextMenuBody() {
   return (
     <>
       <ContextMenu.Portal>
-        <ContextMenu.Content className={`${menuMinWidthClass} ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
+        <MenuContent>
             {/* The working-tree changes themselves, ordered from staging through to discarding. */}
-            {hasUnstagedChanges && (
-              <ContextMenu.Item className={menuItemClass} onSelect={handleStageAll}>
-                Stage All Changes
-              </ContextMenu.Item>
-            )}
-            {hasStagedChanges && (
-              <ContextMenu.Item className={menuItemClass} onSelect={handleUnstageAll}>
-                Unstage All Changes
-              </ContextMenu.Item>
-            )}
+            {hasUnstagedChanges && <MenuItem onSelect={handleStageAll}>Stage All Changes</MenuItem>}
+            {hasStagedChanges && <MenuItem onSelect={handleUnstageAll}>Unstage All Changes</MenuItem>}
             {hasAnyChanges && (
-              <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('uncommittedMenu', 'selectFiles'); setFilePickerOpen(true); }}>
+              <MenuItem onSelect={() => { trackUiInteraction('uncommittedMenu', 'selectFiles'); setFilePickerOpen(true); }}>
                 Select files for...
-              </ContextMenu.Item>
+              </MenuItem>
             )}
             {hasAnyChanges && (
-              <ContextMenu.Item className={menuItemClass} onSelect={() => { trackUiInteraction('uncommittedMenu', 'stash'); setStashDialogOpen(true); }}>
+              <MenuItem onSelect={() => { trackUiInteraction('uncommittedMenu', 'stash'); setStashDialogOpen(true); }}>
                 Stash Everything…
-              </ContextMenu.Item>
+              </MenuItem>
             )}
             {hasUnstagedChanges && (
-              <ContextMenu.Item className={dangerItemClass} onSelect={() => { trackUiInteraction('uncommittedMenu', 'discardAll'); setDiscardAllDialogOpen(true); }}>
+              <MenuItem danger onSelect={() => { trackUiInteraction('uncommittedMenu', 'discardAll'); setDiscardAllDialogOpen(true); }}>
                 Discard All Unstaged Changes
-              </ContextMenu.Item>
+              </MenuItem>
             )}
 
             {/* Compare-refs (042-compare-refs) — Working Tree sentinel. With a clean
@@ -92,10 +85,8 @@ function UncommittedContextMenuBody() {
             <CompareMenuItems slot={{ kind: 'workingTree' }} surface="uncommittedMenu" />
 
             <MenuGroupSeparator />
-            <ContextMenu.Item className={menuItemClass} onSelect={handleRefresh}>
-              Refresh
-            </ContextMenu.Item>
-          </ContextMenu.Content>
+            <MenuItem onSelect={handleRefresh}>Refresh</MenuItem>
+          </MenuContent>
         </ContextMenu.Portal>
       <StashDialog
         open={stashDialogOpen}

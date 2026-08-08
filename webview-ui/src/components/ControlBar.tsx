@@ -8,7 +8,7 @@ import { RepoSelector } from './RepoSelector';
 import { SubmoduleSelector } from './SubmoduleSelector';
 import { MultiBranchDropdown } from './MultiBranchDropdown';
 import { addAllLocalBranches } from '../utils/branchSelection';
-import { CommitListSettingsPopover } from './CommitListSettingsPopover';
+import { ViewSettingsDialog } from './ViewSettingsDialog';
 import { ToolbarIconButton, RemoteButtonToggleItem } from './ToolbarIconButton';
 import {
   CloudIcon,
@@ -242,7 +242,7 @@ export function ControlBar() {
         {totalLoadedWithoutFilter !== null ? totalLoadedWithoutFilter : mergedCommits.length} loaded
       </span>
 
-      <CommitListSettingsPopover />
+      <ViewSettingsDialog />
 
       {showRemoteButton && (
         <ToolbarIconButton

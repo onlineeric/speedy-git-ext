@@ -1,10 +1,13 @@
 import * as vscode from 'vscode';
 import type { InitialDataPayload, ResponseMessage } from '../../shared/messages.js';
-import type { Commit, GraphFilters, TagMetadata, UncommittedSummary, UserSettings } from '../../shared/types.js';
+import type { AvatarUrlMap, Commit, GraphFilters, TagMetadata, UncommittedSummary, UserSettings } from '../../shared/types.js';
 import { DEFAULT_USER_SETTINGS } from '../../shared/types.js';
 import { GitError, type GitErrorCode, type Result } from '../../shared/errors.js';
 import { toCommitCountBucket } from '../../shared/telemetry.js';
 import { GitHubAvatarService } from '../services/GitHubAvatarService.js';
+import type { AvatarCacheStore } from '../services/AvatarCacheStore.js';
+import type { AvatarRefreshQueue } from '../services/AvatarRefreshQueue.js';
+import { toDayNumber, type AvatarLookupTask } from '../services/avatarCachePolicy.js';
 import type { TelemetryService } from '../services/TelemetryService.js';
 import type { GitServiceRegistry } from './GitServiceRegistry.js';
 import type { PersistedUIStateStore } from './PersistedUIStateStore.js';
@@ -16,11 +19,21 @@ export interface SubmoduleNavigationHandlers {
   backToParentRepo: () => Promise<void> | void;
 }
 
+/** A repository on github.com, as parsed from the `origin` remote. */
+export interface GitHubRepoRef {
+  owner: string;
+  repo: string;
+}
+
 export interface RepoDataLoaderDependencies {
   readonly log: vscode.LogOutputChannel;
   readonly runtime: WebviewRuntime;
   readonly services: GitServiceRegistry;
   readonly uiStateStore: PersistedUIStateStore;
+  readonly avatarCache: AvatarCacheStore;
+  readonly avatarQueue: AvatarRefreshQueue;
+  /** Whether GitHub lookups are authorized, for the orientation log line. */
+  readonly isAvatarAuthorized: () => boolean;
   readonly postMessage: (message: ResponseMessage) => void;
   readonly getSettings: () => UserSettings | undefined;
   readonly getBatchSize: () => number;
@@ -70,16 +83,25 @@ export function computeCommitFingerprint(commits: Commit[]): string {
 export class RepoDataLoader {
   /** One-shot: the `perf initialLoad` telemetry event fires once per session. */
   private initialLoadPerfSent = false;
-  private gitHubAvatarService: GitHubAvatarService | null = null;
+  private gitHubRepo: GitHubRepoRef | null = null;
   // In-flight init, so concurrent loads coalesce onto one attempt. Cleared once
-  // settled; a failed attempt (null service) is retried on the next load.
-  private gitHubAvatarInit: Promise<GitHubAvatarService | null> | null = null;
+  // settled; a failed attempt (null repo) is retried on the next load.
+  private gitHubRepoInit: Promise<GitHubRepoRef | null> | null = null;
+  /** Keeps the once-per-repo orientation log out of every auto-refresh. */
+  private loggedGitHubRepoState = false;
+  /** Bumped on every repo switch, so an in-flight resolution can tell it is stale. */
+  private repoGeneration = 0;
 
   constructor(private readonly deps: RepoDataLoaderDependencies) {}
 
   resetRepoScopedState(): void {
-    this.gitHubAvatarService = null;
-    this.gitHubAvatarInit = null;
+    // Only the owner/repo pair is repo-scoped. The avatar cache and its refresh
+    // queue deliberately survive repo switches: an avatar belongs to an account,
+    // not to a repository.
+    this.repoGeneration += 1;
+    this.gitHubRepo = null;
+    this.gitHubRepoInit = null;
+    this.loggedGitHubRepoState = false;
   }
 
   async sendInitialData(filters?: Partial<GraphFilters>, isAutoRefresh = false): Promise<void> {
@@ -209,7 +231,7 @@ export class RepoDataLoader {
     }
 
     if ((settings ?? DEFAULT_USER_SETTINGS).avatarsEnabled !== false && fetchedCommits.length > 0) {
-      void this.fetchAndSendGitHubAvatars(fetchedCommits);
+      void this.hydrateAndQueueAvatars(fetchedCommits);
     }
   }
 
@@ -314,75 +336,132 @@ export class RepoDataLoader {
     }
   }
 
-  private async fetchAndSendGitHubAvatars(commits: Commit[]): Promise<void> {
-    const service = await this.ensureGitHubAvatarService();
-    if (!service) return;
-
-    const avatarResult = await service.fetchAvatarUrls(commits);
-    if (!avatarResult.success) return;
-
-    const resolved = Object.keys(avatarResult.value).length;
-    this.deps.log.debug(`GitHub avatars: resolved ${resolved} email(s)`);
-
-    const rateLimitWarning = service.getRateLimitWarning();
-    if (rateLimitWarning) {
-      this.deps.log.warn(rateLimitWarning);
+  /**
+   * Hydrate avatars for a freshly loaded commit batch.
+   *
+   * Cheap and synchronous on the load path: dedupe emails, read what the cache
+   * already holds, post it in one message. Anything missing or past its refresh
+   * window is handed to the background queue, which trickles through it at its
+   * own pace — nothing here waits on the network.
+   */
+  private async hydrateAndQueueAvatars(commits: Commit[]): Promise<void> {
+    const repo = await this.ensureGitHubRepo();
+    if (!repo) {
+      // Log once per repo, not per load: without this the feature simply does
+      // nothing and there is no way to tell whether it is broken or just not
+      // applicable here.
+      if (!this.loggedGitHubRepoState) {
+        this.loggedGitHubRepoState = true;
+        this.deps.log.info(
+          'GitHub avatars unavailable: no `origin` remote pointing at github.com. '
+          + 'Falling back to Gravatar and initials.',
+        );
+      }
+      return;
     }
 
-    if (resolved > 0) {
-      this.deps.postMessage({ type: 'avatarUrls', payload: { urls: avatarResult.value } });
+    const today = toDayNumber(Date.now());
+    const refreshDays = (this.deps.getSettings() ?? DEFAULT_USER_SETTINGS).avatarRefreshDays;
+
+    // Dedupe by email, keeping the author's oldest and newest commit in this
+    // batch as lookup candidates. Order matters: GitHub only knows commits that
+    // have been pushed, and the newest rows are the ones most likely to be local
+    // only — so the oldest sighting is tried first.
+    const emailToHashes = new Map<string, { newest: string; oldest: string }>();
+    for (const commit of commits) {
+      const email = commit.authorEmail.toLowerCase();
+      // `git commit --author="Name <>"` leaves the email empty. There is nothing
+      // to key an account-scoped cache on, so skip it rather than spending a
+      // lookup and filing the answer under "".
+      if (!email) continue;
+      const existing = emailToHashes.get(email);
+      if (existing) {
+        existing.oldest = commit.hash;
+      } else {
+        emailToHashes.set(email, { newest: commit.hash, oldest: commit.hash });
+      }
+    }
+
+    const urls: AvatarUrlMap = {};
+    const sightings: AvatarLookupTask[] = [];
+
+    for (const [email, { newest, oldest }] of emailToHashes) {
+      const hashes = newest === oldest ? [oldest] : [oldest, newest];
+      // Free path: a GitHub no-reply email carries the account id, so it never
+      // needs an API call and never enters the queue.
+      const noreplyUrl = GitHubAvatarService.resolveNoreplyAvatarUrl(email);
+      if (noreplyUrl) {
+        urls[email] = noreplyUrl;
+        continue;
+      }
+
+      // Show whatever we have straight away, even if it is past its window —
+      // the refresh happens behind the picture that is already on screen.
+      const cached = this.deps.avatarCache.get(email);
+      if (cached?.avatarUrl) urls[email] = cached.avatarUrl;
+
+      sightings.push({ email, owner: repo.owner, repo: repo.repo, hashes });
+    }
+
+    if (!this.loggedGitHubRepoState) {
+      this.loggedGitHubRepoState = true;
+      this.deps.log.info(
+        `GitHub avatars enabled for ${repo.owner}/${repo.repo} `
+        + `(${this.deps.isAvatarAuthorized() ? 'authorized, 5000 lookups/hr' : 'not authorized, 60 lookups/hr shared per IP'}), `
+        + `refresh window ${refreshDays} day(s)`,
+      );
+    }
+
+    if (Object.keys(urls).length > 0) {
+      this.deps.postMessage({ type: 'avatarUrls', payload: { urls } });
+    }
+
+    const due = this.deps.avatarCache.touch(sightings, refreshDays, today);
+
+    // Per-load accounting, at debug so auto-refresh does not flood the channel.
+    const noreplyCount = emailToHashes.size - sightings.length;
+    this.deps.log.debug(
+      `GitHub avatars: ${emailToHashes.size} unique author(s) — `
+      + `${Object.keys(urls).length} shown now (${noreplyCount} free no-reply), ${due.length} queued for lookup`,
+    );
+
+    if (due.length > 0) {
+      this.deps.avatarQueue.enqueue(due);
     }
   }
 
   /**
-   * Resolve the avatar service for the current repo, building it once and
-   * coalescing concurrent callers onto a single init. A failed attempt leaves
-   * the service null and clears the latch, so a later load retries it (e.g.
-   * once `origin` is added or a transient `getRemotes` failure clears).
+   * Resolve the current repo's GitHub owner/name, once per repo. A failed
+   * attempt clears the latch so a later load retries it (e.g. once `origin` is
+   * added, or after a transient `getRemotes` failure).
    */
-  private ensureGitHubAvatarService(): Promise<GitHubAvatarService | null> {
-    if (this.gitHubAvatarService) return Promise.resolve(this.gitHubAvatarService);
-    if (!this.gitHubAvatarInit) {
-      this.gitHubAvatarInit = this.createGitHubAvatarService().then((service) => {
-        this.gitHubAvatarService = service;
-        this.gitHubAvatarInit = null;
-        return service;
+  private ensureGitHubRepo(): Promise<GitHubRepoRef | null> {
+    if (this.gitHubRepo) return Promise.resolve(this.gitHubRepo);
+    if (!this.gitHubRepoInit) {
+      const generation = this.repoGeneration;
+      this.gitHubRepoInit = this.resolveGitHubRepo().then((repo) => {
+        // A repo switch while `getRemotes` was in flight makes this the previous
+        // repository's answer. Caching it would point every avatar lookup at the
+        // wrong repo, where the commits do not exist — 404s all round, each one
+        // stamped as "no account" for a full refresh window.
+        if (generation !== this.repoGeneration) return null;
+        this.gitHubRepo = repo;
+        this.gitHubRepoInit = null;
+        return repo;
       });
     }
-    return this.gitHubAvatarInit;
+    return this.gitHubRepoInit;
   }
 
-  /** Build the avatar service from the `origin` GitHub remote, or null if unavailable. */
-  private async createGitHubAvatarService(): Promise<GitHubAvatarService | null> {
+  /** Parse the `origin` remote into a GitHub owner/repo pair, or null. */
+  private async resolveGitHubRepo(): Promise<GitHubRepoRef | null> {
     const remotesResult = await this.deps.services.current().gitRemoteService.getRemotes();
     if (!remotesResult.success) return null;
 
     const origin = remotesResult.value.find((remote) => remote.name === 'origin');
     if (!origin) return null;
 
-    const parsed = GitHubAvatarService.parseGitHubRemote(origin.fetchUrl);
-    if (!parsed) return null;
-
-    const token = await this.getGitHubToken();
-    this.deps.log.info(
-      `GitHub avatars enabled for ${parsed.owner}/${parsed.repo} (${token ? 'authenticated' : 'unauthenticated'})`,
-    );
-    return new GitHubAvatarService(parsed.owner, parsed.repo, token);
-  }
-
-  /**
-   * Best-effort silent GitHub session token from VS Code's built-in auth.
-   * Never prompts: when the user isn't signed in we fall back to unauthenticated
-   * requests. Failures are non-fatal and only reduce the API rate limit.
-   */
-  private async getGitHubToken(): Promise<string | null> {
-    try {
-      const session = await vscode.authentication.getSession('github', [], { silent: true });
-      return session?.accessToken ?? null;
-    } catch (error) {
-      this.deps.log.debug(`GitHub auth session unavailable: ${String(error)}`);
-      return null;
-    }
+    return GitHubAvatarService.parseGitHubRemote(origin.fetchUrl);
   }
 
   private refreshVSCodeSourceControl(): void {

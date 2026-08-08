@@ -5,8 +5,10 @@
  * renders the same item / disabled-item / danger-item / separator styling, so the
  * tokens live here once instead of being re-declared in each menu component.
  *
- * Most call sites should reach for the `MenuItem` component rather than these
- * strings directly — it picks the right one from a single `disabled`/`danger`.
+ * The three item variants are deliberately NOT exported: `MenuItem` is their only
+ * consumer, and it picks between them from a single `disabled`/`danger` prop.
+ * Handing the strings out again is what previously let a call site state the
+ * condition twice and get the two halves out of step.
  */
 
 /**
@@ -22,7 +24,7 @@ const itemHoverClass =
 /** Geometry + hover affordance, for the items the user can actually invoke. */
 const interactiveItemClass = `${itemBaseClass} cursor-pointer ${itemHoverClass}`;
 
-export const menuItemClass = `${interactiveItemClass} text-[var(--vscode-menu-foreground)]`;
+const menuItemClass = `${interactiveItemClass} text-[var(--vscode-menu-foreground)]`;
 
 /**
  * Item that opens a submenu. Same shape as `menuItemClass` plus room for the
@@ -45,10 +47,17 @@ export const menuSubTriggerClass =
 export const dangerSubTriggerClass =
   `${menuSubTriggerLayoutClass} text-[var(--vscode-errorForeground)]`;
 
-export const menuItemDisabledClass =
+const menuItemDisabledClass =
   `${itemBaseClass} text-[var(--vscode-disabledForeground)] cursor-not-allowed`;
 
-export const dangerItemClass = `${interactiveItemClass} text-[var(--vscode-errorForeground)]`;
+const dangerItemClass = `${interactiveItemClass} text-[var(--vscode-errorForeground)]`;
+
+/** The three item variants, for `MenuItem` alone to choose between. */
+export const menuItemVariants = {
+  default: menuItemClass,
+  danger: dangerItemClass,
+  disabled: menuItemDisabledClass,
+} as const;
 
 /**
  * Plain group divider. 1px rule + 5px margins = an 11px row, matching the

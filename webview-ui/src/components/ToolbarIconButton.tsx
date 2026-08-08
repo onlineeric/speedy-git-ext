@@ -3,7 +3,8 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
-import { MENU_COLLISION_PADDING, menuContentClass, menuItemClass } from './menuStyles';
+import { MenuItem } from './MenuItem';
+import { MenuContent } from './MenuContent';
 
 interface ToolbarIconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Text shown under the icon when `speedyGit.toolbar.showLabels` is enabled. */
@@ -52,18 +53,17 @@ export const ToolbarIconButton = forwardRef<HTMLButtonElement, ToolbarIconButton
           </button>
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
-          <ContextMenu.Content className={`min-w-[140px] ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
-            <ContextMenu.Item
-              className={menuItemClass}
+          <MenuContent minWidth="min-w-[140px]">
+            <MenuItem
               onSelect={() => {
                 trackUiInteraction('toolbarContextMenu', 'toggleLabels');
                 rpcClient.setToolbarSetting('showLabels', !showLabels);
               }}
             >
               {showLabels ? 'Hide Labels' : 'Show Labels'}
-            </ContextMenu.Item>
+            </MenuItem>
             {extraMenuItems}
-          </ContextMenu.Content>
+          </MenuContent>
         </ContextMenu.Portal>
       </ContextMenu.Root>
     );
@@ -79,14 +79,13 @@ export const ToolbarIconButton = forwardRef<HTMLButtonElement, ToolbarIconButton
 export function RemoteButtonToggleItem() {
   const showRemoteButton = useGraphStore((state) => state.userSettings.toolbarShowRemoteButton);
   return (
-    <ContextMenu.Item
-      className={menuItemClass}
+    <MenuItem
       onSelect={() => {
         trackUiInteraction('toolbarContextMenu', 'toggleRemoteButton');
         rpcClient.setToolbarSetting('showRemoteButton', !showRemoteButton);
       }}
     >
       {showRemoteButton ? 'Hide Remote Button' : 'Show Remote Button'}
-    </ContextMenu.Item>
+    </MenuItem>
   );
 }

@@ -1,22 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { graphDataHandlers } from '../webview/handlers/graphDataHandlers.js';
 import type { WebviewRequestContext } from '../webview/WebviewRequestContext.js';
+import type { GitLogService } from '../services/GitLogService.js';
 import { ok, err, GitError } from '../../shared/errors.js';
 
 vi.mock('vscode', () => ({
   window: { showErrorMessage: vi.fn(() => Promise.resolve(undefined)) },
 }));
 
-const execute = vi.fn();
-vi.mock('../services/GitExecutor.js', () => ({
-  GitExecutor: class {
-    execute = (...args: unknown[]) => execute(...args);
-  },
-}));
-
 interface LogServiceMock {
   getHeadCommitHash: ReturnType<typeof vi.fn>;
   getCommitPosition: ReturnType<typeof vi.fn>;
+  getContainingBranches: ReturnType<typeof vi.fn>;
 }
 
 function makeContext(gitLogService: Partial<LogServiceMock> = {}) {
@@ -111,52 +106,31 @@ describe('graphDataHandlers.locateHead', () => {
   });
 });
 
+// Ref-name parsing itself is GitLogService's job and is covered there; this only
+// pins how the handler turns the service's Result into a webview message.
 describe('graphDataHandlers.getContainingBranches', () => {
-  async function run(stdout: string) {
-    execute.mockResolvedValue(ok({ stdout, stderr: '' }));
-    const { context, postMessage } = makeContext();
+  async function run(result: Awaited<ReturnType<GitLogService['getContainingBranches']>>) {
+    const { context, postMessage } = makeContext({
+      getContainingBranches: vi.fn().mockResolvedValue(result),
+    });
     await graphDataHandlers.getContainingBranches(
       { type: 'getContainingBranches', payload: { hash: 'abc123' } },
       context,
     );
-    return { postMessage, branches: postMessage.mock.calls[0][0].payload.branches as string[] };
+    return postMessage;
   }
 
-  it('asks git for fully-qualified ref names', async () => {
-    await run('refs/heads/main\n');
+  it('forwards the branches the service resolved', async () => {
+    const postMessage = await run(ok(['main', 'origin/main']));
 
-    expect(execute).toHaveBeenCalledWith(expect.objectContaining({
-      args: ['branch', '-a', '--contains', 'abc123', '--format=%(refname)'],
-      cwd: '/repo',
-    }));
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'containingBranches',
+      payload: { hash: 'abc123', branches: ['main', 'origin/main'], status: 'loaded' },
+    });
   });
 
-  it('distinguishes a slashed local branch from a remote-tracking branch', async () => {
-    const { branches } = await run('refs/heads/eric/wip\nrefs/remotes/origin/eric/wip\n');
-
-    expect(branches).toEqual(['eric/wip', 'origin/eric/wip']);
-  });
-
-  it('keeps a local branch named release/HEAD but drops the remote HEAD pointer', async () => {
-    const { branches } = await run('refs/heads/release/HEAD\nrefs/remotes/origin/HEAD\n');
-
-    expect(branches).toEqual(['release/HEAD']);
-  });
-
-  it('drops the detached-HEAD pseudo entry', async () => {
-    const { branches } = await run('(HEAD detached at abc1234)\nrefs/heads/main\n');
-
-    expect(branches).toEqual(['main']);
-  });
-
-  it('reports an error status when git fails', async () => {
-    execute.mockResolvedValue(err(new GitError('boom', 'UNKNOWN')));
-    const { context, postMessage } = makeContext();
-
-    await graphDataHandlers.getContainingBranches(
-      { type: 'getContainingBranches', payload: { hash: 'abc123' } },
-      context,
-    );
+  it('reports an error status when the service fails', async () => {
+    const postMessage = await run(err(new GitError('boom', 'UNKNOWN')));
 
     expect(postMessage).toHaveBeenCalledWith({
       type: 'containingBranches',

@@ -3,8 +3,8 @@ import { rpcClient } from '../rpc/rpcClient';
 import { useCopyFeedback } from '../hooks/useCopyFeedback';
 import { trackUiInteraction } from '../utils/telemetry';
 import { HELP_LINKS, ISSUES_URL, VERSION_LABEL, type HelpLinkAction } from '../utils/helpLinks';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
-import { CheckIcon, CopyIcon } from './icons';
+import { buttonSecondaryClassName, dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { CopiedIcon, CopyIcon } from './icons';
 
 interface HelpDialogProps {
   open: boolean;
@@ -60,7 +60,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
               aria-label="Copy issues link"
             >
               {copied ? (
-                <CheckIcon className="w-3.5 h-3.5 text-green-400" />
+                <CopiedIcon className="w-3.5 h-3.5" />
               ) : (
                 <CopyIcon className="w-3.5 h-3.5" />
               )}
@@ -94,9 +94,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
             <span className="text-xs text-[var(--vscode-descriptionForeground)]">
               {VERSION_LABEL}
             </span>
-            <Dialog.Close className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]">
-              Close
-            </Dialog.Close>
+            <Dialog.Close className={buttonSecondaryClassName}>Close</Dialog.Close>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

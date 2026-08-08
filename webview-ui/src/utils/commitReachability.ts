@@ -17,12 +17,13 @@ export interface ReachabilityChecker {
 }
 
 /**
- * Build a reachability checker that closes over a single commit-by-hash map. Use this when
- * many reachability questions are asked against the same commit set (e.g. a tooltip that
- * iterates over every commit) — the alternative `isReachableFromHead` rebuilds the map on
- * every call, which is O(n) per call.
+ * Build a reachability checker that closes over a single commit-by-hash map.
+ *
+ * Private on purpose: `getReachabilityChecker` is the only way in, so no caller
+ * can accidentally pay the O(n) map build per question. See its comment for why
+ * that matters.
  */
-export function createReachabilityChecker(commits: Commit[]): ReachabilityChecker {
+function createReachabilityChecker(commits: Commit[]): ReachabilityChecker {
   const commitByHash = new Map<string, Commit>();
   let fullHashLength = 0;
   for (const commit of commits) {
@@ -55,9 +56,12 @@ export function createReachabilityChecker(commits: Commit[]): ReachabilityChecke
       const queue = [resolvedHead];
       const seen = new Set<string>();
 
-      while (queue.length > 0) {
-        const hash = queue.shift();
-        if (!hash || seen.has(hash)) continue;
+      // Walked with a cursor rather than `shift()`: shifting re-indexes the whole
+      // array each time, which turns this into O(n²) on the tens-of-thousands-of-
+      // commits lists a "Go to HEAD" navigation can leave loaded.
+      for (let i = 0; i < queue.length; i++) {
+        const hash = queue[i];
+        if (seen.has(hash)) continue;
         if (hash === resolvedTarget) return true;
 
         seen.add(hash);
@@ -91,14 +95,6 @@ export function createReachabilityChecker(commits: Commit[]): ReachabilityChecke
       return false;
     },
   };
-}
-
-/**
- * One-shot reachability check. Builds a fresh commit-by-hash map on every call. Prefer
- * `createReachabilityChecker` when asking multiple questions against the same commit set.
- */
-export function isReachableFromHead(commitHash: string, headHash: string, commits: Commit[]): boolean {
-  return getReachabilityChecker(commits).isReachableFromHead(commitHash, headHash);
 }
 
 /**

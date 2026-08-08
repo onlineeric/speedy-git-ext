@@ -3,7 +3,7 @@ import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { RevertState, RevertOptions } from '../../shared/types.js';
 import { validateHash } from '../utils/gitValidation.js';
-import { isConflictStderr } from '../utils/gitParsers.js';
+import { gitErrorDetail, isConflictStderr, isNothingToApplyStderr } from '../utils/gitParsers.js';
 
 /** Git reverted nothing because the branch already contains the inverse of the commit. */
 const ALREADY_REVERTED_MESSAGE =
@@ -130,8 +130,8 @@ export class GitRevertService {
     this.log.info(`Revert commit (edit message): ${hash}`);
     const step1 = await this.executor.execute({ args: step1Args, cwd: this.workspacePath });
     if (!step1.success) {
-      const errorDetail = step1.error.stderr || step1.error.message || '';
-      if (errorDetail.includes('nothing to commit') || errorDetail.includes('nothing to revert')) {
+      const errorDetail = gitErrorDetail(step1.error);
+      if (isNothingToApplyStderr(errorDetail)) {
         return err(new GitError(ALREADY_REVERTED_MESSAGE, 'COMMAND_FAILED'));
       }
       if (isConflictStderr(errorDetail)) {
@@ -173,8 +173,8 @@ export class GitRevertService {
     this.log.info(`Revert commit (stage only): ${hash}`);
     const result = await this.executor.execute({ args, cwd: this.workspacePath });
     if (!result.success) {
-      const errorDetail = result.error.stderr || result.error.message || '';
-      if (errorDetail.includes('nothing to commit') || errorDetail.includes('nothing to revert')) {
+      const errorDetail = gitErrorDetail(result.error);
+      if (isNothingToApplyStderr(errorDetail)) {
         return err(new GitError(ALREADY_REVERTED_MESSAGE, 'COMMAND_FAILED'));
       }
       if (isConflictStderr(errorDetail)) {
@@ -196,8 +196,8 @@ export class GitRevertService {
     this.log.info(`Revert commit: ${hash}`);
     const result = await this.executor.execute({ args, cwd: this.workspacePath });
     if (!result.success) {
-      const errorDetail = result.error.stderr || result.error.message || '';
-      if (errorDetail.includes('nothing to commit') || errorDetail.includes('nothing to revert')) {
+      const errorDetail = gitErrorDetail(result.error);
+      if (isNothingToApplyStderr(errorDetail)) {
         return err(new GitError(ALREADY_REVERTED_MESSAGE, 'COMMAND_FAILED'));
       }
       if (await this.isRevertInProgress() || isConflictStderr(errorDetail)) {

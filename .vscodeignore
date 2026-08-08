@@ -14,6 +14,8 @@ docs/**
 scripts/**
 specs/**
 AGENTS.md
+AGENTS.create.sh
+test-repo-dup.code-workspace
 CLAUDE.md
 eslint.config.mjs
 vitest.config.ts

@@ -19,6 +19,12 @@ export interface UserSettings {
   /** date-fns token string, used only when `dateFormat === 'custom'`. Invalid tokens fall back to `relative`. */
   dateFormatCustom: string;
   avatarsEnabled: boolean;
+  /**
+   * Days an avatar stays fresh before it is queued for a background refresh.
+   * Expiry is computed at read time (`lastRefreshAt + avatarRefreshDays`), never
+   * stored, so changing this applies retroactively to everything already cached.
+   */
+  avatarRefreshDays: number;
   showRemoteBranches: boolean;
   showTags: boolean;
   batchCommitSize: number;
@@ -89,6 +95,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   dateFormat: 'relative',
   dateFormatCustom: '',
   avatarsEnabled: true,
+  avatarRefreshDays: 30,
   showRemoteBranches: true,
   showTags: true,
   batchCommitSize: 500,
@@ -111,6 +118,30 @@ export function clampBatchCommitSize(value: number): number {
     return DEFAULT_USER_SETTINGS.batchCommitSize;
   }
   return Math.min(value, MAX_BATCH_COMMIT_SIZE);
+}
+
+/**
+ * Bounds for `speedyGit.avatars.refreshDays`, mirroring package.json.
+ *
+ * Shared rather than per-side: the settings input clamps what it sends and the
+ * backend clamps what it stores, and if those two disagreed the UI would accept
+ * a value the backend silently rewrote.
+ */
+export const MIN_AVATAR_REFRESH_DAYS = 1;
+export const MAX_AVATAR_REFRESH_DAYS = 365;
+
+/**
+ * Coerce a user-supplied refresh window into the supported range.
+ *
+ * Accepts the raw string straight from the settings input as well as a number,
+ * so both sides apply one rule: clamp rather than reject, so the user never has
+ * to guess the valid range, and fall back to the current setting when the box is
+ * empty or unparseable rather than clearing it.
+ */
+export function clampAvatarRefreshDays(value: number | string, fallback: number): number {
+  const parsed = typeof value === 'string' ? Number.parseInt(value.trim(), 10) : value;
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(MAX_AVATAR_REFRESH_DAYS, Math.max(MIN_AVATAR_REFRESH_DAYS, Math.round(parsed)));
 }
 
 export interface Commit {
@@ -457,6 +488,26 @@ export interface InteractiveRebaseConfig {
 }
 
 export type AvatarUrlMap = Record<string, string>;
+
+/**
+ * GitHub authorization state for avatar lookups, as shown in the View popover's
+ * Avatars section. Deliberately carries no token and no repository identity.
+ */
+export interface AvatarAuthState {
+  /**
+   * True once the user has clicked "Allow avatar lookup" and GitHub granted a
+   * session. Speedy Git never uses a silently-available session without this —
+   * the opt-in is what makes "Remove token" meaningful.
+   */
+  authorized: boolean;
+  /** GitHub account label for the granted session, or null when not authorized. */
+  accountLabel: string | null;
+  /**
+   * Unix ms when the GitHub rate limit resets, or null when not currently
+   * limited. Lets the UI explain the pause instead of looking stuck.
+   */
+  rateLimitResetAt: number | null;
+}
 
 export interface WorktreeInfo {
   path: string;

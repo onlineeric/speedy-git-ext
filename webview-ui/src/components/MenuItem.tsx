@@ -1,6 +1,6 @@
 import type { ComponentPropsWithoutRef } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import { dangerItemClass, menuItemClass, menuItemDisabledClass } from './menuStyles';
+import { menuItemVariants } from './menuStyles';
 
 interface MenuItemProps extends ComponentPropsWithoutRef<typeof ContextMenu.Item> {
   /**
@@ -19,7 +19,11 @@ interface MenuItemProps extends ComponentPropsWithoutRef<typeof ContextMenu.Item
  * dead — so the condition is given once here and drives both.
  */
 export function MenuItem({ danger = false, disabled = false, className, ...props }: MenuItemProps) {
-  const styleClass = disabled ? menuItemDisabledClass : danger ? dangerItemClass : menuItemClass;
+  const styleClass = disabled
+    ? menuItemVariants.disabled
+    : danger
+      ? menuItemVariants.danger
+      : menuItemVariants.default;
   return (
     <ContextMenu.Item
       {...props}

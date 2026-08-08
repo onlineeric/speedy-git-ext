@@ -88,6 +88,7 @@ export const UI_SURFACES = [
   'helpDialog',
   'panelToggle',
   'columnHeader',
+  'avatarSettings',
 ] as const;
 
 export type UiSurface = (typeof UI_SURFACES)[number];
@@ -126,6 +127,8 @@ export const UI_ACTIONS = [
   'columnShowHash', 'columnHideHash', 'columnShowMessage', 'columnHideMessage',
   'columnShowAuthor', 'columnHideAuthor', 'columnShowDate', 'columnHideDate',
   'columnShowSignature', 'columnHideSignature',
+  // Avatar settings section (View popover) + the Author-header shortcut to it
+  'avatarAuthorizeClick', 'avatarRemoveTokenClick', 'avatarRefreshDaysChange', 'avatarSettingsShortcut', 'avatarClearCache',
 ] as const;
 
 export type UiAction = (typeof UI_ACTIONS)[number];
@@ -139,6 +142,8 @@ export const DIALOG_IDS = [
   'stash', 'dropStash', 'discard', 'discardAll', 'filePicker',
   'createWorktree', 'removeWorktree', 'pruneWorktree',
   'removeRemote',
+  // GitHub sign-in prompt for avatar lookups: confirmed = granted, cancelled = declined
+  'avatarAuthorize',
 ] as const;
 
 export type DialogId = (typeof DIALOG_IDS)[number];

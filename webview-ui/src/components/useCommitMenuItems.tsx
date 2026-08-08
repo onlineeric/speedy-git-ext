@@ -31,7 +31,7 @@ import { DropCommitDialog } from './DropCommitDialog';
 import { CreateWorktreeDialog } from './CreateWorktreeDialog';
 import { MenuItem } from './MenuItem';
 import { MenuSubTrigger } from './MenuSubTrigger';
-import { MENU_COLLISION_PADDING, menuContentClass } from './menuStyles';
+import { MenuSubContent } from './MenuContent';
 
 /**
  * Where the commit items are being rendered.
@@ -58,14 +58,18 @@ function buildResetDescription(
   hasRemote: boolean,
   branchName: string | undefined
 ): string {
+  // Soft and mixed resets keep the work, so the only thing worth warning about
+  // is the force-push — and the dialog only opens for them when there *is* a
+  // remote, which is why this branch names no specifics.
+  if (mode !== 'hard') {
+    return 'This branch has a remote counterpart. After resetting, you will need to force-push to update the remote, which may affect collaborators. Proceed?';
+  }
+
   const remotePart =
     hasRemote && branchName
       ? ` Because this branch has a remote counterpart (origin/${branchName}), you will need to force-push to update the remote, which may affect collaborators.`
       : '';
-  if (mode === 'hard') {
-    return `This will permanently discard all staged and unstaged changes from the removed commits.${remotePart} This action cannot be undone.`;
-  }
-  return `This branch has a remote counterpart. After resetting, you will need to force-push to update the remote, which may affect collaborators. Proceed?`;
+  return `This will permanently discard all staged and unstaged changes from the removed commits.${remotePart} This action cannot be undone.`;
 }
 
 /**
@@ -432,7 +436,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
         <ContextMenu.Sub>
           <MenuSubTrigger danger>Reset Current Branch to Here</MenuSubTrigger>
           <ContextMenu.Portal>
-            <ContextMenu.SubContent className={`min-w-[160px] ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
+            <MenuSubContent minWidth="min-w-[160px]">
               <MenuItem onSelect={() => { track('resetSoft'); handleResetSelect('soft'); }}>
                 Soft (keep staged)
               </MenuItem>
@@ -444,7 +448,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
               <MenuItem danger onSelect={() => { track('resetHard'); handleResetSelect('hard'); }}>
                 Hard (discard all)
               </MenuItem>
-            </ContextMenu.SubContent>
+            </MenuSubContent>
           </ContextMenu.Portal>
         </ContextMenu.Sub>
       )}

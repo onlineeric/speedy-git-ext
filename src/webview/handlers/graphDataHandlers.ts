@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
-import { GitExecutor } from '../../services/GitExecutor.js';
-import { parseBranchRefName } from '../../utils/gitParsers.js';
+import type { CommitsResult } from '../../services/GitLogService.js';
 import { MAX_BATCH_COMMIT_SIZE, UNCOMMITTED_HASH } from '../../../shared/types.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 import { postUncommittedCommitDetails } from './workingTreeHandlers.js';
@@ -48,7 +47,7 @@ export const graphDataHandlers = {
       ? Math.min(Math.ceil((targetIndex - skip + 1) / batchSize) * batchSize, MAX_BATCH_COMMIT_SIZE)
       : batchSize;
     const result = await context.services.current().gitLogService.getCommits({ ...filters, maxCount, skip });
-    const postAppended = (value: Extract<typeof result, { success: true }>['value']) => {
+    const postAppended = (value: CommitsResult) => {
       context.postMessage({
         type: 'commitsAppended',
         payload: {
@@ -131,26 +130,14 @@ export const graphDataHandlers = {
   },
 
   getContainingBranches: async (message, context) => {
-    const executor = new GitExecutor(context.log);
-    const result = await executor.execute({
-      // `%(refname)` (not `:short`) so a local branch with a slash is never read
-      // as `<remote>/<branch>` — see parseBranchRefName.
-      args: ['branch', '-a', '--contains', message.payload.hash, '--format=%(refname)'],
-      cwd: context.runtime.currentRepoPath,
-    });
-    let branches: string[] = [];
-    let status: 'loaded' | 'error' = 'loaded';
-    if (result.success) {
-      branches = result.value.stdout
-        .split('\n')
-        .map(parseBranchRefName)
-        .filter((name): name is string => name !== null);
-    } else {
-      status = 'error';
-    }
+    const result = await context.services.current().gitLogService.getContainingBranches(message.payload.hash);
     context.postMessage({
       type: 'containingBranches',
-      payload: { hash: message.payload.hash, branches, status },
+      payload: {
+        hash: message.payload.hash,
+        branches: result.success ? result.value : [],
+        status: result.success ? 'loaded' : 'error',
+      },
     });
   },
 

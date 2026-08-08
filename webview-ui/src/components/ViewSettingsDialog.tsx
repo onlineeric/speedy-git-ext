@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import * as Popover from '@radix-ui/react-popover';
+import { useMemo } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import {
   DndContext,
   KeyboardSensor,
@@ -28,6 +28,8 @@ import {
   setCommitTableColumnVisibility,
 } from '../utils/commitTableLayout';
 import { trackUiInteraction } from '../utils/telemetry';
+import { AvatarSettingsSection } from './AvatarSettingsSection';
+import { buttonSecondaryClassName, dialogContentClassName, dialogSectionLabelClassName } from './dialogStyles';
 import { ColumnsIcon } from './icons';
 import { ToolbarIconButton, RemoteButtonToggleItem } from './ToolbarIconButton';
 
@@ -54,8 +56,11 @@ const COLUMN_WARNINGS: Partial<Record<CommitTableColumnId, string>> = {
     'Warning: signature checks run in the background and can use high CPU in large repositories. Keep this column hidden on slower machines.',
 };
 
-export function CommitListSettingsPopover() {
-  const [open, setOpen] = useState(false);
+export function ViewSettingsDialog() {
+  // Open state lives in the store so the Author column header's gear can open
+  // this same dialog.
+  const open = useGraphStore((state) => state.viewSettingsOpen);
+  const setOpen = useGraphStore((state) => state.setViewSettingsOpen);
   const commitTableLayout = useGraphStore((state) => state.commitTableLayout);
   const setCommitTableLayout = useGraphStore((state) => state.setCommitTableLayout);
 
@@ -114,8 +119,8 @@ export function CommitListSettingsPopover() {
     : 'text-[var(--vscode-icon-foreground)] opacity-70 hover:opacity-100';
 
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger asChild>
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger asChild>
         <ToolbarIconButton
           label="View"
           icon={<ColumnsIcon className="h-6 w-6" />}
@@ -125,25 +130,24 @@ export function CommitListSettingsPopover() {
           aria-label="Commit list settings"
           extraMenuItems={<RemoteButtonToggleItem />}
         />
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          side="bottom"
-          align="end"
-          sideOffset={8}
-          className="z-50 w-[320px] rounded border border-[var(--vscode-menu-border)] bg-[var(--vscode-menu-background)] p-3 shadow-lg"
-          onPointerDownOutside={(event) => {
-            const target = event.target as HTMLElement;
-            if (target.closest('[data-radix-menu-content]') || target.closest('[role="dialog"]')) {
-              event.preventDefault();
-            }
-          }}
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <Dialog.Content
+          className={`${dialogContentClassName} flex max-h-[85vh] w-[46rem] max-w-[92vw] flex-col`}
         >
-          <div className="space-y-3">
-            <section>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--vscode-descriptionForeground)]">
-                Columns
-              </div>
+          <Dialog.Title className="mb-1 text-base font-semibold text-[var(--vscode-foreground)]">
+            View settings
+          </Dialog.Title>
+          <Dialog.Description className="mb-4 text-xs text-[var(--vscode-descriptionForeground)]">
+            Choose which columns appear in the commit list and how author avatars are loaded.
+          </Dialog.Description>
+
+          {/* Two columns so neither half grows tall enough to need scrolling.
+              Stacks on narrow panels, where side-by-side would be unreadable. */}
+          <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto md:grid-cols-2">
+            <section className="min-w-0">
+              <div className={dialogSectionLabelClassName}>Columns</div>
               <p className="mb-3 text-xs text-[var(--vscode-descriptionForeground)]">
                 Graph stays first and always visible. Drag optional columns to reorder them.
               </p>
@@ -174,18 +178,29 @@ export function CommitListSettingsPopover() {
                 <button
                   type="button"
                   onClick={handleResetWidths}
-                  className="w-full rounded px-2.5 py-1.5 text-left text-xs text-[var(--vscode-descriptionForeground)] transition-colors hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)] focus:outline-none"
+                  className={`${buttonSecondaryClassName} w-full text-xs`}
                   title="Restore all column widths to their factory defaults"
                 >
                   Reset column widths to defaults
                 </button>
               </div>
             </section>
+
+            <div className="min-w-0 md:border-l md:border-[var(--vscode-panel-border)] md:pl-6">
+              <AvatarSettingsSection />
+            </div>
           </div>
-          <Popover.Arrow className="fill-[var(--vscode-menu-border)]" />
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+
+          <div className="mt-4 flex justify-end border-t border-[var(--vscode-panel-border)] pt-3">
+            <Dialog.Close asChild>
+              <button type="button" className={`${buttonSecondaryClassName} text-xs`}>
+                Close
+              </button>
+            </Dialog.Close>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 

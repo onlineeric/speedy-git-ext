@@ -7,6 +7,29 @@ export function isConflictStderr(stderr: string): boolean {
 }
 
 /**
+ * Git found nothing to apply — the revert or cherry-pick is already in the
+ * branch, so it would produce an empty commit.
+ *
+ * Every wording git uses for that outcome is matched here rather than at each
+ * call site: revert and cherry-pick phrase it differently, and a git release that
+ * rewords one of them should be a single edit, not a hunt through both services.
+ */
+export function isNothingToApplyStderr(stderr: string): boolean {
+  return stderr.includes('nothing to commit')
+    || stderr.includes('nothing to revert')
+    || stderr.includes('The previous cherry-pick is now empty');
+}
+
+/**
+ * The most specific text a failed git command gave us. `stderr` is where git
+ * explains itself; the message is the fallback for failures that never reached
+ * git (spawn errors, timeouts).
+ */
+export function gitErrorDetail(error: { stderr?: string; message?: string }): string {
+  return error.stderr || error.message || '';
+}
+
+/**
  * The commit a stash was taken on top of, from a `%P` (parent hashes) field.
  *
  * A stash commit has two or three parents: the base commit, the index snapshot

@@ -2,7 +2,8 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
-import { MENU_COLLISION_PADDING, menuContentClass, menuItemClass } from './menuStyles';
+import { MenuItem } from './MenuItem';
+import { MenuContent } from './MenuContent';
 
 interface DateContextMenuProps {
   /** Unix timestamp (milliseconds) */
@@ -22,9 +23,9 @@ export function DateContextMenu({ authorDate, children }: DateContextMenuProps) 
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
         <ContextMenu.Portal>
-          <ContextMenu.Content className={`min-w-[180px] ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
+          <MenuContent minWidth="min-w-[180px]">
             <DateFilterMenuItems authorDate={authorDate} />
-          </ContextMenu.Content>
+          </MenuContent>
         </ContextMenu.Portal>
       </ContextMenu.Root>
     </span>
@@ -62,12 +63,8 @@ function DateFilterMenuItems({ authorDate }: { authorDate: number }) {
 
   return (
     <>
-      <ContextMenu.Item className={menuItemClass} onSelect={handleFilterFrom}>
-        Filter from this date
-      </ContextMenu.Item>
-      <ContextMenu.Item className={menuItemClass} onSelect={handleFilterTo}>
-        Filter to this date
-      </ContextMenu.Item>
+      <MenuItem onSelect={handleFilterFrom}>Filter from this date</MenuItem>
+      <MenuItem onSelect={handleFilterTo}>Filter to this date</MenuItem>
     </>
   );
 }

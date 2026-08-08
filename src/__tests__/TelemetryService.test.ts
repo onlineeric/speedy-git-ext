@@ -170,14 +170,14 @@ describe('real implementation', () => {
         dateFormat: 'relative', avatarsEnabled: 'true', showTags: 'true', showRemoteBranches: 'true',
         toolbarShowLabels: 'true', toolbarShowRemoteButton: 'true', statusBarText: 'iconAndText',
       },
-      { batchCommitSize: 500, overScan: 50 },
+      { batchCommitSize: 500, overScan: 50, avatarRefreshDays: 30 },
     );
     service.sendSettingsSnapshot(
       {
         dateFormat: 'system', avatarsEnabled: 'false', showTags: 'false', showRemoteBranches: 'false',
         toolbarShowLabels: 'false', toolbarShowRemoteButton: 'false', statusBarText: 'icon',
       },
-      { batchCommitSize: 100, overScan: 0 },
+      { batchCommitSize: 100, overScan: 0, avatarRefreshDays: 7 },
     );
 
     const activateCalls = sendTelemetryEvent.mock.calls.filter(([name]) => name === 'activate');

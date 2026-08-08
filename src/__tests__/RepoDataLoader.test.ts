@@ -6,6 +6,7 @@ import { PersistedUIStateStore } from '../webview/PersistedUIStateStore.js';
 import { RepoDataLoader, computeCommitFingerprint } from '../webview/RepoDataLoader.js';
 import { WebviewRuntime } from '../webview/WebviewRuntime.js';
 import { createTelemetryStub } from './telemetryTestStub.js';
+import { createAvatarCacheStub, createAvatarQueueStub } from './avatarTestStubs.js';
 
 vi.mock('vscode', () => ({
   Uri: {
@@ -87,6 +88,9 @@ function createLoaderFixture(options: {
     runtime,
     services,
     uiStateStore,
+    avatarCache: createAvatarCacheStub(),
+    avatarQueue: createAvatarQueueStub(),
+    isAvatarAuthorized: () => false,
     postMessage,
     getSettings: () => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }),
     getBatchSize: () => 500,

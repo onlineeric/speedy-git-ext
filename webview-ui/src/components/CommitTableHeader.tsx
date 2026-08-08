@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { CommitTableColumnId, CommitTableLayout } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
+import { trackUiInteraction } from '../utils/telemetry';
 import { InfoIcon, SettingsIcon } from './icons';
 import {
   COMMIT_TABLE_MIN_WIDTHS,
@@ -79,6 +80,10 @@ function HeaderIconButton({
 export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
   const [resizeSession, setResizeSession] = useState<ResizeSession | null>(null);
   const updateCommitTableLayout = useGraphStore((state) => state.updateCommitTableLayout);
+  // The Author gear is a shortcut into the Avatars section, so it only earns its
+  // place while there is something to set up.
+  const avatarAuthorized = useGraphStore((state) => state.avatarAuthState.authorized);
+  const setViewSettingsOpen = useGraphStore((state) => state.setViewSettingsOpen);
 
   const handleDoubleClick = useCallback((columnId: CommitTableColumnId) => {
     const { commits, topology, userSettings, commitTableLayout } = useGraphStore.getState();
@@ -176,6 +181,18 @@ export function CommitTableHeader({ layout }: CommitTableHeaderProps) {
                 onActivate={() => rpcClient.openSignatureHelp()}
               >
                 <InfoIcon />
+              </HeaderIconButton>
+            )}
+            {column.id === 'author' && !avatarAuthorized && (
+              <HeaderIconButton
+                title="Set up GitHub avatars"
+                ariaLabel="Set up GitHub avatars"
+                onActivate={() => {
+                  trackUiInteraction('columnHeader', 'avatarSettingsShortcut');
+                  setViewSettingsOpen(true);
+                }}
+              >
+                <SettingsIcon />
               </HeaderIconButton>
             )}
             {column.id === 'date' && (

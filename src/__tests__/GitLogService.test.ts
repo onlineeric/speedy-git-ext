@@ -1,6 +1,7 @@
 import type { LogOutputChannel } from 'vscode';
 import { describe, it, expect, vi } from 'vitest';
 import { GitLogService } from '../services/GitLogService.js';
+import { GitError } from '../../shared/errors.js';
 
 const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as LogOutputChannel;
 
@@ -285,5 +286,60 @@ describe('GitLogService.getCommitPosition', () => {
     const result = await service.getCommitPosition('zzz');
 
     expect(result).toEqual({ success: true, value: -1 });
+  });
+});
+
+describe('GitLogService.getContainingBranches', () => {
+  /** Answer the `git branch --contains` call with `stdout`. */
+  function serviceReturning(stdout: string) {
+    const service = new GitLogService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockResolvedValue({ success: true, value: { stdout, stderr: '' } });
+    return { service, executeSpy };
+  }
+
+  it('asks git for fully-qualified ref names', async () => {
+    const { service, executeSpy } = serviceReturning('refs/heads/main\n');
+
+    await service.getContainingBranches('abc123');
+
+    expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({
+      args: ['branch', '-a', '--contains', 'abc123', '--format=%(refname)'],
+      cwd: '/repo',
+    }));
+  });
+
+  it('distinguishes a slashed local branch from a remote-tracking branch', async () => {
+    const { service } = serviceReturning('refs/heads/eric/wip\nrefs/remotes/origin/eric/wip\n');
+
+    const result = await service.getContainingBranches('abc123');
+
+    expect(result.success && result.value).toEqual(['eric/wip', 'origin/eric/wip']);
+  });
+
+  it('keeps a local branch named release/HEAD but drops the remote HEAD pointer', async () => {
+    const { service } = serviceReturning('refs/heads/release/HEAD\nrefs/remotes/origin/HEAD\n');
+
+    const result = await service.getContainingBranches('abc123');
+
+    expect(result.success && result.value).toEqual(['release/HEAD']);
+  });
+
+  it('drops the detached-HEAD pseudo entry', async () => {
+    const { service } = serviceReturning('(HEAD detached at abc1234)\nrefs/heads/main\n');
+
+    const result = await service.getContainingBranches('abc123');
+
+    expect(result.success && result.value).toEqual(['main']);
+  });
+
+  it('propagates a git failure as an error result', async () => {
+    const service = new GitLogService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute')
+      .mockResolvedValue({ success: false, error: new GitError('boom', 'UNKNOWN') });
+
+    const result = await service.getContainingBranches('abc123');
+
+    expect(result.success).toBe(false);
   });
 });
