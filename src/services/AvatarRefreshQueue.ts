@@ -6,7 +6,6 @@ import type { GitHubAvatarService } from './GitHubAvatarService.js';
 import {
   AVATAR_REFRESH_INTERVAL_MS,
   applyAvatarLookupOutcome,
-  avatarUrlFromRecord,
   compareAvatarRefreshPriority,
   toDayNumber,
   type AvatarLookupOutcome,
@@ -189,9 +188,8 @@ export class AvatarRefreshQueue {
       return;
     }
 
-    const url = avatarUrlFromRecord(updated);
-    if (url && url !== avatarUrlFromRecord(record)) {
-      this.bufferResult(task.email, url);
+    if (updated.avatarUrl && updated.avatarUrl !== record.avatarUrl) {
+      this.bufferResult(task.email, updated.avatarUrl);
     }
   }
 

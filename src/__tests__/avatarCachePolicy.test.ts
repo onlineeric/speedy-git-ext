@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   AVATAR_CACHE_MAX_ENTRIES,
-  accountIdFromAvatarUrl,
   applyAvatarLookupOutcome,
   avatarRefreshTier,
-  avatarUrlForAccount,
-  avatarUrlFromRecord,
   clampAvatarRefreshDays,
   compareAvatarRefreshPriority,
   createPendingRecord,
@@ -20,7 +17,12 @@ import {
 const TODAY = 20_304;
 
 function record(overrides: Partial<AvatarCacheRecord> = {}): AvatarCacheRecord {
-  return { accountId: 93807819, refreshedOn: TODAY, seenOn: TODAY, ...overrides };
+  return {
+    avatarUrl: 'https://avatars.githubusercontent.com/u/93807819?v=4',
+    refreshedOn: TODAY,
+    seenOn: TODAY,
+    ...overrides,
+  };
 }
 
 describe('record footprint', () => {
@@ -29,27 +31,19 @@ describe('record footprint', () => {
     // UI state shares that blob. Guarding the per-record size here is what keeps
     // a future field addition from silently blowing the budget.
     const serialized = JSON.stringify({ 'firstname.lastname@somecompany.com': record() });
-    expect(serialized.length).toBeLessThan(100);
-    expect((serialized.length * AVATAR_CACHE_MAX_ENTRIES) / 1024).toBeLessThan(150);
+    expect(serialized.length).toBeLessThan(160);
+    expect((serialized.length * AVATAR_CACHE_MAX_ENTRIES) / 1024).toBeLessThan(200);
   });
 });
 
-describe('avatar URL <-> account id', () => {
-  it('round-trips the canonical GitHub avatar URL', () => {
-    const url = avatarUrlForAccount(93807819);
-    expect(url).toBe('https://avatars.githubusercontent.com/u/93807819?v=4');
-    expect(accountIdFromAvatarUrl(url)).toBe(93807819);
-  });
-
-  it('returns null for a non-canonical URL so the caller keeps the string', () => {
-    expect(accountIdFromAvatarUrl('https://example.test/avatars/alice.png')).toBeNull();
-  });
-
-  it('reads the URL from a record, preferring the account id', () => {
-    expect(avatarUrlFromRecord(record())).toBe('https://avatars.githubusercontent.com/u/93807819?v=4');
-    expect(avatarUrlFromRecord(record({ accountId: null, url: 'https://example.test/a.png' })))
-      .toBe('https://example.test/a.png');
-    expect(avatarUrlFromRecord(record({ accountId: null }))).toBeNull();
+describe('avatar URL storage', () => {
+  it('keeps whatever URL GitHub returned, verbatim', () => {
+    // Deliberately not reduced to an account id and rebuilt from a template:
+    // the URL format is GitHub's to change, and a template would then produce
+    // wrong URLs for every cached record.
+    const odd = 'https://avatars.githubusercontent.com/u/42?v=9&s=80';
+    const next = applyAvatarLookupOutcome(createPendingRecord(TODAY), { kind: 'found', avatarUrl: odd }, TODAY);
+    expect(next.avatarUrl).toBe(odd);
   });
 });
 
@@ -101,43 +95,30 @@ describe('isAvatarRecordExpired', () => {
 });
 
 describe('applyAvatarLookupOutcome', () => {
-  it('stores the account id, not the URL, on success', () => {
+  it('stores the URL and stamps the day on success', () => {
     const next = applyAvatarLookupOutcome(
       createPendingRecord(TODAY),
       { kind: 'found', avatarUrl: 'https://avatars.githubusercontent.com/u/42?v=4' },
       TODAY,
     );
 
-    expect(next.accountId).toBe(42);
-    expect(next.url).toBeUndefined();
+    expect(next.avatarUrl).toBe('https://avatars.githubusercontent.com/u/42?v=4');
     expect(next.refreshedOn).toBe(TODAY);
-  });
-
-  it('falls back to the raw URL when it is not the canonical form', () => {
-    const next = applyAvatarLookupOutcome(
-      createPendingRecord(TODAY),
-      { kind: 'found', avatarUrl: 'https://example.test/custom.png' },
-      TODAY,
-    );
-
-    expect(next.accountId).toBeNull();
-    expect(next.url).toBe('https://example.test/custom.png');
   });
 
   it('records "no GitHub account" as a definitive answer and drops any stale URL', () => {
     const next = applyAvatarLookupOutcome(
-      record({ accountId: null, url: 'https://example.test/old.png', refreshedOn: 0 }),
+      record({ avatarUrl: 'https://example.test/old.png', refreshedOn: 0 }),
       { kind: 'noAccount' },
       TODAY,
     );
 
-    expect(next.accountId).toBeNull();
-    expect(next.url).toBeUndefined();
+    expect(next.avatarUrl).toBeNull();
     expect(next.refreshedOn).toBe(TODAY);
   });
 
   it('leaves the record untouched while candidate commits remain', () => {
-    const before = record({ accountId: null, refreshedOn: 0 });
+    const before = record({ avatarUrl: null, refreshedOn: 0 });
     const next = applyAvatarLookupOutcome(before, { kind: 'notFound' }, TODAY, {
       candidatesExhausted: false,
     });
@@ -147,7 +128,7 @@ describe('applyAvatarLookupOutcome', () => {
 
   it('stamps only once every candidate commit is exhausted', () => {
     const next = applyAvatarLookupOutcome(
-      record({ accountId: null, refreshedOn: 0 }),
+      record({ avatarUrl: null, refreshedOn: 0 }),
       { kind: 'notFound' },
       TODAY,
       { candidatesExhausted: true },
@@ -159,7 +140,7 @@ describe('applyAvatarLookupOutcome', () => {
   });
 
   it('never stamps a transport failure, so being offline costs no refresh window', () => {
-    const before = record({ accountId: null, refreshedOn: 0 });
+    const before = record({ avatarUrl: null, refreshedOn: 0 });
     expect(applyAvatarLookupOutcome(before, { kind: 'networkError' }, TODAY)).toEqual(before);
     // Still expired → the next load re-queues it. This is what removed the
     // need for a persisted retry counter.
@@ -167,33 +148,33 @@ describe('applyAvatarLookupOutcome', () => {
   });
 
   it('leaves the record untouched when rate limited', () => {
-    const before = record({ accountId: null, refreshedOn: 0 });
+    const before = record({ avatarUrl: null, refreshedOn: 0 });
     expect(applyAvatarLookupOutcome(before, { kind: 'rateLimited', resetAt: null }, TODAY)).toEqual(before);
   });
 
   it('keeps a stale avatar visible while a refresh keeps failing', () => {
-    const stale = record({ accountId: 7, refreshedOn: TODAY - 40 });
+    const stale = record({ avatarUrl: 'https://example.test/stale.png', refreshedOn: TODAY - 40 });
     const next = applyAvatarLookupOutcome(stale, { kind: 'networkError' }, TODAY);
-    expect(avatarUrlFromRecord(next)).toBe('https://avatars.githubusercontent.com/u/7?v=4');
+    expect(next.avatarUrl).toBe('https://example.test/stale.png');
   });
 });
 
 describe('avatarRefreshTier / compareAvatarRefreshPriority', () => {
   it('ranks never-looked-up above known-empty above merely stale', () => {
-    expect(avatarRefreshTier(record({ accountId: null, refreshedOn: 0 }))).toBe(0);
-    expect(avatarRefreshTier(record({ accountId: null, refreshedOn: TODAY }))).toBe(1);
-    expect(avatarRefreshTier(record({ accountId: 5 }))).toBe(2);
+    expect(avatarRefreshTier(record({ avatarUrl: null, refreshedOn: 0 }))).toBe(0);
+    expect(avatarRefreshTier(record({ avatarUrl: null, refreshedOn: TODAY }))).toBe(1);
+    expect(avatarRefreshTier(record())).toBe(2);
   });
 
   it('breaks ties by most recently seen', () => {
-    const older = record({ accountId: null, refreshedOn: 0, seenOn: TODAY - 5 });
-    const newer = record({ accountId: null, refreshedOn: 0, seenOn: TODAY });
+    const older = record({ avatarUrl: null, refreshedOn: 0, seenOn: TODAY - 5 });
+    const newer = record({ avatarUrl: null, refreshedOn: 0, seenOn: TODAY });
     expect(compareAvatarRefreshPriority(newer, older)).toBeLessThan(0);
   });
 
   it('puts a visible gap ahead of a stale picture even if the gap is older', () => {
     const staleButRecent = record({ seenOn: TODAY });
-    const gapButOld = record({ accountId: null, refreshedOn: 0, seenOn: TODAY - 100 });
+    const gapButOld = record({ avatarUrl: null, refreshedOn: 0, seenOn: TODAY - 100 });
     expect(compareAvatarRefreshPriority(gapButOld, staleButRecent)).toBeLessThan(0);
   });
 });
@@ -217,6 +198,6 @@ describe('evictLeastRecentlySeen', () => {
 
 describe('createPendingRecord', () => {
   it('starts unresolved and unstamped, carrying no lookup recipe', () => {
-    expect(createPendingRecord(TODAY)).toEqual({ accountId: null, refreshedOn: 0, seenOn: TODAY });
+    expect(createPendingRecord(TODAY)).toEqual({ avatarUrl: null, refreshedOn: 0, seenOn: TODAY });
   });
 });

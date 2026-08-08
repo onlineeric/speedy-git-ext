@@ -104,7 +104,7 @@ export class AvatarCacheStore {
     const reopened: string[] = [];
 
     for (const [email, record] of Object.entries(cache)) {
-      if (record.accountId !== null || record.url || record.refreshedOn === 0) continue;
+      if (record.avatarUrl !== null || record.refreshedOn === 0) continue;
       cache[email] = { ...record, refreshedOn: 0 };
       reopened.push(email);
     }
@@ -177,8 +177,7 @@ function isAvatarCache(value: unknown): value is AvatarCache {
     if (typeof entry !== 'object' || entry === null) return false;
     const record = entry as Partial<AvatarCacheRecord>;
     return (
-      (typeof record.accountId === 'number' || record.accountId === null)
-      && (record.url === undefined || typeof record.url === 'string')
+      (typeof record.avatarUrl === 'string' || record.avatarUrl === null)
       && typeof record.refreshedOn === 'number'
       && typeof record.seenOn === 'number'
     );

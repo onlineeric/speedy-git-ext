@@ -24,28 +24,27 @@
 /**
  * One cached lookup, keyed by lowercase author email.
  *
- * Deliberately tiny — roughly 55-70 bytes serialized. Field names stay readable
+ * Deliberately small — roughly 140 bytes serialized. Field names stay readable
  * rather than being shortened to one letter: the difference is ~19 KB across a
  * full cache, which is not worth an encode/decode layer between the stored shape
  * and the code that reads it.
  */
 export interface AvatarCacheRecord {
   /**
-   * GitHub account id behind this email, or null when GitHub has no account for
-   * it. Stored as the id rather than the full URL because every GitHub avatar
-   * URL is `https://avatars.githubusercontent.com/u/<id>?v=4` — keeping the id
-   * alone saves ~50 bytes per record over storing the string.
+   * The avatar URL exactly as GitHub returned it, or null when GitHub has no
+   * account for this email.
+   *
+   * Stored verbatim rather than reduced to the account id and rebuilt from a
+   * template. Today every URL is `https://avatars.githubusercontent.com/u/<id>?v=4`,
+   * so a template would save ~46 bytes per record — but that format is GitHub's
+   * to change (the `v=` revision has moved before), and a hardcoded template
+   * would then produce wrong URLs for every cached record. 46 bytes against a
+   * 512 KB budget is not worth owning a guess about someone else's URL scheme.
    *
    * `null` means two different things depending on {@link refreshedOn}: never
    * looked up (0) versus looked up and genuinely not on GitHub.
    */
-  accountId: number | null;
-
-  /**
-   * Escape hatch for an avatar URL that does not match the canonical form.
-   * Absent in the normal case, so it costs nothing for almost every record.
-   */
-  url?: string;
+  avatarUrl: string | null;
 
   /**
    * Day number (days since the Unix epoch) of the last completed lookup;
@@ -106,8 +105,8 @@ export const AVATAR_REFRESH_INTERVAL_MS = 1000;
  * Cache ceiling; least-recently-seen entries are dropped past this.
  *
  * Sized against VS Code's storage budget. VS Code keeps an extension's entire
- * `globalState` as one JSON blob and warns at 512 KB. At ~70 bytes per record
- * this lands near 70 KB, leaving ample room for the persisted UI state and
+ * `globalState` as one JSON blob and warns at 512 KB. At ~140 bytes per record
+ * this lands near 140 KB, leaving ample room for the persisted UI state and
  * per-repo table layouts sharing the same blob.
  */
 export const AVATAR_CACHE_MAX_ENTRIES = 1000;
@@ -122,28 +121,6 @@ export const MIN_AVATAR_REFRESH_DAYS = 1;
 export const MAX_AVATAR_REFRESH_DAYS = 365;
 
 const MS_PER_DAY = 86_400_000;
-
-/** Canonical GitHub avatar URL for an account id. */
-export function avatarUrlForAccount(accountId: number): string {
-  return `https://avatars.githubusercontent.com/u/${accountId}?v=4`;
-}
-
-/**
- * Pull the account id out of a GitHub avatar URL, or null when it is not the
- * canonical `/u/<id>` form (in which case the caller keeps the whole string).
- */
-export function accountIdFromAvatarUrl(avatarUrl: string): number | null {
-  const match = avatarUrl.match(/\/u\/(\d+)\b/);
-  if (!match) return null;
-  const id = Number.parseInt(match[1], 10);
-  return Number.isSafeInteger(id) ? id : null;
-}
-
-/** The displayable avatar URL for a record, or null when there is none. */
-export function avatarUrlFromRecord(record: AvatarCacheRecord): string | null {
-  if (record.accountId !== null) return avatarUrlForAccount(record.accountId);
-  return record.url ?? null;
-}
 
 /** Days since the Unix epoch. */
 export function toDayNumber(timestampMs: number): number {
@@ -172,7 +149,7 @@ export function isAvatarRecordExpired(
 
 /** A brand-new record for an email seen for the first time. */
 export function createPendingRecord(today: number): AvatarCacheRecord {
-  return { accountId: null, refreshedOn: 0, seenOn: today };
+  return { avatarUrl: null, refreshedOn: 0, seenOn: today };
 }
 
 /**
@@ -196,20 +173,11 @@ export function applyAvatarLookupOutcome(
   options: { candidatesExhausted?: boolean } = {},
 ): AvatarCacheRecord {
   switch (outcome.kind) {
-    case 'found': {
-      const accountId = accountIdFromAvatarUrl(outcome.avatarUrl);
-      const next: AvatarCacheRecord = { ...record, accountId, refreshedOn: today };
-      // Keep the raw URL only when it is not the canonical /u/<id> form.
-      if (accountId === null) next.url = outcome.avatarUrl;
-      else delete next.url;
-      return next;
-    }
+    case 'found':
+      return { ...record, avatarUrl: outcome.avatarUrl, refreshedOn: today };
 
-    case 'noAccount': {
-      const next: AvatarCacheRecord = { ...record, accountId: null, refreshedOn: today };
-      delete next.url;
-      return next;
-    }
+    case 'noAccount':
+      return { ...record, avatarUrl: null, refreshedOn: today };
 
     case 'notFound':
       // Out of candidates: wait for the window, by which point a later load may
@@ -231,7 +199,7 @@ export function applyAvatarLookupOutcome(
  * 2 — has an avatar, just stale: something is already on screen.
  */
 export function avatarRefreshTier(record: AvatarCacheRecord): 0 | 1 | 2 {
-  if (avatarUrlFromRecord(record) !== null) return 2;
+  if (record.avatarUrl !== null) return 2;
   return record.refreshedOn === 0 ? 0 : 1;
 }
 

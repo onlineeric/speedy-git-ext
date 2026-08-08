@@ -7,7 +7,7 @@ import { toCommitCountBucket } from '../../shared/telemetry.js';
 import { GitHubAvatarService } from '../services/GitHubAvatarService.js';
 import type { AvatarCacheStore } from '../services/AvatarCacheStore.js';
 import type { AvatarRefreshQueue } from '../services/AvatarRefreshQueue.js';
-import { avatarUrlFromRecord, toDayNumber, type AvatarLookupTask } from '../services/avatarCachePolicy.js';
+import { toDayNumber, type AvatarLookupTask } from '../services/avatarCachePolicy.js';
 import type { TelemetryService } from '../services/TelemetryService.js';
 import type { GitServiceRegistry } from './GitServiceRegistry.js';
 import type { PersistedUIStateStore } from './PersistedUIStateStore.js';
@@ -391,8 +391,7 @@ export class RepoDataLoader {
       // Show whatever we have straight away, even if it is past its window —
       // the refresh happens behind the picture that is already on screen.
       const cached = this.deps.avatarCache.get(email);
-      const cachedUrl = cached ? avatarUrlFromRecord(cached) : null;
-      if (cachedUrl) urls[email] = cachedUrl;
+      if (cached?.avatarUrl) urls[email] = cached.avatarUrl;
 
       sightings.push({ email, owner: repo.owner, repo: repo.repo, hashes });
     }
