@@ -2,7 +2,7 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "5.8.2",
+  "version": "5.9.0",
   "publisher": "onlineeric",
   "license": "MIT",
   "repository": {
@@ -173,6 +173,13 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Show author avatars in the commit graph. Initials are used when an avatar is unavailable."
+        },
+        "speedyGit.avatars.refreshDays": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "maximum": 365,
+          "markdownDescription": "How long a looked-up avatar stays cached before it is refreshed in the background. Avatars are cached per author email and reused across repositories, so a longer window means far fewer GitHub API requests. A stale entry keeps displaying while it refreshes, and GitHub avatar image URLs are stable — so a longer window does not mean out-of-date pictures."
         },
         "speedyGit.showRemoteBranches": {
           "type": "boolean",

@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata, ToolbarBooleanSetting } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, AvatarAuthState, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata, ToolbarBooleanSetting } from './types.js';
 
 /** Payload for the batched initial data message */
 export interface InitialDataPayload {
@@ -106,6 +106,32 @@ export type RequestMessage =
    */
   | { type: 'locateHead'; payload: { filters: { branches?: string[]; afterDate?: string; beforeDate?: string }; displayedHeadHash: string | null } }
   | { type: 'openSettings'; payload: { query?: string } }
+  /**
+   * Current avatar authorization state, answered with `avatarAuthState`. Sent
+   * on webview init so the Avatars section and the Author-header shortcut can
+   * render the right variant without flashing the wrong one.
+   */
+  | { type: 'getAvatarAuthState'; payload: Record<string, never> }
+  /**
+   * User clicked "Allow avatar lookup": prompts for a GitHub session
+   * (`createIfNone`) and records the opt-in. Answered with `avatarAuthState`
+   * whether the user granted or declined.
+   */
+  | { type: 'requestGitHubAuth'; payload: Record<string, never> }
+  /**
+   * User clicked "Remove token": Speedy Git stops using the GitHub session and
+   * reverts to unauthenticated lookups. VS Code exposes no API for an extension
+   * to revoke its own grant, so the underlying session is left to the Accounts
+   * menu — only our opt-in is cleared.
+   */
+  | { type: 'removeGitHubAuth'; payload: Record<string, never> }
+  | { type: 'setAvatarRefreshDays'; payload: { days: number } }
+  /**
+   * Drop every cached avatar and everything queued, then reload so the cache
+   * refills from scratch. Answered with `avatarCacheCleared` so the webview can
+   * forget the URLs it is already showing.
+   */
+  | { type: 'clearAvatarCache'; payload: Record<string, never> }
   | { type: 'switchRepo'; payload: { repoPath: string } }
   /**
    * Show a different repository in the graph WITHOUT changing the workspace's
@@ -223,6 +249,8 @@ export type ResponseMessage =
         | { success: false; message: string; errorCode: GitErrorCode };
     }
   | { type: 'avatarUrls'; payload: { urls: AvatarUrlMap } }
+  | { type: 'avatarAuthState'; payload: AvatarAuthState }
+  | { type: 'avatarCacheCleared'; payload: Record<string, never> }
   | { type: 'tagMetadata'; payload: { metadata: Record<string, TagMetadata> } }
   | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[] } }
   | { type: 'worktreePathResolved'; payload: { path: string; requestId: number } }
@@ -259,6 +287,8 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   dropCommit: true, isCommitPushed: true, getCommitParents: true,
   loadMoreCommits: true, locateHead: true, openSettings: true, switchRepo: true, displayRepo: true,
   getSettings: true, setToolbarSetting: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
+  getAvatarAuthState: true, requestGitHubAuth: true, removeGitHubAuth: true, setAvatarRefreshDays: true,
+  clearAvatarCache: true,
   updateSubmodule: true, initSubmodule: true,
   stashAndCheckout: true, stashAndCheckoutCommit: true,
   getWorktreeList: true, resolveWorktreePath: true, getWorktreeEnvFiles: true, addWorktree: true,
@@ -283,7 +313,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commitsAppended: true, prefetchError: true, headLocation: true, headLocationFailed: true, repoList: true,
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
-  pushResult: true, avatarUrls: true, tagMetadata: true, worktreeList: true, worktreePathResolved: true, worktreeEnvFiles: true, containingBranches: true,
+  pushResult: true, avatarUrls: true, avatarAuthState: true, avatarCacheCleared: true, tagMetadata: true, worktreeList: true, worktreePathResolved: true, worktreeEnvFiles: true, containingBranches: true,
   persistedUIState: true, authorList: true, uncommittedChanges: true, conflictState: true,
   initialData: true,
   compareResult: true, compareError: true,

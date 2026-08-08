@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-08-05**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-08-08**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -29,7 +29,7 @@ src/
 │   ├── WebviewMessageRouter.ts   # Exhaustive typed RPC dispatch + allowlisted operation telemetry middleware
 │   ├── WebviewRequestContext.ts  # Narrow per-request handler API, including TelemetryService
 │   ├── PersistedUIStateStore.ts  # Load/save/validate UI state + per-repo table layout (column-width healing)
-│   ├── RepoDataLoader.ts         # Initial + deferred data, avatars, submodules, initial-load perf/error telemetry
+│   ├── RepoDataLoader.ts         # Initial + deferred data, avatar cache hydration/enqueue, submodules, initial-load perf/error telemetry
 │   ├── RefreshCoordinator.ts     # When to load: initial/manual/auto, hidden-panel deferral, loading lifecycle
 │   ├── EditorCommandService.ts   # VS Code diff/file/compare editors, worktree folder/reveal, signature help
 │   ├── OperationGuard.ts         # In-progress checks (rebase/cherry-pick/revert/merge) → GitError | null
@@ -46,6 +46,7 @@ src/
 │       ├── workingTreeHandlers.ts# uncommitted changes, stage/unstage/discard, diff editors
 │       ├── compareHandlers.ts    # compareRefs/cancelCompare/openCompareDiff (latest-wins by request id)
 │       ├── telemetryHandlers.ts  # Validates one-way webview telemetry against closed catalogs
+│       ├── avatarHandlers.ts      # Avatar auth state, GitHub authorize/remove-token, refreshDays setting, clear cache
 │       └── vscodeCommandHandlers.ts # settings, clipboard, openExternal, updatePersistedUIState
 ├── services/                     # All repo-bound; every method returns Result<T, GitError>
 │   ├── index.ts                  # Barrel export for all services
@@ -67,7 +68,11 @@ src/
 │   ├── GitSubmoduleService.ts    # Submodule status, init, update
 │   ├── GitWatcherService.ts      # File system watcher for auto-refresh
 │   ├── GitRepoDiscoveryService.ts # Multi-root workspace scanning
-│   ├── GitHubAvatarService.ts    # Avatar URL fetching (GitHub/Gravatar)
+│   ├── GitHubAvatarService.ts    # Stateless one-shot GitHub avatar lookup + rate-limit tracking
+│   ├── avatarCachePolicy.ts      # PURE: avatar expiry, lookup-outcome state machine, queue priority, LRU eviction
+│   ├── AvatarCacheStore.ts       # Persistent email→avatar cache in globalState; debounced writes, LRU cap
+│   ├── AvatarRefreshQueue.ts     # Paced background drain (1/sec), rate-limit pause, batched result posting
+│   ├── GitHubAuthService.ts      # Explicit opt-in gate for the GitHub session used by avatar lookups
 │   ├── GitConfigService.ts       # Git config reading
 │   └── TelemetryService.ts       # Consent-aware backend telemetry funnel; real + no-op implementations
 └── utils/
@@ -90,7 +95,7 @@ src/
 components/
 ├── GraphContainer.tsx            # Virtual scrolling (@tanstack/react-virtual, ROW_HEIGHT: 28px)
 ├── CommitTableRow.tsx            # Table-style commit row with resizable columns (memoized)
-├── CommitTableHeader.tsx         # Draggable/resizable column headers (@dnd-kit)
+├── CommitTableHeader.tsx         # Draggable/resizable column headers (@dnd-kit); Author gear shortcut to avatar setup
 ├── GraphCell.tsx                 # SVG graph rendering (LANE_WIDTH: 16px, 8 cycling colors)
 ├── CommitDetailsPanel.tsx        # Resizable bottom/right panel, commit metadata + file changes
 ├── CommitTooltip.tsx             # Radix popover tooltip for a row: refs, parents, external ref parsing
@@ -114,7 +119,8 @@ components/
 ├── SearchWidget.tsx              # Text search across commits
 ├── CompareWidget.tsx             # Branch comparison
 ├── WorktreeWidget.tsx            # Worktree list + create/remove (046-git-worktrees)
-├── CommitListSettingsPopover.tsx # Column visibility/order popover (Radix popover + @dnd-kit sortable)
+├── CommitListSettingsPopover.tsx # Centered View settings dialog: columns left, avatars right (Radix dialog + @dnd-kit sortable); open state lives in the store
+├── AvatarSettingsSection.tsx     # Avatars pane of the View dialog: GitHub allow/remove-token, refresh-days, clear cache
 ├── RepoSelector.tsx              # Multi-root repo picker (FilterableSingleSelectDropdown)
 ├── SubmoduleSelector.tsx         # Parent/submodule navigation picker
 ├── ToastContainer.tsx            # Transient success/error toasts driven by the store
@@ -239,6 +245,7 @@ utils/
 ├── colorUtils.ts                 # Graph color cycling + theme helpers
 ├── formatDate.ts                 # Commit-date formatting
 ├── gravatar.ts                   # Gravatar URL builder + load-state cache
+├── avatarSettings.ts             # PURE: clamp/fallback for the refresh-days input
 ├── stashMessage.ts               # Format stash entries for display
 ├── uncommittedUtils.ts           # Helpers for the uncommitted-node row
 ├── repoPath.ts                   # Repo path normalization

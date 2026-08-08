@@ -70,116 +70,120 @@ describe('GitHubAvatarService.resolveNoreplyAvatarUrl', () => {
   });
 });
 
-describe('GitHubAvatarService.fetchAvatarUrls', () => {
-  it('resolves no-reply emails offline without hitting the network', async () => {
-    const service = new GitHubAvatarService('owner', 'repo');
-    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+describe('GitHubAvatarService.lookupCommitAuthorAvatar', () => {
+  const recipe = { owner: 'owner', repo: 'repo', hash: 'abc123' };
 
-    const result = await service.fetchAvatarUrls([
-      { hash: 'a', abbreviatedHash: 'a', parents: [], author: 'Octo', authorEmail: '42+octo@users.noreply.github.com', authorDate: 0, subject: '', refs: [] },
-    ]);
+  function mockResponse(body: unknown, init: ResponseInit) {
+    return vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(body), init));
+  }
 
-    expect(fetchSpy).not.toHaveBeenCalled();
-    if (result.success) {
-      expect(result.value['42+octo@users.noreply.github.com']).toBe('https://avatars.githubusercontent.com/u/42?v=4');
-    }
-    fetchSpy.mockRestore();
-  });
-
-  it('negatively caches misses so refreshes do not re-call the API', async () => {
-    const service = new GitHubAvatarService('owner', 'repo');
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ author: null }), { status: 200, headers: { 'x-ratelimit-remaining': '40' } }),
+  it('reports the avatar URL when GitHub links the commit to an account', async () => {
+    const service = new GitHubAvatarService();
+    const fetchSpy = mockResponse(
+      { author: { avatar_url: 'https://avatars.githubusercontent.com/u/7?v=4' } },
+      { status: 200, headers: { 'x-ratelimit-remaining': '59' } },
     );
 
-    const commits = [
-      { hash: 'a', abbreviatedHash: 'a', parents: [], author: 'E', authorEmail: 'eric@example.com', authorDate: 0, subject: '', refs: [] },
-    ];
-
-    await service.fetchAvatarUrls(commits);
-    await service.fetchAvatarUrls(commits);
-
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    await expect(service.lookupCommitAuthorAvatar(recipe, null)).resolves.toEqual({
+      kind: 'found',
+      avatarUrl: 'https://avatars.githubusercontent.com/u/7?v=4',
+    });
     fetchSpy.mockRestore();
   });
 
-  it('sends an Authorization header when constructed with a token', async () => {
-    const service = new GitHubAvatarService('owner', 'repo', 'secret-token');
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ author: { avatar_url: 'https://avatars/x.png' } }), {
-        status: 200,
-        headers: { 'x-ratelimit-remaining': '4999' },
-      }),
+  it('distinguishes "no GitHub account" from a failure', async () => {
+    const service = new GitHubAvatarService();
+    // A 200 with a null author is a real answer: this email has no account.
+    const fetchSpy = mockResponse({ author: null }, { status: 200, headers: { 'x-ratelimit-remaining': '58' } });
+
+    await expect(service.lookupCommitAuthorAvatar(recipe, null)).resolves.toEqual({ kind: 'noAccount' });
+    fetchSpy.mockRestore();
+  });
+
+  it('reports 404 as notFound so another candidate commit can be tried', async () => {
+    const service = new GitHubAvatarService();
+    const fetchSpy = mockResponse({}, { status: 404, headers: { 'x-ratelimit-remaining': '57' } });
+
+    await expect(service.lookupCommitAuthorAvatar(recipe, null)).resolves.toEqual({ kind: 'notFound' });
+    fetchSpy.mockRestore();
+  });
+
+  it('reports 422 as notFound — GitHub says this for an unpushed commit', async () => {
+    // Asking about a local-only commit answers 422 "No commit found for SHA".
+    // Treating that as a transport failure would burn the record's retries on a
+    // verdict about the commit rather than the author.
+    const service = new GitHubAvatarService();
+    const fetchSpy = mockResponse(
+      { message: 'No commit found for SHA: abc123' },
+      { status: 422, headers: { 'x-ratelimit-remaining': '56' } },
     );
 
-    await service.fetchAvatarUrls([
-      { hash: 'a', abbreviatedHash: 'a', parents: [], author: 'E', authorEmail: 'eric@example.com', authorDate: 0, subject: '', refs: [] },
-    ]);
-
-    const headers = (fetchSpy.mock.calls[0][1] as { headers: Record<string, string> }).headers;
-    expect(headers.Authorization).toBe('Bearer secret-token');
+    await expect(service.lookupCommitAuthorAvatar(recipe, null)).resolves.toEqual({ kind: 'notFound' });
     fetchSpy.mockRestore();
   });
 
-  it('warns once unauthenticated requests exhaust the rate-limit buffer', async () => {
-    const service = new GitHubAvatarService('owner', 'repo');
-    expect(service.getRateLimitWarning()).toBeNull();
+  it('reports 403 as rateLimited and exposes the reset time in ms', async () => {
+    const service = new GitHubAvatarService();
+    const resetSeconds = Math.floor(Date.now() / 1000) + 3600;
+    const fetchSpy = mockResponse({}, {
+      status: 403,
+      headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': String(resetSeconds) },
+    });
 
-    const resetInOneHour = Math.floor(Date.now() / 1000) + 3600;
+    await expect(service.lookupCommitAuthorAvatar(recipe, null)).resolves.toEqual({
+      kind: 'rateLimited',
+      resetAt: resetSeconds * 1000,
+    });
+    expect(service.getRateLimit().resetAt).toBe(resetSeconds * 1000);
+    fetchSpy.mockRestore();
+  });
+
+  it('reports a transport failure as networkError', async () => {
+    const service = new GitHubAvatarService();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('offline'));
+
+    await expect(service.lookupCommitAuthorAvatar(recipe, null)).resolves.toEqual({ kind: 'networkError' });
+    fetchSpy.mockRestore();
+  });
+
+  it('sends an Authorization header only when given a token', async () => {
+    const service = new GitHubAvatarService();
+    const fetchSpy = mockResponse(
+      { author: { avatar_url: 'https://avatars/x.png' } },
+      { status: 200, headers: { 'x-ratelimit-remaining': '4999' } },
+    );
+
+    await service.lookupCommitAuthorAvatar(recipe, 'secret-token');
+    await service.lookupCommitAuthorAvatar(recipe, null);
+
+    const authed = (fetchSpy.mock.calls[0][1] as { headers: Record<string, string> }).headers;
+    const anon = (fetchSpy.mock.calls[1][1] as { headers: Record<string, string> }).headers;
+    expect(authed.Authorization).toBe('Bearer secret-token');
+    expect(anon.Authorization).toBeUndefined();
+    fetchSpy.mockRestore();
+  });
+});
+
+describe('GitHubAvatarService rate-limit tracking', () => {
+  it('is not limited before any request', () => {
+    expect(new GitHubAvatarService().isRateLimited(Date.now())).toBe(false);
+  });
+
+  it('reports limited once the reserve is breached and the window is still open', async () => {
+    const service = new GitHubAvatarService();
+    const resetSeconds = Math.floor(Date.now() / 1000) + 3600;
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ author: null }), {
         status: 200,
-        headers: { 'x-ratelimit-remaining': '2', 'x-ratelimit-reset': String(resetInOneHour) },
+        headers: { 'x-ratelimit-remaining': '2', 'x-ratelimit-reset': String(resetSeconds) },
       }),
     );
-    await service.fetchAvatarUrls([
-      { hash: 'a', abbreviatedHash: 'a', parents: [], author: 'E', authorEmail: 'eric@example.com', authorDate: 0, subject: '', refs: [] },
-    ]);
-    // Remaining (2) is within the buffer that blocks API calls, so the warning fires.
-    expect(service.getRateLimitWarning()).toContain('rate limit');
+
+    await service.lookupCommitAuthorAvatar({ owner: 'o', repo: 'r', hash: 'h' }, null);
+
+    expect(service.isRateLimited(Date.now())).toBe(true);
+    // Past the reset the budget is assumed replenished, so lookups resume.
+    expect(service.isRateLimited(resetSeconds * 1000 + 1)).toBe(false);
     fetchSpy.mockRestore();
-  });
-
-  it('never warns when authenticated', () => {
-    const service = new GitHubAvatarService('owner', 'repo', 'token');
-    expect(service.getRateLimitWarning()).toBeNull();
-  });
-
-  it('returns cached URLs without calling fetch when within TTL', async () => {
-    const service = new GitHubAvatarService('owner', 'repo');
-    const cache = (service as unknown as { cache: Map<string, { url: string; fetchedAt: number }> }).cache;
-    cache.set('eric@example.com', { url: 'https://avatars/eric.png', fetchedAt: Date.now() });
-
-    const result = await service.fetchAvatarUrls([
-      {
-        hash: 'aaa111',
-        abbreviatedHash: 'aaa1',
-        parents: [],
-        author: 'Eric',
-        authorEmail: 'eric@example.com',
-        authorDate: 0,
-        subject: 's',
-        refs: [],
-      },
-    ]);
-
-    expect(result.success).toBe(true);
-    if (result.success) expect(result.value['eric@example.com']).toBe('https://avatars/eric.png');
-  });
-
-  it('deduplicates by lowercase email', async () => {
-    const service = new GitHubAvatarService('owner', 'repo');
-    const cache = (service as unknown as { cache: Map<string, { url: string; fetchedAt: number }> }).cache;
-    cache.set('eric@example.com', { url: 'cached-url', fetchedAt: Date.now() });
-
-    const commits = [
-      { hash: 'a', abbreviatedHash: 'a', parents: [], author: 'E1', authorEmail: 'Eric@Example.com', authorDate: 0, subject: '', refs: [] },
-      { hash: 'b', abbreviatedHash: 'b', parents: [], author: 'E2', authorEmail: 'eric@example.com', authorDate: 0, subject: '', refs: [] },
-    ];
-
-    const result = await service.fetchAvatarUrls(commits);
-    if (result.success) {
-      expect(Object.keys(result.value)).toHaveLength(1);
-    }
   });
 });

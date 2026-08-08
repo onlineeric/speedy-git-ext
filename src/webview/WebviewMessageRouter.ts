@@ -3,6 +3,7 @@ import type { RequestMessage, ResponseMessage } from '../../shared/messages.js';
 import { GIT_ERROR_CODES, type GitErrorCode } from '../../shared/errors.js';
 import { TRACKED_OPERATIONS, type TrackedOperation } from '../../shared/telemetry.js';
 import type { WebviewRequestContext } from './WebviewRequestContext.js';
+import { avatarHandlers } from './handlers/avatarHandlers.js';
 import { branchHandlers } from './handlers/branchHandlers.js';
 import { compareHandlers } from './handlers/compareHandlers.js';
 import { graphDataHandlers } from './handlers/graphDataHandlers.js';
@@ -40,6 +41,7 @@ export const requestHandlers = {
   ...compareHandlers,
   ...vscodeCommandHandlers,
   ...telemetryHandlers,
+  ...avatarHandlers,
 } satisfies RequestHandlerMap;
 
 /**

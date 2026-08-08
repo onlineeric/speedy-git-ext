@@ -9,6 +9,7 @@ import type { PersistedUIStateStore } from './PersistedUIStateStore.js';
 import type { RefreshCoordinator } from './RefreshCoordinator.js';
 import type { RepoDataLoader, SubmoduleNavigationHandlers } from './RepoDataLoader.js';
 import type { TelemetryService } from '../services/TelemetryService.js';
+import type { GitHubAuthService } from '../services/GitHubAuthService.js';
 import type { WebviewRuntime } from './WebviewRuntime.js';
 
 export interface WebviewRequestContext {
@@ -22,8 +23,13 @@ export interface WebviewRequestContext {
   readonly operationGuard: OperationGuard;
   readonly uiStateStore: PersistedUIStateStore;
   readonly telemetry: TelemetryService;
+  readonly avatarAuth: GitHubAuthService;
 
   postMessage(message: ResponseMessage): void;
+  /** Push the current avatar authorization + rate-limit state to the webview. */
+  sendAvatarAuthState(): void;
+  /** Drop the persisted avatar cache and everything queued for refresh. */
+  clearAvatarCache(): Promise<void>;
   getSettings(): UserSettings | undefined;
   getBatchSize(): number;
   getRepoDiscovery(): GitRepoDiscoveryService | undefined;

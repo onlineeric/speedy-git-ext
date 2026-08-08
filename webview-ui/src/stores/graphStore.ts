@@ -35,6 +35,7 @@ import type {
   UserSettings,
   UncommittedSummary,
   WorktreeInfo,
+  AvatarAuthState,
 } from '@shared/types';
 import {
   COMPARE_RECENTS_MAX,
@@ -178,6 +179,13 @@ interface GraphStore {
   searchState: SearchState;
   activeToggleWidget: ActiveToggleWidget;
   gitHubAvatarUrls: Record<string, string>;
+  /** GitHub authorization state for avatar lookups, shown in the Avatars section. */
+  avatarAuthState: AvatarAuthState;
+  /**
+   * Whether the View popover is open. Lifted out of the popover so the Author
+   * column header's gear can open the very same dialog.
+   */
+  viewSettingsOpen: boolean;
   /** Tag annotation metadata keyed by tag name; whole-map replaced on each load (048). */
   tagMetadata: Record<string, TagMetadata>;
   submodules: Submodule[];
@@ -224,6 +232,9 @@ interface GraphStore {
   updateCommitTableLayout: (updater: (layout: CommitTableLayout) => CommitTableLayout) => void;
   hydratePersistedUIState: (state: PersistedUIState) => void;
   setGitHubAvatarUrls: (urls: Record<string, string>) => void;
+  setAvatarAuthState: (state: AvatarAuthState) => void;
+  clearGitHubAvatarUrls: () => void;
+  setViewSettingsOpen: (open: boolean) => void;
   setTagMetadata: (metadata: Record<string, TagMetadata>) => void;
   setCommits: (commits: Commit[]) => void;
   appendCommits: (newCommits: Commit[], totalLoadedWithoutFilter?: number) => void;
@@ -414,6 +425,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   searchState: defaultSearchState,
   activeToggleWidget: null,
   gitHubAvatarUrls: {},
+  avatarAuthState: { authorized: false, accountLabel: null, rateLimitResetAt: null },
+  viewSettingsOpen: false,
   tagMetadata: {},
   submodules: [],
   submoduleStack: [],
@@ -476,9 +489,14 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     rightPanelWidth: state.rightPanelWidth,
     commitTableLayout: cloneCommitTableLayout(state.commitTableLayout),
   }),
+  // Merge, never replace: the background refresh queue posts avatars in small
+  // batches as they resolve, and each batch must leave earlier ones in place.
   setGitHubAvatarUrls: (urls) => set((state) => ({
     gitHubAvatarUrls: { ...state.gitHubAvatarUrls, ...urls },
   })),
+  setAvatarAuthState: (avatarAuthState) => set({ avatarAuthState }),
+  clearGitHubAvatarUrls: () => set({ gitHubAvatarUrls: {} }),
+  setViewSettingsOpen: (viewSettingsOpen) => set({ viewSettingsOpen }),
   // Whole-map replace: a refresh's deferred load resends all tags, so replacing
   // (not merging) invalidates metadata for tags that were deleted.
   setTagMetadata: (tagMetadata) => set({ tagMetadata }),

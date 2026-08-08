@@ -4,6 +4,20 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.9.0] - 2026-08-08
+
+### Added
+- **Author avatars are now cached on disk and refreshed quietly in the background.** Previously every avatar the extension resolved was held only in memory, and that memory was thrown away on each window reload, repo switch and workspace change — so every restart re-spent GitHub's hourly request budget from zero, and most people simply never saw an avatar at all. Avatars are now cached per author email (an avatar belongs to a GitHub account, so resolving someone in one repository serves every other), stored on disk, and reused for 30 days by default. A stale entry keeps displaying while it refreshes behind the picture already on screen, so avatars never blank out. Nothing is ever written off: an email that could not be resolved — including one whose owner has no GitHub account yet — is simply retried on its next refresh cycle, which bounds the worst case at roughly (number of authors ÷ refresh days) requests per day.
+- **A new "Avatars" section in the View popover, with a one-click GitHub sign-in.** Without signing in, GitHub allows 60 avatar lookups per hour *per network address* — a limit shared by everyone behind the same office network or VPN, which is why it ran out almost immediately for teams. The new section explains this and offers **Allow avatar lookup**, which signs in to GitHub and raises the limit to 5,000 per hour for that user alone. The sign-in is used only to look up avatars. Once connected the section shows the account and offers **Remove token** to stop using it. While avatar lookups are unauthorized, a settings gear also appears next to the **Author** column header as a shortcut into this section.
+- **Avatars resolve correctly in repositories with local, unpushed commits.** GitHub can only answer questions about commits that have been pushed, and the newest rows in the graph are usually the ones that have not been — so looking an author up by their most recent commit tends to fail in exactly the repository you are working in. Each author is now looked up by their oldest commit in view first, falling back to their newest, and a commit GitHub does not recognise counts against the commit rather than the author.
+- **New `speedyGit.avatars.refreshDays` setting** (default 30, range 1–365), adjustable from the Avatars section or VS Code settings. Expiry is computed when the cache is read rather than stored per entry, so lowering the value takes effect immediately on everything already cached. A longer window does not mean out-of-date pictures: GitHub's avatar image URLs are stable, so a changed profile picture appears right away regardless of this setting.
+
+- **A "Clear all cached avatars" button** in the Avatars section. Forgets every cached avatar, empties the refresh queue and reloads, so avatars disappear and are looked up again from scratch.
+
+### Changed
+- **The View button now opens a centred dialog rather than a popover anchored to the toolbar.** Columns are on the left and Avatars on the right, so neither half is tall enough to need scrolling. On narrow panels the two stack.
+- **Avatar lookups no longer happen on the commit-load path.** Loading a batch of commits used to fire one GitHub request per unique author address and wait on them, which on a repository with many contributors could exhaust the hourly limit in a single load. Loading a batch now only reads the cache and posts what it already has; anything missing or stale is handed to a background queue that trickles through it one lookup at a time. The queue runs in the extension host — a separate process from the graph — so it cannot affect scrolling or rendering, and it resolves visible gaps before merely-stale pictures, newest commits first. Results are delivered in batches rather than one message per avatar. When GitHub reports the limit is spent, the queue pauses until it resets instead of retrying, and the record it was working on keeps its full retry budget.
+
 ## [5.8.2] - 2026-08-05
 
 ### Fixed

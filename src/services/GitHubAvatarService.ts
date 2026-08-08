@@ -1,52 +1,24 @@
-import type { Commit } from '../../shared/types.js';
-import type { Result } from '../../shared/errors.js';
-import { ok, GitError } from '../../shared/errors.js';
+import { AVATAR_RATE_LIMIT_RESERVE, type AvatarLookupOutcome } from './avatarCachePolicy.js';
 
-interface CacheEntry {
-  // `null` is a negative cache entry: we tried (or know we cannot) resolve this
-  // email and should not re-attempt until the (shorter) failure TTL expires.
-  url: string | null;
-  fetchedAt: number;
+/** Live view of the GitHub API budget, shared by every lookup. */
+export interface RateLimitState {
+  /** Requests left in the current window, as last reported by GitHub. */
+  remaining: number;
+  /** Unix ms when the window resets, or null when never reported. */
+  resetAt: number | null;
 }
 
-const SUCCESS_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const FAILURE_TTL_MS = 60 * 60 * 1000; // 1 hour — keep refreshes from re-burning the rate limit
-const RATE_LIMIT_BUFFER = 5;
-
+/**
+ * One-shot GitHub avatar lookups.
+ *
+ * Deliberately stateless: the cache lives in `AvatarCacheStore` and the pacing
+ * in `AvatarRefreshQueue`, so this class only knows how to turn a commit into an
+ * avatar URL. Keeping the cache out of here is what lets a single cache serve
+ * every repository — the previous per-instance map was thrown away on every repo
+ * switch.
+ */
 export class GitHubAvatarService {
-  private cache = new Map<string, CacheEntry>();
-  private rateLimitRemaining = 60;
-  private rateLimitResetTime = 0;
-
-  /**
-   * @param token Optional GitHub access token. When provided, requests are
-   * authenticated, raising the rate limit from 60 to 5000 requests/hour.
-   */
-  constructor(
-    private readonly owner: string,
-    private readonly repo: string,
-    private readonly token: string | null = null,
-  ) {}
-
-  /** Whether the GitHub rate limit is currently blocking API calls. */
-  private isRateLimited(now: number): boolean {
-    return this.rateLimitRemaining < RATE_LIMIT_BUFFER && now < this.rateLimitResetTime * 1000;
-  }
-
-  /**
-   * A human-readable warning when avatar fetching is degraded by the GitHub
-   * rate limit, or null when healthy. Owns the rate-limit policy (the 60 vs
-   * 5000 req/hr thresholds) so callers don't reconstruct it. The blocked state
-   * matches the gate used in {@link fetchAvatarUrls}, so the warning fires
-   * exactly when API calls are actually being skipped.
-   */
-  getRateLimitWarning(): string | null {
-    if (this.token !== null || !this.isRateLimited(Date.now())) return null;
-    return (
-      'GitHub avatar rate limit reached (60/hr for unauthenticated requests). ' +
-      'Sign in to GitHub in VS Code to raise the limit to 5000/hr.'
-    );
-  }
+  private rateLimit: RateLimitState = { remaining: 60, resetAt: null };
 
   /**
    * Parse a git remote URL to extract GitHub owner and repo.
@@ -81,100 +53,88 @@ export class GitHubAvatarService {
     return `https://avatars.githubusercontent.com/u/${match[1]}?v=4`;
   }
 
+  getRateLimit(): RateLimitState {
+    return this.rateLimit;
+  }
+
   /**
-   * Fetch avatar URLs for unique author emails from commits.
-   * Deduplicates by email, serves cached entries (positive and negative),
-   * resolves no-reply emails offline, and respects the GitHub rate limit.
+   * Whether the API budget is spent. Stops short of zero so anything else on
+   * this machine — or, unauthenticated, anyone else behind the same IP — is not
+   * left with nothing.
    */
-  async fetchAvatarUrls(commits: Commit[]): Promise<Result<Record<string, string>, GitError>> {
-    const now = Date.now();
-    const result: Record<string, string> = {};
-
-    // Deduplicate by email and pick one representative commit hash per email
-    const emailToHash = new Map<string, string>();
-    for (const commit of commits) {
-      const email = commit.authorEmail.toLowerCase();
-      if (!emailToHash.has(email)) {
-        emailToHash.set(email, commit.hash);
-      }
-    }
-
-    for (const [email, hash] of emailToHash) {
-      // Serve from cache when the entry is still fresh (positive or negative).
-      const cached = this.cache.get(email);
-      if (cached && now - cached.fetchedAt < this.ttlFor(cached)) {
-        if (cached.url) result[email] = cached.url;
-        continue;
-      }
-
-      // Free path: derive the avatar from a GitHub no-reply email (no API call).
-      const noreplyUrl = GitHubAvatarService.resolveNoreplyAvatarUrl(email);
-      if (noreplyUrl) {
-        this.cache.set(email, { url: noreplyUrl, fetchedAt: now });
-        result[email] = noreplyUrl;
-        continue;
-      }
-
-      // Skip the API while rate-limited — leave uncached so we retry after reset.
-      if (this.isRateLimited(now)) {
-        continue;
-      }
-
-      const avatarUrl = await this.fetchSingleAvatar(hash);
-      // Cache both outcomes: success keeps it for a day, a miss is negatively
-      // cached so repeated refreshes don't keep spending the rate limit on it.
-      this.cache.set(email, { url: avatarUrl, fetchedAt: now });
-      if (avatarUrl) {
-        result[email] = avatarUrl;
-      }
-
-      // Stop if rate limit is getting low
-      if (this.rateLimitRemaining < RATE_LIMIT_BUFFER) {
-        break;
-      }
-    }
-
-    return ok(result);
+  isRateLimited(now: number): boolean {
+    return (
+      this.rateLimit.remaining < AVATAR_RATE_LIMIT_RESERVE
+      && this.rateLimit.resetAt !== null
+      && now < this.rateLimit.resetAt
+    );
   }
 
-  private ttlFor(entry: CacheEntry): number {
-    return entry.url ? SUCCESS_TTL_MS : FAILURE_TTL_MS;
-  }
-
-  private async fetchSingleAvatar(commitHash: string): Promise<string | null> {
+  /**
+   * Look up the GitHub account behind one commit. Returns a typed outcome
+   * rather than a bare null so the caller can tell "this email has no GitHub
+   * account" (a definitive answer worth caching) from "the request failed"
+   * (worth retrying) and from "we are rate limited" (not this record's fault).
+   */
+  async lookupCommitAuthorAvatar(
+    recipe: { owner: string; repo: string; hash: string },
+    token: string | null,
+  ): Promise<AvatarLookupOutcome> {
     try {
       const headers: Record<string, string> = {
         Accept: 'application/vnd.github.v3+json',
         'User-Agent': 'speedy-git-ext',
       };
-      if (this.token) {
-        headers.Authorization = `Bearer ${this.token}`;
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
       }
 
       const response = await fetch(
-        `https://api.github.com/repos/${this.owner}/${this.repo}/commits/${commitHash}`,
+        `https://api.github.com/repos/${recipe.owner}/${recipe.repo}/commits/${recipe.hash}`,
         { headers },
       );
 
-      // Update rate limit tracking from headers
-      const remaining = response.headers.get('x-ratelimit-remaining');
-      const resetTime = response.headers.get('x-ratelimit-reset');
-      if (remaining !== null) {
-        this.rateLimitRemaining = parseInt(remaining, 10);
+      this.recordRateLimitHeaders(response);
+
+      if (response.status === 403 || response.status === 429) {
+        return { kind: 'rateLimited', resetAt: this.rateLimit.resetAt };
       }
-      if (resetTime !== null) {
-        this.rateLimitResetTime = parseInt(resetTime, 10);
+
+      // 404 = repo missing or invisible. 422 = "no commit found for SHA", which
+      // is what GitHub answers for a commit that was never pushed — common for
+      // the newest rows in any working repo. Both mean "try another commit",
+      // not "this author has no avatar".
+      if (response.status === 404 || response.status === 422) {
+        return { kind: 'notFound' };
       }
 
       if (!response.ok) {
-        return null;
+        return { kind: 'networkError' };
       }
 
-      const data = await response.json() as { author?: { avatar_url?: string } };
-      return data.author?.avatar_url ?? null;
+      const data = await response.json() as { author?: { avatar_url?: string } | null };
+      const avatarUrl = data.author?.avatar_url;
+      // A 200 with a null author means the commit email is not linked to any
+      // GitHub account — a real answer, not a failure.
+      return avatarUrl ? { kind: 'found', avatarUrl } : { kind: 'noAccount' };
     } catch {
-      // Network error (timeout, DNS failure, offline) — return null to trigger Gravatar fallback
-      return null;
+      // Network error (timeout, DNS failure, offline).
+      return { kind: 'networkError' };
+    }
+  }
+
+  private recordRateLimitHeaders(response: Response): void {
+    const remaining = response.headers.get('x-ratelimit-remaining');
+    const resetAt = response.headers.get('x-ratelimit-reset');
+
+    if (remaining !== null) {
+      const parsed = parseInt(remaining, 10);
+      if (Number.isFinite(parsed)) this.rateLimit = { ...this.rateLimit, remaining: parsed };
+    }
+    if (resetAt !== null) {
+      const parsed = parseInt(resetAt, 10);
+      // GitHub reports the reset as unix seconds; we track unix ms throughout.
+      if (Number.isFinite(parsed)) this.rateLimit = { ...this.rateLimit, resetAt: parsed * 1000 };
     }
   }
 }

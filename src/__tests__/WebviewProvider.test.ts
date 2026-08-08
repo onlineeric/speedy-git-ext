@@ -13,6 +13,7 @@ import { RepoDataLoader, computeCommitFingerprint } from '../webview/RepoDataLoa
 import { WebviewMessageRouter } from '../webview/WebviewMessageRouter.js';
 import { WebviewRuntime } from '../webview/WebviewRuntime.js';
 import { createTelemetryStub } from './telemetryTestStub.js';
+import { createAvatarCacheStub, createAvatarQueueStub } from './avatarTestStubs.js';
 import { submoduleHandlers } from '../webview/handlers/submoduleHandlers.js';
 import type { WebviewRequestContext } from '../webview/WebviewRequestContext.js';
 
@@ -119,6 +120,9 @@ function createRepoDataLoaderFixture(options: {
     runtime,
     services,
     uiStateStore: store,
+    avatarCache: createAvatarCacheStub(),
+    avatarQueue: createAvatarQueueStub(),
+    isAvatarAuthorized: () => false,
     postMessage,
     getSettings: () => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }),
     getBatchSize: () => 500,
@@ -168,6 +172,9 @@ describe('WebviewProvider initial load performance', () => {
       runtime,
       services,
       uiStateStore: store,
+      avatarCache: createAvatarCacheStub(),
+      avatarQueue: createAvatarQueueStub(),
+      isAvatarAuthorized: () => false,
       postMessage,
       getSettings: () => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }),
       getBatchSize: () => 500,

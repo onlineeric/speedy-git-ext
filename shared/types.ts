@@ -19,6 +19,12 @@ export interface UserSettings {
   /** date-fns token string, used only when `dateFormat === 'custom'`. Invalid tokens fall back to `relative`. */
   dateFormatCustom: string;
   avatarsEnabled: boolean;
+  /**
+   * Days an avatar stays fresh before it is queued for a background refresh.
+   * Expiry is computed at read time (`lastRefreshAt + avatarRefreshDays`), never
+   * stored, so changing this applies retroactively to everything already cached.
+   */
+  avatarRefreshDays: number;
   showRemoteBranches: boolean;
   showTags: boolean;
   batchCommitSize: number;
@@ -89,6 +95,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   dateFormat: 'relative',
   dateFormatCustom: '',
   avatarsEnabled: true,
+  avatarRefreshDays: 30,
   showRemoteBranches: true,
   showTags: true,
   batchCommitSize: 500,
@@ -457,6 +464,26 @@ export interface InteractiveRebaseConfig {
 }
 
 export type AvatarUrlMap = Record<string, string>;
+
+/**
+ * GitHub authorization state for avatar lookups, as shown in the View popover's
+ * Avatars section. Deliberately carries no token and no repository identity.
+ */
+export interface AvatarAuthState {
+  /**
+   * True once the user has clicked "Allow avatar lookup" and GitHub granted a
+   * session. Speedy Git never uses a silently-available session without this —
+   * the opt-in is what makes "Remove token" meaningful.
+   */
+  authorized: boolean;
+  /** GitHub account label for the granted session, or null when not authorized. */
+  accountLabel: string | null;
+  /**
+   * Unix ms when the GitHub rate limit resets, or null when not currently
+   * limited. Lets the UI explain the pause instead of looking stuck.
+   */
+  rateLimitResetAt: number | null;
+}
 
 export interface WorktreeInfo {
   path: string;

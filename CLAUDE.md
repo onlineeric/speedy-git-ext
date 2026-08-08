@@ -126,13 +126,58 @@ These exist because the rule they encode is subtle or shared across several call
 - `utils/branchSelection.ts` — `getBranchKey` (bare name vs `remote/name`) + additive select-all-local
 - `utils/resolveDefaultRemote.ts` — pick `origin` else first-alpha remote
 - `stores/graphSelectors.ts` — derived store reads (`useOperationInProgress`, `useCurrentLocalBranch`), one selector each so callers can't disagree on the derivation
+- `utils/avatarSettings.ts` — clamp/fallback for the avatar refresh-days input (empty box means "keep current", not zero)
+
+### Avatars — Cache and Background Refresh
+
+GitHub's avatar API is rate limited to 60 requests/hour **per IP** unauthenticated (shared across
+everyone behind one corporate network) and 5000/hour per user once authorized. The subsystem exists
+to spend that budget as rarely as possible:
+
+- **Never look up an avatar on the commit-load path.** `RepoDataLoader` only reads the cache and
+  posts what it has; misses go to `AvatarRefreshQueue`, which trickles at one lookup per
+  `AVATAR_REFRESH_INTERVAL_MS`. Loading commits must never wait on the network for an avatar.
+- **The cache is keyed by email and is account-scoped, not repo-scoped.** It deliberately survives
+  repo switches and reloads (`resetRepoScopedState` clears only the owner/repo pair). Do not move it
+  back under anything repo-bound.
+- **All expiry/state decisions live in the pure `services/avatarCachePolicy.ts`** — expiry is derived
+  from `lastRefreshAt + refreshDays` at read time and never stored, so the setting applies
+  retroactively. No record is ever permanently written off; a failed or unresolvable email simply
+  retries next cycle.
+- **A GitHub session is used only after explicit opt-in** (`GitHubAuthService`), never from a
+  silently-available session — otherwise "Remove token" would be undone by the next lookup.
+- **Results reach the webview in batches**, never one message per avatar, so a background refresh
+  cannot cause a re-render storm during scrolling.
+- The View settings dialog's open state lives in `graphStore` (`viewSettingsOpen`) because the Author
+  column header's gear opens the same dialog.
+
+### Colors — Always Use VS Code Theme Tokens
+
+**Every color in the webview must come from a `var(--vscode-*)` theme token.** The webview is
+rendered inside the user's editor, and VS Code re-defines these tokens for whatever theme the user
+picked. A hardcoded color (`text-sky-400`, `bg-gray-900/40`, `#E8A317`) stays fixed while everything
+around it changes, so it looks correct in whichever theme it was written against and wrong in the
+others — unreadable on light themes, off-brand on high-contrast ones.
+
+- **Buttons**: use `buttonPrimaryClassName` / `buttonSecondaryClassName` from
+  `components/dialogStyles.ts`. VS Code defines exactly these two variants
+  (`--vscode-button-*` and `--vscode-button-secondary*`). One primary per dialog for the confirming
+  action; secondary for everything else. **Never style a clickable control with no background** —
+  it reads as a label until hovered.
+- **Semantic colors**: prefer the token that means the thing — `--vscode-gitDecoration-addedResourceForeground`,
+  `--vscode-editorWarning-foreground`, `--vscode-errorForeground`, `--vscode-charts-*` — over a
+  Tailwind palette color that merely looks right in the current theme.
+- **Legitimate exceptions**, which must stay deliberate and commented: user-configured graph lane
+  colors (`speedyGit.graphColors`), and `bg-black/50` dialog overlays (a scrim is theme-independent).
+
+Search for `-[0-9]{2,3}` Tailwind color suffixes and raw hex before finishing UI work.
 
 Menu/dialog composition:
 
 - `components/MenuItem.tsx` — a menu command; one `disabled`/`danger` prop drives both Radix behaviour and styling. **Prefer this over applying `menuStyles` strings by hand**
 - `components/useCommitMenuItems.tsx` — every commit action as `{ commitItems, compareItems, createItems, worktreeItem, copyItems, dialogs }`. Feeds the commit row menu (`variant: 'row'`) and the Commit/Create groups of ref badge menus (`variant: 'badge'`). Groups are returned separately so callers can interleave their own
 - `components/LazyContextMenu.tsx` — mounts a menu's heavy body only on first right-click; keeps virtualized rows cheap during fast scrolling. Wrap new row menus in it
-- `components/dialogStyles.ts` — shared dialog sizing; every `Dialog.Content` uses it
+- `components/dialogStyles.ts` — shared dialog sizing **and the two VS Code button variants** (`buttonPrimaryClassName`/`buttonSecondaryClassName`); every `Dialog.Content` uses it
 - `components/CompareMenuItems.tsx`, `MenuCopySubmenu.tsx`, `MenuGroupSeparator.tsx`, `MenuSubTrigger.tsx` — shared menu fragments
 - `hooks/useDialogTelemetry.ts` — one confirmed/cancelled outcome per dialog open cycle
 - `hooks/useCopyFeedback.ts` — `copyToClipboard` + short "copied" flash, used by every copy button

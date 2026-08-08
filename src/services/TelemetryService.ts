@@ -34,7 +34,7 @@ export interface TelemetryService extends vscode.Disposable {
   /** Once per session; no-ops on repeat calls. */
   sendSettingsSnapshot(
     snapshot: SettingsSnapshotProperties,
-    measurements: { batchCommitSize: number; overScan: number },
+    measurements: { batchCommitSize: number; overScan: number; avatarRefreshDays: number },
   ): void;
   sendPanelOpened(trigger: 'command' | 'scmButton'): void;
   /** Called only by the router middleware. */
@@ -143,7 +143,7 @@ class ReporterTelemetryService implements TelemetryService {
 
   sendSettingsSnapshot(
     snapshot: SettingsSnapshotProperties,
-    measurements: { batchCommitSize: number; overScan: number },
+    measurements: { batchCommitSize: number; overScan: number; avatarRefreshDays: number },
   ): void {
     if (this.settingsSnapshotSent) return;
     this.settingsSnapshotSent = true;

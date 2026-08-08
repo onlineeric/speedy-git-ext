@@ -18,6 +18,7 @@ import { GitIndexService } from './services/GitIndexService.js';
 import { GitShowContentProvider } from './GitShowContentProvider.js';
 import { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
 import { GitWatcherService } from './services/GitWatcherService.js';
+import { clampAvatarRefreshDays } from './services/avatarCachePolicy.js';
 import type { SettingsSnapshotProperties, TelemetryService } from './services/TelemetryService.js';
 import { PersistedUIStateStore } from './webview/PersistedUIStateStore.js';
 import { GitError } from '../shared/errors.js';
@@ -130,6 +131,7 @@ export class ExtensionController {
     this.telemetry.sendSettingsSnapshot(snapshot, {
       batchCommitSize: settings.batchCommitSize,
       overScan: settings.overScan,
+      avatarRefreshDays: settings.avatarRefreshDays,
     });
   }
 
@@ -376,6 +378,7 @@ export class ExtensionController {
       'speedyGit.dateFormat',
       'speedyGit.dateFormatCustom',
       'speedyGit.avatars.enabled',
+      'speedyGit.avatars.refreshDays',
       'speedyGit.showRemoteBranches',
       'speedyGit.showTags',
       'speedyGit.batchCommitSize',
@@ -415,6 +418,10 @@ export class ExtensionController {
       dateFormat,
       dateFormatCustom,
       avatarsEnabled: config.get<boolean>('avatars.enabled', DEFAULT_USER_SETTINGS.avatarsEnabled),
+      avatarRefreshDays: clampAvatarRefreshDays(
+        config.get<number>('avatars.refreshDays', DEFAULT_USER_SETTINGS.avatarRefreshDays),
+        DEFAULT_USER_SETTINGS.avatarRefreshDays,
+      ),
       showRemoteBranches: config.get<boolean>('showRemoteBranches', DEFAULT_USER_SETTINGS.showRemoteBranches),
       showTags: config.get<boolean>('showTags', DEFAULT_USER_SETTINGS.showTags),
       batchCommitSize,

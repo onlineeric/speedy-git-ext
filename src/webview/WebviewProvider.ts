@@ -17,6 +17,10 @@ import type { GitSubmoduleService } from '../services/GitSubmoduleService.js';
 import type { GitTagService } from '../services/GitTagService.js';
 import type { GitWorktreeService } from '../services/GitWorktreeService.js';
 import type { TelemetryService } from '../services/TelemetryService.js';
+import { AvatarCacheStore } from '../services/AvatarCacheStore.js';
+import { AvatarRefreshQueue } from '../services/AvatarRefreshQueue.js';
+import { GitHubAuthService } from '../services/GitHubAuthService.js';
+import { GitHubAvatarService } from '../services/GitHubAvatarService.js';
 import { clampBatchCommitSize, DEFAULT_USER_SETTINGS } from '../../shared/types.js';
 import { EditorCommandService } from './EditorCommandService.js';
 import { GitServiceRegistry, type GitServiceSet } from './GitServiceRegistry.js';
@@ -39,6 +43,10 @@ export class WebviewProvider {
   private readonly editorCommands: EditorCommandService;
   private readonly operationGuard: OperationGuard;
   private readonly router: WebviewMessageRouter;
+  private readonly avatarCache: AvatarCacheStore;
+  private readonly avatarAuth: GitHubAuthService;
+  private readonly avatarService: GitHubAvatarService;
+  private readonly avatarQueue: AvatarRefreshQueue;
   private getSettingsHandler: (() => UserSettings) | undefined;
   private submoduleHandlers: SubmoduleNavigationHandlers | undefined;
   private onSwitchRepo: ((repoPath: string) => void) | undefined;
@@ -84,11 +92,33 @@ export class WebviewProvider {
     });
     this.uiStateStore = new PersistedUIStateStore(this.context, () => this.runtime.currentRepoPath);
     this.panelHost = new WebviewPanelHost(this.context, this.log);
+
+    // Avatar subsystem. Deliberately owned here rather than by RepoDataLoader:
+    // the cache and queue are account-scoped and must outlive repo switches.
+    this.avatarCache = new AvatarCacheStore(this.context, this.log);
+    this.avatarAuth = new GitHubAuthService(this.context, this.log, () => this.onAvatarAuthChanged());
+    this.avatarService = new GitHubAvatarService();
+    this.avatarQueue = new AvatarRefreshQueue({
+      log: this.log,
+      cache: this.avatarCache,
+      auth: this.avatarAuth,
+      avatarService: this.avatarService,
+      postAvatarUrls: (urls) => this.postMessage({ type: 'avatarUrls', payload: { urls } }),
+      onRateLimitChanged: () => this.sendAvatarAuthState(),
+      // Untracked-path failure (FR-014): functional area + standardized code
+      // only — never the email, hash, repo or GitHub's response.
+      onLookupFailed: () => this.telemetry.sendError('avatarService', 'COMMAND_FAILED'),
+    });
+    void this.avatarAuth.initialize();
+
     this.dataLoader = new RepoDataLoader({
       log: this.log,
       runtime: this.runtime,
       services: this.services,
       uiStateStore: this.uiStateStore,
+      avatarCache: this.avatarCache,
+      avatarQueue: this.avatarQueue,
+      isAvatarAuthorized: () => this.avatarAuth.isOptedIn(),
       postMessage: (message) => this.postMessage(message),
       getSettings: () => this.getSettingsHandler?.(),
       getBatchSize: () => this.getBatchSize(),
@@ -209,6 +239,39 @@ export class WebviewProvider {
 
   dispose(): void {
     this.panelHost.dispose();
+    this.avatarQueue.dispose();
+    // Flush whatever the queue resolved since the last debounced write, so a
+    // shutdown never throws away avatars we already spent API budget on.
+    this.avatarCache.dispose();
+  }
+
+  /**
+   * Authorizing raises the rate limit and grants private-repo access, so every
+   * email that failed while unauthenticated is worth retrying now rather than
+   * after the refresh window.
+   */
+  private onAvatarAuthChanged(): void {
+    this.sendAvatarAuthState();
+    if (!this.avatarAuth.isOptedIn()) return;
+
+    const reopened = this.avatarCache.reopenUnresolved();
+    if (reopened.length > 0) {
+      this.log.info(`GitHub avatars: retrying ${reopened.length} unresolved email(s) after authorization`);
+      this.avatarQueue.enqueue(reopened);
+    }
+  }
+
+  private sendAvatarAuthState(): void {
+    const rateLimit = this.avatarService.getRateLimit();
+    const limited = this.avatarService.isRateLimited(Date.now());
+    this.postMessage({
+      type: 'avatarAuthState',
+      payload: {
+        authorized: this.avatarAuth.isOptedIn(),
+        accountLabel: this.avatarAuth.accountLabel,
+        rateLimitResetAt: limited ? rateLimit.resetAt : null,
+      },
+    });
   }
 
   private async handleMessage(message: RequestMessage): Promise<void> {
@@ -227,7 +290,14 @@ export class WebviewProvider {
       operationGuard: this.operationGuard,
       uiStateStore: this.uiStateStore,
       telemetry: this.telemetry,
+      avatarAuth: this.avatarAuth,
       postMessage: (message) => this.postMessage(message),
+      sendAvatarAuthState: () => this.sendAvatarAuthState(),
+      clearAvatarCache: async () => {
+        this.avatarQueue.clear();
+        await this.avatarCache.clear();
+        this.log.info('GitHub avatar cache cleared');
+      },
       getSettings: () => this.getSettingsHandler?.(),
       getBatchSize: () => this.getBatchSize(),
       getRepoDiscovery: () => this.gitRepoDiscoveryService,

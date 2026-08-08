@@ -61,6 +61,10 @@ class RpcClient {
     }
 
     window.addEventListener('message', this.messageHandler);
+
+    // Ask once up front so the Avatars section and the Author-header gear render
+    // their correct variant instead of briefly showing the unauthorized one.
+    this.getAvatarAuthState();
   }
 
   dispose() {
@@ -328,6 +332,12 @@ class RpcClient {
         break;
       case 'avatarUrls':
         store.setGitHubAvatarUrls(message.payload.urls);
+        break;
+      case 'avatarAuthState':
+        store.setAvatarAuthState(message.payload);
+        break;
+      case 'avatarCacheCleared':
+        store.clearGitHubAvatarUrls();
         break;
       case 'tagMetadata':
         store.setTagMetadata(message.payload.metadata);
@@ -670,6 +680,26 @@ class RpcClient {
 
   getSettings() {
     this.send({ type: 'getSettings', payload: {} });
+  }
+
+  getAvatarAuthState() {
+    this.send({ type: 'getAvatarAuthState', payload: {} });
+  }
+
+  requestGitHubAuth() {
+    this.send({ type: 'requestGitHubAuth', payload: {} });
+  }
+
+  removeGitHubAuth() {
+    this.send({ type: 'removeGitHubAuth', payload: {} });
+  }
+
+  setAvatarRefreshDays(days: number) {
+    this.send({ type: 'setAvatarRefreshDays', payload: { days } });
+  }
+
+  clearAvatarCache() {
+    this.send({ type: 'clearAvatarCache', payload: {} });
   }
 
   setToolbarSetting(setting: ToolbarBooleanSetting, value: boolean) {
