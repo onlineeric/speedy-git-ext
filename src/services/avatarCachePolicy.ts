@@ -71,8 +71,17 @@ export const AVATAR_REFRESH_INTERVAL_MS = 1000;
 /** Consecutive transport/404 failures before a record waits out a full window. */
 export const AVATAR_MAX_ATTEMPTS = 3;
 
-/** Cache ceiling; least-recently-seen entries are dropped past this. */
-export const AVATAR_CACHE_MAX_ENTRIES = 2000;
+/**
+ * Cache ceiling; least-recently-seen entries are dropped past this.
+ *
+ * Sized against VS Code's storage budget, not against taste. VS Code keeps an
+ * extension's entire `globalState` as one JSON blob and warns at 512 KB
+ * ("large extension state detected… consider to use 'globalStorageUri'"). A
+ * record costs roughly 300-340 bytes, so 1000 entries lands near 330 KB and
+ * leaves room for the persisted UI state and per-repo table layouts that share
+ * the same blob. 2000 would have exceeded the threshold on its own.
+ */
+export const AVATAR_CACHE_MAX_ENTRIES = 1000;
 
 /**
  * Leave a little of the hourly budget for anything else on this machine or IP

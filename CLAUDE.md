@@ -148,6 +148,10 @@ to spend that budget as rarely as possible:
   silently-available session — otherwise "Remove token" would be undone by the next lookup.
 - **Results reach the webview in batches**, never one message per avatar, so a background refresh
   cannot cause a re-render storm during scrolling.
+- **`AVATAR_CACHE_MAX_ENTRIES` is a storage budget, not a preference.** VS Code holds an extension's
+  whole `globalState` as one JSON blob and warns past 512 KB; our records cost ~300-340 bytes each,
+  and the same blob also holds UI state and per-repo table layouts. Re-do the arithmetic before
+  raising the cap or widening the record.
 - The View settings dialog's open state lives in `graphStore` (`viewSettingsOpen`) because the Author
   column header's gear opens the same dialog.
 

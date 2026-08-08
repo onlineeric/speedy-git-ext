@@ -70,7 +70,7 @@ src/
 │   ├── GitRepoDiscoveryService.ts # Multi-root workspace scanning
 │   ├── GitHubAvatarService.ts    # Stateless one-shot GitHub avatar lookup + rate-limit tracking
 │   ├── avatarCachePolicy.ts      # PURE: avatar expiry, lookup-outcome state machine, queue priority, LRU eviction
-│   ├── AvatarCacheStore.ts       # Persistent email→avatar cache in globalState; debounced writes, LRU cap
+│   ├── AvatarCacheStore.ts       # Persistent email→avatar cache in globalState; debounced writes, LRU cap 1000 (512KB extension-state budget)
 │   ├── AvatarRefreshQueue.ts     # Paced background drain (1/sec), rate-limit pause, batched result posting
 │   ├── GitHubAuthService.ts      # Explicit opt-in gate for the GitHub session used by avatar lookups
 │   ├── GitConfigService.ts       # Git config reading
