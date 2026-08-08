@@ -102,12 +102,14 @@ export class AvatarRefreshQueue {
 
   private sortQueue(): void {
     const cache = this.deps.cache;
-    this.queue.sort((a, b) => {
-      const recordA = cache.get(a.email);
-      const recordB = cache.get(b.email);
-      if (!recordA || !recordB) return 0;
-      return compareAvatarRefreshPriority(recordA, recordB);
-    });
+    // Each record is fetched once up front rather than twice per comparison:
+    // a full backlog is AVATAR_CACHE_MAX_ENTRIES long and every load re-sorts it,
+    // so the comparator runs tens of thousands of times per sort.
+    const keyed = this.queue.map((task) => ({ task, record: cache.get(task.email) }));
+    keyed.sort((a, b) =>
+      a.record && b.record ? compareAvatarRefreshPriority(a.record, b.record) : 0,
+    );
+    this.queue = keyed.map((entry) => entry.task);
   }
 
   private async run(): Promise<void> {

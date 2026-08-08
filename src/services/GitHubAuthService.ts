@@ -34,8 +34,12 @@ export type AvatarAuthChange = 'granted' | 'refreshed';
  * undo it.
  */
 export class GitHubAuthService {
-  private cachedToken: string | null = null;
-  private cachedAccountLabel: string | null = null;
+  /**
+   * The live session, or null when we hold none. One nullable object rather than
+   * a token field beside a label field: the two are only ever set and cleared
+   * together, and splitting them invites a path that updates one of them.
+   */
+  private session: { token: string; accountLabel: string } | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -57,12 +61,12 @@ export class GitHubAuthService {
   }
 
   get accountLabel(): string | null {
-    return this.cachedAccountLabel;
+    return this.session?.accountLabel ?? null;
   }
 
   /** The token to authenticate lookups with, or null to go unauthenticated. */
   getToken(): string | null {
-    return this.isOptedIn() ? this.cachedToken : null;
+    return this.isOptedIn() ? this.session?.token ?? null : null;
   }
 
   /**
@@ -77,8 +81,9 @@ export class GitHubAuthService {
   private async refreshSilently(): Promise<void> {
     try {
       const session = await vscode.authentication.getSession('github', GITHUB_SCOPES, { silent: true });
-      this.cachedToken = session?.accessToken ?? null;
-      this.cachedAccountLabel = session?.account.label ?? null;
+      this.session = session
+        ? { token: session.accessToken, accountLabel: session.account.label }
+        : null;
 
       if (!session) {
         // The grant is gone (revoked in the Accounts menu). Clear the opt-in so
@@ -87,8 +92,7 @@ export class GitHubAuthService {
         await this.context.globalState.update(OPT_IN_KEY, false);
       }
     } catch (error) {
-      this.cachedToken = null;
-      this.cachedAccountLabel = null;
+      this.session = null;
       this.log.debug(`GitHub avatar session unavailable: ${String(error)}`);
     }
     this.onStateChanged('refreshed');
@@ -100,8 +104,7 @@ export class GitHubAuthService {
       const session = await vscode.authentication.getSession('github', GITHUB_SCOPES, { createIfNone: true });
       if (!session) return 'declined';
 
-      this.cachedToken = session.accessToken;
-      this.cachedAccountLabel = session.account.label;
+      this.session = { token: session.accessToken, accountLabel: session.account.label };
       await this.context.globalState.update(OPT_IN_KEY, true);
       this.log.info('GitHub avatar lookups authorized');
       this.onStateChanged('granted');
@@ -126,8 +129,7 @@ export class GitHubAuthService {
    * actually governs whether Speedy Git authenticates.
    */
   async removeAuthorization(): Promise<void> {
-    this.cachedToken = null;
-    this.cachedAccountLabel = null;
+    this.session = null;
     await this.context.globalState.update(OPT_IN_KEY, false);
     this.log.info('GitHub avatar authorization removed; using unauthenticated lookups');
     this.onStateChanged('refreshed');

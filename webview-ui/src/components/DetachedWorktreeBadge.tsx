@@ -5,8 +5,8 @@ import { detachedWorktreeBadgeText } from '../utils/worktreeDisplay';
 import { worktreeBadgeBorderColor } from '../utils/worktreeBadgeStyle';
 import { WorktreeIcon } from './icons';
 import { useRemoveWorktreeDialog, WorktreeMenuGroup } from './WorktreeMenuItems';
-import { MENU_COLLISION_PADDING, menuContentClass } from './menuStyles';
 import { LazyContextMenu } from './LazyContextMenu';
+import { MenuContent } from './MenuContent';
 
 interface DetachedWorktreeBadgeProps {
   worktrees: WorktreeInfo[];
@@ -44,9 +44,9 @@ function DetachedWorktreeBadgeMenu({ worktrees }: { worktrees: WorktreeInfo[] })
   return (
     <>
       <ContextMenu.Portal>
-        <ContextMenu.Content className={`min-w-[220px] ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
+        <MenuContent minWidth="min-w-[220px]">
           <WorktreeMenuGroup worktrees={worktrees} onRemove={openRemoveWorktreeDialog} />
-        </ContextMenu.Content>
+        </MenuContent>
       </ContextMenu.Portal>
       {removeWorktreeDialog}
     </>

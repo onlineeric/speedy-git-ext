@@ -5,9 +5,10 @@ import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
 import { buildDropStashCommand } from '../utils/gitCommandBuilder';
 import { ConfirmDialog } from './ConfirmDialog';
-import { MENU_COLLISION_PADDING, dangerItemClass, menuContentClass, menuItemClass } from './menuStyles';
 import { LazyContextMenu } from './LazyContextMenu';
 import { MenuGroupSeparator } from './MenuGroupSeparator';
+import { MenuItem } from './MenuItem';
+import { MenuContent } from './MenuContent';
 
 interface StashContextMenuProps {
   commit: Commit;
@@ -55,21 +56,19 @@ function StashContextMenuBody({ commit, stashIndex }: Omit<StashContextMenuProps
   return (
     <>
       <ContextMenu.Portal>
-        <ContextMenu.Content className={`min-w-[160px] ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
-            <ContextMenu.Item className={menuItemClass} onSelect={handleApply} disabled={!isValidIndex}>
+        <MenuContent minWidth="min-w-[160px]">
+            <MenuItem onSelect={handleApply} disabled={!isValidIndex}>
               Apply Stash
-            </ContextMenu.Item>
-            <ContextMenu.Item className={menuItemClass} onSelect={handlePop} disabled={!isValidIndex}>
+            </MenuItem>
+            <MenuItem onSelect={handlePop} disabled={!isValidIndex}>
               Pop Stash
-            </ContextMenu.Item>
-            <ContextMenu.Item className={dangerItemClass} onSelect={handleDrop} disabled={!isValidIndex}>
+            </MenuItem>
+            <MenuItem danger onSelect={handleDrop} disabled={!isValidIndex}>
               Drop Stash
-            </ContextMenu.Item>
+            </MenuItem>
             <MenuGroupSeparator />
-            <ContextMenu.Item className={menuItemClass} onSelect={handleCopyHash}>
-              Copy Commit Hash
-            </ContextMenu.Item>
-          </ContextMenu.Content>
+            <MenuItem onSelect={handleCopyHash}>Copy Commit Hash</MenuItem>
+          </MenuContent>
         </ContextMenu.Portal>
 
       <ConfirmDialog

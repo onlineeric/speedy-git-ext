@@ -29,7 +29,7 @@ import {
 } from '../utils/commitTableLayout';
 import { trackUiInteraction } from '../utils/telemetry';
 import { AvatarSettingsSection } from './AvatarSettingsSection';
-import { buttonSecondaryClassName, dialogContentClassName } from './dialogStyles';
+import { buttonSecondaryClassName, dialogContentClassName, dialogSectionLabelClassName } from './dialogStyles';
 import { ColumnsIcon } from './icons';
 import { ToolbarIconButton, RemoteButtonToggleItem } from './ToolbarIconButton';
 
@@ -56,7 +56,7 @@ const COLUMN_WARNINGS: Partial<Record<CommitTableColumnId, string>> = {
     'Warning: signature checks run in the background and can use high CPU in large repositories. Keep this column hidden on slower machines.',
 };
 
-export function CommitListSettingsPopover() {
+export function ViewSettingsDialog() {
   // Open state lives in the store so the Author column header's gear can open
   // this same dialog.
   const open = useGraphStore((state) => state.viewSettingsOpen);
@@ -147,9 +147,7 @@ export function CommitListSettingsPopover() {
               Stacks on narrow panels, where side-by-side would be unreadable. */}
           <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto md:grid-cols-2">
             <section className="min-w-0">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--vscode-descriptionForeground)]">
-                Columns
-              </div>
+              <div className={dialogSectionLabelClassName}>Columns</div>
               <p className="mb-3 text-xs text-[var(--vscode-descriptionForeground)]">
                 Graph stays first and always visible. Drag optional columns to reorder them.
               </p>

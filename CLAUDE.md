@@ -126,7 +126,7 @@ These exist because the rule they encode is subtle or shared across several call
 - `utils/branchSelection.ts` — `getBranchKey` (bare name vs `remote/name`) + additive select-all-local
 - `utils/resolveDefaultRemote.ts` — pick `origin` else first-alpha remote
 - `stores/graphSelectors.ts` — derived store reads (`useOperationInProgress`, `useCurrentLocalBranch`), one selector each so callers can't disagree on the derivation
-- `utils/avatarSettings.ts` — clamp/fallback for the avatar refresh-days input (empty box means "keep current", not zero)
+- `shared/types.ts` — cross-boundary setting clamps: `clampBatchCommitSize`, and `clampAvatarRefreshDays` (takes the input's raw string or a number; empty box means "keep current", not zero). A setting clamped on both sides belongs here, never once per side
 
 ### Avatars — Cache and Background Refresh
 
@@ -179,10 +179,11 @@ Search for `-[0-9]{2,3}` Tailwind color suffixes and raw hex before finishing UI
 
 Menu/dialog composition:
 
-- `components/MenuItem.tsx` — a menu command; one `disabled`/`danger` prop drives both Radix behaviour and styling. **Prefer this over applying `menuStyles` strings by hand**
+- `components/MenuItem.tsx` — a menu command; one `disabled`/`danger` prop drives both Radix behaviour and styling. The item class strings are **not** exported from `menuStyles.ts`, so this is the only way to render one
+- `components/MenuContent.tsx` — `MenuContent`/`MenuSubContent`, the menu panel shell. Carries the height cap and collision padding that keep a long menu usable in a short window, so a new menu gets them by default. Only the width floor is a prop
 - `components/useCommitMenuItems.tsx` — every commit action as `{ commitItems, compareItems, createItems, worktreeItem, copyItems, dialogs }`. Feeds the commit row menu (`variant: 'row'`) and the Commit/Create groups of ref badge menus (`variant: 'badge'`). Groups are returned separately so callers can interleave their own
 - `components/LazyContextMenu.tsx` — mounts a menu's heavy body only on first right-click; keeps virtualized rows cheap during fast scrolling. Wrap new row menus in it
-- `components/dialogStyles.ts` — shared dialog sizing **and the two VS Code button variants** (`buttonPrimaryClassName`/`buttonSecondaryClassName`); every `Dialog.Content` uses it
+- `components/dialogStyles.ts` — shared dialog sizing, **the two VS Code button variants** (`buttonPrimaryClassName`/`buttonSecondaryClassName`) and `dialogSectionLabelClassName` for settings-group captions; every `Dialog.Content` uses it
 - `components/CompareMenuItems.tsx`, `MenuCopySubmenu.tsx`, `MenuGroupSeparator.tsx`, `MenuSubTrigger.tsx` — shared menu fragments
 - `hooks/useDialogTelemetry.ts` — one confirmed/cancelled outcome per dialog open cycle
 - `hooks/useCopyFeedback.ts` — `copyToClipboard` + short "copied" flash, used by every copy button

@@ -27,12 +27,12 @@ import { PushDialog } from './PushDialog';
 import { CheckoutWithPullDialog } from './CheckoutWithPullDialog';
 import { CreateWorktreeDialog, type WorktreeSource } from './CreateWorktreeDialog';
 import { useRemoveWorktreeDialog, WorktreeMenuItems } from './WorktreeMenuItems';
-import { MENU_COLLISION_PADDING, menuContentClass, menuMinWidthClass } from './menuStyles';
 import { MenuItem } from './MenuItem';
 import { LazyContextMenu } from './LazyContextMenu';
 import { MenuCopySubmenu } from './MenuCopySubmenu';
 import { MenuGroupSeparator } from './MenuGroupSeparator';
 import { useCommitMenuItems } from './useCommitMenuItems';
+import { MenuContent } from './MenuContent';
 
 
 interface BranchContextMenuProps {
@@ -280,7 +280,7 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
   return (
     <>
       <ContextMenu.Portal>
-        <ContextMenu.Content className={`${menuMinWidthClass} ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
+        <MenuContent>
             {/* The ref this badge names, ordered from navigating to it through to deleting it. */}
             {!isStash && (
               <>
@@ -421,7 +421,7 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
                 </MenuCopySubmenu>
               </>
             )}
-          </ContextMenu.Content>
+          </MenuContent>
         </ContextMenu.Portal>
 
       {/* Delete confirmation for remote branches */}

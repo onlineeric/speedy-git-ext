@@ -120,6 +120,30 @@ export function clampBatchCommitSize(value: number): number {
   return Math.min(value, MAX_BATCH_COMMIT_SIZE);
 }
 
+/**
+ * Bounds for `speedyGit.avatars.refreshDays`, mirroring package.json.
+ *
+ * Shared rather than per-side: the settings input clamps what it sends and the
+ * backend clamps what it stores, and if those two disagreed the UI would accept
+ * a value the backend silently rewrote.
+ */
+export const MIN_AVATAR_REFRESH_DAYS = 1;
+export const MAX_AVATAR_REFRESH_DAYS = 365;
+
+/**
+ * Coerce a user-supplied refresh window into the supported range.
+ *
+ * Accepts the raw string straight from the settings input as well as a number,
+ * so both sides apply one rule: clamp rather than reject, so the user never has
+ * to guess the valid range, and fall back to the current setting when the box is
+ * empty or unparseable rather than clearing it.
+ */
+export function clampAvatarRefreshDays(value: number | string, fallback: number): number {
+  const parsed = typeof value === 'string' ? Number.parseInt(value.trim(), 10) : value;
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(MAX_AVATAR_REFRESH_DAYS, Math.max(MIN_AVATAR_REFRESH_DAYS, Math.round(parsed)));
+}
+
 export interface Commit {
   hash: string;
   abbreviatedHash: string;

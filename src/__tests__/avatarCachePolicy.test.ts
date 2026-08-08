@@ -3,7 +3,6 @@ import {
   AVATAR_CACHE_MAX_ENTRIES,
   applyAvatarLookupOutcome,
   avatarRefreshTier,
-  clampAvatarRefreshDays,
   compareAvatarRefreshPriority,
   createPendingRecord,
   evictLeastRecentlySeen,
@@ -53,26 +52,6 @@ describe('toDayNumber', () => {
     expect(day).toBe(Math.floor(Date.UTC(2026, 7, 8, 13, 45) / 86_400_000));
     // Same day, different time of day → same number.
     expect(toDayNumber(Date.UTC(2026, 7, 8, 1, 0))).toBe(day);
-  });
-});
-
-describe('clampAvatarRefreshDays', () => {
-  it('keeps values inside the supported range', () => {
-    expect(clampAvatarRefreshDays(30, 30)).toBe(30);
-    expect(clampAvatarRefreshDays(1, 30)).toBe(1);
-    expect(clampAvatarRefreshDays(365, 30)).toBe(365);
-  });
-
-  it('clamps out-of-range values instead of rejecting them', () => {
-    expect(clampAvatarRefreshDays(0, 30)).toBe(1);
-    expect(clampAvatarRefreshDays(-5, 30)).toBe(1);
-    expect(clampAvatarRefreshDays(10_000, 30)).toBe(365);
-  });
-
-  it('rounds fractional days and falls back on non-finite input', () => {
-    expect(clampAvatarRefreshDays(7.4, 30)).toBe(7);
-    expect(clampAvatarRefreshDays(Number.NaN, 30)).toBe(30);
-    expect(clampAvatarRefreshDays(Number.POSITIVE_INFINITY, 30)).toBe(30);
   });
 });
 

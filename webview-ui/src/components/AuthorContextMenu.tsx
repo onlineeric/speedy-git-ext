@@ -2,7 +2,8 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
-import { MENU_COLLISION_PADDING, menuContentClass, menuItemClass } from './menuStyles';
+import { MenuItem } from './MenuItem';
+import { MenuContent } from './MenuContent';
 
 interface AuthorContextMenuProps {
   authorEmail: string;
@@ -24,9 +25,9 @@ export function AuthorContextMenu({ authorEmail, children }: AuthorContextMenuPr
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
         <ContextMenu.Portal>
-          <ContextMenu.Content className={`min-w-[180px] ${menuContentClass}`} collisionPadding={MENU_COLLISION_PADDING}>
+          <MenuContent minWidth="min-w-[180px]">
             <AuthorFilterMenuItems authorEmail={authorEmail} />
-          </ContextMenu.Content>
+          </MenuContent>
         </ContextMenu.Portal>
       </ContextMenu.Root>
     </span>
@@ -55,8 +56,8 @@ function AuthorFilterMenuItems({ authorEmail }: { authorEmail: string }) {
   };
 
   return (
-    <ContextMenu.Item className={menuItemClass} onSelect={handleToggle}>
+    <MenuItem onSelect={handleToggle}>
       {isFiltered ? 'Remove Author from filter' : 'Add Author to filter'}
-    </ContextMenu.Item>
+    </MenuItem>
   );
 }

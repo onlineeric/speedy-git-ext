@@ -1,6 +1,6 @@
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
-import { parseCommitLine, parseBranchLine, parseStashBaseHash } from '../utils/gitParsers.js';
+import { parseCommitLine, parseBranchLine, parseBranchRefName, parseStashBaseHash } from '../utils/gitParsers.js';
 import { type Result, ok } from '../../shared/errors.js';
 import type { Author, Commit, Branch, GraphFilters } from '../../shared/types.js';
 
@@ -290,6 +290,27 @@ export class GitLogService {
     }
 
     return ok(branches);
+  }
+
+  /** Every local and remote branch whose history contains `hash`. */
+  async getContainingBranches(hash: string): Promise<Result<string[]>> {
+    const result = await this.executor.execute({
+      // `%(refname)` (not `:short`) so a local branch with a slash is never read
+      // as `<remote>/<branch>` — see parseBranchRefName.
+      args: ['branch', '-a', '--contains', hash, '--format=%(refname)'],
+      cwd: this.workspacePath,
+    });
+
+    if (!result.success) {
+      return result;
+    }
+
+    return ok(
+      result.value.stdout
+        .split('\n')
+        .map(parseBranchRefName)
+        .filter((name): name is string => name !== null),
+    );
   }
 
   async verifyRef(ref: string): Promise<Result<boolean>> {

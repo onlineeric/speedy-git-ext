@@ -18,11 +18,10 @@ import { GitIndexService } from './services/GitIndexService.js';
 import { GitShowContentProvider } from './GitShowContentProvider.js';
 import { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService.js';
 import { GitWatcherService } from './services/GitWatcherService.js';
-import { clampAvatarRefreshDays } from './services/avatarCachePolicy.js';
 import type { SettingsSnapshotProperties, TelemetryService } from './services/TelemetryService.js';
 import { PersistedUIStateStore } from './webview/PersistedUIStateStore.js';
 import { GitError } from '../shared/errors.js';
-import { clampBatchCommitSize, DEFAULT_GRAPH_COLORS, DEFAULT_USER_SETTINGS, type SubmoduleNavEntry, type UserDateFormat, type UserSettings } from '../shared/types.js';
+import { clampAvatarRefreshDays, clampBatchCommitSize, DEFAULT_GRAPH_COLORS, DEFAULT_USER_SETTINGS, type SubmoduleNavEntry, type UserDateFormat, type UserSettings } from '../shared/types.js';
 
 export class ExtensionController {
   private webviewProvider: WebviewProvider | undefined;

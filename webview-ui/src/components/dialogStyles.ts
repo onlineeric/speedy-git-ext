@@ -47,3 +47,13 @@ export const buttonPrimaryClassName =
 
 export const buttonSecondaryClassName =
   'px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] disabled:cursor-default disabled:opacity-50';
+
+/**
+ * Caption above a group of settings inside a dialog.
+ *
+ * Shared because the View settings dialog stands several of these side by side —
+ * captions that sit next to each other are exactly the ones that must not drift
+ * apart in weight or spacing.
+ */
+export const dialogSectionLabelClassName =
+  'mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--vscode-descriptionForeground)]';

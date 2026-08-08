@@ -51,7 +51,7 @@ src/
 ├── services/                     # All repo-bound; every method returns Result<T, GitError>
 │   ├── index.ts                  # Barrel export for all services
 │   ├── GitExecutor.ts            # Spawns git processes, 30s timeout — the only place git is invoked
-│   ├── GitLogService.ts          # Parses git log (null-byte format), branches. Default 500 commits.
+│   ├── GitLogService.ts          # Parses git log (null-byte format), branches, branches-containing-a-commit. Default 500 commits.
 │   │                             #   Also walks stash base commits, so a stash survives its branch moving
 │   ├── GitDiffService.ts         # Commit details, file changes, file content at revision
 │   ├── GitBranchService.ts       # Checkout, create, rename, delete, fast-forward branches
@@ -69,14 +69,14 @@ src/
 │   ├── GitWatcherService.ts      # File system watcher for auto-refresh
 │   ├── GitRepoDiscoveryService.ts # Multi-root workspace scanning
 │   ├── GitHubAvatarService.ts    # Stateless one-shot GitHub avatar lookup + rate-limit tracking
-│   ├── avatarCachePolicy.ts      # PURE: avatar expiry, lookup-outcome state machine, queue priority, LRU eviction
+│   ├── avatarCachePolicy.ts      # PURE: avatar expiry, lookup-outcome state machine, queue priority, LRU eviction (bounds/clamp live in shared/types.ts)
 │   ├── AvatarCacheStore.ts       # Persistent email→avatar cache in globalState; debounced writes, LRU cap 1000 (512KB extension-state budget)
 │   ├── AvatarRefreshQueue.ts     # Paced background drain (1/sec), rate-limit pause, batched result posting
 │   ├── GitHubAuthService.ts      # Explicit opt-in gate for the GitHub session used by avatar lookups
 │   ├── GitConfigService.ts       # Git config reading
 │   └── TelemetryService.ts       # Consent-aware backend telemetry funnel; real + no-op implementations
 └── utils/
-    ├── gitParsers.ts             # Parse git log lines, refs (%D), branch list, stash base (%P)
+    ├── gitParsers.ts             # Parse git log lines, refs (%D), branch list, stash base (%P); classify git stderr (conflict, nothing-to-apply)
     ├── gitQueries.ts             # Shared read-only git queries. isDirtyWorkingTree counts untracked
     │                             #   files — for `worktree remove` only; never gate rebase/pick/revert on it
     ├── gitValidation.ts          # Input validation (backend wrappers over shared/gitRefValidation)
@@ -119,7 +119,7 @@ components/
 ├── SearchWidget.tsx              # Text search across commits
 ├── CompareWidget.tsx             # Branch comparison
 ├── WorktreeWidget.tsx            # Worktree list + create/remove (046-git-worktrees)
-├── CommitListSettingsPopover.tsx # Centered View settings dialog: columns left, avatars right (Radix dialog + @dnd-kit sortable); open state lives in the store
+├── ViewSettingsDialog.tsx        # Centered View settings dialog: columns left, avatars right (Radix dialog + @dnd-kit sortable); open state lives in the store
 ├── AvatarSettingsSection.tsx     # Avatars pane of the View dialog: GitHub allow/remove-token, refresh-days, clear cache
 ├── RepoSelector.tsx              # Multi-root repo picker (FilterableSingleSelectDropdown)
 ├── SubmoduleSelector.tsx         # Parent/submodule navigation picker
@@ -146,12 +146,13 @@ Menu building blocks — see `CLAUDE.md` for the reuse rules:
 ```
 ├── useCommitMenuItems.tsx        # All commit actions, grouped
 ├── MenuItem.tsx                  # A menu command; `disabled`/`danger` drive behaviour + styling together
+├── MenuContent.tsx               # The menu panel shell: width floor + height cap + collision padding in one place
 ├── MenuSubTrigger.tsx            # Submenu opener: trailing chevron, stays highlighted while open
 ├── MenuGroupSeparator.tsx        # Divider, optionally captioned `label` + `name` (11px tall either way)
 ├── MenuCopySubmenu.tsx           # Shared "Copy" submenu
 ├── CompareMenuItems.tsx          # "Set as Compare Base" / "Compare with Base" pair (042)
 ├── WorktreeMenuItems.tsx         # Worktree entries shared across menus (046)
-└── menuStyles.ts                 # Tailwind class strings composed from one geometry + hover base
+└── menuStyles.ts                 # Tailwind class strings composed from one geometry + hover base; item variants exported only to `MenuItem`
 ```
 
 ### Dialogs
@@ -245,7 +246,6 @@ utils/
 ├── colorUtils.ts                 # Graph color cycling + theme helpers
 ├── formatDate.ts                 # Commit-date formatting
 ├── gravatar.ts                   # Gravatar URL builder + load-state cache
-├── avatarSettings.ts             # PURE: clamp/fallback for the refresh-days input
 ├── stashMessage.ts               # Format stash entries for display
 ├── uncommittedUtils.ts           # Helpers for the uncommitted-node row
 ├── repoPath.ts                   # Repo path normalization
@@ -258,7 +258,7 @@ utils/
 
 ```
 shared/
-├── types.ts                      # Domain types: Commit, Branch, RefInfo, GraphFilters, CommitDetails, …
+├── types.ts                      # Domain types: Commit, Branch, RefInfo, GraphFilters, CommitDetails, …; cross-boundary setting clamps (batch size, avatar refresh days)
 ├── messages.ts                   # RequestMessage/ResponseMessage union types for RPC
 ├── errors.ts                     # Result<T,E> monad, GitError class, GitErrorCode enum
 ├── gitRefValidation.ts           # git check-ref-format validator + tag/branch/remote wrappers — the same rules

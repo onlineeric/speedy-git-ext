@@ -117,20 +117,11 @@ export const AVATAR_CACHE_MAX_ENTRIES = 1000;
  */
 export const AVATAR_RATE_LIMIT_RESERVE = 10;
 
-export const MIN_AVATAR_REFRESH_DAYS = 1;
-export const MAX_AVATAR_REFRESH_DAYS = 365;
-
 const MS_PER_DAY = 86_400_000;
 
 /** Days since the Unix epoch. */
 export function toDayNumber(timestampMs: number): number {
   return Math.floor(timestampMs / MS_PER_DAY);
-}
-
-/** Clamp a user-supplied refresh window to the supported range. */
-export function clampAvatarRefreshDays(days: number, fallback: number): number {
-  if (!Number.isFinite(days)) return fallback;
-  return Math.min(MAX_AVATAR_REFRESH_DAYS, Math.max(MIN_AVATAR_REFRESH_DAYS, Math.round(days)));
 }
 
 /**

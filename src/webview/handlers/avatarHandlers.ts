@@ -1,11 +1,6 @@
 import * as vscode from 'vscode';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
-import {
-  MAX_AVATAR_REFRESH_DAYS,
-  MIN_AVATAR_REFRESH_DAYS,
-  clampAvatarRefreshDays,
-} from '../../services/avatarCachePolicy.js';
-import { DEFAULT_USER_SETTINGS } from '../../../shared/types.js';
+import { clampAvatarRefreshDays, DEFAULT_USER_SETTINGS } from '../../../shared/types.js';
 
 export const avatarHandlers = {
   getAvatarAuthState: async (_message, context) => {
@@ -44,5 +39,3 @@ export const avatarHandlers = {
   RequestHandlerMap,
   'getAvatarAuthState' | 'requestGitHubAuth' | 'removeGitHubAuth' | 'setAvatarRefreshDays' | 'clearAvatarCache'
 >;
-
-export { MAX_AVATAR_REFRESH_DAYS, MIN_AVATAR_REFRESH_DAYS };

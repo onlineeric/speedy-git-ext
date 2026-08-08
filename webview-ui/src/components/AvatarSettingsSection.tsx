@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { trackDialogOutcome, trackUiInteraction } from '../utils/telemetry';
-import { MAX_AVATAR_REFRESH_DAYS, MIN_AVATAR_REFRESH_DAYS, clampRefreshDaysInput } from '../utils/avatarSettings';
-import { buttonPrimaryClassName, buttonSecondaryClassName } from './dialogStyles';
+import { MAX_AVATAR_REFRESH_DAYS, MIN_AVATAR_REFRESH_DAYS, clampAvatarRefreshDays } from '@shared/types';
+import { buttonPrimaryClassName, buttonSecondaryClassName, dialogSectionLabelClassName } from './dialogStyles';
 
 /**
  * Avatars section of the View popover.
@@ -33,7 +33,7 @@ export function AvatarSettingsSection() {
   }, [authState]);
 
   const commitDays = () => {
-    const parsed = clampRefreshDaysInput(draftDays, refreshDays);
+    const parsed = clampAvatarRefreshDays(draftDays, refreshDays);
     setDraftDays(String(parsed));
     if (parsed === refreshDays) return;
     trackUiInteraction('avatarSettings', 'avatarRefreshDaysChange');
@@ -58,9 +58,7 @@ export function AvatarSettingsSection() {
 
   return (
     <section>
-      <div className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--vscode-descriptionForeground)]">
-        Avatars
-      </div>
+      <div className={dialogSectionLabelClassName}>Avatars</div>
 
       {authState.authorized ? (
         <ConnectedDescription accountLabel={authState.accountLabel} />

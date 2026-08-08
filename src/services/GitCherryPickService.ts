@@ -5,7 +5,7 @@ import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { CherryPickOptions, CherryPickState } from '../../shared/types.js';
 import { validateHash } from '../utils/gitValidation.js';
-import { isConflictStderr } from '../utils/gitParsers.js';
+import { isConflictStderr, isNothingToApplyStderr } from '../utils/gitParsers.js';
 
 export class GitCherryPickService {
   private executor: GitExecutor;
@@ -53,7 +53,7 @@ export class GitCherryPickService {
     const result = await this.executor.execute({ args, cwd: this.workspacePath });
     if (!result.success) {
       const stderr = result.error.stderr ?? '';
-      if (stderr.includes('nothing to commit') || stderr.includes('The previous cherry-pick is now empty')) {
+      if (isNothingToApplyStderr(stderr)) {
         return err(new GitError(
           'This commit introduces no new changes to the current branch (empty cherry-pick). Nothing was committed.',
           'COMMAND_FAILED'

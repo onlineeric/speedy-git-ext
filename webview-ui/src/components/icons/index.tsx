@@ -73,6 +73,21 @@ export function CheckIcon({ className }: IconProps) {
   );
 }
 
+/**
+ * The tick shown after a successful copy, for every `useCopyFeedback` consumer.
+ *
+ * Green is the point of it, but it has to be the theme's green: a fixed palette
+ * value keeps whatever contrast it had against the theme it was written for and
+ * loses it against the others.
+ */
+export function CopiedIcon({ className }: IconProps) {
+  return (
+    <CheckIcon
+      className={`text-[var(--vscode-gitDecoration-addedResourceForeground)]${className ? ` ${className}` : ''}`}
+    />
+  );
+}
+
 /** Document icon (open file) — 12×12, inherits text color via currentColor */
 export function FileIcon({ className }: IconProps) {
   return (

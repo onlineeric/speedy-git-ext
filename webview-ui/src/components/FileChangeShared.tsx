@@ -1,6 +1,6 @@
 import type { FileChange, FileViewMode } from '@shared/types';
 import { UNCOMMITTED_HASH } from '@shared/types';
-import { CopyIcon, CheckIcon, FileIcon, FileCodeIcon, StageIcon, UnstageIcon, DiscardIcon, ListViewIcon, TreeViewIcon } from './icons';
+import { CopyIcon, CopiedIcon, FileIcon, FileCodeIcon, StageIcon, UnstageIcon, DiscardIcon, ListViewIcon, TreeViewIcon } from './icons';
 import { rpcClient } from '../rpc/rpcClient';
 import { useCopyFeedback } from '../hooks/useCopyFeedback';
 import { useGraphStore } from '../stores/graphStore';
@@ -238,7 +238,7 @@ export function FileActionIcons({
           onClick={handleCopyPath}
           title="Copy relative path"
         >
-          {copied ? <CheckIcon className="text-green-400" /> : <CopyIcon />}
+          {copied ? <CopiedIcon /> : <CopyIcon />}
         </button>
         {!isUncommitted && (
           <button
