@@ -89,6 +89,8 @@ export class RepoDataLoader {
   private gitHubRepoInit: Promise<GitHubRepoRef | null> | null = null;
   /** Keeps the once-per-repo orientation log out of every auto-refresh. */
   private loggedGitHubRepoState = false;
+  /** Bumped on every repo switch, so an in-flight resolution can tell it is stale. */
+  private repoGeneration = 0;
 
   constructor(private readonly deps: RepoDataLoaderDependencies) {}
 
@@ -96,6 +98,7 @@ export class RepoDataLoader {
     // Only the owner/repo pair is repo-scoped. The avatar cache and its refresh
     // queue deliberately survive repo switches: an avatar belongs to an account,
     // not to a repository.
+    this.repoGeneration += 1;
     this.gitHubRepo = null;
     this.gitHubRepoInit = null;
     this.loggedGitHubRepoState = false;
@@ -367,6 +370,10 @@ export class RepoDataLoader {
     const emailToHashes = new Map<string, { newest: string; oldest: string }>();
     for (const commit of commits) {
       const email = commit.authorEmail.toLowerCase();
+      // `git commit --author="Name <>"` leaves the email empty. There is nothing
+      // to key an account-scoped cache on, so skip it rather than spending a
+      // lookup and filing the answer under "".
+      if (!email) continue;
       const existing = emailToHashes.get(email);
       if (existing) {
         existing.oldest = commit.hash;
@@ -431,7 +438,13 @@ export class RepoDataLoader {
   private ensureGitHubRepo(): Promise<GitHubRepoRef | null> {
     if (this.gitHubRepo) return Promise.resolve(this.gitHubRepo);
     if (!this.gitHubRepoInit) {
+      const generation = this.repoGeneration;
       this.gitHubRepoInit = this.resolveGitHubRepo().then((repo) => {
+        // A repo switch while `getRemotes` was in flight makes this the previous
+        // repository's answer. Caching it would point every avatar lookup at the
+        // wrong repo, where the commits do not exist — 404s all round, each one
+        // stamped as "no account" for a full refresh window.
+        if (generation !== this.repoGeneration) return null;
         this.gitHubRepo = repo;
         this.gitHubRepoInit = null;
         return repo;

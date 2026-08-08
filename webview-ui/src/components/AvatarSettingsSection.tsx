@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { trackDialogOutcome, trackUiInteraction } from '../utils/telemetry';
@@ -16,12 +16,21 @@ export function AvatarSettingsSection() {
   const authState = useGraphStore((state) => state.avatarAuthState);
   const refreshDays = useGraphStore((state) => state.userSettings.avatarRefreshDays);
   const [draftDays, setDraftDays] = useState(String(refreshDays));
+  // The GitHub consent prompt is VS Code's, not ours, so its outcome only shows
+  // up as the auth state that comes back. Latch the click and read the answer.
+  const awaitingAuthAnswer = useRef(false);
 
   // Settings can change from the VS Code settings UI too, so follow the store
   // whenever the user is not mid-edit here.
   useEffect(() => {
     setDraftDays(String(refreshDays));
   }, [refreshDays]);
+
+  useEffect(() => {
+    if (!awaitingAuthAnswer.current) return;
+    awaitingAuthAnswer.current = false;
+    trackDialogOutcome('avatarAuthorize', authState.authorized ? 'confirmed' : 'cancelled');
+  }, [authState]);
 
   const commitDays = () => {
     const parsed = clampRefreshDaysInput(draftDays, refreshDays);
@@ -33,6 +42,7 @@ export function AvatarSettingsSection() {
 
   const handleAuthorize = () => {
     trackUiInteraction('avatarSettings', 'avatarAuthorizeClick');
+    awaitingAuthAnswer.current = true;
     rpcClient.requestGitHubAuth();
   };
 
@@ -43,7 +53,6 @@ export function AvatarSettingsSection() {
 
   const handleRemoveToken = () => {
     trackUiInteraction('avatarSettings', 'avatarRemoveTokenClick');
-    trackDialogOutcome('avatarAuthorize', 'cancelled');
     rpcClient.removeGitHubAuth();
   };
 

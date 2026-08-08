@@ -19,7 +19,7 @@ import type { GitWorktreeService } from '../services/GitWorktreeService.js';
 import type { TelemetryService } from '../services/TelemetryService.js';
 import { AvatarCacheStore } from '../services/AvatarCacheStore.js';
 import { AvatarRefreshQueue } from '../services/AvatarRefreshQueue.js';
-import { GitHubAuthService } from '../services/GitHubAuthService.js';
+import { GitHubAuthService, type AvatarAuthChange } from '../services/GitHubAuthService.js';
 import { GitHubAvatarService } from '../services/GitHubAvatarService.js';
 import { clampBatchCommitSize, DEFAULT_USER_SETTINGS } from '../../shared/types.js';
 import { EditorCommandService } from './EditorCommandService.js';
@@ -96,7 +96,7 @@ export class WebviewProvider {
     // Avatar subsystem. Deliberately owned here rather than by RepoDataLoader:
     // the cache and queue are account-scoped and must outlive repo switches.
     this.avatarCache = new AvatarCacheStore(this.context, this.log);
-    this.avatarAuth = new GitHubAuthService(this.context, this.log, () => this.onAvatarAuthChanged());
+    this.avatarAuth = new GitHubAuthService(this.context, this.log, (change) => this.onAvatarAuthChanged(change));
     this.avatarService = new GitHubAvatarService();
     this.avatarQueue = new AvatarRefreshQueue({
       log: this.log,
@@ -249,10 +249,15 @@ export class WebviewProvider {
    * Authorizing raises the rate limit and grants private-repo access, so every
    * email that failed while unauthenticated is worth retrying now rather than
    * after the refresh window.
+   *
+   * Only on `granted`. Restoring the session at startup, or an unrelated GitHub
+   * session event, reports `refreshed` — the cached answers were obtained under
+   * the very same authorization, so re-opening them there would discard the
+   * whole negative cache on every window reload and re-spend the API budget.
    */
-  private onAvatarAuthChanged(): void {
+  private onAvatarAuthChanged(change: AvatarAuthChange): void {
     this.sendAvatarAuthState();
-    if (!this.avatarAuth.isOptedIn()) return;
+    if (change !== 'granted' || !this.avatarAuth.isOptedIn()) return;
 
     const reopened = this.avatarCache.reopenUnresolved();
     if (reopened.length > 0) {

@@ -13,6 +13,18 @@ const GITHUB_SCOPES = ['repo'];
 export type AuthRequestResult = 'granted' | 'declined' | 'failed';
 
 /**
+ * Why the authorization state changed.
+ *
+ * `granted` is the one and only case where the user just gained a better budget
+ * and private-repo access, so it is the one case worth re-opening cached
+ * "no account" answers for. Restoring an existing session at startup, or an
+ * unrelated GitHub session event, is `refreshed` — the answers already in the
+ * cache were obtained under exactly the same authorization and must be left
+ * alone, or every window reload would re-spend the API budget on all of them.
+ */
+export type AvatarAuthChange = 'granted' | 'refreshed';
+
+/**
  * Owns whether Speedy Git may use a GitHub session for avatar lookups.
  *
  * The opt-in is explicit and persisted: a session that merely happens to exist
@@ -28,7 +40,7 @@ export class GitHubAuthService {
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly log: vscode.LogOutputChannel,
-    private readonly onStateChanged: () => void,
+    private readonly onStateChanged: (change: AvatarAuthChange) => void,
   ) {
     // A session revoked from VS Code's Accounts menu must not leave us holding
     // a dead token; drop it and fall back to unauthenticated lookups.
@@ -79,7 +91,7 @@ export class GitHubAuthService {
       this.cachedAccountLabel = null;
       this.log.debug(`GitHub avatar session unavailable: ${String(error)}`);
     }
-    this.onStateChanged();
+    this.onStateChanged('refreshed');
   }
 
   /** "Allow avatar lookup": prompt for a session and record the opt-in. */
@@ -92,7 +104,7 @@ export class GitHubAuthService {
       this.cachedAccountLabel = session.account.label;
       await this.context.globalState.update(OPT_IN_KEY, true);
       this.log.info('GitHub avatar lookups authorized');
-      this.onStateChanged();
+      this.onStateChanged('granted');
       return 'granted';
     } catch (error) {
       // VS Code rejects the promise when the user dismisses the consent prompt,
@@ -118,6 +130,6 @@ export class GitHubAuthService {
     this.cachedAccountLabel = null;
     await this.context.globalState.update(OPT_IN_KEY, false);
     this.log.info('GitHub avatar authorization removed; using unauthenticated lookups');
-    this.onStateChanged();
+    this.onStateChanged('refreshed');
   }
 }

@@ -52,8 +52,12 @@ export class AvatarRefreshQueue {
   /** Tasks waiting to be looked up, best candidate first. */
   private queue: AvatarLookupTask[] = [];
   private queued = new Set<string>();
+  /** Email currently being looked up; still "queued" as far as callers care. */
+  private inFlight: string | null = null;
   private running = false;
   private disposed = false;
+  /** Whether the webview was last told the queue is paused on the rate limit. */
+  private rateLimitAnnounced = false;
 
   /** Results waiting to be posted as one batch. */
   private pendingResults: AvatarUrlMap = {};
@@ -81,7 +85,11 @@ export class AvatarRefreshQueue {
 
     let added = false;
     for (const task of tasks) {
-      if (this.queued.has(task.email)) continue;
+      // `inFlight` too: the email leaves `queued` the moment its lookup starts,
+      // and its record is not stamped until the lookup answers — so an
+      // auto-refresh landing in that window would otherwise re-queue an email
+      // that is already being looked up and spend the budget on it twice.
+      if (this.queued.has(task.email) || task.email === this.inFlight) continue;
       this.queued.add(task.email);
       this.queue.push(task);
       added = true;
@@ -116,16 +124,25 @@ export class AvatarRefreshQueue {
           const resetAt = this.deps.avatarService.getRateLimit().resetAt;
           const waitMs = resetAt !== null ? Math.max(0, resetAt - now) : 60_000;
           this.deps.log.debug(`Avatar refresh paused for ${Math.round(waitMs / 1000)}s (GitHub rate limit)`);
-          this.deps.onRateLimitChanged();
+          this.announceRateLimit(true);
           await this.delay(waitMs);
           continue;
         }
 
+        // The window has reopened; nothing else tells the webview to drop the
+        // "limit reached" notice, so it would otherwise sit there for good.
+        this.announceRateLimit(false);
+
         const task = this.queue.shift();
         if (task === undefined) break;
         this.queued.delete(task.email);
+        this.inFlight = task.email;
 
-        await this.processOne(task);
+        try {
+          await this.processOne(task);
+        } finally {
+          this.inFlight = null;
+        }
       }
 
       if (!this.disposed) {
@@ -158,9 +175,25 @@ export class AvatarRefreshQueue {
     );
 
     if (outcome.kind === 'rateLimited') {
-      // Put it back untouched — the pause happens at the top of the loop.
-      this.requeue(task);
-      this.deps.onRateLimitChanged();
+      const paused = this.deps.avatarService.isRateLimited(Date.now());
+      this.announceRateLimit(paused);
+
+      if (paused) {
+        // Put it back untouched — the pause happens at the top of the loop.
+        this.requeue(task);
+        return;
+      }
+
+      // GitHub refused the request without reporting a spent budget: a secondary
+      // rate limit, a blocked resource, or SSO enforcement. Requeueing would
+      // hand the same task straight back to a loop that will not pause, so the
+      // queue would hammer GitHub once a second forever. Drop it instead — the
+      // record stays unstamped, so the next load re-queues it.
+      this.deps.log.debug(
+        `Avatar lookup ${task.email}: GitHub refused the request without reporting a rate-limit reset; `
+        + 'retrying on the next load',
+      );
+      this.deps.onLookupFailed();
       return;
     }
 
@@ -178,7 +211,10 @@ export class AvatarRefreshQueue {
     const updated = applyAvatarLookupOutcome(record, outcome, toDayNumber(Date.now()), {
       candidatesExhausted,
     });
-    this.deps.cache.update(task.email, updated);
+    // The policy returns the same record when the outcome changed nothing (a
+    // `notFound` with candidates left); writing it would dirty the cache and
+    // re-serialize the whole map for nothing.
+    if (updated !== record) this.deps.cache.update(task.email, updated);
 
     if (outcome.kind === 'notFound' && remainingHashes.length > 0) {
       this.deps.log.debug(
@@ -191,6 +227,17 @@ export class AvatarRefreshQueue {
     if (updated.avatarUrl && updated.avatarUrl !== record.avatarUrl) {
       this.bufferResult(task.email, updated.avatarUrl);
     }
+  }
+
+  /**
+   * Tell the webview about the rate limit only when it actually flips, so the
+   * "limit reached" notice appears once and — just as importantly — is taken
+   * back down once the window reopens.
+   */
+  private announceRateLimit(limited: boolean): void {
+    if (limited === this.rateLimitAnnounced) return;
+    this.rateLimitAnnounced = limited;
+    this.deps.onRateLimitChanged();
   }
 
   private requeue(task: AvatarLookupTask): void {
