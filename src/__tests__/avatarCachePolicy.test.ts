@@ -201,3 +201,24 @@ describe('createPendingRecord', () => {
     expect(createPendingRecord(TODAY)).toEqual({ avatarUrl: null, refreshedOn: 0, seenOn: TODAY });
   });
 });
+
+describe('queue ordering within a single load', () => {
+  it('leaves same-day tasks tied, so a stable sort preserves arrival order', () => {
+    // Everything queued from one load shares today's day number, so the
+    // tie-break is deliberately 0 and newest-commit-first comes from the
+    // caller's insertion order surviving a stable sort.
+    const first = record({ avatarUrl: null, refreshedOn: 0, seenOn: TODAY });
+    const second = record({ avatarUrl: null, refreshedOn: 0, seenOn: TODAY });
+    expect(compareAvatarRefreshPriority(first, second)).toBe(0);
+
+    const order = ['newest', 'middle', 'oldest'];
+    const sorted = [...order].sort(() => compareAvatarRefreshPriority(first, second));
+    expect(sorted).toEqual(order);
+  });
+
+  it('still prefers today over a task left over from an earlier day', () => {
+    const today = record({ avatarUrl: null, refreshedOn: 0, seenOn: TODAY });
+    const yesterday = record({ avatarUrl: null, refreshedOn: 0, seenOn: TODAY - 1 });
+    expect(compareAvatarRefreshPriority(today, yesterday)).toBeLessThan(0);
+  });
+});

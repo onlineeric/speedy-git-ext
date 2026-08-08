@@ -204,8 +204,15 @@ export function avatarRefreshTier(record: AvatarCacheRecord): 0 | 1 | 2 {
 }
 
 /**
- * Queue order: visible gaps before stale pictures, and within a tier the most
- * recently seen author first — the top of the graph, where the user is looking.
+ * Queue order: visible gaps before stale pictures, then the most recently seen
+ * author first.
+ *
+ * The `seenOn` tie-break only separates tasks queued on *different days* —
+ * everything from a single load carries the same day number. Within one load,
+ * ordering comes from the caller: `RepoDataLoader` walks commits newest-first,
+ * and `Array.prototype.sort` is stable (ES2019), so equal-priority tasks keep
+ * that arrival order and the top of the graph resolves first. Do not replace the
+ * queue sort with an unstable one.
  */
 export function compareAvatarRefreshPriority(a: AvatarCacheRecord, b: AvatarCacheRecord): number {
   const tierDelta = avatarRefreshTier(a) - avatarRefreshTier(b);
