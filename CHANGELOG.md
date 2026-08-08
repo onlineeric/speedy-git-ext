@@ -4,7 +4,7 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [5.9.0] - 2026-08-08
+## [5.9.0] - pre-release - 2026-08-08
 
 ### Added
 - **Author avatars are now cached on disk and refreshed quietly in the background.** Previously every avatar the extension resolved was held only in memory, and that memory was thrown away on each window reload, repo switch and workspace change — so every restart re-spent GitHub's hourly request budget from zero, and most people simply never saw an avatar at all. Avatars are now cached per author email (an avatar belongs to a GitHub account, so resolving someone in one repository serves every other), stored on disk, and reused for 30 days by default. A stale entry keeps displaying while it refreshes behind the picture already on screen, so avatars never blank out. Nothing is ever written off: an email that could not be resolved — including one whose owner has no GitHub account yet — is simply retried on its next refresh cycle, which bounds the worst case at roughly (number of authors ÷ refresh days) requests per day.
