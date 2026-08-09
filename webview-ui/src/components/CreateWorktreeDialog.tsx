@@ -8,7 +8,12 @@ import { WORKTREE_FOLDER_MISSING_TOOLTIP } from '../utils/worktreeDisplay';
 import { rpcClient } from '../rpc/rpcClient';
 import { CommandPreview } from './CommandPreview';
 import { FieldError } from './FieldError';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonPrimaryClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 export type WorktreeSourceKind = 'local-branch' | 'remote-branch' | 'commit' | 'tag';
@@ -289,7 +294,7 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
 
           <div className="flex justify-end gap-2 mt-4">
             <AlertDialog.Cancel
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+              className={buttonSecondaryClassName}
               onClick={handleCancel}
             >
               Cancel
@@ -298,7 +303,7 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
             <button
               type="button"
               disabled={!canConfirm}
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className={buttonPrimaryClassName}
               onClick={handleConfirm}
             >
               {busy ? 'Creating…' : 'Create Worktree'}

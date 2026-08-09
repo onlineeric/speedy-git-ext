@@ -6,7 +6,12 @@ import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { worktreeLocalBranch } from '../utils/worktreeDisplay';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonDangerClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface RemoveWorktreeDialogProps {
@@ -208,7 +213,7 @@ export function RemoveWorktreeDialog({ open, worktree, onClose }: RemoveWorktree
 
           <div className="flex justify-end gap-2 mt-4">
             <AlertDialog.Cancel
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+              className={buttonSecondaryClassName}
               onClick={handleCancel}
             >
               {worktreeRemoved ? 'Close' : 'Cancel'}
@@ -217,7 +222,7 @@ export function RemoveWorktreeDialog({ open, worktree, onClose }: RemoveWorktree
             <button
               type="button"
               disabled={busy}
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-errorForeground)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              className={buttonDangerClassName}
               onClick={handleConfirm}
             >
               {busy ? 'Working…' : worktreeRemoved ? 'Delete Branch' : 'Remove'}

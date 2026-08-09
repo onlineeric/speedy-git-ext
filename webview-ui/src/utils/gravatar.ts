@@ -32,6 +32,8 @@ export function getInitials(author: string): string {
 export function getAvatarBackgroundColor(email: string): string {
   const hash = md5(normalizeEmail(email));
   const hue = parseInt(hash.slice(0, 6), 16) % 360;
+  // theme-color-exception: a per-email hue, so that two authors are told apart at a
+  // glance. There is no theme token for "a color derived from this string".
   return `hsl(${hue} 55% 45%)`;
 }
 

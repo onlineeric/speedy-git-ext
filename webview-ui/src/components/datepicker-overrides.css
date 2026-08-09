@@ -189,7 +189,7 @@
   color: var(--vscode-list-activeSelectionForeground);
 }
 
-/* Validation: red border on invalid input */
+/* Validation: error border on invalid input */
 .react-datepicker__input-container input.invalid-date {
-  border-color: #ef4444;
+  border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
 }

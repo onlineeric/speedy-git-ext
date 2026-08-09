@@ -6,6 +6,8 @@ import { rpcClient } from '../rpc/rpcClient';
 import { formatRelativeDate } from '../utils/formatDate';
 import { renderInlineCode } from '../utils/inlineCodeRenderer';
 import { slotLabel } from '../utils/compareSlot';
+import { signatureGlyph } from '../utils/signatureGlyph';
+import { ADDED_COLOR, DELETED_COLOR, ERROR_COLOR, NEUTRAL_COLOR } from '../utils/themeColors';
 import { CloseIcon, MoveRightIcon, MoveBottomIcon, ChevronDownIcon, ChevronRightIcon, InfoIcon } from './icons';
 import { FileChangesTreeView } from './FileChangesTreeView';
 import { FileChangeRow, ViewModeToggle } from './FileChangeShared';
@@ -289,8 +291,8 @@ function CompareBody({ result }: { result: CompareResult }) {
             {result.files.length} file{result.files.length !== 1 ? 's' : ''} changed
             {(result.stats.additions > 0 || result.stats.deletions > 0) && (
               <>
-                {'  '}<span className="text-green-400">+{result.stats.additions}</span>{' '}
-                <span className="text-red-400">−{result.stats.deletions}</span>
+                {'  '}<span style={{ color: ADDED_COLOR }}>+{result.stats.additions}</span>{' '}
+                <span style={{ color: DELETED_COLOR }}>−{result.stats.deletions}</span>
               </>
             )}
           </span>
@@ -576,12 +578,14 @@ function CommitSignatureSection({ hash }: { hash: string }) {
     );
   }
 
-  const statusConfig = getSignatureStatusConfig(signature.status, signature.format);
+  const statusColor = signatureGlyph(signature.status)?.color ?? NEUTRAL_COLOR;
 
   return (
     <div className="space-y-1 border-b border-[var(--vscode-panel-border)] px-3 py-2 text-xs">
       <div className="flex items-center gap-2">
-        <span className={statusConfig.className}>{statusConfig.label}</span>
+        <span className="font-medium" style={{ color: statusColor }}>
+          {getSignatureStatusLabel(signature.status, signature.format)}
+        </span>
         {signature.format && (
           <span className="uppercase text-[var(--vscode-descriptionForeground)]">
             {signature.format}
@@ -610,11 +614,15 @@ function SignatureHelpButton() {
   );
 }
 
-function getSignatureStatusConfig(
+/**
+ * The label only — the matching color comes from `signatureGlyph()`, the single
+ * status → color mapping, so the label here and the glyph in the history column
+ * cannot drift into two different verdicts.
+ */
+function getSignatureStatusLabel(
   status: CommitSignatureInfo['status'],
   format: CommitSignatureInfo['format']
-): { label: string; className: string } {
-  const warning = 'font-medium text-[var(--vscode-editorWarning-foreground)]';
+): string {
   // SSH and GPG fail verification for different, mechanism-specific reasons, so
   // these "signed but can't verify" labels name the exact local fix: import the
   // signer's GPG key into your keyring, vs. add the signer to your SSH
@@ -622,29 +630,25 @@ function getSignatureStatusConfig(
   const isSsh = format === 'ssh';
   switch (status) {
     case 'verified':
-      return { label: 'Verified', className: 'font-medium text-green-400' };
+      return 'Verified';
     case 'bad':
-      return { label: 'Bad Signature', className: 'font-medium text-red-400' };
+      return 'Bad Signature';
     case 'signed-not-trusted':
-      return {
-        label: isSsh
-          ? 'Signed, signer not in your allowedSignersFile'
-          : "Signed, signer's public key not trusted",
-        className: warning,
-      };
+      return isSsh
+        ? 'Signed, signer not in your allowedSignersFile'
+        : "Signed, signer's public key not trusted";
     case 'signed-key-missing':
-      return {
-        label: isSsh
-          ? 'Signed, signer not in your allowedSignersFile'
-          : "Signed, signer's public key not in your keyring",
-        className: warning,
-      };
+      return isSsh
+        ? 'Signed, signer not in your allowedSignersFile'
+        : "Signed, signer's public key not in your keyring";
     case 'signed-not-good':
-      return { label: 'Signed, expired or revoked', className: warning };
+      return 'Signed, expired or revoked';
     case 'unavailable':
-      return { label: 'Signed, not verified locally', className: warning };
+      return 'Signed, not verified locally';
+    // Unreachable — the caller returns early on the `null` unsigned sentinel —
+    // but `noImplicitReturns` needs every status covered.
     case 'unsigned':
-      return { label: 'No signature', className: 'font-medium text-[var(--vscode-descriptionForeground)]' };
+      return 'No signature';
   }
 }
 
@@ -808,10 +812,10 @@ function UncommittedFileSection({
 
   const variantColor =
     variant === 'conflict'
-      ? 'text-red-400'
+      ? ERROR_COLOR
       : variant === 'staged'
-        ? 'text-green-400'
-        : 'text-[var(--vscode-descriptionForeground)]';
+        ? ADDED_COLOR
+        : NEUTRAL_COLOR;
 
   return (
     <div className="mb-2">
@@ -821,7 +825,7 @@ function UncommittedFileSection({
           onClick={() => setCollapsed(!collapsed)}
         >
           {collapsed ? <ChevronRightIcon /> : <ChevronDownIcon />}
-          <span className={variantColor}>{title}</span>
+          <span style={{ color: variantColor }}>{title}</span>
           <span className="text-[var(--vscode-descriptionForeground)]">({files.length})</span>
         </button>
         {onBulkAction && bulkActionLabel && (

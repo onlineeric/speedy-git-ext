@@ -2,7 +2,13 @@ import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import type { DialogId } from '@shared/telemetry';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonDangerClassName,
+  buttonPrimaryClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -29,10 +35,7 @@ export function ConfirmDialog({
   telemetryId,
 }: ConfirmDialogProps) {
   const dialogTelemetry = useDialogTelemetry(telemetryId, open);
-  const confirmButtonClass =
-    variant === 'danger'
-      ? 'bg-[var(--vscode-errorForeground)] text-white hover:opacity-90'
-      : 'bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]';
+  const confirmButtonClass = variant === 'danger' ? buttonDangerClassName : buttonPrimaryClassName;
 
   return (
     <AlertDialog.Root
@@ -62,13 +65,13 @@ export function ConfirmDialog({
           )}
           <div className="flex justify-end gap-2 mt-4">
             <AlertDialog.Cancel
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+              className={buttonSecondaryClassName}
               onClick={onCancel}
             >
               Cancel
             </AlertDialog.Cancel>
             <AlertDialog.Action
-              className={`px-3 py-1.5 text-sm rounded ${confirmButtonClass}`}
+              className={confirmButtonClass}
               onClick={() => {
                 dialogTelemetry.confirmed();
                 onConfirm();

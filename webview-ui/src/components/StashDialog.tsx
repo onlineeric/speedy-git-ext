@@ -2,7 +2,12 @@ import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { buildStashWithMessageCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonPrimaryClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface StashDialogProps {
@@ -70,13 +75,13 @@ export function StashDialog({
             <CommandPreview command={buildStashWithMessageCommand({ message: message.trim() || undefined })} />
           </div>
           <div className="mt-6 flex justify-end gap-2">
-            <Dialog.Close className="rounded bg-[var(--vscode-button-secondaryBackground)] px-3 py-1.5 text-sm text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]">
+            <Dialog.Close className={buttonSecondaryClassName}>
               Cancel
             </Dialog.Close>
             <button
               type="button"
               onClick={handleConfirm}
-              className="rounded bg-[var(--vscode-button-background)] px-3 py-1.5 text-sm text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+              className={buttonPrimaryClassName}
             >
               Stash
             </button>

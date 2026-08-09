@@ -5,6 +5,24 @@ import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
 import { MenuItem } from './MenuItem';
 import { MenuContent } from './MenuContent';
+import { ACCENT_COLOR, ICON_COLOR, WARNING_COLOR } from '../utils/themeColors';
+
+/**
+ * Toolbar button tones, spread onto a `ToolbarIconButton` (or onto the trigger of
+ * a toolbar popover). The color is an inline style because it comes from
+ * `themeColors.ts`, which Tailwind's JIT cannot see through; only the hover
+ * *state* needs to be a class.
+ *
+ * `attention` covers both meanings that draw the eye without meaning "open" — a
+ * filter or compare slot currently narrowing the view, and an operation in flight.
+ * They have always rendered identically, so they are one tone rather than two
+ * names for the same thing.
+ */
+export const TOGGLE_BUTTON_TONES = {
+  inactive: { className: 'opacity-70 hover:opacity-100', style: { color: ICON_COLOR } },
+  active: { style: { color: ACCENT_COLOR } },
+  attention: { style: { color: WARNING_COLOR } },
+} as const;
 
 interface ToolbarIconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Text shown under the icon when `speedyGit.toolbar.showLabels` is enabled. */

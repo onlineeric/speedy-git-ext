@@ -1,5 +1,14 @@
-const WORKTREE_BADGE_BORDER_COLOR = '#facc15';
-const WORKTREE_BADGE_BORDER_COLOR_ON_YELLOW = '#ef4444';
+/**
+ * Deliberate hardcoded colors, in the same class as `colorUtils.ts`'s luminance
+ * pick: this border has to stay visible against a *user-configured* lane color
+ * (`speedyGit.graphColors`), which no theme token knows anything about. Deriving
+ * it from one would defeat the contrast choice `isYellowTone` exists to make —
+ * the border would sometimes land on top of a lane of the same color.
+ *
+ * theme-color-exception: contrasts against the user's lane color, not the theme.
+ */
+const WORKTREE_BADGE_BORDER_COLOR = '#facc15'; // theme-color-exception: see above
+const WORKTREE_BADGE_BORDER_COLOR_ON_YELLOW = '#ef4444'; // theme-color-exception: see above
 
 export function worktreeBadgeBorderColor(borderColor: unknown): string {
   return isYellowTone(borderColor) ? WORKTREE_BADGE_BORDER_COLOR_ON_YELLOW : WORKTREE_BADGE_BORDER_COLOR;

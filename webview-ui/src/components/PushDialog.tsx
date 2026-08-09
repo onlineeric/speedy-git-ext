@@ -5,7 +5,13 @@ import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { buildPushCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonDangerClassName,
+  buttonPrimaryClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface PushDialogProps {
@@ -136,7 +142,7 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
             {/* Always rendered to reserve fixed height — prevents dialog from resizing when toggling push mode */}
             <div className={`px-3 py-2 rounded border text-sm ${
               isForce
-                ? 'border-yellow-500 bg-yellow-500/10 text-yellow-300'
+                ? 'border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-inputValidation-warningBackground)] text-[var(--vscode-inputValidation-warningForeground,var(--vscode-foreground))]'
                 : 'border-transparent text-transparent select-none'
             }`}>
               Warning: Force pushing will overwrite remote history. This can cause data loss for other collaborators.
@@ -152,7 +158,7 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
               <button
                 type="button"
                 disabled={isPushing}
-                className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                className={buttonSecondaryClassName}
               >
                 Cancel
               </button>
@@ -161,11 +167,7 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
               type="button"
               onClick={handleExecute}
               disabled={isPushing || noRemotes}
-              className={`px-3 py-1.5 text-sm rounded ${
-                isForce
-                  ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-                  : 'bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]'
-              } disabled:opacity-50`}
+              className={isForce ? buttonDangerClassName : buttonPrimaryClassName}
             >
               {isPushing ? 'Pushing...' : 'Execute'}
             </button>

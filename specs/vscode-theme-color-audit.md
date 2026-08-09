@@ -1,7 +1,33 @@
 # Follow-up: VS Code Theme Color Compliance Audit
 
-**Status:** open — logged 2026-08-08, not yet scheduled
+**Status:** done — logged 2026-08-08, implemented 2026-08-09 in 5.9.1
 **Scope:** `webview-ui/src/**`
+
+## Outcome
+
+All three groups are done. `utils/themeColors.ts` now holds the semantic tokens and the `tint()`
+helper; `dialogStyles.ts` gained `buttonDangerClassName`. Both audit greps below return nothing, and
+`utils/__tests__/themeColors.test.ts` runs them on every `pnpm test` so they cannot come back.
+
+Three corrections to the survey below, found while implementing:
+
+- `FileChangeShared.tsx` had **24** instances, not 22.
+- `CommitListSettingsPopover.tsx` was renamed to `ViewSettingsDialog.tsx` (same line 118).
+- `HelpDialog.tsx:63` had already been fixed; there was nothing to change.
+
+Two things the greps did not surface and one they did, resolved differently than suggested:
+
+- `text-white` on the danger button was duplicated across six dialogs and is unreadable on dark
+  themes, where `errorForeground` is a light salmon. Extracted as `buttonDangerClassName` using
+  `--vscode-editor-background` for the label. Force push now uses it instead of its own amber button.
+- The details panel's "Verified"/"Bad Signature" labels now import their colors from
+  `signatureGlyph.ts`, so the label matches the glyph in the signature column.
+- `worktreeBadgeStyle.ts` and `CommitTooltip.tsx`'s arrow shadow were **kept** and documented as
+  deliberate. The badge border exists to contrast against a user-configured lane color, which is the
+  same reasoning that already exempts `colorUtils.ts:56`; a shadow is theme-independent like the
+  scrim. Both are in the test's exception list.
+
+---
 **Origin:** Found while building the 5.9.0 avatar feature. The "Clear all cached avatars" and
 "Reset column widths" buttons rendered as plain labels because they had no background at all. Fixing
 that surfaced a broader pattern: the webview mixes VS Code theme tokens with hardcoded Tailwind

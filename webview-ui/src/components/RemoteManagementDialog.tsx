@@ -5,7 +5,12 @@ import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { ConfirmDialog } from './ConfirmDialog';
 import { FieldError } from './FieldError';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonPrimaryClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 import { deriveRefNameField } from '../utils/refNameField';
 
 interface RemoteManagementDialogProps {
@@ -17,12 +22,6 @@ type Mode = 'view' | 'add' | 'edit';
 
 const inputClass =
   'w-full px-2 py-1.5 text-sm rounded bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] focus:outline-none focus:border-[var(--vscode-focusBorder)]';
-
-const buttonPrimaryClass =
-  'px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]';
-
-const buttonSecondaryClass =
-  'px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]';
 
 export function RemoteManagementDialog({ open, onClose }: RemoteManagementDialogProps) {
   const { remotes, branches } = useGraphStore();
@@ -149,7 +148,7 @@ export function RemoteManagementDialog({ open, onClose }: RemoteManagementDialog
                         {!isEditing && mode === 'view' && (
                           <div className="flex items-center gap-1 shrink-0">
                             <button
-                              className={buttonSecondaryClass}
+                              className={buttonSecondaryClassName}
                               onClick={() => handleEditClick(remote.name, remote.fetchUrl)}
                             >
                               Edit
@@ -185,13 +184,13 @@ export function RemoteManagementDialog({ open, onClose }: RemoteManagementDialog
                             />
                           </div>
                           <div className="flex justify-end gap-2">
-                            <button type="button" className={buttonSecondaryClass} onClick={handleCancelForm}>
+                            <button type="button" className={buttonSecondaryClassName} onClick={handleCancelForm}>
                               Cancel
                             </button>
                             <button
                               type="submit"
                               disabled={!canSaveEdit}
-                              className={`${buttonPrimaryClass} disabled:opacity-50 disabled:cursor-not-allowed`}
+                              className={buttonPrimaryClassName}
                             >
                               Save
                             </button>
@@ -237,13 +236,13 @@ export function RemoteManagementDialog({ open, onClose }: RemoteManagementDialog
                   />
                 </div>
                 <div className="flex justify-end gap-2">
-                  <button type="button" className={buttonSecondaryClass} onClick={handleCancelForm}>
+                  <button type="button" className={buttonSecondaryClassName} onClick={handleCancelForm}>
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={!canAdd}
-                    className={`${buttonPrimaryClass} disabled:opacity-50 disabled:cursor-not-allowed`}
+                    className={buttonPrimaryClassName}
                   >
                     Add
                   </button>
@@ -254,12 +253,12 @@ export function RemoteManagementDialog({ open, onClose }: RemoteManagementDialog
             {/* Footer buttons */}
             <div className="flex items-center justify-between">
               {mode === 'view' && (
-                <button className={buttonSecondaryClass} onClick={handleAddClick}>
+                <button className={buttonSecondaryClassName} onClick={handleAddClick}>
                   Add Remote...
                 </button>
               )}
               {mode !== 'view' && <div />}
-              <Dialog.Close className={buttonSecondaryClass}>
+              <Dialog.Close className={buttonSecondaryClassName}>
                 Close
               </Dialog.Close>
             </div>

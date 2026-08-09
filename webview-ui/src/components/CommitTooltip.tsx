@@ -65,6 +65,9 @@ export function CommitTooltip({ commit, onMouseEnter, onMouseLeave }: CommitTool
           <Popover.Arrow
             width={14}
             height={8}
+            // Hairline shadow, not a color: it keeps the lane-colored arrow's edge
+            // readable against the hover-widget background whatever the theme —
+            // the same reasoning as the theme-independent dialog scrim.
             className="drop-shadow-[0_0_0.5px_rgba(0,0,0,0.35)]"
             style={{ fill: connectorColor }}
           />

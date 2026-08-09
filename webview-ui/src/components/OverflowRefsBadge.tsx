@@ -5,6 +5,14 @@ import { BranchContextMenu } from './BranchContextMenu';
 import { RefLabel } from './RefLabel';
 import { displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
 import { worktreeForDisplayRef } from '../utils/worktreeDisplay';
+import { ACCENT_COLOR, tint } from '../utils/themeColors';
+
+/** Used when the row has no lane color to borrow — see `laneColorStyle`. */
+const OVERFLOW_BADGE_FALLBACK_STYLE: React.CSSProperties = {
+  borderColor: ACCENT_COLOR,
+  color: ACCENT_COLOR,
+  backgroundColor: tint(ACCENT_COLOR, 10),
+};
 
 interface OverflowRefsBadgeProps {
   hiddenRefs: DisplayRef[];
@@ -22,8 +30,8 @@ export function OverflowRefsBadge({ hiddenRefs, commit, laneColorStyle, worktree
     <Popover.Root>
       <Popover.Trigger asChild>
         <span
-          className={`px-1.5 py-0.5 text-xs rounded border cursor-pointer font-medium${!laneColorStyle ? ' border-amber-500 text-amber-400 hover:border-amber-400 hover:text-amber-300' : ''}`}
-          style={laneColorStyle}
+          className="px-1.5 py-0.5 text-xs rounded border cursor-pointer font-medium hover:opacity-80"
+          style={laneColorStyle ?? OVERFLOW_BADGE_FALLBACK_STYLE}
           onClick={(e) => e.stopPropagation()}
         >
           +{hiddenRefs.length}

@@ -1,4 +1,10 @@
-/** Default graph color palette when user has no custom colors configured. */
+/**
+ * Default graph color palette when user has no custom colors configured.
+ *
+ * theme-color-exception: this is the default *value* of the user-configurable
+ * `speedyGit.graphColors` setting, not a color the UI picks — lane colors are the
+ * user's to choose and no theme token corresponds to them.
+ */
 export const DEFAULT_GRAPH_PALETTE = ['#4ec9b0'];
 
 /** Return the user's configured graph colors, or the default palette if none are set. */
@@ -53,6 +59,8 @@ export function getContrastTextColor(hexColor: string): string {
     0.7152 * linearize(g / 255) +
     0.0722 * linearize(b / 255);
 
+  // theme-color-exception: picked to contrast against the user's lane color, which
+  // no theme token knows anything about — deriving it from one would defeat the point.
   return luminance > 0.4 ? '#1a1a1a' : '#f5f5f5';
 }
 

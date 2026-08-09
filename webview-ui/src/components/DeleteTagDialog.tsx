@@ -2,7 +2,12 @@ import { useState, useMemo } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { buildDeleteTagCommand, buildDeleteTagWithRemoteCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonDangerClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface DeleteTagDialogProps {
@@ -74,13 +79,13 @@ export function DeleteTagDialog({ open, tagName, remote, onConfirm, onCancel }: 
 
           <div className="flex justify-end gap-2 mt-4">
             <AlertDialog.Cancel
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+              className={buttonSecondaryClassName}
               onClick={handleCancel}
             >
               Cancel
             </AlertDialog.Cancel>
             <AlertDialog.Action
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-errorForeground)] text-white hover:opacity-90"
+              className={buttonDangerClassName}
               onClick={handleConfirm}
             >
               Delete

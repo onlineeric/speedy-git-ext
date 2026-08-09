@@ -42,11 +42,27 @@ export const dialogContentClassName =
  * Sizing is deliberately not baked in beyond padding; callers add width or text
  * size utilities as needed.
  */
+/** Shape and disabled behaviour every variant shares; only the colors differ. */
+const buttonBaseClassName = 'px-3 py-1.5 text-sm rounded disabled:cursor-default disabled:opacity-50';
+
 export const buttonPrimaryClassName =
-  'px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:cursor-default disabled:opacity-50';
+  `${buttonBaseClassName} bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]`;
 
 export const buttonSecondaryClassName =
-  'px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] disabled:cursor-default disabled:opacity-50';
+  `${buttonBaseClassName} bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]`;
+
+/**
+ * The confirming action of a destructive dialog — delete, discard, drop, force
+ * push. VS Code defines no third button variant, so this is built from
+ * `errorForeground` (the token themes already use to mean "this is bad").
+ *
+ * The label is the editor background rather than white: on dark themes
+ * `errorForeground` is a light salmon, and white on it is close to unreadable,
+ * while the editor background is dark there and light on light themes — so it
+ * stays legible either way.
+ */
+export const buttonDangerClassName =
+  `${buttonBaseClassName} bg-[var(--vscode-errorForeground)] text-[var(--vscode-editor-background)] hover:opacity-90`;
 
 /**
  * Caption above a group of settings inside a dialog.

@@ -5,7 +5,13 @@ import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { DiscardAllDialog } from './DiscardAllDialog';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonDangerClassName,
+  buttonPrimaryClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 import { FileChangeRow, ViewModeToggle } from './FileChangeShared';
 import { FileChangesTreeView } from './FileChangesTreeView';
 import {
@@ -481,11 +487,7 @@ function FilePickerDialogInner({
                   type="button"
                   disabled={isRunning || !enabledByKind[selectedRadio]}
                   onClick={handleActionButton}
-                  className={`rounded px-3 py-1.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed ${
-                    selectedRadio === 'discard'
-                      ? 'bg-[var(--vscode-errorForeground)] text-white hover:opacity-90'
-                      : 'bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]'
-                  }`}
+                  className={selectedRadio === 'discard' ? buttonDangerClassName : buttonPrimaryClassName}
                 >
                   {isRunning ? (
                     <span className="inline-flex items-center gap-1.5">
@@ -497,7 +499,7 @@ function FilePickerDialogInner({
                   )}
                 </button>
               )}
-              <Dialog.Close className="rounded bg-[var(--vscode-button-secondaryBackground)] px-3 py-1.5 text-sm text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]">
+              <Dialog.Close className={buttonSecondaryClassName}>
                 Close
               </Dialog.Close>
             </div>
