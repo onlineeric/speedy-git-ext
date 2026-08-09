@@ -33,6 +33,13 @@ import {
 
 const EMPTY_WORKTREES: WorktreeInfo[] = [];
 
+// Hoisted out of render: every commit row re-creates its cells while the list is
+// virtualized and scrolling, and these styles never vary per row.
+const COMPARE_BASE_BADGE_STYLE: React.CSSProperties = { backgroundColor: COMPARE_BASE_COLOR, color: ON_ACCENT_COLOR };
+const COMPARE_TARGET_BADGE_STYLE: React.CSSProperties = { backgroundColor: COMPARE_TARGET_COLOR, color: ON_ACCENT_COLOR };
+const STASH_SUBJECT_STYLE: React.CSSProperties = { color: NEUTRAL_COLOR };
+const UNCOMMITTED_SUBJECT_STYLE: React.CSSProperties = { color: UNCOMMITTED_COLOR };
+
 /** Compare-refs A/B markers (042-compare-refs FR-026/027/028) — table-row variant. */
 function CompareABMarker({ commit, isUncommitted }: { commit: Commit; isUncommitted: boolean }) {
   const a = useGraphStore((s) => s.compareSelection.a);
@@ -48,7 +55,7 @@ function CompareABMarker({ commit, isUncommitted }: { commit: Commit; isUncommit
       {isA && (
         <span
           className="rounded px-1 py-0 text-[10px] font-bold"
-          style={{ backgroundColor: COMPARE_BASE_COLOR, color: ON_ACCENT_COLOR }}
+          style={COMPARE_BASE_BADGE_STYLE}
           title="Compare: Base"
         >
           B
@@ -57,7 +64,7 @@ function CompareABMarker({ commit, isUncommitted }: { commit: Commit; isUncommit
       {isB && (
         <span
           className="rounded px-1 py-0 text-[10px] font-bold"
-          style={{ backgroundColor: COMPARE_TARGET_COLOR, color: ON_ACCENT_COLOR }}
+          style={COMPARE_TARGET_BADGE_STYLE}
           title="Compare: Target"
         >
           T
@@ -345,7 +352,7 @@ function renderColumn({
           )}
           <span
             className={`truncate text-sm ${isStash || isUncommitted ? 'italic' : ''}`}
-            style={isStash ? { color: NEUTRAL_COLOR } : isUncommitted ? { color: UNCOMMITTED_COLOR } : undefined}
+            style={isStash ? STASH_SUBJECT_STYLE : isUncommitted ? UNCOMMITTED_SUBJECT_STYLE : undefined}
             title={commit.subject}
           >
             {renderInlineCode(commit.subject)}

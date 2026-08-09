@@ -49,6 +49,14 @@ describe('exported colors', () => {
       expect(`${name}: ${value}`).toMatch(/var\(--vscode-/);
     }
   });
+
+  // The `*ClassName` strings must stay spelled out for Tailwind's JIT, so they
+  // mirror the `*_COLOR` values rather than referencing them. Nothing but this
+  // keeps the two halves in step.
+  it('keep the spelled-out class strings in step with the color constants', () => {
+    expect(themeColors.accentTextClassName).toBe(`text-[${themeColors.ACCENT_COLOR}]`);
+    expect(themeColors.warningTextClassName).toBe(`text-[${themeColors.WARNING_COLOR}]`);
+  });
 });
 
 /**
@@ -84,7 +92,13 @@ describe('no hardcoded colors in the webview', () => {
       if (DELIBERATE_HARDCODED_COLORS.includes(rel)) return [];
       return readFileSync(file, 'utf8')
         .split('\n')
-        .filter((line) => /#[0-9a-fA-F]{6}\b|rgba?\(/.test(line) && !line.includes('var(--vscode'))
+        // `#rrggbb` and `#rrggbbaa` anywhere; `#rgb` shorthand only inside quotes,
+        // so a `#123` issue reference in a comment is not mistaken for a color.
+        .filter(
+          (line) =>
+            /#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?\b|['"`]#[0-9a-fA-F]{3}['"`]|rgba?\(/.test(line) &&
+            !line.includes('var(--vscode')
+        )
         // A shadow is theme-independent — it darkens or lightens whatever is
         // behind it rather than claiming a color of its own, the same reasoning
         // that exempts the `bg-black/50` dialog scrims.
