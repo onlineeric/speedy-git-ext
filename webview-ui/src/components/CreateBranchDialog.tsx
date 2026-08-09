@@ -7,7 +7,12 @@ import { buildCreateBranchCommand } from '../utils/gitCommandBuilder';
 import { deriveRefNameField } from '../utils/refNameField';
 import { CommandPreview } from './CommandPreview';
 import { FieldError } from './FieldError';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonPrimaryClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface CreateBranchDialogProps {
@@ -97,7 +102,7 @@ export function CreateBranchDialog({ open, commit, onClose }: CreateBranchDialog
             </div>
             <div className="flex justify-end gap-2 mt-4">
               <Dialog.Close
-                className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                className={buttonSecondaryClassName}
                 type="button"
               >
                 Cancel
@@ -105,7 +110,7 @@ export function CreateBranchDialog({ open, commit, onClose }: CreateBranchDialog
               <button
                 type="submit"
                 disabled={!canCreate}
-                className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 disabled:cursor-not-allowed"
+                className={buttonPrimaryClassName}
               >
                 Create Branch
               </button>

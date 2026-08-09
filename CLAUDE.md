@@ -126,7 +126,7 @@ These exist because the rule they encode is subtle or shared across several call
 - `utils/branchSelection.ts` — `getBranchKey` (bare name vs `remote/name`) + additive select-all-local
 - `utils/resolveDefaultRemote.ts` — pick `origin` else first-alpha remote
 - `stores/graphSelectors.ts` — derived store reads (`useOperationInProgress`, `useCurrentLocalBranch`), one selector each so callers can't disagree on the derivation
-- `utils/themeColors.ts` — **the one place webview colors are defined.** Semantic names (`ADDED_COLOR`, `WARNING_COLOR`, `ACCENT_COLOR`, `UNCOMMITTED_COLOR`…) over `var(--vscode-*)` tokens, plus `tint()` for the faint chip/badge fill. Exports two forms because Tailwind's JIT only emits classes it can see spelled out: `*_COLOR` values for inline `style` (the default), `*ClassName` strings for the few call sites needing a hover state
+- `utils/themeColors.ts` — **the one place a color *meaning* is named.** Semantic constants (`ADDED_COLOR`, `WARNING_COLOR`, `ACCENT_COLOR`, `UNCOMMITTED_COLOR`, `SIGNATURE_*`…) over `var(--vscode-*)` tokens, plus `tint()` for the faint chip/badge fill. They are plain CSS values for inline `style`, never class strings — Tailwind's JIT only emits classes it can see spelled out, so `text-[${SOME_COLOR}]` compiles to a class that never exists. A call site needing a pseudo-state pairs the inline color with a class carrying only the state (`opacity-70 hover:opacity-100`)
 - `shared/types.ts` — cross-boundary setting clamps: `clampBatchCommitSize`, and `clampAvatarRefreshDays` (takes the input's raw string or a number; empty box means "keep current", not zero). A setting clamped on both sides belongs here, never once per side
 
 ### Avatars — Cache and Background Refresh
@@ -173,15 +173,18 @@ others — unreadable on light themes, off-brand on high-contrast ones.
   (`--vscode-button-*` and `--vscode-button-secondary*`); danger is built from `errorForeground` for
   destructive confirming actions. One primary or danger per dialog; secondary for everything else.
   **Never style a clickable control with no background** — it reads as a label until hovered.
-- **Legitimate exceptions**, which must stay deliberate and commented: colors that have to contrast
-  against a *user-configured* value rather than the theme — the graph lane palette
+- **Legitimate exceptions** must be marked in place with a `theme-color-exception:` comment naming
+  the reason — on the line, or in the comment block above it. The bar is a color that has to contrast
+  against a *user-configured* value rather than the theme: the graph lane palette
   (`speedyGit.graphColors`), `colorUtils.ts`'s luminance-picked label color, `worktreeBadgeStyle.ts`'s
-  border, `gravatar.ts`'s generated `hsl()` and the white initials on it — plus shadows and
-  `bg-black/50` dialog scrims, which are theme-independent by nature.
+  border, `gravatar.ts`'s generated `hsl()` and the white initials on it. Shadows and the `bg-black/50`
+  dialog scrim are theme-independent by nature and need no marker.
 
-`utils/__tests__/themeColors.test.ts` enforces both halves of this rule over the whole webview and
-carries the exception list; it fails on any new Tailwind palette class or raw hex. It cannot catch
-"a token, but the wrong one" — check that on a light theme.
+`utils/__tests__/themeColors.test.ts` scans every `.ts`/`.tsx`/`.css` file under `webview-ui/src` and
+fails on a Tailwind palette class (numbered, plus `white`/`black`), a raw hex, or an `rgb()`/`hsl()`/
+`oklch()` — a hex is allowed only inside a `var(--token, #fallback)`. Exceptions are per-line, not
+per-file, so a *new* hardcoded color in a file that already has a marked one still fails. It cannot
+catch "a token, but the wrong one" — check that on a light theme.
 
 Menu/dialog composition:
 
@@ -189,7 +192,8 @@ Menu/dialog composition:
 - `components/MenuContent.tsx` — `MenuContent`/`MenuSubContent`, the menu panel shell. Carries the height cap and collision padding that keep a long menu usable in a short window, so a new menu gets them by default. Only the width floor is a prop
 - `components/useCommitMenuItems.tsx` — every commit action as `{ commitItems, compareItems, createItems, worktreeItem, copyItems, dialogs }`. Feeds the commit row menu (`variant: 'row'`) and the Commit/Create groups of ref badge menus (`variant: 'badge'`). Groups are returned separately so callers can interleave their own
 - `components/LazyContextMenu.tsx` — mounts a menu's heavy body only on first right-click; keeps virtualized rows cheap during fast scrolling. Wrap new row menus in it
-- `components/dialogStyles.ts` — shared dialog sizing, **the two VS Code button variants** (`buttonPrimaryClassName`/`buttonSecondaryClassName`) and `dialogSectionLabelClassName` for settings-group captions; every `Dialog.Content` uses it
+- `components/dialogStyles.ts` — shared dialog sizing, **the three button variants** (`buttonPrimaryClassName`/`buttonSecondaryClassName`/`buttonDangerClassName`, all composed from one base so shape and disabled behaviour cannot drift) and `dialogSectionLabelClassName` for settings-group captions; every `Dialog.Content` uses it. Never hand-write a button's classes — the variants carry `disabled:` handling that inline copies kept getting wrong
+- `components/ToolbarIconButton.tsx` — `TOGGLE_BUTTON_TONES` (`inactive`/`active`/`attention`), spread onto a toolbar button or a toolbar popover's trigger. Spread, not `className=`: the color is an inline style and only the hover state is a class
 - `components/CompareMenuItems.tsx`, `MenuCopySubmenu.tsx`, `MenuGroupSeparator.tsx`, `MenuSubTrigger.tsx` — shared menu fragments
 - `hooks/useDialogTelemetry.ts` — one confirmed/cancelled outcome per dialog open cycle
 - `hooks/useCopyFeedback.ts` — `copyToClipboard` + short "copied" flash, used by every copy button

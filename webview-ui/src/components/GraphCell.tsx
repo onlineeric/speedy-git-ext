@@ -143,53 +143,30 @@ export const GraphCell = memo(function GraphCell({
           ? <title>{conn.hiddenCount} hidden commit{conn.hiddenCount !== 1 ? 's' : ''}</title>
           : null;
 
-        if (conn.fromLane === conn.toLane) {
-          // Same lane - straight line down
-          return (
-            <g key={`parent-${idx}`} style={{ stroke: connColor }}>
-              {tooltip}
-              <line
-                x1={fromX}
-                y1={nodeY + nodeRadius}
-                x2={toX}
-                y2={height}
-                strokeWidth={2}
-                {...dottedProps}
-              />
-            </g>
-          );
-        } else {
-          if (connectionContinuationLane(hasMerge, conn) === conn.fromLane) {
-            // Branch-style connection: keep child row straight and let the parent row
-            // render the split curve via incomingConnections (matches Git Graph style).
-            return (
-              <g key={`parent-${idx}`} style={{ stroke: connColor }}>
-                {tooltip}
-                <line
-                  x1={fromX}
-                  y1={nodeY + nodeRadius}
-                  x2={fromX}
-                  y2={height}
-                  strokeWidth={2}
-                  {...dottedProps}
-                />
-              </g>
-            );
-          }
+        // Straight down when the parent stays in this lane, and also for a
+        // branch-style split: there the child row is kept straight and the parent
+        // row draws the curve via incomingConnections (matches Git Graph style).
+        const straightDown =
+          conn.fromLane === conn.toLane || connectionContinuationLane(hasMerge, conn) === conn.fromLane;
 
-          // Different lane - rounded elbow from the node's side down into the target lane
-          return (
-            <g key={`parent-${idx}`} style={{ stroke: connColor }}>
-              {tooltip}
+        // `stroke` goes through `style`, not the SVG presentation attribute:
+        // attributes do not evaluate `var()`, so a theme token there is inert.
+        return (
+          <g key={`parent-${idx}`} style={{ stroke: connColor }}>
+            {tooltip}
+            {straightDown ? (
+              <line x1={fromX} y1={nodeY + nodeRadius} x2={fromX} y2={height} strokeWidth={2} {...dottedProps} />
+            ) : (
+              // Rounded elbow from the node's side down into the target lane
               <path
                 d={curveOutOfNodePath(fromX, toX, nodeY, height, nodeRadius)}
                 strokeWidth={2}
                 fill="none"
                 {...dottedProps}
               />
-            </g>
-          );
-        }
+            )}
+          </g>
+        );
       })}
 
       {/* 5. Draw the commit node circle */}

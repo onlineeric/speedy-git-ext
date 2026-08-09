@@ -1,7 +1,12 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { buildDropCommitCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
-import { buttonDangerClassName, dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonDangerClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface DropCommitDialogProps {
@@ -54,7 +59,7 @@ export function DropCommitDialog({
             <CommandPreview command={buildDropCommitCommand({ hash: commitHash.slice(0, 7) })} />
           </div>
           <div className="mt-6 flex justify-end gap-2">
-            <Dialog.Close className="rounded bg-[var(--vscode-button-secondaryBackground)] px-3 py-1.5 text-sm text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]">
+            <Dialog.Close className={buttonSecondaryClassName}>
               Cancel
             </Dialog.Close>
             <button

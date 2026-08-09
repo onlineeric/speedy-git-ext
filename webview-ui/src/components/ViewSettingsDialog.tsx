@@ -20,7 +20,6 @@ import { CSS } from '@dnd-kit/utilities';
 import type { CommitTableColumnId } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
-import { accentTextClassName } from '../utils/themeColors';
 import {
   COMMIT_TABLE_DEFAULT_WIDTHS,
   getOptionalCommitTableColumnIds,
@@ -32,7 +31,7 @@ import { trackUiInteraction } from '../utils/telemetry';
 import { AvatarSettingsSection } from './AvatarSettingsSection';
 import { buttonSecondaryClassName, dialogContentClassName, dialogSectionLabelClassName } from './dialogStyles';
 import { ColumnsIcon } from './icons';
-import { ToolbarIconButton, RemoteButtonToggleItem } from './ToolbarIconButton';
+import { ToolbarIconButton, RemoteButtonToggleItem, TOGGLE_BUTTON_TONES } from './ToolbarIconButton';
 
 /** Column show/hide telemetry actions per optional column (049-usage-telemetry). */
 const COLUMN_VISIBILITY_ACTIONS = {
@@ -115,10 +114,6 @@ export function ViewSettingsDialog() {
     rpcClient.persistUIState({ commitTableLayout: nextLayout });
   };
 
-  const triggerColor = open
-    ? `${accentTextClassName} opacity-100`
-    : 'text-[var(--vscode-icon-foreground)] opacity-70 hover:opacity-100';
-
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
@@ -126,7 +121,7 @@ export function ViewSettingsDialog() {
           label="View"
           icon={<ColumnsIcon className="h-6 w-6" />}
           onClick={() => trackUiInteraction('toolbar', 'view')}
-          className={triggerColor}
+          {...(open ? TOGGLE_BUTTON_TONES.active : TOGGLE_BUTTON_TONES.inactive)}
           title="Commit list settings"
           aria-label="Commit list settings"
           extraMenuItems={<RemoteButtonToggleItem />}

@@ -12,12 +12,11 @@
  * own tokens, so a file marked "modified" here matches the same file in the
  * Explorer.
  *
- * Two forms are exported on purpose. The `*_COLOR` constants are plain CSS values
- * for inline `style`, which is what a call site needs when the color is chosen at
- * runtime — Tailwind's JIT only emits classes it can see spelled out in the source,
- * so `text-[${SOME_COLOR}]` would compile to a class that never exists. The
- * `*ClassName` constants are spelled-out classes, for the few call sites that need
- * a hover or other pseudo-state alongside the color.
+ * They are plain CSS values, for inline `style`. That is deliberate: Tailwind's JIT
+ * only emits classes it can see spelled out in the source, so `text-[${SOME_COLOR}]`
+ * would compile to a class that never exists. A call site that also needs a
+ * pseudo-state pairs the inline color with a class carrying only the state
+ * (`opacity-70 hover:opacity-100`), rather than moving the color into the class.
  */
 
 export const ADDED_COLOR = 'var(--vscode-gitDecoration-addedResourceForeground)';
@@ -27,6 +26,7 @@ export const DELETED_COLOR = 'var(--vscode-gitDecoration-deletedResourceForegrou
 export const RENAMED_COLOR = 'var(--vscode-gitDecoration-renamedResourceForeground)';
 export const UNTRACKED_COLOR = 'var(--vscode-gitDecoration-untrackedResourceForeground)';
 export const NEUTRAL_COLOR = 'var(--vscode-descriptionForeground)';
+export const FOREGROUND_COLOR = 'var(--vscode-foreground)';
 
 /**
  * The uncommitted-changes row: its message text and its dashed graph node and
@@ -44,12 +44,37 @@ export const ERROR_COLOR = 'var(--vscode-errorForeground)';
 
 /** Toolbar toggles and popover triggers that are currently active. */
 export const ACCENT_COLOR = 'var(--vscode-textLink-activeForeground)';
+export const ICON_COLOR = 'var(--vscode-icon-foreground)';
 
 /** Compare panel slot badges. Charts tokens are theme-defined and stay distinguishable from each other. */
 export const COMPARE_BASE_COLOR = 'var(--vscode-charts-blue)';
 export const COMPARE_TARGET_COLOR = 'var(--vscode-charts-green)';
 /** Text drawn on top of a solid accent fill; the editor background is the reliable contrast partner. */
 export const ON_ACCENT_COLOR = 'var(--vscode-editor-background)';
+
+/**
+ * Filled surfaces, paired with the foreground token the theme intends for them.
+ * `WARNING_SURFACE_COLOR` is the block VS Code uses for a validation warning;
+ * `BADGE_*` is its neutral count/label chip.
+ */
+export const WARNING_SURFACE_COLOR = 'var(--vscode-inputValidation-warningBackground)';
+export const BADGE_SURFACE_COLOR = 'var(--vscode-badge-background)';
+export const BADGE_TEXT_COLOR = 'var(--vscode-badge-foreground)';
+
+/**
+ * Commit signature verdicts. Shared by the history column's glyphs
+ * (`utils/signatureGlyph.ts`) and the details panel's labels, which sit on screen
+ * together — a "Verified" label in a different green from the tick beside it reads
+ * as a second state.
+ *
+ * These three carry hex fallbacks because their tokens are contributed by VS Code's
+ * built-in Git extension rather than by themes, so a user who disables it would
+ * otherwise get no color at all. The tokens above are core theme colors and always
+ * resolve.
+ */
+export const SIGNATURE_VERIFIED_COLOR = 'var(--vscode-testing-iconPassed, #4CAF50)';
+export const SIGNATURE_PROBLEM_COLOR = 'var(--vscode-editorError-foreground, #F44336)';
+export const SIGNATURE_CANNOT_VERIFY_COLOR = 'var(--vscode-editorWarning-foreground, #FFCC00)';
 
 /**
  * A faint fill of `color`, for chips and badges that tint their background to
@@ -59,11 +84,3 @@ export const ON_ACCENT_COLOR = 'var(--vscode-editor-background)';
 export function tint(color: string, percent = 18): string {
   return `color-mix(in srgb, ${color} ${percent}%, transparent)`;
 }
-
-/**
- * Spelled-out class equivalents of the constants above. These must stay written
- * out in full for Tailwind to emit them, so they mirror rather than reference the
- * values — keep the two in step when changing a token.
- */
-export const accentTextClassName = 'text-[var(--vscode-textLink-activeForeground)]';
-export const warningTextClassName = 'text-[var(--vscode-editorWarning-foreground)]';

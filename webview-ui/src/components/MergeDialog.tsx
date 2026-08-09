@@ -5,7 +5,12 @@ import { buildMergeCommand } from '../utils/gitCommandBuilder';
 import { InlineCode } from '../utils/inlineCodeRenderer';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonPrimaryClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 
 interface MergeDialogProps {
   open: boolean;
@@ -90,13 +95,13 @@ export function MergeDialog({ open, branchName, onConfirm, onCancel }: MergeDial
 
           <div className="flex justify-end gap-2 mt-4">
             <AlertDialog.Cancel
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+              className={buttonSecondaryClassName}
               onClick={handleCancel}
             >
               Cancel
             </AlertDialog.Cancel>
             <AlertDialog.Action
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+              className={buttonPrimaryClassName}
               onClick={handleConfirm}
             >
               Merge

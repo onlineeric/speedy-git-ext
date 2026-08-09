@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import * as themeColors from '../themeColors';
 import { tint } from '../themeColors';
@@ -7,28 +7,73 @@ import { tint } from '../themeColors';
 const WEBVIEW_SRC = join(__dirname, '..', '..');
 
 /**
- * Files whose hardcoded colors are deliberate, each for a reason a theme token
- * cannot serve. Keep this list short and keep the reason in the file itself.
+ * A hardcoded color is allowed only where a theme token cannot serve — a color
+ * that has to contrast against a *user-configured* value rather than against the
+ * theme. Mark it on the offending line, or the line above it:
+ *
+ *   // theme-color-exception: contrasts against the user's lane color
+ *
+ * Deliberately per-line rather than a list of exempt files: the files that need an
+ * exception are the ones where color code gets edited, so exempting a whole file
+ * would wave through the *next* hardcoded color as well as the intended one.
  */
-const DELIBERATE_HARDCODED_COLORS = [
-  // User-configurable graph lane palette, and the luminance-picked text color
-  // that has to stay readable on whatever lane color the user chose.
-  'utils/colorUtils.ts',
-  // Badge border that must contrast against a user-configured lane color.
-  'utils/worktreeBadgeStyle.ts',
-  // Per-email hsl() background for the initials avatar fallback, and the label on it.
-  'utils/gravatar.ts',
-  'components/AuthorAvatar.tsx',
-];
+const EXCEPTION_MARKER = 'theme-color-exception:';
 
-function sourceFiles(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      return entry.name === '__tests__' ? [] : sourceFiles(full);
-    }
-    return /\.tsx?$/.test(entry.name) ? [full] : [];
-  });
+/**
+ * The one scrim: a dialog overlay darkens whatever is behind it rather than
+ * claiming a color of its own, so it is theme-independent by nature and every
+ * dialog spells it the same way.
+ */
+const DIALOG_SCRIM_CLASS = 'bg-black/50';
+
+interface SourceFile {
+  /** Slash-separated path relative to `webview-ui/src`, for offender messages. */
+  path: string;
+  lines: string[];
+}
+
+function sourceFiles(): SourceFile[] {
+  return readdirSync(WEBVIEW_SRC, { recursive: true, encoding: 'utf8' })
+    .map((entry) => entry.split(sep).join('/'))
+    .filter((path) => /\.(tsx?|css)$/.test(path) && !path.includes('__tests__/'))
+    .map((path) => ({ path, lines: readFileSync(join(WEBVIEW_SRC, path), 'utf8').split('\n') }));
+}
+
+const COMMENT_LINE = /^\s*(\/\/|\/?\*)/;
+
+/**
+ * A line is excepted if it carries the marker itself, or if the comment block
+ * immediately above it does — so the marker can go in a `//` line or anywhere in
+ * a JSDoc block explaining the exception.
+ */
+function isExcepted(lines: string[], index: number): boolean {
+  if (lines[index].includes(EXCEPTION_MARKER)) return true;
+  for (let above = index - 1; above >= 0 && COMMENT_LINE.test(lines[above]); above--) {
+    if (lines[above].includes(EXCEPTION_MARKER)) return true;
+  }
+  return false;
+}
+
+/**
+ * Drop every `var(--token, fallback)` from a line so a hex *fallback* is allowed
+ * while a hex anywhere else on the same line still fails. Innermost-first, so
+ * nested fallbacks (`var(--a, var(--b))`) unwrap completely.
+ */
+function stripVarReferences(line: string): string {
+  let stripped = line;
+  for (let previous = ''; previous !== stripped; ) {
+    previous = stripped;
+    stripped = stripped.replace(/var\([^()]*\)/g, '');
+  }
+  return stripped;
+}
+
+function findOffenders(files: SourceFile[], matches: (line: string) => boolean): string[] {
+  return files.flatMap(({ path, lines }) =>
+    lines.flatMap((line, index) =>
+      matches(line) && !isExcepted(lines, index) ? [`${path}:${index + 1}: ${line.trim()}`] : []
+    )
+  );
 }
 
 describe('tint', () => {
@@ -49,14 +94,6 @@ describe('exported colors', () => {
       expect(`${name}: ${value}`).toMatch(/var\(--vscode-/);
     }
   });
-
-  // The `*ClassName` strings must stay spelled out for Tailwind's JIT, so they
-  // mirror the `*_COLOR` values rather than referencing them. Nothing but this
-  // keeps the two halves in step.
-  it('keep the spelled-out class strings in step with the color constants', () => {
-    expect(themeColors.accentTextClassName).toBe(`text-[${themeColors.ACCENT_COLOR}]`);
-    expect(themeColors.warningTextClassName).toBe(`text-[${themeColors.WARNING_COLOR}]`);
-  });
 });
 
 /**
@@ -66,44 +103,35 @@ describe('exported colors', () => {
  * but the wrong one", which still needs a look on a light theme.
  */
 describe('no hardcoded colors in the webview', () => {
-  const files = sourceFiles(WEBVIEW_SRC);
+  const files = sourceFiles();
 
   it('finds source files to scan', () => {
     expect(files.length).toBeGreaterThan(50);
+    expect(files.some((file) => file.path.endsWith('.css'))).toBe(true);
   });
 
   it('uses no Tailwind palette colors', () => {
-    const utility = '(text|bg|border|fill|stroke|ring|decoration|outline|accent|shadow|from|to|via)';
-    const palette =
-      '(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)';
-    const pattern = new RegExp(`\\b${utility}-${palette}-[0-9]{2,3}(/[0-9]+)?\\b`, 'g');
+    const utility = '(text|bg|border|fill|stroke|ring|decoration|outline|accent|shadow|from|to|via|divide)';
+    const numbered =
+      '(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}';
+    const pattern = new RegExp(`\\b${utility}-(${numbered}|white|black)(/[0-9]+)?\\b`);
 
-    const offenders = files.flatMap((file) => {
-      const matches = readFileSync(file, 'utf8').match(pattern) ?? [];
-      return matches.map((match) => `${relative(WEBVIEW_SRC, file)}: ${match}`);
-    });
+    const offenders = findOffenders(files, (line) => pattern.test(line.split(DIALOG_SCRIM_CLASS).join('')));
 
     expect(offenders).toEqual([]);
   });
 
-  it('uses no raw hex or rgb() outside a var() fallback or a documented exception', () => {
-    const offenders = files.flatMap((file) => {
-      const rel = relative(WEBVIEW_SRC, file).split('\\').join('/');
-      if (DELIBERATE_HARDCODED_COLORS.includes(rel)) return [];
-      return readFileSync(file, 'utf8')
-        .split('\n')
-        // `#rrggbb` and `#rrggbbaa` anywhere; `#rgb` shorthand only inside quotes,
-        // so a `#123` issue reference in a comment is not mistaken for a color.
-        .filter(
-          (line) =>
-            /#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?\b|['"`]#[0-9a-fA-F]{3}['"`]|rgba?\(/.test(line) &&
-            !line.includes('var(--vscode')
-        )
-        // A shadow is theme-independent — it darkens or lightens whatever is
-        // behind it rather than claiming a color of its own, the same reasoning
-        // that exempts the `bg-black/50` dialog scrims.
-        .filter((line) => !/shadow/.test(line))
-        .map((line) => `${rel}: ${line.trim()}`);
+  it('uses no raw color values outside a var() fallback', () => {
+    // `#rrggbb`/`#rrggbbaa` anywhere, `#rgb` shorthand only inside quotes so a
+    // `#123` issue reference in prose is not mistaken for a color, and the CSS
+    // color functions that take raw channel values.
+    const pattern = /#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?\b|['"`]#[0-9a-fA-F]{3}['"`]|\b(rgba?|hsla?|hwb|oklch|lab)\(/;
+
+    const offenders = findOffenders(files, (line) => {
+      // A shadow darkens or lightens what is behind it rather than claiming a
+      // color of its own — the same reasoning that exempts the dialog scrim.
+      if (/(drop-)?shadow-\[/.test(line)) return false;
+      return pattern.test(stripVarReferences(line));
     });
 
     expect(offenders).toEqual([]);

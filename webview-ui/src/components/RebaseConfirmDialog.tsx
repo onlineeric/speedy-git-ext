@@ -2,7 +2,12 @@ import { useState } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { buildRebaseCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonPrimaryClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface RebaseConfirmDialogProps {
@@ -73,13 +78,13 @@ export function RebaseConfirmDialog({
           )}
           <div className="flex justify-end gap-2 mt-4">
             <AlertDialog.Cancel
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+              className={buttonSecondaryClassName}
               onClick={handleCancel}
             >
               Cancel
             </AlertDialog.Cancel>
             <AlertDialog.Action
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+              className={buttonPrimaryClassName}
               onClick={handleConfirm}
             >
               Rebase

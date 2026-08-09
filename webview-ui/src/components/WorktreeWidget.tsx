@@ -3,7 +3,14 @@ import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { buildPruneWorktreeCommand } from '../utils/gitCommandBuilder';
 import { worktreeBranchLabel } from '../utils/worktreeDisplay';
-import { ACCENT_COLOR, tint } from '../utils/themeColors';
+import {
+  ACCENT_COLOR,
+  BADGE_SURFACE_COLOR,
+  BADGE_TEXT_COLOR,
+  FOREGROUND_COLOR,
+  WARNING_SURFACE_COLOR,
+  tint,
+} from '../utils/themeColors';
 import { ConfirmDialog } from './ConfirmDialog';
 import { useRemoveWorktreeDialog } from './WorktreeMenuItems';
 import { RefreshIcon } from './icons';
@@ -119,16 +126,24 @@ export function WorktreeWidget() {
   );
 }
 
-function Badge({ children, tone = 'default' }: { children: React.ReactNode; tone?: 'default' | 'current' | 'warning' }) {
-  // "current" reads as an accent, not a warning — the two tones sit side by side
-  // in the same list and must not collapse into the same color.
-  const style =
-    tone === 'warning'
-      ? { backgroundColor: 'var(--vscode-inputValidation-warningBackground)', color: 'var(--vscode-foreground)' }
-      : tone === 'current'
-        ? { backgroundColor: tint(ACCENT_COLOR), color: ACCENT_COLOR }
-        : { backgroundColor: 'var(--vscode-badge-background)', color: 'var(--vscode-badge-foreground)' };
-  return <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide" style={style}>{children}</span>;
+type BadgeTone = 'default' | 'current' | 'warning';
+
+/**
+ * "current" reads as an accent, not a warning — the two tones sit side by side in
+ * the same list and must not collapse into the same color.
+ */
+const BADGE_TONE_STYLES: Record<BadgeTone, React.CSSProperties> = {
+  default: { backgroundColor: BADGE_SURFACE_COLOR, color: BADGE_TEXT_COLOR },
+  current: { backgroundColor: tint(ACCENT_COLOR), color: ACCENT_COLOR },
+  warning: { backgroundColor: WARNING_SURFACE_COLOR, color: FOREGROUND_COLOR },
+};
+
+function Badge({ children, tone = 'default' }: { children: React.ReactNode; tone?: BadgeTone }) {
+  return (
+    <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide" style={BADGE_TONE_STYLES[tone]}>
+      {children}
+    </span>
+  );
 }
 
 function RowButton({

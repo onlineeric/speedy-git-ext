@@ -22,35 +22,38 @@ export function shouldShowChangeCounts(file: FileChange): boolean {
   return true;
 }
 
-export function getStatusConfig(status: FileChange['status']): {
-  letter: string;
-  label: string;
-  color: string;
-} {
-  switch (status) {
-    case 'added':
-      return { letter: 'A', label: 'Added', color: ADDED_COLOR };
-    case 'modified':
-      return { letter: 'M', label: 'Modified', color: MODIFIED_COLOR };
-    case 'deleted':
-      return { letter: 'D', label: 'Deleted', color: DELETED_COLOR };
-    case 'renamed':
-      return { letter: 'R', label: 'Renamed', color: RENAMED_COLOR };
-    case 'copied':
-      return { letter: 'C', label: 'Copied', color: RENAMED_COLOR };
-    case 'untracked':
-      return { letter: 'U', label: 'Untracked', color: UNTRACKED_COLOR };
-    default:
-      return { letter: '?', label: 'Unknown', color: NEUTRAL_COLOR };
-  }
+/**
+ * Built once at module load rather than per call: file lists are neither
+ * virtualized nor capped, so a large commit renders one badge per file and the
+ * `tint()` string would otherwise be rebuilt for every one of them on every
+ * render. The style objects are stable references for the same reason.
+ */
+function statusConfig(letter: string, label: string, color: string) {
+  return { letter, label, style: { color, backgroundColor: tint(color) } } as const;
 }
 
+const STATUS_CONFIG: Record<FileChange['status'], ReturnType<typeof statusConfig>> = {
+  added: statusConfig('A', 'Added', ADDED_COLOR),
+  modified: statusConfig('M', 'Modified', MODIFIED_COLOR),
+  deleted: statusConfig('D', 'Deleted', DELETED_COLOR),
+  renamed: statusConfig('R', 'Renamed', RENAMED_COLOR),
+  copied: statusConfig('C', 'Copied', RENAMED_COLOR),
+  untracked: statusConfig('U', 'Untracked', UNTRACKED_COLOR),
+  unknown: statusConfig('?', 'Unknown', NEUTRAL_COLOR),
+};
+
+const ADDED_STYLE = { color: ADDED_COLOR };
+const DELETED_STYLE = { color: DELETED_COLOR };
+const MODIFIED_STYLE = { color: MODIFIED_COLOR };
+const ACCENT_STYLE = { color: ACCENT_COLOR };
+const NEUTRAL_STYLE = { color: NEUTRAL_COLOR };
+
 export function FileStatusBadge({ status }: { status: FileChange['status'] }) {
-  const config = getStatusConfig(status);
+  const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.unknown;
   return (
     <span
       className="flex h-4 w-4 items-center justify-center rounded text-[10px] font-bold"
-      style={{ color: config.color, backgroundColor: tint(config.color) }}
+      style={config.style}
       title={config.label}
     >
       {config.letter}
@@ -64,10 +67,10 @@ export function FileChangeIndicators({ file }: { file: FileChange }) {
   return (
     <>
       {showCounts && file.additions !== undefined && file.additions > 0 && (
-        <span style={{ color: ADDED_COLOR }}>+{file.additions}</span>
+        <span style={ADDED_STYLE}>+{file.additions}</span>
       )}
       {showCounts && file.deletions !== undefined && file.deletions > 0 && (
-        <span style={{ color: DELETED_COLOR }}>-{file.deletions}</span>
+        <span style={DELETED_STYLE}>-{file.deletions}</span>
       )}
     </>
   );
@@ -86,7 +89,7 @@ export function ViewModeToggle() {
     <span className="flex items-center gap-0.5">
       <button
         className="rounded p-0.5 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
-        style={{ color: fileViewMode === 'list' ? ACCENT_COLOR : NEUTRAL_COLOR }}
+        style={fileViewMode === 'list' ? ACCENT_STYLE : NEUTRAL_STYLE}
         onClick={() => handleSetFileViewMode('list')}
         title="List view"
       >
@@ -94,7 +97,7 @@ export function ViewModeToggle() {
       </button>
       <button
         className="rounded p-0.5 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
-        style={{ color: fileViewMode === 'tree' ? ACCENT_COLOR : NEUTRAL_COLOR }}
+        style={fileViewMode === 'tree' ? ACCENT_STYLE : NEUTRAL_STYLE}
         onClick={() => handleSetFileViewMode('tree')}
         title="Tree view"
       >
@@ -218,7 +221,7 @@ export function FileActionIcons({
             <>
               <button
                 className="rounded p-0.5 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
-                style={{ color: ADDED_COLOR }}
+                style={ADDED_STYLE}
                 onClick={handleStage}
                 title="Stage file"
               >
@@ -227,7 +230,7 @@ export function FileActionIcons({
               {onDiscardClick && (
                 <button
                   className="rounded p-0.5 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
-                  style={{ color: DELETED_COLOR }}
+                  style={DELETED_STYLE}
                   onClick={handleDiscard}
                   title="Discard changes"
                 >
@@ -239,7 +242,7 @@ export function FileActionIcons({
           {file.stageState === 'staged' && (
             <button
               className="rounded p-0.5 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
-              style={{ color: MODIFIED_COLOR }}
+              style={MODIFIED_STYLE}
               onClick={handleUnstage}
               title="Unstage file"
             >

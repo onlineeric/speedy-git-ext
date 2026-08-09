@@ -4,7 +4,12 @@ import type { Commit, CommitParentInfo, RevertMode, RevertOptions } from '@share
 import { useGraphStore } from '../stores/graphStore';
 import { buildRevertCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonPrimaryClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface RevertDialogProps {
@@ -263,7 +268,7 @@ export function RevertDialog({ open, commit, parents, onConfirm, onCancel }: Rev
 
           <div className="flex justify-end gap-2 mt-6">
             <Dialog.Close
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className={buttonSecondaryClassName}
               onClick={() => {
                 dialogTelemetry.cancelled();
                 onCancel();
@@ -275,7 +280,7 @@ export function RevertDialog({ open, commit, parents, onConfirm, onCancel }: Rev
             <button
               onClick={handleConfirm}
               disabled={confirmDisabled}
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className={buttonPrimaryClassName}
             >
               {submitting ? 'Reverting…' : 'Revert'}
             </button>

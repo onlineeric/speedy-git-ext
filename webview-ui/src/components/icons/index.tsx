@@ -1,3 +1,5 @@
+import { ADDED_COLOR } from '../../utils/themeColors';
+
 interface IconProps {
   className?: string;
   style?: React.CSSProperties;
@@ -65,9 +67,9 @@ export function CopyIcon({ className }: IconProps) {
 }
 
 /** Checkmark icon — 12×12, inherits text color via currentColor */
-export function CheckIcon({ className }: IconProps) {
+export function CheckIcon({ className, style }: IconProps) {
   return (
-    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} style={style} aria-hidden>
       <path d="M 2.5 6 L 5 8.5 L 9.5 3.5" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -81,11 +83,7 @@ export function CheckIcon({ className }: IconProps) {
  * loses it against the others.
  */
 export function CopiedIcon({ className }: IconProps) {
-  return (
-    <CheckIcon
-      className={`text-[var(--vscode-gitDecoration-addedResourceForeground)]${className ? ` ${className}` : ''}`}
-    />
-  );
+  return <CheckIcon className={className} style={{ color: ADDED_COLOR }} />;
 }
 
 /** Document icon (open file) — 12×12, inherits text color via currentColor */

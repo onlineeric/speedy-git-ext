@@ -8,9 +8,8 @@ import { RepoSelector } from './RepoSelector';
 import { SubmoduleSelector } from './SubmoduleSelector';
 import { MultiBranchDropdown } from './MultiBranchDropdown';
 import { addAllLocalBranches } from '../utils/branchSelection';
-import { accentTextClassName, warningTextClassName } from '../utils/themeColors';
 import { ViewSettingsDialog } from './ViewSettingsDialog';
-import { ToolbarIconButton, RemoteButtonToggleItem } from './ToolbarIconButton';
+import { ToolbarIconButton, RemoteButtonToggleItem, TOGGLE_BUTTON_TONES } from './ToolbarIconButton';
 import {
   CloudIcon,
   FilterIcon,
@@ -35,13 +34,6 @@ const PANEL_TOGGLE_ACTIONS = {
   search: { open: 'searchOpen', close: 'searchClose' },
   compare: { open: 'compareOpen', close: 'compareClose' },
   worktree: { open: 'worktreeOpen', close: 'worktreeClose' },
-} as const;
-
-const TOGGLE_BUTTON_COLORS = {
-  inactive: 'text-[var(--vscode-icon-foreground)] opacity-70 hover:opacity-100',
-  active: `${accentTextClassName} opacity-100`,
-  filtered: `${warningTextClassName} opacity-100`,
-  processing: `${warningTextClassName} opacity-100`,
 } as const;
 
 export function ControlBar() {
@@ -138,30 +130,30 @@ export function ControlBar() {
     || (graphFilters.authors?.length ?? 0) > 0
     || !!graphFilters.afterDate
     || !!graphFilters.beforeDate;
-  const filterColor =
+  const filterTone =
     activeToggleWidget === 'filter'
-      ? TOGGLE_BUTTON_COLORS.active
+      ? TOGGLE_BUTTON_TONES.active
       : hasAnyFilter
-        ? TOGGLE_BUTTON_COLORS.filtered
-        : TOGGLE_BUTTON_COLORS.inactive;
-  const searchColor =
-    activeToggleWidget === 'search' ? TOGGLE_BUTTON_COLORS.active : TOGGLE_BUTTON_COLORS.inactive;
-  const worktreeColor =
+        ? TOGGLE_BUTTON_TONES.attention
+        : TOGGLE_BUTTON_TONES.inactive;
+  const searchTone =
+    activeToggleWidget === 'search' ? TOGGLE_BUTTON_TONES.active : TOGGLE_BUTTON_TONES.inactive;
+  const worktreeTone =
     activeToggleWidget === 'worktree'
-      ? TOGGLE_BUTTON_COLORS.active
+      ? TOGGLE_BUTTON_TONES.active
       : isCurrentLinkedWorktree
-        ? TOGGLE_BUTTON_COLORS.filtered
-        : TOGGLE_BUTTON_COLORS.inactive;
+        ? TOGGLE_BUTTON_TONES.attention
+        : TOGGLE_BUTTON_TONES.inactive;
   const worktreeTitle = isCurrentLinkedWorktree ? 'You are in a Worktree' : 'Worktrees';
   // FR-002 (042-compare-refs): three-state Compare toolbar color (idle / open / pending).
   const compareSelection = useGraphStore((state) => state.compareSelection);
   const anyCompareSlotFilled = compareSelection.a !== null || compareSelection.b !== null;
-  const compareColor =
+  const compareTone =
     activeToggleWidget === 'compare'
-      ? TOGGLE_BUTTON_COLORS.active
+      ? TOGGLE_BUTTON_TONES.active
       : anyCompareSlotFilled
-        ? TOGGLE_BUTTON_COLORS.filtered
-        : TOGGLE_BUTTON_COLORS.inactive;
+        ? TOGGLE_BUTTON_TONES.attention
+        : TOGGLE_BUTTON_TONES.inactive;
 
   return (
     <div className="flex items-center gap-1 px-2 py-1.5 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)]">
@@ -180,7 +172,7 @@ export function ControlBar() {
         label="Filter"
         icon={<FilterIcon className={iconClass} />}
         onClick={() => handleToggleWidget('filter')}
-        className={filterColor}
+        {...filterTone}
         title="Filter"
       />
 
@@ -188,7 +180,7 @@ export function ControlBar() {
         label="Search"
         icon={<SearchIcon className={iconClass} />}
         onClick={() => handleToggleWidget('search')}
-        className={searchColor}
+        {...searchTone}
         title="Search commits"
       />
 
@@ -196,7 +188,7 @@ export function ControlBar() {
         label="Compare"
         icon={<CompareIcon className={iconClass} />}
         onClick={() => handleToggleWidget('compare')}
-        className={compareColor}
+        {...compareTone}
         title="Compare refs (Base vs Target)"
       />
 
@@ -204,7 +196,7 @@ export function ControlBar() {
         label="Worktrees"
         icon={<WorktreeIcon className={iconClass} />}
         onClick={() => handleToggleWidget('worktree')}
-        className={worktreeColor}
+        {...worktreeTone}
         title={worktreeTitle}
       />
 
@@ -214,7 +206,7 @@ export function ControlBar() {
         label="Refresh"
         icon={<RefreshIcon className={`${iconClass}${isRefreshing ? ' animate-spin' : ''}`} />}
         onClick={handleRefresh}
-        className={isRefreshing ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}
+        {...(isRefreshing ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
         title="Refresh"
       />
 
@@ -223,7 +215,7 @@ export function ControlBar() {
         icon={<FetchIcon className={iconClass} />}
         onClick={handleFetch}
         disabled={fetching || loading || !hasConfiguredRemote}
-        className={fetching ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}
+        {...(fetching ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
         title={hasConfiguredRemote ? 'Fetch all remotes' : 'No remotes configured'}
       />
 
@@ -235,7 +227,7 @@ export function ControlBar() {
         onClick={handleGoToHead}
         disabled={goToHeadBusy || loading}
         aria-label="Go to HEAD commit"
-        className={goToHeadBusy ? TOGGLE_BUTTON_COLORS.processing : TOGGLE_BUTTON_COLORS.inactive}
+        {...(goToHeadBusy ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
         title="Go to HEAD commit (current checkout)"
       />
 
@@ -254,7 +246,7 @@ export function ControlBar() {
             setRemoteDialogOpen(true);
           }}
           aria-label="Manage Remotes"
-          className={TOGGLE_BUTTON_COLORS.inactive}
+          {...TOGGLE_BUTTON_TONES.inactive}
           title="Manage Remotes"
           extraMenuItems={<RemoteButtonToggleItem />}
         />
@@ -268,7 +260,7 @@ export function ControlBar() {
           rpcClient.openSettings();
         }}
         aria-label="Open extension settings"
-        className={TOGGLE_BUTTON_COLORS.inactive}
+        {...TOGGLE_BUTTON_TONES.inactive}
         title="Extension settings"
         extraMenuItems={<RemoteButtonToggleItem />}
       />
@@ -281,7 +273,7 @@ export function ControlBar() {
           setHelpDialogOpen(true);
         }}
         aria-label="Help and feedback"
-        className={TOGGLE_BUTTON_COLORS.inactive}
+        {...TOGGLE_BUTTON_TONES.inactive}
         title="Help & feedback"
         extraMenuItems={<RemoteButtonToggleItem />}
       />

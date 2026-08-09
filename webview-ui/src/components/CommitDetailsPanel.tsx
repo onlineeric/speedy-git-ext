@@ -6,11 +6,7 @@ import { rpcClient } from '../rpc/rpcClient';
 import { formatRelativeDate } from '../utils/formatDate';
 import { renderInlineCode } from '../utils/inlineCodeRenderer';
 import { slotLabel } from '../utils/compareSlot';
-import {
-  SIGNATURE_CANNOT_VERIFY_COLOR,
-  SIGNATURE_PROBLEM_COLOR,
-  SIGNATURE_VERIFIED_COLOR,
-} from '../utils/signatureGlyph';
+import { signatureGlyph } from '../utils/signatureGlyph';
 import { ADDED_COLOR, DELETED_COLOR, ERROR_COLOR, NEUTRAL_COLOR } from '../utils/themeColors';
 import { CloseIcon, MoveRightIcon, MoveBottomIcon, ChevronDownIcon, ChevronRightIcon, InfoIcon } from './icons';
 import { FileChangesTreeView } from './FileChangesTreeView';
@@ -582,12 +578,14 @@ function CommitSignatureSection({ hash }: { hash: string }) {
     );
   }
 
-  const statusConfig = getSignatureStatusConfig(signature.status, signature.format);
+  const statusColor = signatureGlyph(signature.status)?.color ?? NEUTRAL_COLOR;
 
   return (
     <div className="space-y-1 border-b border-[var(--vscode-panel-border)] px-3 py-2 text-xs">
       <div className="flex items-center gap-2">
-        <span className="font-medium" style={{ color: statusConfig.color }}>{statusConfig.label}</span>
+        <span className="font-medium" style={{ color: statusColor }}>
+          {getSignatureStatusLabel(signature.status, signature.format)}
+        </span>
         {signature.format && (
           <span className="uppercase text-[var(--vscode-descriptionForeground)]">
             {signature.format}
@@ -616,10 +614,15 @@ function SignatureHelpButton() {
   );
 }
 
-function getSignatureStatusConfig(
+/**
+ * The label only — the matching color comes from `signatureGlyph()`, the single
+ * status → color mapping, so the label here and the glyph in the history column
+ * cannot drift into two different verdicts.
+ */
+function getSignatureStatusLabel(
   status: CommitSignatureInfo['status'],
   format: CommitSignatureInfo['format']
-): { label: string; color: string } {
+): string {
   // SSH and GPG fail verification for different, mechanism-specific reasons, so
   // these "signed but can't verify" labels name the exact local fix: import the
   // signer's GPG key into your keyring, vs. add the signer to your SSH
@@ -627,29 +630,25 @@ function getSignatureStatusConfig(
   const isSsh = format === 'ssh';
   switch (status) {
     case 'verified':
-      return { label: 'Verified', color: SIGNATURE_VERIFIED_COLOR };
+      return 'Verified';
     case 'bad':
-      return { label: 'Bad Signature', color: SIGNATURE_PROBLEM_COLOR };
+      return 'Bad Signature';
     case 'signed-not-trusted':
-      return {
-        label: isSsh
-          ? 'Signed, signer not in your allowedSignersFile'
-          : "Signed, signer's public key not trusted",
-        color: SIGNATURE_CANNOT_VERIFY_COLOR,
-      };
+      return isSsh
+        ? 'Signed, signer not in your allowedSignersFile'
+        : "Signed, signer's public key not trusted";
     case 'signed-key-missing':
-      return {
-        label: isSsh
-          ? 'Signed, signer not in your allowedSignersFile'
-          : "Signed, signer's public key not in your keyring",
-        color: SIGNATURE_CANNOT_VERIFY_COLOR,
-      };
+      return isSsh
+        ? 'Signed, signer not in your allowedSignersFile'
+        : "Signed, signer's public key not in your keyring";
     case 'signed-not-good':
-      return { label: 'Signed, expired or revoked', color: SIGNATURE_CANNOT_VERIFY_COLOR };
+      return 'Signed, expired or revoked';
     case 'unavailable':
-      return { label: 'Signed, not verified locally', color: SIGNATURE_CANNOT_VERIFY_COLOR };
+      return 'Signed, not verified locally';
+    // Unreachable — the caller returns early on the `null` unsigned sentinel —
+    // but `noImplicitReturns` needs every status covered.
     case 'unsigned':
-      return { label: 'No signature', color: NEUTRAL_COLOR };
+      return 'No signature';
   }
 }
 

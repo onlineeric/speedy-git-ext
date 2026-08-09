@@ -4,7 +4,12 @@ import type { DialogId } from '@shared/telemetry';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 import { CommandPreview } from './CommandPreview';
 import { FieldError } from './FieldError';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonPrimaryClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 
 interface InputDialogProps {
   open: boolean;
@@ -87,7 +92,7 @@ export function InputDialog({
             )}
             <div className="flex justify-end gap-2 mt-4">
               <Dialog.Close
-                className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+                className={buttonSecondaryClassName}
                 type="button"
               >
                 Cancel
@@ -95,7 +100,7 @@ export function InputDialog({
               <button
                 type="submit"
                 disabled={!canSubmit}
-                className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 disabled:cursor-not-allowed"
+                className={buttonPrimaryClassName}
               >
                 OK
               </button>

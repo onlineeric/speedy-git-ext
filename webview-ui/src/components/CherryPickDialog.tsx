@@ -4,7 +4,12 @@ import type { Commit, CherryPickOptions } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { buildCherryPickCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonPrimaryClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface CherryPickDialogProps {
@@ -149,14 +154,14 @@ export function CherryPickDialog({ open, commits, onConfirm, onCancel }: CherryP
 
           <div className="flex justify-end gap-2 mt-6">
             <Dialog.Close
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]"
+              className={buttonSecondaryClassName}
               onClick={handleCancel}
             >
               Cancel
             </Dialog.Close>
             <button
               onClick={handleConfirm}
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]"
+              className={buttonPrimaryClassName}
             >
               Cherry-Pick
             </button>
