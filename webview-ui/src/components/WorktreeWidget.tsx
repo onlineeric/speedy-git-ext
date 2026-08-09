@@ -3,6 +3,7 @@ import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { buildPruneWorktreeCommand } from '../utils/gitCommandBuilder';
 import { worktreeBranchLabel } from '../utils/worktreeDisplay';
+import { ACCENT_COLOR, tint } from '../utils/themeColors';
 import { ConfirmDialog } from './ConfirmDialog';
 import { useRemoveWorktreeDialog } from './WorktreeMenuItems';
 import { RefreshIcon } from './icons';
@@ -119,13 +120,15 @@ export function WorktreeWidget() {
 }
 
 function Badge({ children, tone = 'default' }: { children: React.ReactNode; tone?: 'default' | 'current' | 'warning' }) {
-  const cls =
+  // "current" reads as an accent, not a warning — the two tones sit side by side
+  // in the same list and must not collapse into the same color.
+  const style =
     tone === 'warning'
-      ? 'bg-[var(--vscode-inputValidation-warningBackground)] text-[var(--vscode-foreground)]'
+      ? { backgroundColor: 'var(--vscode-inputValidation-warningBackground)', color: 'var(--vscode-foreground)' }
       : tone === 'current'
-        ? 'bg-yellow-400/10 text-yellow-400'
-      : 'bg-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]';
-  return <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide ${cls}`}>{children}</span>;
+        ? { backgroundColor: tint(ACCENT_COLOR), color: ACCENT_COLOR }
+        : { backgroundColor: 'var(--vscode-badge-background)', color: 'var(--vscode-badge-foreground)' };
+  return <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide" style={style}>{children}</span>;
 }
 
 function RowButton({

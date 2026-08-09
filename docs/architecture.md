@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-08-08**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-08-09**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -160,7 +160,7 @@ Menu building blocks — see `CLAUDE.md` for the reuse rules:
 All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome reporting.
 
 ```
-├── dialogStyles.ts               # Shared dialog width/resize; applied to every Dialog.Content
+├── dialogStyles.ts               # Shared dialog width/resize + the primary/secondary/danger button variants
 ├── ConfirmDialog.tsx             # Generic confirm (danger/warning variants) + CommandPreview
 ├── InputDialog.tsx               # Generic single-input dialog + FieldError
 ├── CommandPreview.tsx            # Live git command preview shown in dialogs
@@ -236,13 +236,14 @@ utils/
 ├── fileTreeBuilder.ts            # Flat file list → tree structure
 ├── radioAvailability.ts          # Enable/disable logic for mutually-exclusive options
 ├── mergeRefs.ts                  # Merges local/remote refs into DisplayRef[]
-├── signatureGlyph.ts             # SignatureStatus → glyph/color (047)
-├── worktreeBadgeStyle.ts         # Worktree badge styling (046)
+├── signatureGlyph.ts             # SignatureStatus → glyph/color (047); its colors are shared with the details-panel labels
+├── worktreeBadgeStyle.ts         # Worktree badge styling (046); hardcoded colors are deliberate — contrast vs. user lane colors
 ├── worktreeDisplay.ts            # Worktree list formatting/derivation (046)
 ├── telemetry.ts                  # Fire-and-forget webview telemetry helpers
 ├── searchFilter.ts               # Client-side search by message, hash, author
 ├── filterUtils.ts                # Author/date filter logic
 ├── refStyle.ts                   # Per-ref-kind badge styling
+├── themeColors.ts                # Semantic VS Code theme tokens (added/deleted/warning/accent…) + `tint()`; the one place webview colors are defined
 ├── colorUtils.ts                 # Graph color cycling + theme helpers
 ├── formatDate.ts                 # Commit-date formatting
 ├── gravatar.ts                   # Gravatar URL builder + load-state cache

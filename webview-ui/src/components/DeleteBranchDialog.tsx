@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { buildDeleteBranchCommand, buildDeleteBranchWithRemoteCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { buttonDangerClassName, dialogContentClassName, dialogContentStyle } from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface DeleteBranchDialogProps {
@@ -100,7 +100,7 @@ export function DeleteBranchDialog({
               Cancel
             </AlertDialog.Cancel>
             <AlertDialog.Action
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-errorForeground)] text-white hover:opacity-90"
+              className={buttonDangerClassName}
               onClick={handleConfirm}
             >
               {confirmLabel}

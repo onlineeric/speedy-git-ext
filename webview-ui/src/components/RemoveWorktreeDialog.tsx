@@ -6,7 +6,7 @@ import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { worktreeLocalBranch } from '../utils/worktreeDisplay';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { buttonDangerClassName, dialogContentClassName, dialogContentStyle } from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface RemoveWorktreeDialogProps {
@@ -217,7 +217,7 @@ export function RemoveWorktreeDialog({ open, worktree, onClose }: RemoveWorktree
             <button
               type="button"
               disabled={busy}
-              className="px-3 py-1.5 text-sm rounded bg-[var(--vscode-errorForeground)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              className={buttonDangerClassName}
               onClick={handleConfirm}
             >
               {busy ? 'Working…' : worktreeRemoved ? 'Delete Branch' : 'Remove'}

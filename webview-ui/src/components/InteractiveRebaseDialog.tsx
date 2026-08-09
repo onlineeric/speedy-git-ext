@@ -1,6 +1,11 @@
 import { useState, useCallback, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonPrimaryClassName,
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+} from './dialogStyles';
 import {
   DndContext,
   closestCenter,
@@ -30,9 +35,6 @@ interface InteractiveRebaseDialogProps {
 }
 
 type Step = 1 | 2 | 3;
-
-const buttonPrimary = 'px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]';
-const buttonSecondary = 'px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]';
 
 function buildSquashMessages(entries: RebaseEntry[]): SquashGroupMessage[] {
   const groups: SquashGroupMessage[] = [];
@@ -240,14 +242,14 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, onClos
           <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-[var(--vscode-panel-border)]">
             <button
               onClick={handleClose}
-              className={buttonSecondary}
+              className={buttonSecondaryClassName}
             >
               Cancel
             </button>
             {step === 1 && (
               <button
                 onClick={handleNext}
-                className={buttonPrimary}
+                className={buttonPrimaryClassName}
               >
                 Next
               </button>
@@ -256,13 +258,13 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, onClos
               <>
                 <button
                   onClick={() => setStep(1)}
-                  className={buttonSecondary}
+                  className={buttonSecondaryClassName}
                 >
                   Back
                 </button>
                 <button
                   onClick={() => setStep(3)}
-                  className={buttonPrimary}
+                  className={buttonPrimaryClassName}
                 >
                   Next
                 </button>
@@ -272,13 +274,13 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, onClos
               <>
                 <button
                   onClick={() => setStep(squashMessages.length > 0 ? 2 : 1)}
-                  className={buttonSecondary}
+                  className={buttonSecondaryClassName}
                 >
                   Back
                 </button>
                 <button
                   onClick={handleStart}
-                  className={buttonPrimary}
+                  className={buttonPrimaryClassName}
                 >
                   Start Rebase
                 </button>

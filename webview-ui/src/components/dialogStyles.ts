@@ -49,6 +49,19 @@ export const buttonSecondaryClassName =
   'px-3 py-1.5 text-sm rounded bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] disabled:cursor-default disabled:opacity-50';
 
 /**
+ * The confirming action of a destructive dialog — delete, discard, drop, force
+ * push. VS Code defines no third button variant, so this is built from
+ * `errorForeground` (the token themes already use to mean "this is bad").
+ *
+ * The label is the editor background rather than white: on dark themes
+ * `errorForeground` is a light salmon, and white on it is close to unreadable,
+ * while the editor background is dark there and light on light themes — so it
+ * stays legible either way.
+ */
+export const buttonDangerClassName =
+  'px-3 py-1.5 text-sm rounded bg-[var(--vscode-errorForeground)] text-[var(--vscode-editor-background)] hover:opacity-90 disabled:cursor-default disabled:opacity-50';
+
+/**
  * Caption above a group of settings inside a dialog.
  *
  * Shared because the View settings dialog stands several of these side by side —

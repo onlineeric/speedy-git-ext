@@ -3,6 +3,7 @@ import type { Branch, CompareMode, RefInfo, SlotValue } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { dispatchCompare, effectiveCompareMode } from '../utils/compareDispatch';
 import { slotLabel, slotsEqual } from '../utils/compareSlot';
+import { ERROR_COLOR } from '../utils/themeColors';
 import { FilterableSingleSelectDropdown } from './FilterableSingleSelectDropdown';
 
 /** Discriminator for items shown in the slot dropdown — separates synthetic items
@@ -296,7 +297,7 @@ export function CompareWidget() {
       </div>
 
       {(slotsAreEqual || comparePanelUI.inlineError) && (
-        <div className="mt-1 text-xs text-red-400">
+        <div className="mt-1 text-xs" style={{ color: ERROR_COLOR }}>
           {slotsAreEqual ? 'A and B are the same' : comparePanelUI.inlineError}
         </div>
       )}

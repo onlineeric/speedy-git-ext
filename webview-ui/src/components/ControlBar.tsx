@@ -8,6 +8,7 @@ import { RepoSelector } from './RepoSelector';
 import { SubmoduleSelector } from './SubmoduleSelector';
 import { MultiBranchDropdown } from './MultiBranchDropdown';
 import { addAllLocalBranches } from '../utils/branchSelection';
+import { accentTextClassName, warningTextClassName } from '../utils/themeColors';
 import { ViewSettingsDialog } from './ViewSettingsDialog';
 import { ToolbarIconButton, RemoteButtonToggleItem } from './ToolbarIconButton';
 import {
@@ -38,9 +39,9 @@ const PANEL_TOGGLE_ACTIONS = {
 
 const TOGGLE_BUTTON_COLORS = {
   inactive: 'text-[var(--vscode-icon-foreground)] opacity-70 hover:opacity-100',
-  active: 'text-sky-400 opacity-100',
-  filtered: 'text-yellow-400 opacity-100',
-  processing: 'text-yellow-400 opacity-100',
+  active: `${accentTextClassName} opacity-100`,
+  filtered: `${warningTextClassName} opacity-100`,
+  processing: `${warningTextClassName} opacity-100`,
 } as const;
 
 export function ControlBar() {

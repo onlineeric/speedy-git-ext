@@ -23,6 +23,13 @@ import type { ResolvedCommitTableLayout } from '../utils/commitTableLayout';
 import { SignatureColumnCell } from './SignatureColumnCell';
 import { DetachedWorktreeBadge } from './DetachedWorktreeBadge';
 import { prioritizeWorktreeDisplayRefs, worktreeForDisplayRef } from '../utils/worktreeDisplay';
+import {
+  COMPARE_BASE_COLOR,
+  COMPARE_TARGET_COLOR,
+  NEUTRAL_COLOR,
+  ON_ACCENT_COLOR,
+  UNCOMMITTED_COLOR,
+} from '../utils/themeColors';
 
 const EMPTY_WORKTREES: WorktreeInfo[] = [];
 
@@ -38,8 +45,24 @@ function CompareABMarker({ commit, isUncommitted }: { commit: Commit; isUncommit
   if (!isA && !isB) return null;
   return (
     <span className="ml-1 flex flex-shrink-0 items-center gap-0.5">
-      {isA && <span className="rounded bg-sky-500 px-1 py-0 text-[10px] font-bold text-white" title="Compare: Base">B</span>}
-      {isB && <span className="rounded bg-emerald-500 px-1 py-0 text-[10px] font-bold text-white" title="Compare: Target">T</span>}
+      {isA && (
+        <span
+          className="rounded px-1 py-0 text-[10px] font-bold"
+          style={{ backgroundColor: COMPARE_BASE_COLOR, color: ON_ACCENT_COLOR }}
+          title="Compare: Base"
+        >
+          B
+        </span>
+      )}
+      {isB && (
+        <span
+          className="rounded px-1 py-0 text-[10px] font-bold"
+          style={{ backgroundColor: COMPARE_TARGET_COLOR, color: ON_ACCENT_COLOR }}
+          title="Compare: Target"
+        >
+          T
+        </span>
+      )}
     </span>
   );
 }
@@ -321,7 +344,8 @@ function renderColumn({
             </div>
           )}
           <span
-            className={`truncate text-sm ${isStash ? 'italic text-[var(--vscode-descriptionForeground)]' : isUncommitted ? 'italic text-[#E8A317]' : ''}`}
+            className={`truncate text-sm ${isStash || isUncommitted ? 'italic' : ''}`}
+            style={isStash ? { color: NEUTRAL_COLOR } : isUncommitted ? { color: UNCOMMITTED_COLOR } : undefined}
             title={commit.subject}
           >
             {renderInlineCode(commit.subject)}

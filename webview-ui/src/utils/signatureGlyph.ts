@@ -16,9 +16,15 @@ export interface SignatureGlyph {
   color: string;
 }
 
-const VERIFIED_COLOR = 'var(--vscode-testing-iconPassed, #4CAF50)';
-const PROBLEM_COLOR = 'var(--vscode-editorError-foreground, #F44336)';
-const CANNOT_VERIFY_COLOR = 'var(--vscode-editorWarning-foreground, #FFCC00)';
+/**
+ * Exported so the details panel's signature *labels* use the same colors as the
+ * history column's *glyphs* — the two sit on screen together, and a "Verified"
+ * label in a different green from the tick beside it reads as a second state.
+ * The hexes are fallbacks only; the theme token wins whenever it is defined.
+ */
+export const SIGNATURE_VERIFIED_COLOR = 'var(--vscode-testing-iconPassed, #4CAF50)';
+export const SIGNATURE_PROBLEM_COLOR = 'var(--vscode-editorError-foreground, #F44336)';
+export const SIGNATURE_CANNOT_VERIFY_COLOR = 'var(--vscode-editorWarning-foreground, #FFCC00)';
 
 /**
  * Map a 7-state `SignatureStatus` to a grouped column glyph, or `null` for
@@ -27,9 +33,9 @@ const CANNOT_VERIFY_COLOR = 'var(--vscode-editorWarning-foreground, #FFCC00)';
 export function signatureGlyph(status: SignatureStatus): SignatureGlyph | null {
   switch (status) {
     case 'verified':
-      return { category: 'verified', glyph: 'verified', ariaLabel: 'Verified signature', color: VERIFIED_COLOR };
+      return { category: 'verified', glyph: 'verified', ariaLabel: 'Verified signature', color: SIGNATURE_VERIFIED_COLOR };
     case 'bad':
-      return { category: 'problem', glyph: 'error', ariaLabel: 'Bad signature', color: PROBLEM_COLOR };
+      return { category: 'problem', glyph: 'error', ariaLabel: 'Bad signature', color: SIGNATURE_PROBLEM_COLOR };
     case 'signed-not-trusted':
     case 'signed-key-missing':
     case 'signed-not-good':
@@ -38,7 +44,7 @@ export function signatureGlyph(status: SignatureStatus): SignatureGlyph | null {
         category: 'cannot-verify',
         glyph: 'unverified',
         ariaLabel: 'Signed, but cannot verify locally',
-        color: CANNOT_VERIFY_COLOR,
+        color: SIGNATURE_CANNOT_VERIFY_COLOR,
       };
     case 'unsigned':
       return null;

@@ -31,7 +31,7 @@ export function ConfirmDialog({
   const dialogTelemetry = useDialogTelemetry(telemetryId, open);
   const confirmButtonClass =
     variant === 'danger'
-      ? 'bg-[var(--vscode-errorForeground)] text-white hover:opacity-90'
+      ? 'bg-[var(--vscode-errorForeground)] text-[var(--vscode-editor-background)] hover:opacity-90'
       : 'bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]';
 
   return (

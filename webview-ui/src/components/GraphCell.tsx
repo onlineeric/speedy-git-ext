@@ -3,6 +3,7 @@ import type { Commit } from '@shared/types';
 import { type GraphTopology, getPassingLanes, connectionContinuationLane } from '../utils/graphTopology';
 import { getColor, resolvePalette } from '../utils/colorUtils';
 import { curveIntoNodePath, curveOutOfNodePath } from '../utils/graphPaths';
+import { NEUTRAL_COLOR, UNCOMMITTED_COLOR } from '../utils/themeColors';
 
 interface GraphCellProps {
   commit: Commit;
@@ -44,7 +45,12 @@ export const GraphCell = memo(function GraphCell({
   if (!node) {
     return (
       <svg width={width} height={height} className="relative z-[1] flex-shrink-0">
-        <circle cx={LANE_WIDTH / 2} cy={height / 2} r={isHeadCommit ? HEAD_NODE_RADIUS : NODE_RADIUS} fill="#888" />
+        <circle
+          cx={LANE_WIDTH / 2}
+          cy={height / 2}
+          r={isHeadCommit ? HEAD_NODE_RADIUS : NODE_RADIUS}
+          style={{ fill: NEUTRAL_COLOR }}
+        />
       </svg>
     );
   }
@@ -55,7 +61,6 @@ export const GraphCell = memo(function GraphCell({
   const color = getColor(node.colorIndex, palette);
   const hasMerge = commit.parents.length > 1;
   const isUncommitted = commit.refs.some(r => r.type === 'uncommitted');
-  const uncommittedColor = '#E8A317'; // amber accent distinct from lane colors
 
   // Get lanes that pass through this row
   const passingLanes = getPassingLanes(index, commits, topology);
@@ -132,7 +137,7 @@ export const GraphCell = memo(function GraphCell({
       {node.parentConnections.map((conn, idx) => {
         const fromX = getLaneX(conn.fromLane);
         const toX = getLaneX(conn.toLane);
-        const connColor = isUncommitted ? uncommittedColor : getColor(conn.colorIndex, palette);
+        const connColor = isUncommitted ? UNCOMMITTED_COLOR : getColor(conn.colorIndex, palette);
         const dottedProps = (conn.isDotted || isUncommitted) ? { strokeDasharray: '4 3', opacity: isUncommitted ? 0.9 : 0.7 } : {};
         const tooltip = conn.isDotted && conn.hiddenCount
           ? <title>{conn.hiddenCount} hidden commit{conn.hiddenCount !== 1 ? 's' : ''}</title>
@@ -141,14 +146,13 @@ export const GraphCell = memo(function GraphCell({
         if (conn.fromLane === conn.toLane) {
           // Same lane - straight line down
           return (
-            <g key={`parent-${idx}`}>
+            <g key={`parent-${idx}`} style={{ stroke: connColor }}>
               {tooltip}
               <line
                 x1={fromX}
                 y1={nodeY + nodeRadius}
                 x2={toX}
                 y2={height}
-                stroke={connColor}
                 strokeWidth={2}
                 {...dottedProps}
               />
@@ -159,14 +163,13 @@ export const GraphCell = memo(function GraphCell({
             // Branch-style connection: keep child row straight and let the parent row
             // render the split curve via incomingConnections (matches Git Graph style).
             return (
-              <g key={`parent-${idx}`}>
+              <g key={`parent-${idx}`} style={{ stroke: connColor }}>
                 {tooltip}
                 <line
                   x1={fromX}
                   y1={nodeY + nodeRadius}
                   x2={fromX}
                   y2={height}
-                  stroke={connColor}
                   strokeWidth={2}
                   {...dottedProps}
                 />
@@ -176,11 +179,10 @@ export const GraphCell = memo(function GraphCell({
 
           // Different lane - rounded elbow from the node's side down into the target lane
           return (
-            <g key={`parent-${idx}`}>
+            <g key={`parent-${idx}`} style={{ stroke: connColor }}>
               {tooltip}
               <path
                 d={curveOutOfNodePath(fromX, toX, nodeY, height, nodeRadius)}
-                stroke={connColor}
                 strokeWidth={2}
                 fill="none"
                 {...dottedProps}
@@ -196,7 +198,7 @@ export const GraphCell = memo(function GraphCell({
         cy={nodeY}
         r={nodeRadius}
         fill={isUncommitted ? 'transparent' : hasMerge ? 'transparent' : color}
-        stroke={isUncommitted ? uncommittedColor : color}
+        style={{ stroke: isUncommitted ? UNCOMMITTED_COLOR : color }}
         strokeWidth={2}
         {...(isUncommitted ? { strokeDasharray: '3 2' } : {})}
         className={onNodeMouseEnter ? 'cursor-pointer' : undefined}

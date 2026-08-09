@@ -126,6 +126,7 @@ These exist because the rule they encode is subtle or shared across several call
 - `utils/branchSelection.ts` — `getBranchKey` (bare name vs `remote/name`) + additive select-all-local
 - `utils/resolveDefaultRemote.ts` — pick `origin` else first-alpha remote
 - `stores/graphSelectors.ts` — derived store reads (`useOperationInProgress`, `useCurrentLocalBranch`), one selector each so callers can't disagree on the derivation
+- `utils/themeColors.ts` — **the one place webview colors are defined.** Semantic names (`ADDED_COLOR`, `WARNING_COLOR`, `ACCENT_COLOR`, `UNCOMMITTED_COLOR`…) over `var(--vscode-*)` tokens, plus `tint()` for the faint chip/badge fill. Exports two forms because Tailwind's JIT only emits classes it can see spelled out: `*_COLOR` values for inline `style` (the default), `*ClassName` strings for the few call sites needing a hover state
 - `shared/types.ts` — cross-boundary setting clamps: `clampBatchCommitSize`, and `clampAvatarRefreshDays` (takes the input's raw string or a number; empty box means "keep current", not zero). A setting clamped on both sides belongs here, never once per side
 
 ### Avatars — Cache and Background Refresh
@@ -164,18 +165,23 @@ picked. A hardcoded color (`text-sky-400`, `bg-gray-900/40`, `#E8A317`) stays fi
 around it changes, so it looks correct in whichever theme it was written against and wrong in the
 others — unreadable on light themes, off-brand on high-contrast ones.
 
-- **Buttons**: use `buttonPrimaryClassName` / `buttonSecondaryClassName` from
-  `components/dialogStyles.ts`. VS Code defines exactly these two variants
-  (`--vscode-button-*` and `--vscode-button-secondary*`). One primary per dialog for the confirming
-  action; secondary for everything else. **Never style a clickable control with no background** —
-  it reads as a label until hovered.
-- **Semantic colors**: prefer the token that means the thing — `--vscode-gitDecoration-addedResourceForeground`,
-  `--vscode-editorWarning-foreground`, `--vscode-errorForeground`, `--vscode-charts-*` — over a
-  Tailwind palette color that merely looks right in the current theme.
-- **Legitimate exceptions**, which must stay deliberate and commented: user-configured graph lane
-  colors (`speedyGit.graphColors`), and `bg-black/50` dialog overlays (a scrim is theme-independent).
+- **Semantic colors**: take them from `utils/themeColors.ts` rather than writing a token inline —
+  it names the *meaning* (added, deleted, warning, accent) so call sites don't each pick a different
+  token for the same idea. Add a constant there when you need a meaning it doesn't cover yet.
+- **Buttons**: use `buttonPrimaryClassName` / `buttonSecondaryClassName` / `buttonDangerClassName`
+  from `components/dialogStyles.ts`. VS Code defines only the first two variants
+  (`--vscode-button-*` and `--vscode-button-secondary*`); danger is built from `errorForeground` for
+  destructive confirming actions. One primary or danger per dialog; secondary for everything else.
+  **Never style a clickable control with no background** — it reads as a label until hovered.
+- **Legitimate exceptions**, which must stay deliberate and commented: colors that have to contrast
+  against a *user-configured* value rather than the theme — the graph lane palette
+  (`speedyGit.graphColors`), `colorUtils.ts`'s luminance-picked label color, `worktreeBadgeStyle.ts`'s
+  border, `gravatar.ts`'s generated `hsl()` and the white initials on it — plus shadows and
+  `bg-black/50` dialog scrims, which are theme-independent by nature.
 
-Search for `-[0-9]{2,3}` Tailwind color suffixes and raw hex before finishing UI work.
+`utils/__tests__/themeColors.test.ts` enforces both halves of this rule over the whole webview and
+carries the exception list; it fails on any new Tailwind palette class or raw hex. It cannot catch
+"a token, but the wrong one" — check that on a light theme.
 
 Menu/dialog composition:
 

@@ -4,6 +4,14 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.9.1] - pre-release - 2026-08-09
+
+### Changed
+- **The graph now takes all of its colors from your VS Code theme.** Around fifty colors across the webview were fixed values chosen against a dark theme rather than theme colors, so they stayed put while everything around them changed with the theme — washed out on light themes and off-brand on high-contrast ones. The file status letters (A/M/D/R/C/U) and their chips, the `+`/`−` line counts, the stage, discard and unstage icons, the list/tree toggle, the signature status labels, the force-push warning, the worktree "current" badge, the compare panel's error text and B/T badges, the `+N` overflow badge, the active toolbar buttons and the uncommitted row and its graph node are now drawn with the colors your theme defines. Git file status in particular now uses VS Code's own source-control colors, so a file marked modified here matches the same file in the Explorer.
+- **Destructive buttons are readable on dark themes.** Delete branch, delete tag, remove worktree, drop commit, discard and force push all put white text on the theme's error color, which on dark themes is a light salmon — close to unreadable. They now use the editor background for the label, which is dark on dark themes and light on light ones.
+- **The "Verified" and "Bad Signature" labels now match the tick and cross in the signature column.** They were separately chosen greens and reds, so the label and the glyph beside it could read as two different states.
+- **Force push is now styled as the destructive action it is**, matching the other destructive confirmations, instead of having a one-off amber button.
+
 ## [5.9.0] - pre-release - 2026-08-08
 
 ### Added

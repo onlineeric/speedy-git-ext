@@ -4,6 +4,16 @@ import { CopyIcon, CopiedIcon, FileIcon, FileCodeIcon, StageIcon, UnstageIcon, D
 import { rpcClient } from '../rpc/rpcClient';
 import { useCopyFeedback } from '../hooks/useCopyFeedback';
 import { useGraphStore } from '../stores/graphStore';
+import {
+  ACCENT_COLOR,
+  ADDED_COLOR,
+  DELETED_COLOR,
+  MODIFIED_COLOR,
+  NEUTRAL_COLOR,
+  RENAMED_COLOR,
+  UNTRACKED_COLOR,
+  tint,
+} from '../utils/themeColors';
 
 export function shouldShowChangeCounts(file: FileChange): boolean {
   if (file.status === 'added' || file.status === 'deleted') return false;
@@ -15,23 +25,23 @@ export function shouldShowChangeCounts(file: FileChange): boolean {
 export function getStatusConfig(status: FileChange['status']): {
   letter: string;
   label: string;
-  className: string;
+  color: string;
 } {
   switch (status) {
     case 'added':
-      return { letter: 'A', label: 'Added', className: 'text-green-400 bg-green-900/40' };
+      return { letter: 'A', label: 'Added', color: ADDED_COLOR };
     case 'modified':
-      return { letter: 'M', label: 'Modified', className: 'text-blue-400 bg-blue-900/40' };
+      return { letter: 'M', label: 'Modified', color: MODIFIED_COLOR };
     case 'deleted':
-      return { letter: 'D', label: 'Deleted', className: 'text-red-400 bg-red-900/40' };
+      return { letter: 'D', label: 'Deleted', color: DELETED_COLOR };
     case 'renamed':
-      return { letter: 'R', label: 'Renamed', className: 'text-yellow-400 bg-yellow-900/40' };
+      return { letter: 'R', label: 'Renamed', color: RENAMED_COLOR };
     case 'copied':
-      return { letter: 'C', label: 'Copied', className: 'text-purple-400 bg-purple-900/40' };
+      return { letter: 'C', label: 'Copied', color: RENAMED_COLOR };
     case 'untracked':
-      return { letter: 'U', label: 'Untracked', className: 'text-gray-400 bg-gray-900/40' };
+      return { letter: 'U', label: 'Untracked', color: UNTRACKED_COLOR };
     default:
-      return { letter: '?', label: 'Unknown', className: 'text-gray-400 bg-gray-900/40' };
+      return { letter: '?', label: 'Unknown', color: NEUTRAL_COLOR };
   }
 }
 
@@ -39,7 +49,8 @@ export function FileStatusBadge({ status }: { status: FileChange['status'] }) {
   const config = getStatusConfig(status);
   return (
     <span
-      className={`flex h-4 w-4 items-center justify-center rounded text-[10px] font-bold ${config.className}`}
+      className="flex h-4 w-4 items-center justify-center rounded text-[10px] font-bold"
+      style={{ color: config.color, backgroundColor: tint(config.color) }}
       title={config.label}
     >
       {config.letter}
@@ -53,10 +64,10 @@ export function FileChangeIndicators({ file }: { file: FileChange }) {
   return (
     <>
       {showCounts && file.additions !== undefined && file.additions > 0 && (
-        <span className="text-green-400">+{file.additions}</span>
+        <span style={{ color: ADDED_COLOR }}>+{file.additions}</span>
       )}
       {showCounts && file.deletions !== undefined && file.deletions > 0 && (
-        <span className="text-red-400">-{file.deletions}</span>
+        <span style={{ color: DELETED_COLOR }}>-{file.deletions}</span>
       )}
     </>
   );
@@ -74,14 +85,16 @@ export function ViewModeToggle() {
   return (
     <span className="flex items-center gap-0.5">
       <button
-        className={`rounded p-0.5 ${fileViewMode === 'list' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
+        className="rounded p-0.5 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+        style={{ color: fileViewMode === 'list' ? ACCENT_COLOR : NEUTRAL_COLOR }}
         onClick={() => handleSetFileViewMode('list')}
         title="List view"
       >
         <ListViewIcon size={16} />
       </button>
       <button
-        className={`rounded p-0.5 ${fileViewMode === 'tree' ? 'text-yellow-400' : 'text-[var(--vscode-descriptionForeground)]'} hover:bg-[var(--vscode-toolbar-hoverBackground)]`}
+        className="rounded p-0.5 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+        style={{ color: fileViewMode === 'tree' ? ACCENT_COLOR : NEUTRAL_COLOR }}
         onClick={() => handleSetFileViewMode('tree')}
         title="Tree view"
       >
@@ -204,7 +217,8 @@ export function FileActionIcons({
           {file.stageState === 'unstaged' && (
             <>
               <button
-                className="rounded p-0.5 text-green-400 hover:text-green-300 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+                className="rounded p-0.5 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+                style={{ color: ADDED_COLOR }}
                 onClick={handleStage}
                 title="Stage file"
               >
@@ -212,7 +226,8 @@ export function FileActionIcons({
               </button>
               {onDiscardClick && (
                 <button
-                  className="rounded p-0.5 text-red-400 hover:text-red-300 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+                  className="rounded p-0.5 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+                  style={{ color: DELETED_COLOR }}
                   onClick={handleDiscard}
                   title="Discard changes"
                 >
@@ -223,7 +238,8 @@ export function FileActionIcons({
           )}
           {file.stageState === 'staged' && (
             <button
-              className="rounded p-0.5 text-yellow-400 hover:text-yellow-300 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+              className="rounded p-0.5 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+              style={{ color: MODIFIED_COLOR }}
               onClick={handleUnstage}
               title="Unstage file"
             >

@@ -1,7 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { buildDropCommitCommand } from '../utils/gitCommandBuilder';
 import { CommandPreview } from './CommandPreview';
-import { dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import { buttonDangerClassName, dialogContentClassName, dialogContentStyle } from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface DropCommitDialogProps {
@@ -63,7 +63,7 @@ export function DropCommitDialog({
                 dialogTelemetry.confirmed();
                 onConfirm();
               }}
-              className="rounded bg-[var(--vscode-errorForeground)] px-3 py-1.5 text-sm text-white hover:opacity-90"
+              className={buttonDangerClassName}
             >
               Drop Commit
             </button>

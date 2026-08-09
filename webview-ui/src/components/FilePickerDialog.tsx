@@ -483,7 +483,7 @@ function FilePickerDialogInner({
                   onClick={handleActionButton}
                   className={`rounded px-3 py-1.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed ${
                     selectedRadio === 'discard'
-                      ? 'bg-[var(--vscode-errorForeground)] text-white hover:opacity-90'
+                      ? 'bg-[var(--vscode-errorForeground)] text-[var(--vscode-editor-background)] hover:opacity-90'
                       : 'bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]'
                   }`}
                 >

@@ -20,6 +20,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { CommitTableColumnId } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
+import { accentTextClassName } from '../utils/themeColors';
 import {
   COMMIT_TABLE_DEFAULT_WIDTHS,
   getOptionalCommitTableColumnIds,
@@ -115,7 +116,7 @@ export function ViewSettingsDialog() {
   };
 
   const triggerColor = open
-    ? 'text-sky-400 opacity-100'
+    ? `${accentTextClassName} opacity-100`
     : 'text-[var(--vscode-icon-foreground)] opacity-70 hover:opacity-100';
 
   return (
