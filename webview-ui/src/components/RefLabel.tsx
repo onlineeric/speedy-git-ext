@@ -4,7 +4,7 @@ import type { DisplayRef } from '../types/displayRefs';
 import { formatDate } from '../utils/formatDate';
 import { getRefStyle } from '../utils/refStyle';
 import { worktreeBadgeBorderColor } from '../utils/worktreeBadgeStyle';
-import { BranchIcon, TagIcon, WorktreeIcon } from './icons';
+import { BranchIcon, CloudIcon, TagIcon, WorktreeIcon } from './icons';
 
 interface RefLabelProps extends React.HTMLAttributes<HTMLSpanElement> {
   displayRef: DisplayRef;
@@ -22,6 +22,7 @@ export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
     const title = getRefTitle(displayRef, worktree, tagMeta);
     const icon = getRefIcon(displayRef);
     const showWorktreeIcon = !!worktree && (displayRef.type === 'local-branch' || displayRef.type === 'merged-branch');
+    const showRemoteIcon = displayRef.type === 'merged-branch';
 
     const fallbackColor = !laneColorStyle ? ' border-[var(--vscode-badge-background)] text-[var(--vscode-badge-foreground)]' : '';
     const badgeStyle = laneColorStyle ? { ...style, ...laneColorStyle } : style;
@@ -40,6 +41,7 @@ export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
       >
         {icon}
         {label}
+        {showRemoteIcon && <CloudIcon className="ml-0.5 h-3 w-3 shrink-0" />}
         {showWorktreeIcon && <WorktreeIcon className="ml-0.5 h-3 w-3 shrink-0" />}
       </span>
     );
@@ -52,13 +54,8 @@ function getRefLabel(displayRef: DisplayRef): string {
       return displayRef.localName;
     case 'remote-branch':
       return displayRef.remoteName;
-    case 'merged-branch': {
-      const remoteHosts = displayRef.remoteNames.map((r) => {
-        const slashIdx = r.indexOf('/');
-        return slashIdx >= 0 ? r.slice(0, slashIdx) : r;
-      });
-      return `${displayRef.localName} \u21c4 ${remoteHosts.join(', ')}`;
-    }
+    case 'merged-branch':
+      return displayRef.localName;
     case 'tag':
       return displayRef.tagName;
     case 'stash':
