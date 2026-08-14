@@ -47,6 +47,12 @@ export class WebviewProvider {
   private readonly avatarAuth: GitHubAuthService;
   private readonly avatarService: GitHubAvatarService;
   private readonly avatarQueue: AvatarRefreshQueue;
+  /**
+   * Whether avatar lookups were authorized as of the last auth change. The
+   * tracked rate limit belongs to whichever identity spent it, so a flip in
+   * either direction invalidates it — see {@link onAvatarAuthChanged}.
+   */
+  private avatarAuthorized = false;
   private getSettingsHandler: (() => UserSettings) | undefined;
   private submoduleHandlers: SubmoduleNavigationHandlers | undefined;
   private onSwitchRepo: ((repoPath: string) => void) | undefined;
@@ -109,6 +115,7 @@ export class WebviewProvider {
       // only — never the email, hash, repo or GitHub's response.
       onLookupFailed: () => this.telemetry.sendError('avatarService', 'COMMAND_FAILED'),
     });
+    this.avatarAuthorized = this.avatarAuth.isOptedIn();
     void this.avatarAuth.initialize();
 
     this.dataLoader = new RepoDataLoader({
@@ -250,15 +257,28 @@ export class WebviewProvider {
    * email that failed while unauthenticated is worth retrying now rather than
    * after the refresh window.
    *
-   * Only on `granted`. Restoring the session at startup, or an unrelated GitHub
-   * session event, reports `refreshed` — the cached answers were obtained under
-   * the very same authorization, so re-opening them there would discard the
-   * whole negative cache on every window reload and re-spend the API budget.
+   * Re-opening cached answers happens only on `granted`. Restoring the session
+   * at startup, or an unrelated GitHub session event, reports `refreshed` — the
+   * cached answers were obtained under the very same authorization, so
+   * re-opening them there would discard the whole negative cache on every window
+   * reload and re-spend the API budget.
+   *
+   * Dropping the tracked rate limit is the wider case: it belongs to whoever
+   * spent it, so any flip of the authorized state invalidates it — including
+   * "Remove token" and a session revoked from the Accounts menu, both of which
+   * arrive as `refreshed`.
    */
   private onAvatarAuthChanged(change: AvatarAuthChange): void {
-    const granted = change === 'granted' && this.avatarAuth.isOptedIn();
+    const authorized = this.avatarAuth.isOptedIn();
+    const granted = change === 'granted' && authorized;
+    // Removing the token, or a session revoked from the Accounts menu, swaps the
+    // identity back the other way — the budget we tracked for the account is
+    // just as meaningless then, and leaving it in place would park lookups on
+    // that account's reset time while the unauthenticated budget sits unused.
+    const identityChanged = authorized !== this.avatarAuthorized;
+    this.avatarAuthorized = authorized;
 
-    if (granted) {
+    if (granted || identityChanged) {
       // The pause we may be sitting in was measured against the unauthenticated
       // 60/hr budget shared by everyone behind this IP; the user now has their
       // own 5000/hr one. Dropping it before announcing the new state is what

@@ -206,4 +206,24 @@ describe('GitHubAvatarService rate-limit tracking', () => {
     expect(service.getRateLimit().resetAt).toBeNull();
     fetchSpy.mockRestore();
   });
+
+  it('ignores headers from a request that was in flight when the budget was reset', async () => {
+    const service = new GitHubAvatarService();
+    const resetSeconds = Math.floor(Date.now() / 1000) + 3600;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      // The user authorizes while this unauthenticated request is on the wire.
+      service.resetRateLimit();
+      return new Response('', {
+        status: 403,
+        headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': String(resetSeconds) },
+      });
+    });
+
+    await service.lookupCommitAuthorAvatar({ owner: 'o', repo: 'r', hash: 'h' }, null);
+
+    // The spent anonymous budget must not be written back over the fresh one.
+    expect(service.isRateLimited(Date.now())).toBe(false);
+    expect(service.getRateLimit().resetAt).toBeNull();
+    fetchSpy.mockRestore();
+  });
 });

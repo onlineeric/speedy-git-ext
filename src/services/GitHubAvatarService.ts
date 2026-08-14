@@ -12,8 +12,14 @@ export interface RateLimitState {
  * What we know about the budget before GitHub has told us anything: the
  * unauthenticated hourly allowance, with no reset time — `isRateLimited`
  * requires a reset time, so this state never pauses the queue.
+ *
+ * A factory rather than a shared constant: the returned object becomes the
+ * instance's live state, and one shared object would be handed out by
+ * `getRateLimit` to every caller of every instance.
  */
-const UNKNOWN_RATE_LIMIT: RateLimitState = { remaining: 60, resetAt: null };
+function unknownRateLimit(): RateLimitState {
+  return { remaining: 60, resetAt: null };
+}
 
 /**
  * One-shot GitHub avatar lookups.
@@ -25,7 +31,14 @@ const UNKNOWN_RATE_LIMIT: RateLimitState = { remaining: 60, resetAt: null };
  * switch.
  */
 export class GitHubAvatarService {
-  private rateLimit: RateLimitState = UNKNOWN_RATE_LIMIT;
+  private rateLimit: RateLimitState = unknownRateLimit();
+
+  /**
+   * Which identity the tracked budget belongs to. Bumped on every reset so a
+   * reply to a request that was already in flight under the previous identity
+   * cannot write that identity's spent budget back over the fresh one.
+   */
+  private rateLimitIdentity = 0;
 
   /**
    * Parse a git remote URL to extract GitHub owner and repo.
@@ -73,7 +86,8 @@ export class GitHubAvatarService {
    * The next response re-establishes the real numbers from GitHub's headers.
    */
   resetRateLimit(): void {
-    this.rateLimit = UNKNOWN_RATE_LIMIT;
+    this.rateLimitIdentity++;
+    this.rateLimit = unknownRateLimit();
   }
 
   /**
@@ -99,6 +113,10 @@ export class GitHubAvatarService {
     recipe: { owner: string; repo: string; hash: string },
     token: string | null,
   ): Promise<AvatarLookupOutcome> {
+    // Captured before the request so the reply can be matched against the
+    // identity that made it — see `rateLimitIdentity`.
+    const identity = this.rateLimitIdentity;
+
     try {
       const headers: Record<string, string> = {
         Accept: 'application/vnd.github.v3+json',
@@ -113,7 +131,7 @@ export class GitHubAvatarService {
         { headers },
       );
 
-      this.recordRateLimitHeaders(response);
+      this.recordRateLimitHeaders(response, identity);
 
       if (response.status === 403 || response.status === 429) {
         return { kind: 'rateLimited', resetAt: this.rateLimit.resetAt };
@@ -142,7 +160,12 @@ export class GitHubAvatarService {
     }
   }
 
-  private recordRateLimitHeaders(response: Response): void {
+  private recordRateLimitHeaders(response: Response, identity: number): void {
+    // The budget was reset while this request was in flight, so these headers
+    // describe an identity we no longer use — writing them back would park the
+    // queue on the very limit the reset just discarded.
+    if (identity !== this.rateLimitIdentity) return;
+
     const remaining = response.headers.get('x-ratelimit-remaining');
     const resetAt = response.headers.get('x-ratelimit-reset');
 
