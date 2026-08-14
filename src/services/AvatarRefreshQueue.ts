@@ -58,6 +58,8 @@ export class AvatarRefreshQueue {
   private disposed = false;
   /** Whether the webview was last told the queue is paused on the rate limit. */
   private rateLimitAnnounced = false;
+  /** Ends the current rate-limit pause early; null when not paused. */
+  private wakeFromPause: (() => void) | null = null;
 
   /** Results waiting to be posted as one batch. */
   private pendingResults: AvatarUrlMap = {};
@@ -127,7 +129,7 @@ export class AvatarRefreshQueue {
           const waitMs = resetAt !== null ? Math.max(0, resetAt - now) : 60_000;
           this.deps.log.debug(`Avatar refresh paused for ${Math.round(waitMs / 1000)}s (GitHub rate limit)`);
           this.announceRateLimit(true);
-          await this.delay(waitMs);
+          await this.pause(waitMs);
           continue;
         }
 
@@ -242,6 +244,25 @@ export class AvatarRefreshQueue {
     this.deps.onRateLimitChanged();
   }
 
+  /**
+   * Abandon a pause whose rate limit no longer applies — authorizing replaces
+   * the shared unauthenticated budget with the user's own, so the reset time we
+   * are sleeping on became meaningless. Without this the queue would stay asleep
+   * (and the webview would keep showing "limit reached") until a reset that no
+   * longer governs anything.
+   *
+   * The caller must clear the tracked budget first, or the loop pauses again on
+   * the next turn.
+   */
+  resumeAfterRateLimitReset(): void {
+    if (this.disposed) return;
+    this.announceRateLimit(false);
+    this.wakeFromPause?.();
+    // The loop exits when the queue empties, so a pending pause is not the only
+    // reason nothing is running; restarting is a no-op when it already is.
+    void this.run();
+  }
+
   private requeue(task: AvatarLookupTask): void {
     if (this.queued.has(task.email) || this.disposed) return;
     this.queued.add(task.email);
@@ -276,6 +297,23 @@ export class AvatarRefreshQueue {
   }
 
   /**
+   * The rate-limit wait, which is the one delay long enough (up to a full hour)
+   * that it has to be interruptible — see {@link resumeAfterRateLimitReset}.
+   */
+  private pause(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      const finish = () => {
+        clearTimeout(timer);
+        this.wakeFromPause = null;
+        resolve();
+      };
+      const timer = setTimeout(finish, ms);
+      timer.unref?.();
+      this.wakeFromPause = finish;
+    });
+  }
+
+  /**
    * Drop everything waiting, without stopping the queue. Used when the cache is
    * cleared: the queued emails point at records that no longer exist.
    */
@@ -289,6 +327,9 @@ export class AvatarRefreshQueue {
     this.disposed = true;
     this.queue = [];
     this.queued.clear();
+    // Otherwise a queue parked on the rate limit holds its loop open for up to
+    // an hour after the panel is gone.
+    this.wakeFromPause?.();
     if (this.flushTimer !== undefined) {
       clearTimeout(this.flushTimer);
       this.flushTimer = undefined;

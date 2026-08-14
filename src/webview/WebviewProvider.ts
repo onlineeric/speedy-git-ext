@@ -256,8 +256,20 @@ export class WebviewProvider {
    * whole negative cache on every window reload and re-spend the API budget.
    */
   private onAvatarAuthChanged(change: AvatarAuthChange): void {
+    const granted = change === 'granted' && this.avatarAuth.isOptedIn();
+
+    if (granted) {
+      // The pause we may be sitting in was measured against the unauthenticated
+      // 60/hr budget shared by everyone behind this IP; the user now has their
+      // own 5000/hr one. Dropping it before announcing the new state is what
+      // takes the "limit reached" notice down and lets lookups resume now
+      // instead of at a reset time that no longer applies.
+      this.avatarService.resetRateLimit();
+      this.avatarQueue.resumeAfterRateLimitReset();
+    }
+
     this.sendAvatarAuthState();
-    if (change !== 'granted' || !this.avatarAuth.isOptedIn()) return;
+    if (!granted) return;
 
     const reopened = this.avatarCache.reopenUnresolved();
     if (reopened.length > 0) {

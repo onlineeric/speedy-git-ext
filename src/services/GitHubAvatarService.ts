@@ -9,6 +9,13 @@ export interface RateLimitState {
 }
 
 /**
+ * What we know about the budget before GitHub has told us anything: the
+ * unauthenticated hourly allowance, with no reset time — `isRateLimited`
+ * requires a reset time, so this state never pauses the queue.
+ */
+const UNKNOWN_RATE_LIMIT: RateLimitState = { remaining: 60, resetAt: null };
+
+/**
  * One-shot GitHub avatar lookups.
  *
  * Deliberately stateless: the cache lives in `AvatarCacheStore` and the pacing
@@ -18,7 +25,7 @@ export interface RateLimitState {
  * switch.
  */
 export class GitHubAvatarService {
-  private rateLimit: RateLimitState = { remaining: 60, resetAt: null };
+  private rateLimit: RateLimitState = UNKNOWN_RATE_LIMIT;
 
   /**
    * Parse a git remote URL to extract GitHub owner and repo.
@@ -55,6 +62,18 @@ export class GitHubAvatarService {
 
   getRateLimit(): RateLimitState {
     return this.rateLimit;
+  }
+
+  /**
+   * Forget the tracked budget, because it belongs to an identity we no longer
+   * use. Authorizing swaps the 60/hr allowance shared by everyone behind one IP
+   * for the user's own 5000/hr one, so a spent budget and its reset time stop
+   * describing anything real the moment that happens — keeping them would park
+   * lookups for the rest of the hour under a limit that is no longer in force.
+   * The next response re-establishes the real numbers from GitHub's headers.
+   */
+  resetRateLimit(): void {
+    this.rateLimit = UNKNOWN_RATE_LIMIT;
   }
 
   /**

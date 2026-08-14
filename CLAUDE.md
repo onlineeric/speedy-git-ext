@@ -145,6 +145,12 @@ to spend that budget as rarely as possible:
   from `lastRefreshAt + refreshDays` at read time and never stored, so the setting applies
   retroactively. No record is ever permanently written off; a failed or unresolvable email simply
   retries next cycle.
+- **The tracked rate limit belongs to an identity, not to the extension.** Authorizing swaps the
+  60/hr budget shared by everyone behind one IP for the user's own 5000/hr one, so `WebviewProvider`
+  clears it (`GitHubAvatarService.resetRateLimit`) and wakes the parked queue
+  (`AvatarRefreshQueue.resumeAfterRateLimitReset`) on `granted`. Any future path that changes who we
+  authenticate as has to do the same, or the queue sleeps — and the webview keeps showing "limit
+  reached" — until a reset time that no longer governs anything.
 - **A GitHub session is used only after explicit opt-in** (`GitHubAuthService`), never from a
   silently-available session — otherwise "Remove token" would be undone by the next lookup.
 - **Results reach the webview in batches**, never one message per avatar, so a background refresh
