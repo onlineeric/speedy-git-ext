@@ -58,7 +58,7 @@ export class AvatarRefreshQueue {
   private disposed = false;
   /** Whether the webview was last told the queue is paused on the rate limit. */
   private rateLimitAnnounced = false;
-  /** Ends the current rate-limit pause early; null when not paused. */
+  /** Ends the wait the loop is currently in; null when it is not in one. */
   private wakeFromPause: (() => void) | null = null;
 
   /** Results waiting to be posted as one batch. */
@@ -120,7 +120,7 @@ export class AvatarRefreshQueue {
 
     try {
       while (this.queue.length > 0 && !this.disposed) {
-        await this.delay(AVATAR_REFRESH_INTERVAL_MS);
+        await this.wait(AVATAR_REFRESH_INTERVAL_MS);
         if (this.disposed) break;
 
         const now = Date.now();
@@ -129,7 +129,7 @@ export class AvatarRefreshQueue {
           const waitMs = resetAt !== null ? Math.max(0, resetAt - now) : 60_000;
           this.deps.log.debug(`Avatar refresh paused for ${Math.round(waitMs / 1000)}s (GitHub rate limit)`);
           this.announceRateLimit(true);
-          await this.pause(waitMs);
+          await this.wait(waitMs);
           continue;
         }
 
@@ -245,22 +245,22 @@ export class AvatarRefreshQueue {
   }
 
   /**
-   * Abandon a pause whose rate limit no longer applies — authorizing replaces
-   * the shared unauthenticated budget with the user's own, so the reset time we
-   * are sleeping on became meaningless. Without this the queue would stay asleep
-   * (and the webview would keep showing "limit reached") until a reset that no
-   * longer governs anything.
+   * The account we authenticate as changed, so the tracked budget and any pause
+   * measured against it belong to an identity we no longer use — see
+   * {@link GitHubAvatarService.resetRateLimit}. Retiring the budget and waking
+   * the pause are one call because doing them in the other order re-parks the
+   * loop on its next turn, and doing only one of them is never right.
    *
-   * The caller must clear the tracked budget first, or the loop pauses again on
-   * the next turn.
+   * Without this the queue would stay asleep — and the webview would keep
+   * showing "limit reached" — until a reset that no longer governs anything.
    */
-  resumeAfterRateLimitReset(): void {
+  onIdentityChanged(): void {
     if (this.disposed) return;
-    this.announceRateLimit(false);
+    this.deps.avatarService.resetRateLimit();
+    // Set rather than announced: the caller reports the new state itself, and
+    // the loop only clears this flag on a turn a drained queue never takes.
+    this.rateLimitAnnounced = false;
     this.wakeFromPause?.();
-    // The loop exits when the queue empties, so a pending pause is not the only
-    // reason nothing is running; restarting is a no-op when it already is.
-    void this.run();
   }
 
   private requeue(task: AvatarLookupTask): void {
@@ -289,18 +289,14 @@ export class AvatarRefreshQueue {
     }
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => {
-      const timer = setTimeout(resolve, ms);
-      timer.unref?.();
-    });
-  }
-
   /**
-   * The rate-limit wait, which is the one delay long enough (up to a full hour)
-   * that it has to be interruptible — see {@link resumeAfterRateLimitReset}.
+   * Every wait the loop takes, all interruptible. The rate-limit pause is the
+   * one that has to be — it runs up to a full hour, and both
+   * {@link onIdentityChanged} and {@link dispose} need it to end early. Cutting
+   * the 1s pacing tick short on the same signal costs nothing, so the loop needs
+   * only one kind of wait rather than a rule about which one can be woken.
    */
-  private pause(ms: number): Promise<void> {
+  private wait(ms: number): Promise<void> {
     return new Promise((resolve) => {
       const finish = () => {
         clearTimeout(timer);

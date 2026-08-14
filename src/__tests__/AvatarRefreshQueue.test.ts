@@ -14,12 +14,16 @@ function createAvatarServiceStub(resetAt: number) {
   const lookup = vi.fn(
     async (): Promise<AvatarLookupOutcome> => ({ kind: 'found', avatarUrl: 'https://avatars/1.png' }),
   );
+  // Retiring the budget is what un-parks the queue, so the stub models it as the
+  // real service does rather than letting the test flip the flag behind its back.
+  const resetRateLimit = vi.fn(() => { state.limited = false; });
   const service = {
     isRateLimited: () => state.limited,
     getRateLimit: () => ({ remaining: state.limited ? 0 : 60, resetAt: state.limited ? resetAt : null }),
     lookupCommitAuthorAvatar: lookup,
+    resetRateLimit,
   } as unknown as GitHubAvatarService;
-  return { service, state, lookup };
+  return { service, state, lookup, resetRateLimit };
 }
 
 function createQueue(avatarService: GitHubAvatarService) {
@@ -43,7 +47,7 @@ describe('AvatarRefreshQueue rate-limit pause', () => {
 
   it('resumes immediately when the limit it parked on no longer applies', async () => {
     const resetAt = Date.now() + 60 * 60 * 1000;
-    const { service, state, lookup } = createAvatarServiceStub(resetAt);
+    const { service, state, lookup, resetRateLimit } = createAvatarServiceStub(resetAt);
     const { queue, onRateLimitChanged } = createQueue(service);
 
     state.limited = true;
@@ -58,10 +62,12 @@ describe('AvatarRefreshQueue rate-limit pause', () => {
     await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
     expect(lookup).not.toHaveBeenCalled();
 
-    // Authorizing clears the tracked budget and wakes the queue.
-    state.limited = false;
-    queue.resumeAfterRateLimitReset();
-    expect(onRateLimitChanged).toHaveBeenCalledTimes(2);
+    // Authorizing retires the tracked budget and wakes the queue in one call.
+    queue.onIdentityChanged();
+    expect(resetRateLimit).toHaveBeenCalledTimes(1);
+    // The caller reports the new state itself, so the queue stays quiet rather
+    // than making the webview render the same payload twice.
+    expect(onRateLimitChanged).toHaveBeenCalledTimes(1);
 
     await vi.advanceTimersByTimeAsync(1_000);
     expect(lookup).toHaveBeenCalledTimes(1);
@@ -75,7 +81,7 @@ describe('AvatarRefreshQueue rate-limit pause', () => {
 
     queue.enqueue([TASK]);
     await vi.advanceTimersByTimeAsync(1_000);
-    queue.resumeAfterRateLimitReset();
+    queue.onIdentityChanged();
 
     expect(onRateLimitChanged).not.toHaveBeenCalled();
     queue.dispose();

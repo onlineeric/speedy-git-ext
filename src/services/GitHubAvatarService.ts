@@ -1,25 +1,30 @@
-import { AVATAR_RATE_LIMIT_RESERVE, type AvatarLookupOutcome } from './avatarCachePolicy.js';
+import {
+  AVATAR_RATE_LIMIT_RESERVE,
+  AVATAR_UNAUTHENTICATED_HOURLY_LIMIT,
+  type AvatarLookupOutcome,
+} from './avatarCachePolicy.js';
 
-/** Live view of the GitHub API budget, shared by every lookup. */
+/**
+ * Live view of the GitHub API budget, shared by every lookup. Read-only so the
+ * state can only ever be replaced wholesale, never edited under a caller
+ * holding it from `getRateLimit`.
+ */
 export interface RateLimitState {
   /** Requests left in the current window, as last reported by GitHub. */
-  remaining: number;
+  readonly remaining: number;
   /** Unix ms when the window resets, or null when never reported. */
-  resetAt: number | null;
+  readonly resetAt: number | null;
 }
 
 /**
  * What we know about the budget before GitHub has told us anything: the
  * unauthenticated hourly allowance, with no reset time — `isRateLimited`
  * requires a reset time, so this state never pauses the queue.
- *
- * A factory rather than a shared constant: the returned object becomes the
- * instance's live state, and one shared object would be handed out by
- * `getRateLimit` to every caller of every instance.
  */
-function unknownRateLimit(): RateLimitState {
-  return { remaining: 60, resetAt: null };
-}
+const UNKNOWN_RATE_LIMIT: RateLimitState = {
+  remaining: AVATAR_UNAUTHENTICATED_HOURLY_LIMIT,
+  resetAt: null,
+};
 
 /**
  * One-shot GitHub avatar lookups.
@@ -31,14 +36,16 @@ function unknownRateLimit(): RateLimitState {
  * switch.
  */
 export class GitHubAvatarService {
-  private rateLimit: RateLimitState = unknownRateLimit();
+  private rateLimit: RateLimitState = UNKNOWN_RATE_LIMIT;
 
   /**
    * Which identity the tracked budget belongs to. Bumped on every reset so a
    * reply to a request that was already in flight under the previous identity
-   * cannot write that identity's spent budget back over the fresh one.
+   * cannot write that identity's spent budget back over the fresh one. Same
+   * pattern as `RepoDataLoader.repoGeneration`: a private counter guarding one
+   * class's own async writes.
    */
-  private rateLimitIdentity = 0;
+  private rateLimitGeneration = 0;
 
   /**
    * Parse a git remote URL to extract GitHub owner and repo.
@@ -86,8 +93,8 @@ export class GitHubAvatarService {
    * The next response re-establishes the real numbers from GitHub's headers.
    */
   resetRateLimit(): void {
-    this.rateLimitIdentity++;
-    this.rateLimit = unknownRateLimit();
+    this.rateLimitGeneration++;
+    this.rateLimit = UNKNOWN_RATE_LIMIT;
   }
 
   /**
@@ -113,9 +120,7 @@ export class GitHubAvatarService {
     recipe: { owner: string; repo: string; hash: string },
     token: string | null,
   ): Promise<AvatarLookupOutcome> {
-    // Captured before the request so the reply can be matched against the
-    // identity that made it — see `rateLimitIdentity`.
-    const identity = this.rateLimitIdentity;
+    const generation = this.rateLimitGeneration;
 
     try {
       const headers: Record<string, string> = {
@@ -131,7 +136,7 @@ export class GitHubAvatarService {
         { headers },
       );
 
-      this.recordRateLimitHeaders(response, identity);
+      this.recordRateLimitHeaders(response, generation);
 
       if (response.status === 403 || response.status === 429) {
         return { kind: 'rateLimited', resetAt: this.rateLimit.resetAt };
@@ -160,11 +165,11 @@ export class GitHubAvatarService {
     }
   }
 
-  private recordRateLimitHeaders(response: Response, identity: number): void {
+  private recordRateLimitHeaders(response: Response, generation: number): void {
     // The budget was reset while this request was in flight, so these headers
     // describe an identity we no longer use — writing them back would park the
     // queue on the very limit the reset just discarded.
-    if (identity !== this.rateLimitIdentity) return;
+    if (generation !== this.rateLimitGeneration) return;
 
     const remaining = response.headers.get('x-ratelimit-remaining');
     const resetAt = response.headers.get('x-ratelimit-reset');

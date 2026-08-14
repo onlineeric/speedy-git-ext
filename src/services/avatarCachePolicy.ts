@@ -117,6 +117,13 @@ export const AVATAR_CACHE_MAX_ENTRIES = 1000;
  */
 export const AVATAR_RATE_LIMIT_RESERVE = 10;
 
+/**
+ * GitHub's hourly allowance for unauthenticated requests, which is per IP and
+ * so shared with everyone else behind the same network. Assumed until GitHub's
+ * headers say otherwise; authorizing replaces it with the user's own 5000/hr.
+ */
+export const AVATAR_UNAUTHENTICATED_HOURLY_LIMIT = 60;
+
 const MS_PER_DAY = 86_400_000;
 
 /** Days since the Unix epoch. */
