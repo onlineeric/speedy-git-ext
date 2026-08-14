@@ -250,14 +250,22 @@ export class WebviewProvider {
    * email that failed while unauthenticated is worth retrying now rather than
    * after the refresh window.
    *
-   * Only on `granted`. Restoring the session at startup, or an unrelated GitHub
-   * session event, reports `refreshed` — the cached answers were obtained under
-   * the very same authorization, so re-opening them there would discard the
-   * whole negative cache on every window reload and re-spend the API budget.
+   * Re-opening cached answers happens only on `granted`. Restoring the session
+   * at startup, or an unrelated GitHub session event, reports `refreshed` — the
+   * cached answers were obtained under the very same authorization, so
+   * re-opening them there would discard the whole negative cache on every window
+   * reload and re-spend the API budget.
+   *
+   * Retiring the tracked rate limit is the wider case: `revoked` retires it too,
+   * because the budget belongs to whoever spent it and both directions of the
+   * flip leave us spending someone else's. Announcing the new state afterwards
+   * is what takes the "limit reached" notice down.
    */
   private onAvatarAuthChanged(change: AvatarAuthChange): void {
+    if (change !== 'refreshed') this.avatarQueue.onIdentityChanged();
+
     this.sendAvatarAuthState();
-    if (change !== 'granted' || !this.avatarAuth.isOptedIn()) return;
+    if (change !== 'granted') return;
 
     const reopened = this.avatarCache.reopenUnresolved();
     if (reopened.length > 0) {

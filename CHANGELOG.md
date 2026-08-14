@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.9.2] - pre-release - 2026-08-14
+
+### Fixed
+- **Signing in to GitHub now clears a spent avatar lookup limit instead of inheriting it.** Hitting the unauthenticated limit put a "GitHub lookup limit reached — refreshing resumes at …" note in the Avatars section and parked the background refresh until that reset time. Signing in raises the limit from 60 lookups per hour shared across everyone on your network to 5,000 per hour for you alone — but the note stayed up and no avatar was looked up for the rest of the hour, because the extension was still holding the old budget and its reset time. Those belong to the network address, not to your account, so they are now discarded the moment you connect: the note disappears, the paused queue wakes immediately, and avatars start resolving again within about a second rather than at a reset time that no longer applies.
+
 ## [5.9.1] - pre-release - 2026-08-09
 
 ### Changed
