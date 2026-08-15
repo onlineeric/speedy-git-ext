@@ -204,6 +204,7 @@ Menu/dialog composition:
 - `components/dialogStyles.ts` — shared dialog sizing, **the three button variants** (`buttonPrimaryClassName`/`buttonSecondaryClassName`/`buttonDangerClassName`, all composed from one base so shape and disabled behaviour cannot drift) and `dialogSectionLabelClassName` for settings-group captions; every `Dialog.Content` uses it. Never hand-write a button's classes — the variants carry `disabled:` handling that inline copies kept getting wrong
 - `components/ToolbarIconButton.tsx` — `TOGGLE_BUTTON_TONES` (`inactive`/`active`/`attention`), spread onto a toolbar button or a toolbar popover's trigger. Spread, not `className=`: the color is an inline style and only the hover state is a class
 - `components/CompareMenuItems.tsx`, `MenuCopySubmenu.tsx`, `MenuGroupSeparator.tsx`, `MenuSubTrigger.tsx` — shared menu fragments
+- `components/RefBadgeLegend.tsx` + `utils/refBadgeLegend.ts` — the "Badge Legend" section. Needs no props and no dialog context, so any dialog drops it in as `<RefBadgeLegend />`. Samples render through the real `RefLabel` in the graph's own lane-0 color, so the legend explains the badges the graph draws rather than a picture of them; a test asserts every `DisplayRef` type has a row
 - `hooks/useDialogTelemetry.ts` — one confirmed/cancelled outcome per dialog open cycle
 - `hooks/useCopyFeedback.ts` — `copyToClipboard` + short "copied" flash, used by every copy button
 

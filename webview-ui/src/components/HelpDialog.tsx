@@ -3,8 +3,14 @@ import { rpcClient } from '../rpc/rpcClient';
 import { useCopyFeedback } from '../hooks/useCopyFeedback';
 import { trackUiInteraction } from '../utils/telemetry';
 import { HELP_LINKS, ISSUES_URL, VERSION_LABEL, type HelpLinkAction } from '../utils/helpLinks';
-import { buttonSecondaryClassName, dialogContentClassName, dialogContentStyle } from './dialogStyles';
+import {
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+  dialogSectionLabelClassName,
+} from './dialogStyles';
 import { CopiedIcon, CopyIcon } from './icons';
+import { RefBadgeLegend } from './RefBadgeLegend';
 
 interface HelpDialogProps {
   open: boolean;
@@ -39,58 +45,68 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-        <Dialog.Content className={dialogContentClassName} style={dialogContentStyle}>
+        <Dialog.Content
+          className={`${dialogContentClassName} flex max-h-[80vh] flex-col`}
+          style={dialogContentStyle}
+        >
           <Dialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">
             Help &amp; Feedback
           </Dialog.Title>
-          <Dialog.Description className="mt-2 text-sm text-[var(--vscode-descriptionForeground)]">
-            Got a question, a suggestion, a feature request, or found a bug? Please open an issue on
-            GitHub — that is where everything is tracked and answered.
-          </Dialog.Description>
 
-          <div className="mt-3 flex items-center gap-2 rounded bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
-            <code className="flex-1 select-all break-all text-xs text-[var(--vscode-foreground)]">
-              {ISSUES_URL}
-            </code>
-            <button
-              type="button"
-              onClick={handleCopyIssuesUrl}
-              className="p-1 rounded text-[var(--vscode-icon-foreground)] opacity-70 hover:opacity-100 hover:bg-[var(--vscode-toolbar-hoverBackground)] focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]"
-              title={copied ? 'Copied!' : 'Copy link'}
-              aria-label="Copy issues link"
-            >
-              {copied ? (
-                <CopiedIcon className="w-3.5 h-3.5" />
-              ) : (
-                <CopyIcon className="w-3.5 h-3.5" />
-              )}
-            </button>
-          </div>
+          {/* Only the body scrolls, so the version and Close stay reachable however long it grows. */}
+          <div className="mt-4 flex-1 overflow-y-auto">
+            <RefBadgeLegend />
 
-          <div className="mt-4 flex flex-col gap-2">
-            {HELP_LINKS.map((link) => (
+            <h3 className={`${dialogSectionLabelClassName} mt-6`}>Help &amp; Feedback</h3>
+            <Dialog.Description className="text-sm text-[var(--vscode-descriptionForeground)]">
+              Got a question, a suggestion, a feature request, or found a bug? Please open an issue
+              on GitHub — that is where everything is tracked and answered.
+            </Dialog.Description>
+
+            <div className="mt-3 flex items-center gap-2 rounded bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+              <code className="flex-1 select-all break-all text-xs text-[var(--vscode-foreground)]">
+                {ISSUES_URL}
+              </code>
               <button
-                key={link.telemetryAction}
                 type="button"
-                className={linkRowClass}
-                onClick={() => handleOpenLink(link.url, link.telemetryAction)}
+                onClick={handleCopyIssuesUrl}
+                className="p-1 rounded text-[var(--vscode-icon-foreground)] opacity-70 hover:opacity-100 hover:bg-[var(--vscode-toolbar-hoverBackground)] focus:outline-none focus:ring-1 focus:ring-[var(--vscode-focusBorder)]"
+                title={copied ? 'Copied!' : 'Copy link'}
+                aria-label="Copy issues link"
               >
-                <span className="block text-sm text-[var(--vscode-textLink-foreground)]">
-                  {link.label}
-                </span>
-                <span className="block text-xs text-[var(--vscode-descriptionForeground)]">
-                  {link.description}
-                </span>
+                {copied ? (
+                  <CopiedIcon className="w-3.5 h-3.5" />
+                ) : (
+                  <CopyIcon className="w-3.5 h-3.5" />
+                )}
               </button>
-            ))}
+            </div>
+
+            <div className="mt-4 flex flex-col gap-2">
+              {HELP_LINKS.map((link) => (
+                <button
+                  key={link.telemetryAction}
+                  type="button"
+                  className={linkRowClass}
+                  onClick={() => handleOpenLink(link.url, link.telemetryAction)}
+                >
+                  <span className="block text-sm text-[var(--vscode-textLink-foreground)]">
+                    {link.label}
+                  </span>
+                  <span className="block text-xs text-[var(--vscode-descriptionForeground)]">
+                    {link.description}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <p className="mt-4 text-xs text-[var(--vscode-descriptionForeground)]">
+              When reporting a bug, including the version below, your OS, your IDE
+              (VSCode / Cursor / etc), and the steps to reproduce makes it much faster to fix.
+            </p>
           </div>
 
-          <p className="mt-4 text-xs text-[var(--vscode-descriptionForeground)]">
-            When reporting a bug, including the version below, your OS, your IDE
-            (VSCode / Cursor / etc), and the steps to reproduce makes it much faster to fix.
-          </p>
-
-          <div className="mt-4 flex items-center justify-between">
+          <div className="mt-4 flex shrink-0 items-center justify-between">
             <span className="text-xs text-[var(--vscode-descriptionForeground)]">
               {VERSION_LABEL}
             </span>

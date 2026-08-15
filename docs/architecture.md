@@ -172,7 +172,9 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── PushDialog.tsx  RemoteManagementDialog.tsx  StashDialog.tsx
 ├── CreateWorktreeDialog.tsx  RemoveWorktreeDialog.tsx
 ├── DiscardDialog.tsx  DiscardAllDialog.tsx  FilePickerDialog.tsx
-└── HelpDialog.tsx                # "Help & Feedback": GitHub Issues + docs/changelog/marketplace + version
+├── RefBadgeLegend.tsx            # Standalone "Badge Legend" section; samples are real `RefLabel`s in lane-0 color
+│                                 #   so it can't drift from the graph. Needs no props — reusable in a What's New dialog
+└── HelpDialog.tsx                # "Help & Feedback": Badge Legend + GitHub Issues + docs/changelog/marketplace + version
 ```
 
 ### Shared inputs & file views
@@ -245,6 +247,8 @@ utils/
 ├── refStyle.ts                   # Per-ref-kind badge styling
 ├── refBadgeContent.ts            # What a ref badge shows: label, lead icons (fork = local, cloud = remote;
 │                                 #   merged = both), remote count on the cloud, and the title tooltip
+├── refBadgeLegend.ts             # Legend rows explaining the badge vocabulary; a test enforces that every
+│                                 #   DisplayRef type appears, so a new ref kind can't ship unexplained
 ├── themeColors.ts                # Semantic VS Code theme tokens (added/deleted/warning/accent/signature…) + `tint()`; the one place a color meaning is named
 ├── colorUtils.ts                 # Graph color cycling + theme helpers
 ├── formatDate.ts                 # Commit-date formatting
