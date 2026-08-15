@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-08-14**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-08-15**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -99,7 +99,7 @@ components/
 ├── GraphCell.tsx                 # SVG graph rendering (LANE_WIDTH: 16px, 8 cycling colors)
 ├── CommitDetailsPanel.tsx        # Resizable bottom/right panel, commit metadata + file changes
 ├── CommitTooltip.tsx             # Radix popover tooltip for a row: refs, parents, external ref parsing
-├── RefLabel.tsx                  # One ref badge (branch/tag/worktree), styled per ref kind
+├── RefLabel.tsx                  # One ref badge (branch/tag/worktree), styled per ref kind; merged local+remote branch shows a trailing cloud icon (remotes in the tooltip)
 ├── OverflowRefsBadge.tsx         # "+N" popover holding refs that don't fit the row; same menus as inline badges
 ├── DetachedWorktreeBadge.tsx     # Badge for a detached-HEAD worktree row (046)
 ├── SignatureColumnCell.tsx       # Grouped signature glyphs in the optional "Signature" column (047)
