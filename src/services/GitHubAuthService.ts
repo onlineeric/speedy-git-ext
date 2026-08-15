@@ -21,8 +21,13 @@ export type AuthRequestResult = 'granted' | 'declined' | 'failed';
  * unrelated GitHub session event, is `refreshed` — the answers already in the
  * cache were obtained under exactly the same authorization and must be left
  * alone, or every window reload would re-spend the API budget on all of them.
+ *
+ * `granted` and `revoked` are exactly the cases where the opt-in flipped, so
+ * they are also exactly the cases where a tracked rate limit stops describing
+ * the identity we now use. That is reported here, by the only writer of the
+ * opt-in, rather than left for each consumer to spot by diffing a copy of it.
  */
-export type AvatarAuthChange = 'granted' | 'refreshed';
+export type AvatarAuthChange = 'granted' | 'revoked' | 'refreshed';
 
 /**
  * Owns whether Speedy Git may use a GitHub session for avatar lookups.
@@ -90,6 +95,9 @@ export class GitHubAuthService {
         // the UI offers Allow again instead of claiming to be connected.
         this.log.info('GitHub avatar session no longer available; reverting to unauthenticated lookups');
         await this.context.globalState.update(OPT_IN_KEY, false);
+        // Only reached while opted in — both callers check — so this is a flip.
+        this.onStateChanged('revoked');
+        return;
       }
     } catch (error) {
       this.session = null;
@@ -129,9 +137,10 @@ export class GitHubAuthService {
    * actually governs whether Speedy Git authenticates.
    */
   async removeAuthorization(): Promise<void> {
+    const wasOptedIn = this.isOptedIn();
     this.session = null;
     await this.context.globalState.update(OPT_IN_KEY, false);
     this.log.info('GitHub avatar authorization removed; using unauthenticated lookups');
-    this.onStateChanged('refreshed');
+    this.onStateChanged(wasOptedIn ? 'revoked' : 'refreshed');
   }
 }

@@ -58,6 +58,8 @@ export class AvatarRefreshQueue {
   private disposed = false;
   /** Whether the webview was last told the queue is paused on the rate limit. */
   private rateLimitAnnounced = false;
+  /** Ends the wait the loop is currently in; null when it is not in one. */
+  private wakeFromPause: (() => void) | null = null;
 
   /** Results waiting to be posted as one batch. */
   private pendingResults: AvatarUrlMap = {};
@@ -118,7 +120,7 @@ export class AvatarRefreshQueue {
 
     try {
       while (this.queue.length > 0 && !this.disposed) {
-        await this.delay(AVATAR_REFRESH_INTERVAL_MS);
+        await this.wait(AVATAR_REFRESH_INTERVAL_MS);
         if (this.disposed) break;
 
         const now = Date.now();
@@ -127,7 +129,7 @@ export class AvatarRefreshQueue {
           const waitMs = resetAt !== null ? Math.max(0, resetAt - now) : 60_000;
           this.deps.log.debug(`Avatar refresh paused for ${Math.round(waitMs / 1000)}s (GitHub rate limit)`);
           this.announceRateLimit(true);
-          await this.delay(waitMs);
+          await this.wait(waitMs);
           continue;
         }
 
@@ -242,6 +244,25 @@ export class AvatarRefreshQueue {
     this.deps.onRateLimitChanged();
   }
 
+  /**
+   * The account we authenticate as changed, so the tracked budget and any pause
+   * measured against it belong to an identity we no longer use — see
+   * {@link GitHubAvatarService.resetRateLimit}. Retiring the budget and waking
+   * the pause are one call because doing them in the other order re-parks the
+   * loop on its next turn, and doing only one of them is never right.
+   *
+   * Without this the queue would stay asleep — and the webview would keep
+   * showing "limit reached" — until a reset that no longer governs anything.
+   */
+  onIdentityChanged(): void {
+    if (this.disposed) return;
+    this.deps.avatarService.resetRateLimit();
+    // Set rather than announced: the caller reports the new state itself, and
+    // the loop only clears this flag on a turn a drained queue never takes.
+    this.rateLimitAnnounced = false;
+    this.wakeFromPause?.();
+  }
+
   private requeue(task: AvatarLookupTask): void {
     if (this.queued.has(task.email) || this.disposed) return;
     this.queued.add(task.email);
@@ -268,10 +289,23 @@ export class AvatarRefreshQueue {
     }
   }
 
-  private delay(ms: number): Promise<void> {
+  /**
+   * Every wait the loop takes, all interruptible. The rate-limit pause is the
+   * one that has to be — it runs up to a full hour, and both
+   * {@link onIdentityChanged} and {@link dispose} need it to end early. Cutting
+   * the 1s pacing tick short on the same signal costs nothing, so the loop needs
+   * only one kind of wait rather than a rule about which one can be woken.
+   */
+  private wait(ms: number): Promise<void> {
     return new Promise((resolve) => {
-      const timer = setTimeout(resolve, ms);
+      const finish = () => {
+        clearTimeout(timer);
+        this.wakeFromPause = null;
+        resolve();
+      };
+      const timer = setTimeout(finish, ms);
       timer.unref?.();
+      this.wakeFromPause = finish;
     });
   }
 
@@ -289,6 +323,9 @@ export class AvatarRefreshQueue {
     this.disposed = true;
     this.queue = [];
     this.queued.clear();
+    // Otherwise a queue parked on the rate limit holds its loop open for up to
+    // an hour after the panel is gone.
+    this.wakeFromPause?.();
     if (this.flushTimer !== undefined) {
       clearTimeout(this.flushTimer);
       this.flushTimer = undefined;

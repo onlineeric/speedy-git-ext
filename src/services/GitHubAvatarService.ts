@@ -1,12 +1,30 @@
-import { AVATAR_RATE_LIMIT_RESERVE, type AvatarLookupOutcome } from './avatarCachePolicy.js';
+import {
+  AVATAR_RATE_LIMIT_RESERVE,
+  AVATAR_UNAUTHENTICATED_HOURLY_LIMIT,
+  type AvatarLookupOutcome,
+} from './avatarCachePolicy.js';
 
-/** Live view of the GitHub API budget, shared by every lookup. */
+/**
+ * Live view of the GitHub API budget, shared by every lookup. Read-only so the
+ * state can only ever be replaced wholesale, never edited under a caller
+ * holding it from `getRateLimit`.
+ */
 export interface RateLimitState {
   /** Requests left in the current window, as last reported by GitHub. */
-  remaining: number;
+  readonly remaining: number;
   /** Unix ms when the window resets, or null when never reported. */
-  resetAt: number | null;
+  readonly resetAt: number | null;
 }
+
+/**
+ * What we know about the budget before GitHub has told us anything: the
+ * unauthenticated hourly allowance, with no reset time — `isRateLimited`
+ * requires a reset time, so this state never pauses the queue.
+ */
+const UNKNOWN_RATE_LIMIT: RateLimitState = {
+  remaining: AVATAR_UNAUTHENTICATED_HOURLY_LIMIT,
+  resetAt: null,
+};
 
 /**
  * One-shot GitHub avatar lookups.
@@ -18,7 +36,16 @@ export interface RateLimitState {
  * switch.
  */
 export class GitHubAvatarService {
-  private rateLimit: RateLimitState = { remaining: 60, resetAt: null };
+  private rateLimit: RateLimitState = UNKNOWN_RATE_LIMIT;
+
+  /**
+   * Which identity the tracked budget belongs to. Bumped on every reset so a
+   * reply to a request that was already in flight under the previous identity
+   * cannot write that identity's spent budget back over the fresh one. Same
+   * pattern as `RepoDataLoader.repoGeneration`: a private counter guarding one
+   * class's own async writes.
+   */
+  private rateLimitGeneration = 0;
 
   /**
    * Parse a git remote URL to extract GitHub owner and repo.
@@ -58,6 +85,19 @@ export class GitHubAvatarService {
   }
 
   /**
+   * Forget the tracked budget, because it belongs to an identity we no longer
+   * use. Authorizing swaps the 60/hr allowance shared by everyone behind one IP
+   * for the user's own 5000/hr one, so a spent budget and its reset time stop
+   * describing anything real the moment that happens — keeping them would park
+   * lookups for the rest of the hour under a limit that is no longer in force.
+   * The next response re-establishes the real numbers from GitHub's headers.
+   */
+  resetRateLimit(): void {
+    this.rateLimitGeneration++;
+    this.rateLimit = UNKNOWN_RATE_LIMIT;
+  }
+
+  /**
    * Whether the API budget is spent. Stops short of zero so anything else on
    * this machine — or, unauthenticated, anyone else behind the same IP — is not
    * left with nothing.
@@ -80,6 +120,8 @@ export class GitHubAvatarService {
     recipe: { owner: string; repo: string; hash: string },
     token: string | null,
   ): Promise<AvatarLookupOutcome> {
+    const generation = this.rateLimitGeneration;
+
     try {
       const headers: Record<string, string> = {
         Accept: 'application/vnd.github.v3+json',
@@ -94,7 +136,7 @@ export class GitHubAvatarService {
         { headers },
       );
 
-      this.recordRateLimitHeaders(response);
+      this.recordRateLimitHeaders(response, generation);
 
       if (response.status === 403 || response.status === 429) {
         return { kind: 'rateLimited', resetAt: this.rateLimit.resetAt };
@@ -123,7 +165,12 @@ export class GitHubAvatarService {
     }
   }
 
-  private recordRateLimitHeaders(response: Response): void {
+  private recordRateLimitHeaders(response: Response, generation: number): void {
+    // The budget was reset while this request was in flight, so these headers
+    // describe an identity we no longer use — writing them back would park the
+    // queue on the very limit the reset just discarded.
+    if (generation !== this.rateLimitGeneration) return;
+
     const remaining = response.headers.get('x-ratelimit-remaining');
     const resetAt = response.headers.get('x-ratelimit-reset');
 

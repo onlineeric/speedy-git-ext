@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-08-11**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-08-15**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -68,10 +68,10 @@ src/
 │   ├── GitSubmoduleService.ts    # Submodule status, init, update
 │   ├── GitWatcherService.ts      # File system watcher for auto-refresh
 │   ├── GitRepoDiscoveryService.ts # Multi-root workspace scanning
-│   ├── GitHubAvatarService.ts    # Stateless one-shot GitHub avatar lookup + rate-limit tracking
+│   ├── GitHubAvatarService.ts    # Stateless one-shot GitHub avatar lookup + rate-limit tracking (reset on authorization)
 │   ├── avatarCachePolicy.ts      # PURE: avatar expiry, lookup-outcome state machine, queue priority, LRU eviction (bounds/clamp live in shared/types.ts)
 │   ├── AvatarCacheStore.ts       # Persistent email→avatar cache in globalState; debounced writes, LRU cap 1000 (512KB extension-state budget)
-│   ├── AvatarRefreshQueue.ts     # Paced background drain (1/sec), rate-limit pause, batched result posting
+│   ├── AvatarRefreshQueue.ts     # Paced background drain (1/sec), interruptible rate-limit pause, batched result posting
 │   ├── GitHubAuthService.ts      # Explicit opt-in gate for the GitHub session used by avatar lookups
 │   ├── GitConfigService.ts       # Git config reading
 │   └── TelemetryService.ts       # Consent-aware backend telemetry funnel; real + no-op implementations
