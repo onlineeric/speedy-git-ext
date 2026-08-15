@@ -99,7 +99,7 @@ components/
 ├── GraphCell.tsx                 # SVG graph rendering (LANE_WIDTH: 16px, 8 cycling colors)
 ├── CommitDetailsPanel.tsx        # Resizable bottom/right panel, commit metadata + file changes
 ├── CommitTooltip.tsx             # Radix popover tooltip for a row: refs, parents, external ref parsing
-├── RefLabel.tsx                  # One ref badge (branch/tag/worktree), styled per ref kind; merged local+remote branch shows a trailing cloud icon (remotes in the tooltip)
+├── RefLabel.tsx                  # One ref badge (branch/tag/worktree), styled per ref kind; presentation only — content decisions live in `utils/refBadgeContent.ts`
 ├── OverflowRefsBadge.tsx         # "+N" popover holding refs that don't fit the row; same menus as inline badges
 ├── DetachedWorktreeBadge.tsx     # Badge for a detached-HEAD worktree row (046)
 ├── SignatureColumnCell.tsx       # Grouped signature glyphs in the optional "Signature" column (047)
@@ -243,6 +243,8 @@ utils/
 ├── searchFilter.ts               # Client-side search by message, hash, author
 ├── filterUtils.ts                # Author/date filter logic
 ├── refStyle.ts                   # Per-ref-kind badge styling
+├── refBadgeContent.ts            # What a ref badge shows: label, lead icon (fork = local, cloud = remote),
+│                                 #   trailing cloud + remote count for merged branches, and the title tooltip
 ├── themeColors.ts                # Semantic VS Code theme tokens (added/deleted/warning/accent/signature…) + `tint()`; the one place a color meaning is named
 ├── colorUtils.ts                 # Graph color cycling + theme helpers
 ├── formatDate.ts                 # Commit-date formatting
