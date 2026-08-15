@@ -103,6 +103,7 @@ The `src/webview/` subsystem was split out of a former ~2400-line `WebviewProvid
 - `RepoDataLoader` — initial + deferred data, avatars, submodules
 - `PersistedUIStateStore` — UI state + per-repo table layout (column-width healing)
 - `OperationGuard` — in-progress checks (rebase/cherry-pick/revert/merge) → `GitError | null`
+- `WhatsNewStore` — is this the first run on this version (`globalState`, dev mode always shows)
 - `EditorCommandService` — VS Code diff/file/compare editors, worktree folder/reveal
 
 Rules:
@@ -118,8 +119,9 @@ These exist because the rule they encode is subtle or shared across several call
 
 - `utils/refNameField.ts` — live ref-name validation state, error suppressed while the field is pristine. Used by Create Tag/Branch/Worktree/Remote dialogs
 - `utils/commitMenuAvailability.ts` — which commit actions apply (rebase/reset/revert/drop/cherry-pick); shared by the commit row menu and the badge "Commit actions" submenu
+- `utils/refBadgeContent.ts` — a ref badge's label, icons and tooltip. **The two branch glyphs are a system**: the fork means "exists locally", the cloud means "exists on a remote", so a branch that is both leads with the union (`⑂☁ main`) and the scheme is legible without hovering. Both glyphs *lead*, which keeps the cloud on the same side of the name in every badge and leaves the trailing slot to the worktree icon alone. Remote *names* live only in the tooltip; 2+ remotes add a count to the cloud (`⑂☁2 main`), because a badge should spend row width only on what can't be inferred. Adding a cloud that means anything else breaks the encoding
 - `utils/commitRefs.ts` — identify a row by its ref decorations (`findHeadCommit`, `isStashPseudoCommit`); used by topology, the uncommitted node's parent, the tooltip and Go to HEAD
-- `utils/headNavigation.ts` — pure "Go to HEAD" decision logic (scrollTo/loadMore/hiddenByFilter/notInView/unresolved) + its toast messages
+- `utils/headNavigation.ts` — pure "Go to HEAD" decision logic + its toast messages, covering **both halves**: `decideHeadNavigation` for the `locateHead` answer and `decideHeadContinuation` for each follow-up batch (including the attempt cap). Both return the same decision kinds, so `rpcClient` executes them through one function — a rule added to only one half puts the two back out of step
 - `utils/commitReachability.ts` — branch reachability; checkers cached by commit-list identity (WeakMap)
 - `utils/graphPaths.ts` — SVG elbow paths that cross row boundaries perfectly vertically, so per-row SVG cells join without kinks
 - `utils/compareSlot.ts` / `compareDefaults.ts` / `compareDispatch.ts` / `compareMarker.ts` — the Compare panel's slot model, seeding, dispatch and per-row B/T badges
@@ -127,7 +129,7 @@ These exist because the rule they encode is subtle or shared across several call
 - `utils/resolveDefaultRemote.ts` — pick `origin` else first-alpha remote
 - `stores/graphSelectors.ts` — derived store reads (`useOperationInProgress`, `useCurrentLocalBranch`), one selector each so callers can't disagree on the derivation
 - `utils/themeColors.ts` — **the one place a color *meaning* is named.** Semantic constants (`ADDED_COLOR`, `WARNING_COLOR`, `ACCENT_COLOR`, `UNCOMMITTED_COLOR`, `SIGNATURE_*`…) over `var(--vscode-*)` tokens, plus `tint()` for the faint chip/badge fill. They are plain CSS values for inline `style`, never class strings — Tailwind's JIT only emits classes it can see spelled out, so `text-[${SOME_COLOR}]` compiles to a class that never exists. A call site needing a pseudo-state pairs the inline color with a class carrying only the state (`opacity-70 hover:opacity-100`)
-- `shared/types.ts` — cross-boundary setting clamps: `clampBatchCommitSize`, and `clampAvatarRefreshDays` (takes the input's raw string or a number; empty box means "keep current", not zero). A setting clamped on both sides belongs here, never once per side
+- `shared/types.ts` — cross-boundary setting clamps: `clampBatchCommitSize`, and `clampAvatarRefreshDays` (takes the input's raw string or a number; empty box means "keep current", not zero). A setting clamped on both sides belongs here, never once per side. `growBatchForTarget` sits beside them: how large a targeted "Go to HEAD" load may grow, so both rules bounding one batch stay together
 
 ### Avatars — Cache and Background Refresh
 
@@ -144,7 +146,9 @@ to spend that budget as rarely as possible:
 - **All expiry/state decisions live in the pure `services/avatarCachePolicy.ts`** — expiry is derived
   from `lastRefreshAt + refreshDays` at read time and never stored, so the setting applies
   retroactively. No record is ever permanently written off; a failed or unresolvable email simply
-  retries next cycle.
+  retries next cycle. `buildAvatarLookupCandidates` lives there too: which commits a batch offers per
+  author, **oldest sighting first** — GitHub only knows *pushed* commits, and the newest rows are the
+  ones most likely to be local-only, so reversing that order spends the rate limit on 422s.
 - **The tracked rate limit belongs to an identity, not to the extension.** Authorizing swaps the
   60/hr budget shared by everyone behind one IP for the user's own 5000/hr one, so a spent budget and
   its reset time stop describing anything real — removing the token or a revoked session invalidates
@@ -200,9 +204,11 @@ Menu/dialog composition:
 - `components/MenuContent.tsx` — `MenuContent`/`MenuSubContent`, the menu panel shell. Carries the height cap and collision padding that keep a long menu usable in a short window, so a new menu gets them by default. Only the width floor is a prop
 - `components/useCommitMenuItems.tsx` — every commit action as `{ commitItems, compareItems, createItems, worktreeItem, copyItems, dialogs }`. Feeds the commit row menu (`variant: 'row'`) and the Commit/Create groups of ref badge menus (`variant: 'badge'`). Groups are returned separately so callers can interleave their own
 - `components/LazyContextMenu.tsx` — mounts a menu's heavy body only on first right-click; keeps virtualized rows cheap during fast scrolling. Wrap new row menus in it
-- `components/dialogStyles.ts` — shared dialog sizing, **the three button variants** (`buttonPrimaryClassName`/`buttonSecondaryClassName`/`buttonDangerClassName`, all composed from one base so shape and disabled behaviour cannot drift) and `dialogSectionLabelClassName` for settings-group captions; every `Dialog.Content` uses it. Never hand-write a button's classes — the variants carry `disabled:` handling that inline copies kept getting wrong
+- `components/dialogStyles.ts` — shared dialog sizing, **the three button variants** (`buttonPrimaryClassName`/`buttonSecondaryClassName`/`buttonDangerClassName`, all composed from one base so shape and disabled behaviour cannot drift) `dialogSectionLabelClassName` for settings-group captions and `dialogOverlayClassName` for the scrim; every `Dialog.Content` uses `dialogContentClassName` + `dialogContentStyle`, and every `Dialog.Overlay` the overlay constant. Never hand-write a button's classes — the variants carry `disabled:` handling that inline copies kept getting wrong
 - `components/ToolbarIconButton.tsx` — `TOGGLE_BUTTON_TONES` (`inactive`/`active`/`attention`), spread onto a toolbar button or a toolbar popover's trigger. Spread, not `className=`: the color is an inline style and only the hover state is a class
 - `components/CompareMenuItems.tsx`, `MenuCopySubmenu.tsx`, `MenuGroupSeparator.tsx`, `MenuSubTrigger.tsx` — shared menu fragments
+- `components/RefBadgeLegend.tsx` + `utils/refBadgeLegend.ts` — the "Badge Legend" section. Needs no props and no dialog context, so any dialog drops it in as `<RefBadgeLegend />`. Samples render through the real `RefLabel` in the graph's own lane-0 color, so the legend explains the badges the graph draws rather than a picture of them; a test asserts every `DisplayRef` type has a row
+- `components/whatsNewEntries.tsx` — **release notes are added here and nowhere else.** One entry per version, matched by *exact* `package.json` version; a version with no entry shows no dialog, which is how a release opts out. Content is a `ReactNode`, so an entry can embed live UI (5.10.0 embeds `RefBadgeLegend`) rather than describing it. A test asserts the shipping version has an entry — without it, a version-string typo silently means no dialog ever
 - `hooks/useDialogTelemetry.ts` — one confirmed/cancelled outcome per dialog open cycle
 - `hooks/useCopyFeedback.ts` — `copyToClipboard` + short "copied" flash, used by every copy button
 

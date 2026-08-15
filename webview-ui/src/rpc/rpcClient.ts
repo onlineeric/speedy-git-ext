@@ -1,7 +1,13 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
 import type { CherryPickOptions, CompareMode, GraphFilters, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
-import { decideHeadNavigation, HEAD_NAVIGATION_MESSAGES, MAX_GO_TO_HEAD_LOADS, type HeadNavigationDecision } from '../utils/headNavigation';
+import {
+  decideHeadContinuation,
+  decideHeadNavigation,
+  HEAD_NAVIGATION_MESSAGES,
+  type HeadContinuationDecision,
+  type HeadNavigationDecision,
+} from '../utils/headNavigation';
 import { findHeadCommitHash } from '../utils/commitRefs';
 
 /**
@@ -354,6 +360,9 @@ class RpcClient {
         break;
       case 'conflictState':
         store.setConflictState(message.payload);
+        break;
+      case 'whatsNew':
+        store.setWhatsNew(message.payload);
         break;
       case 'initialData':
         store.setInitialData(message.payload);
@@ -789,6 +798,10 @@ class RpcClient {
     this.send({ type: 'openExternal', payload: { url } });
   }
 
+  dismissWhatsNew() {
+    this.send({ type: 'dismissWhatsNew', payload: {} });
+  }
+
   // Pagination
   loadMoreCommits(skip: number, generation: number, filters: { branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string }, targetIndex?: number) {
     this.send({ type: 'loadMoreCommits', payload: { skip, generation, filters, targetIndex } });
@@ -809,8 +822,12 @@ class RpcClient {
     });
   }
 
-  /** Execute the decided next step of a Go to HEAD navigation. */
-  private applyHeadNavigation(decision: HeadNavigationDecision, hash: string | null) {
+  /**
+   * Execute the decided next step of a Go to HEAD navigation — either half of
+   * it: the initial `locateHead` answer and each follow-up batch produce the
+   * same decision kinds, so they share one executor.
+   */
+  private applyHeadNavigation(decision: HeadNavigationDecision | HeadContinuationDecision, hash: string | null) {
     const store = useGraphStore.getState();
     switch (decision.kind) {
       case 'scrollTo':
@@ -871,27 +888,15 @@ class RpcClient {
     const pending = store.pendingHead;
     if (store.goToHeadState !== 'loading' || !pending) return;
 
-    if (store.mergedCommits.some((c) => c.hash === pending.hash)) {
-      if (store.navigateToCommit(pending.hash)) {
-        this.refreshDetailsPanelIfOpen(pending.hash);
-      }
-      return;
-    }
-    if (store.hiddenCommitHashes.has(pending.hash)) {
-      store.resetGoToHead();
-      store.setError(HEAD_NAVIGATION_MESSAGES.hiddenByFilter);
-      return;
-    }
-    if (!store.hasMore || pending.attempts >= MAX_GO_TO_HEAD_LOADS) {
-      store.resetGoToHead();
-      store.setError(HEAD_NAVIGATION_MESSAGES.unreachable);
-      return;
-    }
-
-    store.setPendingHead({ ...pending, attempts: pending.attempts + 1 });
-    // History may have grown since HEAD was located — never request less than
-    // one batch past what is already loaded.
-    this.requestTargetedBatch(Math.max(pending.targetIndex, store.commits.length));
+    const decision = decideHeadContinuation({
+      isDisplayed: store.mergedCommits.some((c) => c.hash === pending.hash),
+      isHiddenClientSide: store.hiddenCommitHashes.has(pending.hash),
+      hasMore: store.hasMore,
+      attempts: pending.attempts,
+      targetIndex: pending.targetIndex,
+      loadedCount: store.commits.length,
+    });
+    this.applyHeadNavigation(decision, pending.hash);
   }
 
   stageFiles(paths: string[]) {

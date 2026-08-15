@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-08-14**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-08-15**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -47,6 +47,7 @@ src/
 │       ├── compareHandlers.ts    # compareRefs/cancelCompare/openCompareDiff (latest-wins by request id)
 │       ├── telemetryHandlers.ts  # Validates one-way webview telemetry against closed catalogs
 │       ├── avatarHandlers.ts      # Avatar auth state, GitHub authorize/remove-token, refreshDays setting, clear cache
+│       ├── updateSpeedyGitSetting.ts # Writes one speedyGit.* setting; ExtensionController broadcasts the change
 │       └── vscodeCommandHandlers.ts # settings, clipboard, openExternal, updatePersistedUIState
 ├── services/                     # All repo-bound; every method returns Result<T, GitError>
 │   ├── index.ts                  # Barrel export for all services
@@ -73,6 +74,8 @@ src/
 │   ├── AvatarCacheStore.ts       # Persistent email→avatar cache in globalState; debounced writes, LRU cap 1000 (512KB extension-state budget)
 │   ├── AvatarRefreshQueue.ts     # Paced background drain (1/sec), interruptible rate-limit pause, batched result posting
 │   ├── GitHubAuthService.ts      # Explicit opt-in gate for the GitHub session used by avatar lookups
+│   ├── WhatsNewStore.ts          # Owns the one fact the webview can't know: is this the first run on this version.
+│   │                             #   Dev mode always shows; globalState records the version only once the user closes it
 │   ├── GitConfigService.ts       # Git config reading
 │   └── TelemetryService.ts       # Consent-aware backend telemetry funnel; real + no-op implementations
 └── utils/
@@ -99,7 +102,7 @@ components/
 ├── GraphCell.tsx                 # SVG graph rendering (LANE_WIDTH: 16px, 8 cycling colors)
 ├── CommitDetailsPanel.tsx        # Resizable bottom/right panel, commit metadata + file changes
 ├── CommitTooltip.tsx             # Radix popover tooltip for a row: refs, parents, external ref parsing
-├── RefLabel.tsx                  # One ref badge (branch/tag/worktree), styled per ref kind
+├── RefLabel.tsx                  # One ref badge (branch/tag/worktree), styled per ref kind; presentation only — content decisions live in `utils/refBadgeContent.ts`
 ├── OverflowRefsBadge.tsx         # "+N" popover holding refs that don't fit the row; same menus as inline badges
 ├── DetachedWorktreeBadge.tsx     # Badge for a detached-HEAD worktree row (046)
 ├── SignatureColumnCell.tsx       # Grouped signature glyphs in the optional "Signature" column (047)
@@ -172,7 +175,12 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── PushDialog.tsx  RemoteManagementDialog.tsx  StashDialog.tsx
 ├── CreateWorktreeDialog.tsx  RemoveWorktreeDialog.tsx
 ├── DiscardDialog.tsx  DiscardAllDialog.tsx  FilePickerDialog.tsx
-└── HelpDialog.tsx                # "Help & Feedback": GitHub Issues + docs/changelog/marketplace + version
+├── RefBadgeLegend.tsx            # Standalone "Badge Legend" section; samples are real `RefLabel`s in lane-0 color
+│                                 #   so it can't drift from the graph. Needs no props — reused by the What's New dialog
+├── WhatsNewDialog.tsx            # First-run release notes; close button counts down before enabling (Esc/outside held too)
+├── whatsNewEntries.tsx           # Per-version release-note content, looked up by exact version. A version with no
+│                                 #   entry shows no dialog — that is how a release opts out
+└── HelpDialog.tsx                # "Help & Feedback": Badge Legend + GitHub Issues + docs/changelog/marketplace + version
 ```
 
 ### Shared inputs & file views
@@ -202,6 +210,7 @@ hooks/
 ├── useTooltipHover.ts            # Tooltip positioning logic
 ├── useCopyFeedback.ts            # copyToClipboard + short "copied" flash, shared by every copy button
 ├── useSignatureColumnLoader.ts   # Async viewport-first signature verification loader (047)
+├── useCountdown.ts               # Deadline-based countdown (survives background throttling); + PURE `remainingSeconds`
 └── useDialogTelemetry.ts         # One confirmed/cancelled outcome per dialog open cycle
 
 types/displayRefs.ts              # Discriminated union for ref-label rendering (local-branch/remote-branch/tag/HEAD/…)
@@ -243,6 +252,10 @@ utils/
 ├── searchFilter.ts               # Client-side search by message, hash, author
 ├── filterUtils.ts                # Author/date filter logic
 ├── refStyle.ts                   # Per-ref-kind badge styling
+├── refBadgeContent.ts            # What a ref badge shows: label, lead icons (fork = local, cloud = remote;
+│                                 #   merged = both), remote count on the cloud, and the title tooltip
+├── refBadgeLegend.ts             # Legend rows explaining the badge vocabulary; a test enforces that every
+│                                 #   DisplayRef type appears, so a new ref kind can't ship unexplained
 ├── themeColors.ts                # Semantic VS Code theme tokens (added/deleted/warning/accent/signature…) + `tint()`; the one place a color meaning is named
 ├── colorUtils.ts                 # Graph color cycling + theme helpers
 ├── formatDate.ts                 # Commit-date formatting
@@ -264,7 +277,9 @@ shared/
 ├── errors.ts                     # Result<T,E> monad, GitError class, GitErrorCode enum
 ├── gitRefValidation.ts           # git check-ref-format validator + tag/branch/remote wrappers — the same rules
 │                                 #   drive live dialog validation (frontend) and creation guards (backend)
-└── telemetry.ts                  # Closed telemetry catalogs, payload types, buckets, runtime validator
+├── telemetry.ts                  # Closed telemetry catalogs, payload types, buckets, runtime validator
+└── whatsNew.ts                   # PURE: whether the release-notes dialog opens on this run + the countdown lengths
+                                  #   (dev always shows, 2s; release shows once per version, 5s)
 
 telemetry.json                    # Machine-readable event manifest for VS Code telemetry inspection
 esbuild.config.mjs                # Production-only telemetry destination injection; empty in dev/test builds

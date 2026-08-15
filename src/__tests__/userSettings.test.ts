@@ -3,10 +3,38 @@ import {
   clampAvatarRefreshDays,
   clampBatchCommitSize,
   DEFAULT_USER_SETTINGS,
+  growBatchForTarget,
   MAX_AVATAR_REFRESH_DAYS,
   MAX_BATCH_COMMIT_SIZE,
   MIN_AVATAR_REFRESH_DAYS,
 } from '../../shared/types.js';
+
+describe('growBatchForTarget', () => {
+  it('uses the plain batch size when no target is given', () => {
+    expect(growBatchForTarget(500, 0, undefined)).toBe(500);
+    expect(growBatchForTarget(500, 1000, undefined)).toBe(500);
+  });
+
+  it('uses the plain batch size when the target is already behind the skip point', () => {
+    expect(growBatchForTarget(500, 1000, 999)).toBe(500);
+  });
+
+  it('rounds a reachable target up to whole batches', () => {
+    expect(growBatchForTarget(500, 0, 0)).toBe(500);
+    expect(growBatchForTarget(500, 0, 499)).toBe(500);
+    expect(growBatchForTarget(500, 0, 500)).toBe(1000);
+    expect(growBatchForTarget(500, 1000, 1200)).toBe(500);
+    expect(growBatchForTarget(500, 1000, 2200)).toBe(1500);
+  });
+
+  it('never returns less than one batch', () => {
+    expect(growBatchForTarget(500, 0, 1)).toBe(500);
+  });
+
+  it('caps the grown batch at the shared ceiling', () => {
+    expect(growBatchForTarget(500, 0, 5_000_000)).toBe(MAX_BATCH_COMMIT_SIZE);
+  });
+});
 
 describe('clampBatchCommitSize', () => {
   it('keeps a value inside the supported range', () => {

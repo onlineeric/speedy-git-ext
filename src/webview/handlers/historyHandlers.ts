@@ -242,10 +242,15 @@ async function postOperationInProgress(
 ): Promise<boolean> {
   const operationError = await context.operationGuard.getOperationInProgressError();
   if (!operationError) return false;
-  // Error only — no `rebaseState: idle`. The guard fires precisely when an operation
-  // is still running, so declaring the rebase idle here would tear down the
-  // conflict-resolution UI the user still needs.
+  // No `rebaseState: idle`. The guard fires precisely when an operation is still
+  // running, so declaring the rebase idle here would tear down the conflict-resolution
+  // UI the user still needs.
   context.postMessage({ type: 'error', payload: { error: operationError } });
+  // The webview flips `loading` on before sending a rebase and every other rebase
+  // response clears it (`rebaseState` does so as a side effect). Refusing with an
+  // error alone would leave that latch stuck on, disabling every menu action and
+  // toolbar button until the next full reload — so the refusal clears it explicitly.
+  context.postMessage({ type: 'loading', payload: { loading: false } });
   return true;
 }
 

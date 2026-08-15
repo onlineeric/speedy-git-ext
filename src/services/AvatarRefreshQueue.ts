@@ -316,6 +316,14 @@ export class AvatarRefreshQueue {
   clear(): void {
     this.queue = [];
     this.queued.clear();
+    // `inFlight` too. The reload that follows a cache clear re-queues every email,
+    // and `enqueue` skips the one whose lookup is mid-flight — but that lookup
+    // answers against the record it read *before* the clear, so it writes the same
+    // URL back and posts nothing (the result is only posted when it changed). The
+    // webview, which just dropped every URL, would then show initials for that one
+    // author until the next reload. Forgetting the in-flight email costs at most one
+    // duplicate lookup in that race and keeps the clear honest.
+    this.inFlight = null;
     this.pendingResults = {};
   }
 

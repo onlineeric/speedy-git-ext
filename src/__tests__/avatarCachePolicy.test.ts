@@ -3,6 +3,7 @@ import {
   AVATAR_CACHE_MAX_ENTRIES,
   applyAvatarLookupOutcome,
   avatarRefreshTier,
+  buildAvatarLookupCandidates,
   compareAvatarRefreshPriority,
   createPendingRecord,
   evictLeastRecentlySeen,
@@ -199,5 +200,49 @@ describe('queue ordering within a single load', () => {
     const today = record({ avatarUrl: null, refreshedOn: 0, seenOn: TODAY });
     const yesterday = record({ avatarUrl: null, refreshedOn: 0, seenOn: TODAY - 1 });
     expect(compareAvatarRefreshPriority(today, yesterday)).toBeLessThan(0);
+  });
+});
+
+describe('buildAvatarLookupCandidates', () => {
+  // Commits arrive newest-first, as the graph loads them.
+  const commit = (hash: string, authorEmail: string) => ({ hash, authorEmail });
+
+  it('returns one candidate per author', () => {
+    const candidates = buildAvatarLookupCandidates([
+      commit('c3', 'a@example.com'),
+      commit('c2', 'b@example.com'),
+      commit('c1', 'a@example.com'),
+    ]);
+    expect(candidates.map((c) => c.email)).toEqual(['a@example.com', 'b@example.com']);
+  });
+
+  it('tries the oldest sighting first, because the newest may be unpushed', () => {
+    const [candidate] = buildAvatarLookupCandidates([
+      commit('newest', 'a@example.com'),
+      commit('middle', 'a@example.com'),
+      commit('oldest', 'a@example.com'),
+    ]);
+    expect(candidate.hashes).toEqual(['oldest', 'newest']);
+  });
+
+  it('lists a single hash when the author appears once', () => {
+    const [candidate] = buildAvatarLookupCandidates([commit('only', 'a@example.com')]);
+    expect(candidate.hashes).toEqual(['only']);
+  });
+
+  it('keys by lowercased email so case variants share one lookup', () => {
+    const candidates = buildAvatarLookupCandidates([
+      commit('newest', 'Alice@Example.com'),
+      commit('oldest', 'alice@example.com'),
+    ]);
+    expect(candidates).toEqual([{ email: 'alice@example.com', hashes: ['oldest', 'newest'] }]);
+  });
+
+  it('skips commits with no author email, which cannot key the cache', () => {
+    expect(buildAvatarLookupCandidates([commit('c1', '')])).toEqual([]);
+  });
+
+  it('returns nothing for an empty batch', () => {
+    expect(buildAvatarLookupCandidates([])).toEqual([]);
   });
 });

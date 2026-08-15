@@ -116,7 +116,7 @@ export function AvatarSettingsSection() {
             onKeyDown={(event) => {
               if (event.key === 'Enter') event.currentTarget.blur();
             }}
-            className="w-16 rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-input-background)] px-1.5 py-1 text-right text-[var(--vscode-input-foreground)]"
+            className="w-16 rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] px-1.5 py-1 text-right text-[var(--vscode-input-foreground)] focus:border-[var(--vscode-focusBorder)] focus:outline-none"
             aria-label="Days before an avatar is refreshed"
           />
           <span>days</span>

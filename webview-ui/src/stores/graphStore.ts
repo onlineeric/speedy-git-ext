@@ -308,6 +308,9 @@ interface GraphStore {
   setAuthorListLoading: (loading: boolean) => void;
   setUncommittedChanges: (payload: UncommittedSummary) => void;
   setConflictState: (state: ConflictState) => void;
+  /** Release notes to show, or null once dismissed / when this run doesn't qualify. */
+  whatsNew: { version: string; countdownSeconds: number } | null;
+  setWhatsNew: (payload: { version: string; countdownSeconds: number } | null) => void;
   recomputeVisibility: () => void;
   resetAllFilters: (options?: { preserveBranches?: boolean }) => void;
   setIsRefreshing: (value: boolean) => void;
@@ -1096,6 +1099,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     // Conflict state is primarily delivered via uncommittedChanges payload;
     // this handler is available for standalone conflict state queries
   },
+  whatsNew: null,
+  setWhatsNew: (payload) => set({ whatsNew: payload }),
   recomputeVisibility: () => {
     const { commits, stashes, filters } = get();
     const hiddenCommitHashes = computeHiddenCommitHashes(commits, filters);

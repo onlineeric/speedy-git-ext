@@ -29,7 +29,13 @@ import {
 } from '../utils/commitTableLayout';
 import { trackUiInteraction } from '../utils/telemetry';
 import { AvatarSettingsSection } from './AvatarSettingsSection';
-import { buttonSecondaryClassName, dialogContentClassName, dialogSectionLabelClassName } from './dialogStyles';
+import {
+  buttonSecondaryClassName,
+  dialogContentClassName,
+  dialogContentStyle,
+  dialogOverlayClassName,
+  dialogSectionLabelClassName,
+} from './dialogStyles';
 import { ColumnsIcon } from './icons';
 import { ToolbarIconButton, RemoteButtonToggleItem, TOGGLE_BUTTON_TONES } from './ToolbarIconButton';
 
@@ -128,9 +134,10 @@ export function ViewSettingsDialog() {
         />
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <Dialog.Overlay className={dialogOverlayClassName} />
         <Dialog.Content
-          className={`${dialogContentClassName} flex max-h-[85vh] w-[46rem] max-w-[92vw] flex-col`}
+          className={`${dialogContentClassName} flex max-h-[85vh] flex-col`}
+          style={dialogContentStyle}
         >
           <Dialog.Title className="mb-1 text-base font-semibold text-[var(--vscode-foreground)]">
             View settings

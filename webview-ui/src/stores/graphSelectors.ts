@@ -7,7 +7,9 @@
  * spelled out per component, which let the commit menu and the branch menu
  * disagree about something as basic as "is an operation running right now".
  */
+import type { CSSProperties } from 'react';
 import type { Branch } from '@shared/types';
+import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils';
 import { useGraphStore } from './graphStore';
 
 /**
@@ -30,4 +32,18 @@ export function useOperationInProgress(): boolean {
  */
 export function useCurrentLocalBranch(): Branch | null {
   return useGraphStore((s) => s.branches.find((b) => b.current && !b.remote) ?? null);
+}
+
+/**
+ * The graph's first lane color, and the badge style built from it.
+ *
+ * For badges shown *outside* the graph — the legend, release notes — where a
+ * sample should look like something the user has already seen on screen. Read
+ * from the palette setting rather than hardcoded, since `speedyGit.graphColors`
+ * is the user's to change; lane 0 is simply the first column's color.
+ */
+export function useFirstLaneBadgeStyle(): { laneColor: string; laneColorStyle: CSSProperties } {
+  const graphColors = useGraphStore((s) => s.userSettings.graphColors);
+  const laneColor = getColor(0, resolvePalette(graphColors));
+  return { laneColor, laneColorStyle: getLaneColorStyle(laneColor) };
 }
