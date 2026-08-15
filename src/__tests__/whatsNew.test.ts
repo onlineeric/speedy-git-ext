@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   decideWhatsNew,
+  shouldRecordWhatsNew,
   WHATS_NEW_COUNTDOWN_SECONDS,
   WHATS_NEW_DEV_COUNTDOWN_SECONDS,
 } from '../../shared/whatsNew.js';
@@ -49,5 +50,15 @@ describe('decideWhatsNew', () => {
       expect(decision.countdownSeconds).toBe(WHATS_NEW_DEV_COUNTDOWN_SECONDS);
       expect(WHATS_NEW_DEV_COUNTDOWN_SECONDS).toBeLessThan(WHATS_NEW_COUNTDOWN_SECONDS);
     });
+  });
+});
+
+describe('shouldRecordWhatsNew', () => {
+  it('records a dismissal in a released build, so the dialog shows once', () => {
+    expect(shouldRecordWhatsNew(false)).toBe(true);
+  });
+
+  it('records nothing in development, which shares globalState with the installed extension', () => {
+    expect(shouldRecordWhatsNew(true)).toBe(false);
   });
 });

@@ -56,3 +56,18 @@ export function decideWhatsNew({
     countdownSeconds: WHATS_NEW_COUNTDOWN_SECONDS,
   };
 }
+
+/**
+ * Whether closing the dialog should be recorded as "this version has been seen".
+ *
+ * Never under F5 debugging. The Extension Development Host is launched without
+ * `--user-data-dir`, so it shares one `globalState` with the normal window under
+ * the same extension id — a dismissal there would write the version the
+ * *installed* extension is about to check, and the release build would then stay
+ * silent on the very upgrade the dialog exists for. Development re-shows the
+ * dialog on every launch regardless, so there is nothing for it to record and
+ * nothing lost by not recording it.
+ */
+export function shouldRecordWhatsNew(isDevelopment: boolean): boolean {
+  return !isDevelopment;
+}

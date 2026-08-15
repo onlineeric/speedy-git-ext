@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { decideWhatsNew, type WhatsNewDecision } from '../../shared/whatsNew.js';
+import { decideWhatsNew, shouldRecordWhatsNew, type WhatsNewDecision } from '../../shared/whatsNew.js';
 
 /**
  * Version whose "What's new" dialog the user last dismissed. Kept in
@@ -29,11 +29,15 @@ export class WhatsNewStore {
     return typeof version === 'string' ? version : '';
   }
 
+  private get isDevelopment(): boolean {
+    return this.context.extensionMode === vscode.ExtensionMode.Development;
+  }
+
   decide(): WhatsNewDecision {
     return decideWhatsNew({
       currentVersion: this.currentVersion,
       lastShownVersion: this.context.globalState.get<string>(LAST_SHOWN_KEY),
-      isDevelopment: this.context.extensionMode === vscode.ExtensionMode.Development,
+      isDevelopment: this.isDevelopment,
     });
   }
 
@@ -41,8 +45,15 @@ export class WhatsNewStore {
    * Record that this version's dialog has been seen. Called when the user closes
    * it — never when it is merely sent — so a webview that reloads before the
    * user got to read it shows the dialog again.
+   *
+   * Debug launches deliberately record nothing; see `shouldRecordWhatsNew`.
    */
   async markShown(): Promise<void> {
+    if (!shouldRecordWhatsNew(this.isDevelopment)) {
+      this.log.info("What's new dialog dismissed in development — not recorded");
+      return;
+    }
+
     const version = this.currentVersion;
     if (!version) return;
 

@@ -75,7 +75,8 @@ src/
 │   ├── AvatarRefreshQueue.ts     # Paced background drain (1/sec), interruptible rate-limit pause, batched result posting
 │   ├── GitHubAuthService.ts      # Explicit opt-in gate for the GitHub session used by avatar lookups
 │   ├── WhatsNewStore.ts          # Owns the one fact the webview can't know: is this the first run on this version.
-│   │                             #   Dev mode always shows; globalState records the version only once the user closes it
+│   │                             #   Dev mode always shows and records nothing — the debug host shares one globalState
+│   │                             #   with the installed extension; release records the version once the user closes it
 │   ├── GitConfigService.ts       # Git config reading
 │   └── TelemetryService.ts       # Consent-aware backend telemetry funnel; real + no-op implementations
 └── utils/
@@ -279,7 +280,8 @@ shared/
 │                                 #   drive live dialog validation (frontend) and creation guards (backend)
 ├── telemetry.ts                  # Closed telemetry catalogs, payload types, buckets, runtime validator
 └── whatsNew.ts                   # PURE: whether the release-notes dialog opens on this run + the countdown lengths
-                                  #   (dev always shows, 2s; release shows once per version, 5s)
+                                  #   (dev always shows, 2s; release shows once per version, 5s), and whether a
+                                  #   dismissal may be recorded at all (never in dev — shared globalState)
 
 telemetry.json                    # Machine-readable event manifest for VS Code telemetry inspection
 esbuild.config.mjs                # Production-only telemetry destination injection; empty in dev/test builds
