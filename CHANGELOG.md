@@ -4,6 +4,14 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.10.0] - pre-release - 2026-08-15
+
+### Changed
+- **Branch badges now show where a branch lives as icons rather than words.** A branch that existed both locally and on a remote was written out in full — `main ⇄ origin/main` — which spent a lot of row width repeating a name you had already read, and pushed the other refs sharing that commit behind the **+N** overflow badge sooner. The three cases are now told apart by two small glyphs, where the fork means "exists locally" and the cloud means "exists on a remote": a local-only branch reads `⑂ main`, a remote-only branch `☁ origin/main`, and a branch that is both `⑂☁ main` — visibly the combination of the other two, so the scheme can be worked out from the badges on screen rather than having to be learned or hovered over. Both glyphs sit before the name, which leaves the space after it to the worktree icon as before. The remote names themselves remain in the badge's tooltip, since a single `origin` is not worth a badge's width; a branch pushed to more than one remote — an `origin` plus an `upstream` fork, say — instead shows a count beside the cloud, `⑂☁2 main`, that being the one thing the badge cannot otherwise tell you.
+
+### Credits
+- The compact cloud-icon branch badge was contributed by [@jayll1303](https://github.com/jayll1303) in [#181](https://github.com/onlineeric/speedy-git-ext/pull/181); the matching fork/cloud scheme and the multi-remote count grew out of the review discussion there. First contribution — thank you!
+
 ## [5.9.2] - pre-release - 2026-08-14
 
 ### Fixed
