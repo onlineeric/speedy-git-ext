@@ -7,7 +7,7 @@ describe('getRefBadgeContent', () => {
     it('marks a local-only branch with the branch icon and no cloud', () => {
       expect(getRefBadgeContent({ type: 'local-branch', localName: 'main' })).toEqual({
         label: 'main',
-        leadIcon: 'branch',
+        leadIcons: ['branch'],
         remoteCount: 0,
       });
     });
@@ -15,17 +15,24 @@ describe('getRefBadgeContent', () => {
     it('leads a remote-only branch with the cloud, so the glyph means "on a remote" everywhere', () => {
       expect(getRefBadgeContent({ type: 'remote-branch', remoteName: 'origin/main' })).toEqual({
         label: 'origin/main',
-        leadIcon: 'cloud',
+        leadIcons: ['cloud'],
         remoteCount: 0,
       });
     });
 
-    it('renders a merged branch as the union of both: branch icon plus a trailing cloud', () => {
+    it('leads a merged branch with the union of the two, fork before cloud', () => {
       expect(getRefBadgeContent({ type: 'merged-branch', localName: 'main', remoteNames: ['origin/main'] })).toEqual({
         label: 'main',
-        leadIcon: 'branch',
+        leadIcons: ['branch', 'cloud'],
         remoteCount: 1,
       });
+    });
+
+    it('is literally the union of the local-only and remote-only icon sets', () => {
+      const local = getRefBadgeContent({ type: 'local-branch', localName: 'main' });
+      const remote = getRefBadgeContent({ type: 'remote-branch', remoteName: 'origin/main' });
+      const merged = getRefBadgeContent({ type: 'merged-branch', localName: 'main', remoteNames: ['origin/main'] });
+      expect(merged.leadIcons).toEqual([...local.leadIcons, ...remote.leadIcons]);
     });
   });
 
@@ -54,7 +61,7 @@ describe('getRefBadgeContent', () => {
         localName: 'main',
         remoteNames: ['origin/main', 'upstream/main', 'fork/main'],
       };
-      expect(getRefBadgeContent(displayRef)).toEqual({ label: 'main', leadIcon: 'branch', remoteCount: 3 });
+      expect(getRefBadgeContent(displayRef)).toEqual({ label: 'main', leadIcons: ['branch', 'cloud'], remoteCount: 3 });
     });
   });
 
@@ -62,7 +69,7 @@ describe('getRefBadgeContent', () => {
     it('gives a tag the tag icon and no cloud', () => {
       expect(getRefBadgeContent({ type: 'tag', tagName: 'v1.0.0' })).toEqual({
         label: 'v1.0.0',
-        leadIcon: 'tag',
+        leadIcons: ['tag'],
         remoteCount: 0,
       });
     });
@@ -70,7 +77,7 @@ describe('getRefBadgeContent', () => {
     it('gives a stash no icon at all', () => {
       expect(getRefBadgeContent({ type: 'stash', stashRef: 'stash@{0}' })).toEqual({
         label: 'stash@{0}',
-        leadIcon: null,
+        leadIcons: [],
         remoteCount: 0,
       });
     });

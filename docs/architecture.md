@@ -243,8 +243,8 @@ utils/
 ├── searchFilter.ts               # Client-side search by message, hash, author
 ├── filterUtils.ts                # Author/date filter logic
 ├── refStyle.ts                   # Per-ref-kind badge styling
-├── refBadgeContent.ts            # What a ref badge shows: label, lead icon (fork = local, cloud = remote),
-│                                 #   trailing cloud + remote count for merged branches, and the title tooltip
+├── refBadgeContent.ts            # What a ref badge shows: label, lead icons (fork = local, cloud = remote;
+│                                 #   merged = both), remote count on the cloud, and the title tooltip
 ├── themeColors.ts                # Semantic VS Code theme tokens (added/deleted/warning/accent/signature…) + `tint()`; the one place a color meaning is named
 ├── colorUtils.ts                 # Graph color cycling + theme helpers
 ├── formatDate.ts                 # Commit-date formatting

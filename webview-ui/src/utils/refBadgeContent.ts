@@ -2,16 +2,17 @@ import type { TagMetadata, WorktreeInfo } from '@shared/types';
 import type { DisplayRef } from '../types/displayRefs';
 import { formatDate } from './formatDate';
 
-/** Which glyph leads a ref badge. `null` for refs that carry no icon (stashes). */
-export type RefBadgeLeadIcon = 'branch' | 'cloud' | 'tag' | null;
+/** A glyph that can precede a ref badge's label. */
+export type RefBadgeIcon = 'branch' | 'cloud' | 'tag';
 
 export interface RefBadgeContent {
   /** Visible badge text. */
   label: string;
-  leadIcon: RefBadgeLeadIcon;
+  /** Glyphs preceding the label, in render order. Empty for refs that carry none (stashes). */
+  leadIcons: RefBadgeIcon[];
   /**
-   * How many remotes a *local* branch is synced to, driving the trailing cloud.
-   * 0 for every badge that isn't a merged branch, so no trailing cloud is drawn.
+   * How many remotes a *local* branch is synced to, driving the count next to
+   * the cloud. 0 for every badge that isn't a merged branch.
    */
   remoteCount: number;
 }
@@ -21,30 +22,34 @@ export interface RefBadgeContent {
  *
  * The two branch icons are a system, not decoration: the fork glyph means
  * "exists locally" and the cloud means "exists on a remote". A branch that is
- * both therefore reads as the union of the two — `⑂ main ☁` — which is what
- * lets a user work out the scheme from the badges alone, without hovering:
+ * both therefore leads with the union of the two sets — which is what lets a
+ * user work out the scheme from the badges alone, without hovering:
  *
  * - local-only    `⑂ main`
  * - remote-only   `☁ origin/main`
- * - local+remote  `⑂ main ☁`
+ * - local+remote  `⑂☁ main`
+ *
+ * Both glyphs lead so they sit on the same side of the name in every badge, and
+ * so the *trailing* slot stays reserved for the worktree icon — an unrelated
+ * annotation that would otherwise queue up behind the cloud (`⑂☁ main ⧉`).
  *
  * The remote *names* stay in the tooltip, since the common single-remote case
  * gains nothing from spending row width to repeat `origin`. Two or more remotes
- * can't be guessed that way, so those get a count on the cloud (`⑂ main ☁2`) —
+ * can't be guessed that way, so those get a count on the cloud (`⑂☁2 main`) —
  * a badge only spends space on what the user can't otherwise infer.
  */
 export function getRefBadgeContent(displayRef: DisplayRef): RefBadgeContent {
   switch (displayRef.type) {
     case 'local-branch':
-      return { label: displayRef.localName, leadIcon: 'branch', remoteCount: 0 };
+      return { label: displayRef.localName, leadIcons: ['branch'], remoteCount: 0 };
     case 'remote-branch':
-      return { label: displayRef.remoteName, leadIcon: 'cloud', remoteCount: 0 };
+      return { label: displayRef.remoteName, leadIcons: ['cloud'], remoteCount: 0 };
     case 'merged-branch':
-      return { label: displayRef.localName, leadIcon: 'branch', remoteCount: displayRef.remoteNames.length };
+      return { label: displayRef.localName, leadIcons: ['branch', 'cloud'], remoteCount: displayRef.remoteNames.length };
     case 'tag':
-      return { label: displayRef.tagName, leadIcon: 'tag', remoteCount: 0 };
+      return { label: displayRef.tagName, leadIcons: ['tag'], remoteCount: 0 };
     case 'stash':
-      return { label: displayRef.stashRef, leadIcon: null, remoteCount: 0 };
+      return { label: displayRef.stashRef, leadIcons: [], remoteCount: 0 };
   }
 }
 
@@ -92,7 +97,7 @@ function getTagTitle(tagName: string, tagMeta?: TagMetadata): string {
 }
 
 /**
- * Screen-reader text standing in for the trailing cloud, which is `aria-hidden`.
+ * Screen-reader text standing in for the cloud glyph, which is `aria-hidden`.
  * Without it the sync state would be visible but unannounced, since it no longer
  * appears in the badge's own text.
  */

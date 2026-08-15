@@ -1,7 +1,7 @@
 import { forwardRef, type ReactNode } from 'react';
 import type { TagMetadata, WorktreeInfo } from '@shared/types';
 import type { DisplayRef } from '../types/displayRefs';
-import { getRefBadgeContent, getRefTitle, remoteCountLabel, type RefBadgeLeadIcon } from '../utils/refBadgeContent';
+import { getRefBadgeContent, getRefTitle, remoteCountLabel, type RefBadgeIcon } from '../utils/refBadgeContent';
 import { getRefStyle } from '../utils/refStyle';
 import { worktreeBadgeBorderColor } from '../utils/worktreeBadgeStyle';
 import { BranchIcon, CloudIcon, TagIcon, WorktreeIcon } from './icons';
@@ -18,7 +18,7 @@ interface RefLabelProps extends React.HTMLAttributes<HTMLSpanElement> {
 export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
   function RefLabel({ displayRef, laneColorStyle, worktree, tagMeta, className, style, ...rest }, ref) {
     const layoutStyle = getRefStyle(displayRef.type);
-    const { label, leadIcon, remoteCount } = getRefBadgeContent(displayRef);
+    const { label, leadIcons, remoteCount } = getRefBadgeContent(displayRef);
     const title = getRefTitle(displayRef, worktree, tagMeta);
     const showWorktreeIcon = !!worktree && (displayRef.type === 'local-branch' || displayRef.type === 'merged-branch');
 
@@ -37,31 +37,31 @@ export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
         {...rest}
         style={worktreeBadgeStyle}
       >
-        {renderLeadIcon(leadIcon)}
-        {label}
-        {remoteCount > 0 && (
-          <span className="ml-0.5 inline-flex shrink-0 items-center gap-px">
-            <CloudIcon className="h-3 w-3" />
+        {leadIcons.length > 0 && (
+          // Tighter than the badge's own gap so a fork+cloud pair reads as one sigil, not two icons.
+          <span className="inline-flex shrink-0 items-center gap-px">
+            {leadIcons.map((icon) => (
+              <LeadIcon key={icon} icon={icon} />
+            ))}
             {/* Only 2+ remotes need the count — one remote is what a cloud already implies. */}
             {remoteCount > 1 && <span className="text-[10px] leading-none">{remoteCount}</span>}
-            <span className="sr-only">{remoteCountLabel(remoteCount)}</span>
           </span>
         )}
+        {label}
+        {remoteCount > 0 && <span className="sr-only">{remoteCountLabel(remoteCount)}</span>}
         {showWorktreeIcon && <WorktreeIcon className="ml-0.5 h-3 w-3 shrink-0" />}
       </span>
     );
   }
 );
 
-function renderLeadIcon(leadIcon: RefBadgeLeadIcon): ReactNode {
-  switch (leadIcon) {
+function LeadIcon({ icon }: { icon: RefBadgeIcon }): ReactNode {
+  switch (icon) {
     case 'branch':
       return <BranchIcon />;
     case 'cloud':
       return <CloudIcon />;
     case 'tag':
       return <TagIcon />;
-    case null:
-      return null;
   }
 }
