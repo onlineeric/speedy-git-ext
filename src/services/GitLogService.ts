@@ -18,14 +18,46 @@ const LOG_FORMAT = '%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D';
  */
 const COMMIT_POSITION_SEARCH_CAP = 100_000;
 
+/**
+ * 0-based index of the line exactly equal to `hash` in a newline-separated
+ * hash listing, or -1.
+ *
+ * Scans the buffer with a cursor rather than `split('\n').indexOf(...)`: the
+ * listing runs to `COMMIT_POSITION_SEARCH_CAP` lines, and splitting it would
+ * allocate that many separate strings just to find one index.
+ */
+function indexOfHashLine(stdout: string, hash: string): number {
+  let lineStart = 0;
+  let index = 0;
+
+  while (lineStart <= stdout.length) {
+    let lineEnd = stdout.indexOf('\n', lineStart);
+    if (lineEnd === -1) lineEnd = stdout.length;
+
+    if (lineEnd - lineStart === hash.length && stdout.startsWith(hash, lineStart)) {
+      return index;
+    }
+
+    lineStart = lineEnd + 1;
+    index++;
+  }
+
+  return -1;
+}
+
 export class GitLogService {
   private executor: GitExecutor;
   /**
    * Stash base commits for the load in progress, or null when they must be
    * re-resolved. Every page of one load has to walk the same revisions — a set
    * that changed between pages would shift the `--skip` offsets under the user.
+   *
+   * The in-flight promise is held rather than the resolved array so callers that
+   * start together — a page load and the `getAuthors`/`getCommitPosition` query
+   * beside it — coalesce onto one `git stash list` instead of racing to spawn
+   * their own.
    */
-  private stashBaseHashes: string[] | null = null;
+  private stashBaseHashes: Promise<string[]> | null = null;
 
   constructor(
     private readonly workspacePath: string,
@@ -77,9 +109,12 @@ export class GitLogService {
    * unreadable stash reflog must never take the whole graph down with it. Stale
    * hashes are equally harmless, because the default walk carries `--ignore-missing`.
    */
-  private async getStashBaseHashes(): Promise<string[]> {
-    if (this.stashBaseHashes) return this.stashBaseHashes;
+  private getStashBaseHashes(): Promise<string[]> {
+    this.stashBaseHashes ??= this.fetchStashBaseHashes();
+    return this.stashBaseHashes;
+  }
 
+  private async fetchStashBaseHashes(): Promise<string[]> {
     const result = await this.executor.execute({
       args: ['stash', 'list', '--format=%P'],
       cwd: this.workspacePath,
@@ -91,8 +126,7 @@ export class GitLogService {
       const base = parseStashBaseHash(line);
       if (base) bases.add(base);
     }
-    this.stashBaseHashes = [...bases];
-    return this.stashBaseHashes;
+    return [...bases];
   }
 
   /**
@@ -225,7 +259,7 @@ export class GitLogService {
       return result;
     }
 
-    return ok(result.value.stdout.split('\n').indexOf(hash));
+    return ok(indexOfHashLine(result.value.stdout, hash));
   }
 
   async getAuthors(): Promise<Result<Author[]>> {

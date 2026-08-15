@@ -16,12 +16,18 @@ export class OperationGuard {
       return new GitError('Another git operation is already in progress (cherry-pick). Finish it before starting this action.', 'OPERATION_IN_PROGRESS');
     }
 
-    const revertState = await services.gitRevertService.getRevertState();
+    // Two independent `rev-parse` probes: spawn them together and decide in
+    // priority order afterwards, so a guarded operation pays one round trip
+    // rather than two serialized ones.
+    const [revertState, mergeHeadCheck] = await Promise.all([
+      services.gitRevertService.getRevertState(),
+      services.gitLogService.verifyRef('MERGE_HEAD'),
+    ]);
+
     if (revertState.success && revertState.value === 'in-progress') {
       return new GitError('Another git operation is already in progress (revert). Finish it before starting this action.', 'OPERATION_IN_PROGRESS');
     }
 
-    const mergeHeadCheck = await services.gitLogService.verifyRef('MERGE_HEAD');
     if (mergeHeadCheck.success && mergeHeadCheck.value) {
       return new GitError('Another git operation is already in progress (merge). Finish it before starting this action.', 'OPERATION_IN_PROGRESS');
     }

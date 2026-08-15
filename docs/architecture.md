@@ -47,6 +47,7 @@ src/
 │       ├── compareHandlers.ts    # compareRefs/cancelCompare/openCompareDiff (latest-wins by request id)
 │       ├── telemetryHandlers.ts  # Validates one-way webview telemetry against closed catalogs
 │       ├── avatarHandlers.ts      # Avatar auth state, GitHub authorize/remove-token, refreshDays setting, clear cache
+│       ├── updateSpeedyGitSetting.ts # Writes one speedyGit.* setting; ExtensionController broadcasts the change
 │       └── vscodeCommandHandlers.ts # settings, clipboard, openExternal, updatePersistedUIState
 ├── services/                     # All repo-bound; every method returns Result<T, GitError>
 │   ├── index.ts                  # Barrel export for all services

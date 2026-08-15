@@ -7,6 +7,7 @@ import {
   buttonSecondaryClassName,
   dialogContentClassName,
   dialogContentStyle,
+  dialogOverlayClassName,
   dialogSectionLabelClassName,
 } from './dialogStyles';
 import { CopiedIcon, CopyIcon } from './icons';
@@ -44,7 +45,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
   return (
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
+        <Dialog.Overlay className={dialogOverlayClassName} />
         <Dialog.Content
           className={`${dialogContentClassName} flex max-h-[80vh] flex-col`}
           style={dialogContentStyle}

@@ -121,6 +121,24 @@ export function clampBatchCommitSize(value: number): number {
 }
 
 /**
+ * How many commits one `loadMoreCommits` should ask for.
+ *
+ * A targeted load ("Go to HEAD") grows the batch so a known log position is
+ * reached in as few requests as possible, rounded up to whole batches and capped
+ * at {@link MAX_BATCH_COMMIT_SIZE} — so a single response never carries an
+ * unbounded payload, and a targeted batch is never *smaller* than a regular one.
+ * Requests without a target, or for a position already behind `skip`, get the
+ * plain batch size.
+ *
+ * Lives beside {@link clampBatchCommitSize} so both rules bounding a batch are
+ * in one place rather than half here and half inline in a handler.
+ */
+export function growBatchForTarget(batchSize: number, skip: number, targetIndex?: number): number {
+  if (targetIndex === undefined || targetIndex < skip) return batchSize;
+  return Math.min(Math.ceil((targetIndex - skip + 1) / batchSize) * batchSize, MAX_BATCH_COMMIT_SIZE);
+}
+
+/**
  * Bounds for `speedyGit.avatars.refreshDays`, mirroring package.json.
  *
  * Shared rather than per-side: the settings input clamps what it sends and the

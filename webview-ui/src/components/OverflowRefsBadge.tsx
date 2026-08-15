@@ -6,6 +6,7 @@ import { RefLabel } from './RefLabel';
 import { displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
 import { worktreeForDisplayRef } from '../utils/worktreeDisplay';
 import { ACCENT_COLOR, tint } from '../utils/themeColors';
+import { REF_BADGE_BASE_CLASS } from '../utils/refStyle';
 
 /** Used when the row has no lane color to borrow — see `laneColorStyle`. */
 const OVERFLOW_BADGE_FALLBACK_STYLE: React.CSSProperties = {
@@ -30,7 +31,7 @@ export function OverflowRefsBadge({ hiddenRefs, commit, laneColorStyle, worktree
     <Popover.Root>
       <Popover.Trigger asChild>
         <span
-          className="px-1.5 py-0.5 text-xs rounded border cursor-pointer font-medium hover:opacity-80"
+          className={`${REF_BADGE_BASE_CLASS} border cursor-pointer font-medium hover:opacity-80`}
           style={laneColorStyle ?? OVERFLOW_BADGE_FALLBACK_STYLE}
           onClick={(e) => e.stopPropagation()}
         >

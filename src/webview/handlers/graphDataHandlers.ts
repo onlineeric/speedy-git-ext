@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { CommitsResult } from '../../services/GitLogService.js';
-import { MAX_BATCH_COMMIT_SIZE, UNCOMMITTED_HASH } from '../../../shared/types.js';
+import { growBatchForTarget, UNCOMMITTED_HASH } from '../../../shared/types.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 import { postUncommittedCommitDetails } from './workingTreeHandlers.js';
 
@@ -38,14 +38,8 @@ export const graphDataHandlers = {
   loadMoreCommits: async (message, context) => {
     const batchSize = context.getBatchSize();
     const { skip, generation, filters, targetIndex } = message.payload;
-    // Targeted loads (Go to HEAD) grow the batch to reach a known log position
-    // in one request, rounded up to whole batches and capped at the same ceiling
-    // a configured batch size gets — so a single response never carries an
-    // unbounded commit payload, and a targeted batch is never smaller than a
-    // regular one. The webview keeps requesting until the target is loaded.
-    const maxCount = targetIndex !== undefined && targetIndex >= skip
-      ? Math.min(Math.ceil((targetIndex - skip + 1) / batchSize) * batchSize, MAX_BATCH_COMMIT_SIZE)
-      : batchSize;
+    // The webview keeps requesting until the target is loaded; see growBatchForTarget.
+    const maxCount = growBatchForTarget(batchSize, skip, targetIndex);
     const result = await context.services.current().gitLogService.getCommits({ ...filters, maxCount, skip });
     const postAppended = (value: CommitsResult) => {
       context.postMessage({

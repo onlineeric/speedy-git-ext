@@ -31,6 +31,15 @@ export const dialogContentClassName =
   'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 rounded-lg shadow-xl bg-[var(--vscode-editor-background)] border border-[var(--vscode-panel-border)] z-50';
 
 /**
+ * The scrim behind a dialog / alert dialog, paired with every `Dialog.Overlay`.
+ *
+ * Centralized because the utilities are order-independent and were drifting into
+ * two spellings of the same rules; a scrim is theme-independent by nature, so
+ * the literal black is deliberate.
+ */
+export const dialogOverlayClassName = 'fixed inset-0 z-50 bg-black/50';
+
+/**
  * The two button variants VS Code themes define, so buttons re-colour with the
  * user's theme instead of being pinned to one palette.
  *

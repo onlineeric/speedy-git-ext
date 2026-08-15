@@ -9,13 +9,27 @@ export interface RefBadgeContent {
   /** Visible badge text. */
   label: string;
   /** Glyphs preceding the label, in render order. Empty for refs that carry none (stashes). */
-  leadIcons: RefBadgeIcon[];
+  leadIcons: readonly RefBadgeIcon[];
   /**
    * How many remotes a *local* branch is synced to, driving the count next to
    * the cloud. 0 for every badge that isn't a merged branch.
    */
   remoteCount: number;
 }
+
+/**
+ * Every icon list a badge can carry, hoisted to module scope.
+ *
+ * `getRefBadgeContent` runs once per visible badge on every commit row render,
+ * and each list is a constant of its ref type — allocating them per call would
+ * churn the virtualized list's hot path for nothing. Frozen so a caller cannot
+ * mutate the list every badge of that type shares.
+ */
+const BRANCH_ICONS: readonly RefBadgeIcon[] = Object.freeze(['branch']);
+const CLOUD_ICONS: readonly RefBadgeIcon[] = Object.freeze(['cloud']);
+const BRANCH_CLOUD_ICONS: readonly RefBadgeIcon[] = Object.freeze(['branch', 'cloud']);
+const TAG_ICONS: readonly RefBadgeIcon[] = Object.freeze(['tag']);
+const NO_ICONS: readonly RefBadgeIcon[] = Object.freeze([]);
 
 /**
  * Decides what a ref badge shows.
@@ -41,15 +55,15 @@ export interface RefBadgeContent {
 export function getRefBadgeContent(displayRef: DisplayRef): RefBadgeContent {
   switch (displayRef.type) {
     case 'local-branch':
-      return { label: displayRef.localName, leadIcons: ['branch'], remoteCount: 0 };
+      return { label: displayRef.localName, leadIcons: BRANCH_ICONS, remoteCount: 0 };
     case 'remote-branch':
-      return { label: displayRef.remoteName, leadIcons: ['cloud'], remoteCount: 0 };
+      return { label: displayRef.remoteName, leadIcons: CLOUD_ICONS, remoteCount: 0 };
     case 'merged-branch':
-      return { label: displayRef.localName, leadIcons: ['branch', 'cloud'], remoteCount: displayRef.remoteNames.length };
+      return { label: displayRef.localName, leadIcons: BRANCH_CLOUD_ICONS, remoteCount: displayRef.remoteNames.length };
     case 'tag':
-      return { label: displayRef.tagName, leadIcons: ['tag'], remoteCount: 0 };
+      return { label: displayRef.tagName, leadIcons: TAG_ICONS, remoteCount: 0 };
     case 'stash':
-      return { label: displayRef.stashRef, leadIcons: [], remoteCount: 0 };
+      return { label: displayRef.stashRef, leadIcons: NO_ICONS, remoteCount: 0 };
   }
 }
 

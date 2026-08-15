@@ -11,8 +11,6 @@ import { GoToHeadIcon, HeadIcon, INLINE_ICON_CLASS } from './icons';
 import { RefLabel } from './RefLabel';
 
 interface RefBadgeLegendProps {
-  /** Set false when the host already titles the section (e.g. a What's New dialog). */
-  showHeading?: boolean;
   className?: string;
 }
 
@@ -26,14 +24,14 @@ interface RefBadgeLegendProps {
  * color, which is what keeps the legend honest — it explains the badges the
  * graph actually draws rather than a picture of them.
  */
-export function RefBadgeLegend({ showHeading = true, className }: RefBadgeLegendProps) {
+export function RefBadgeLegend({ className }: RefBadgeLegendProps) {
   // Lane 0 — the color of the graph's first column, so a sample badge here is
   // one the user has already seen on screen.
   const { laneColor, laneColorStyle } = useFirstLaneBadgeStyle();
 
   return (
     <section className={className}>
-      {showHeading && <h3 className={dialogSectionLabelClassName}>Badge Legend</h3>}
+      <h3 className={dialogSectionLabelClassName}>Badge Legend</h3>
       <dl className="flex flex-col gap-1.5">
         {REF_BADGE_LEGEND.map((entry) => (
           <div key={entry.id} className="flex items-start gap-3">

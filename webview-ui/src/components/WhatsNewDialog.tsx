@@ -7,6 +7,7 @@ import {
   buttonPrimaryClassName,
   dialogContentClassName,
   dialogContentStyle,
+  dialogOverlayClassName,
 } from './dialogStyles';
 import { findWhatsNewEntry } from './whatsNewEntries';
 
@@ -48,7 +49,7 @@ export function WhatsNewDialog({ version, countdownSeconds, open, onClose }: Wha
   return (
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
+        <Dialog.Overlay className={dialogOverlayClassName} />
         <Dialog.Content
           className={`${dialogContentClassName} flex max-h-[80vh] flex-col`}
           style={dialogContentStyle}

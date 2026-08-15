@@ -7,7 +7,7 @@ import { toCommitCountBucket } from '../../shared/telemetry.js';
 import { GitHubAvatarService } from '../services/GitHubAvatarService.js';
 import type { AvatarCacheStore } from '../services/AvatarCacheStore.js';
 import type { AvatarRefreshQueue } from '../services/AvatarRefreshQueue.js';
-import { toDayNumber, type AvatarLookupTask } from '../services/avatarCachePolicy.js';
+import { buildAvatarLookupCandidates, toDayNumber, type AvatarLookupTask } from '../services/avatarCachePolicy.js';
 import type { TelemetryService } from '../services/TelemetryService.js';
 import type { GitServiceRegistry } from './GitServiceRegistry.js';
 import type { PersistedUIStateStore } from './PersistedUIStateStore.js';
@@ -80,6 +80,18 @@ export function computeCommitFingerprint(commits: Commit[]): string {
     .join(';');
 }
 
+/**
+ * Identity of a posted avatar map, so an unchanged one can be skipped. Sorted
+ * because the map is built from a `Map` whose key order follows whichever commit
+ * was seen first, which a reordered batch would change without changing content.
+ */
+function avatarUrlsSignature(urls: AvatarUrlMap): string {
+  return Object.entries(urls)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([email, url]) => `${email}=${url}`)
+    .join(';');
+}
+
 export class RepoDataLoader {
   /** One-shot: the `perf initialLoad` telemetry event fires once per session. */
   private initialLoadPerfSent = false;
@@ -89,6 +101,8 @@ export class RepoDataLoader {
   private gitHubRepoInit: Promise<GitHubRepoRef | null> | null = null;
   /** Keeps the once-per-repo orientation log out of every auto-refresh. */
   private loggedGitHubRepoState = false;
+  /** Last `avatarUrls` payload posted, so an auto-refresh can skip an identical one. */
+  private lastAvatarUrlsSignature: string | null = null;
   /** Bumped on every repo switch, so an in-flight resolution can tell it is stale. */
   private repoGeneration = 0;
 
@@ -102,6 +116,9 @@ export class RepoDataLoader {
     this.gitHubRepo = null;
     this.gitHubRepoInit = null;
     this.loggedGitHubRepoState = false;
+    // The cache survives the switch, but the posted map is what *this* repo's
+    // authors need — clear it so the new repo's avatars are always sent.
+    this.lastAvatarUrlsSignature = null;
   }
 
   async sendInitialData(filters?: Partial<GraphFilters>, isAutoRefresh = false): Promise<void> {
@@ -231,7 +248,7 @@ export class RepoDataLoader {
     }
 
     if ((settings ?? DEFAULT_USER_SETTINGS).avatarsEnabled !== false && fetchedCommits.length > 0) {
-      void this.hydrateAndQueueAvatars(fetchedCommits);
+      void this.hydrateAndQueueAvatars(fetchedCommits, isAutoRefresh);
     }
   }
 
@@ -344,7 +361,7 @@ export class RepoDataLoader {
    * window is handed to the background queue, which trickles through it at its
    * own pace — nothing here waits on the network.
    */
-  private async hydrateAndQueueAvatars(commits: Commit[]): Promise<void> {
+  private async hydrateAndQueueAvatars(commits: Commit[], isAutoRefresh = false): Promise<void> {
     const repo = await this.ensureGitHubRepo();
     if (!repo) {
       // Log once per repo, not per load: without this the feature simply does
@@ -363,30 +380,11 @@ export class RepoDataLoader {
     const today = toDayNumber(Date.now());
     const refreshDays = (this.deps.getSettings() ?? DEFAULT_USER_SETTINGS).avatarRefreshDays;
 
-    // Dedupe by email, keeping the author's oldest and newest commit in this
-    // batch as lookup candidates. Order matters: GitHub only knows commits that
-    // have been pushed, and the newest rows are the ones most likely to be local
-    // only — so the oldest sighting is tried first.
-    const emailToHashes = new Map<string, { newest: string; oldest: string }>();
-    for (const commit of commits) {
-      const email = commit.authorEmail.toLowerCase();
-      // `git commit --author="Name <>"` leaves the email empty. There is nothing
-      // to key an account-scoped cache on, so skip it rather than spending a
-      // lookup and filing the answer under "".
-      if (!email) continue;
-      const existing = emailToHashes.get(email);
-      if (existing) {
-        existing.oldest = commit.hash;
-      } else {
-        emailToHashes.set(email, { newest: commit.hash, oldest: commit.hash });
-      }
-    }
-
+    const candidates = buildAvatarLookupCandidates(commits);
     const urls: AvatarUrlMap = {};
     const sightings: AvatarLookupTask[] = [];
 
-    for (const [email, { newest, oldest }] of emailToHashes) {
-      const hashes = newest === oldest ? [oldest] : [oldest, newest];
+    for (const { email, hashes } of candidates) {
       // Free path: a GitHub no-reply email carries the account id, so it never
       // needs an API call and never enters the queue.
       const noreplyUrl = GitHubAvatarService.resolveNoreplyAvatarUrl(email);
@@ -412,16 +410,24 @@ export class RepoDataLoader {
       );
     }
 
-    if (Object.keys(urls).length > 0) {
+    // On a steady repo an auto-refresh rebuilds a byte-identical map every
+    // cycle, and posting it re-`set`s the store — which notifies every
+    // subscriber. Gate the resend the same way the commit payload above is
+    // gated; a manual refresh still always posts.
+    const signature = avatarUrlsSignature(urls);
+    const urlsUnchanged = isAutoRefresh && signature === this.lastAvatarUrlsSignature;
+    this.lastAvatarUrlsSignature = signature;
+
+    if (Object.keys(urls).length > 0 && !urlsUnchanged) {
       this.deps.postMessage({ type: 'avatarUrls', payload: { urls } });
     }
 
     const due = this.deps.avatarCache.touch(sightings, refreshDays, today);
 
     // Per-load accounting, at debug so auto-refresh does not flood the channel.
-    const noreplyCount = emailToHashes.size - sightings.length;
+    const noreplyCount = candidates.length - sightings.length;
     this.deps.log.debug(
-      `GitHub avatars: ${emailToHashes.size} unique author(s) — `
+      `GitHub avatars: ${candidates.length} unique author(s) — `
       + `${Object.keys(urls).length} shown now (${noreplyCount} free no-reply), ${due.length} queued for lookup`,
     );
 

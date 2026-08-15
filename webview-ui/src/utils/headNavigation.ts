@@ -63,6 +63,56 @@ export function decideHeadNavigation(context: HeadLocationContext): HeadNavigati
   return { kind: 'notInView' };
 }
 
+/**
+ * State after one `commitsAppended` batch of a Go to HEAD already in flight,
+ * snapshotted from the store plus the pending navigation.
+ */
+export interface HeadContinuationContext {
+  /** True once the target row is present in the displayed (merged) row list. */
+  isDisplayed: boolean;
+  /** True when the target is loaded but hidden by a client-side filter. */
+  isHiddenClientSide: boolean;
+  /** Whether more commits can still be paginated in. */
+  hasMore: boolean;
+  /** How many targeted batches this navigation has already requested. */
+  attempts: number;
+  /** HEAD's position as located when the navigation started. */
+  targetIndex: number;
+  /** Number of raw commits currently loaded in the store. */
+  loadedCount: number;
+}
+
+export type HeadContinuationDecision =
+  | { kind: 'scrollTo' }
+  | { kind: 'loadMore'; targetIndex: number }
+  | { kind: 'hiddenByFilter' }
+  /** Ran out of history, or hit the attempt cap, without reaching HEAD. */
+  | { kind: 'unreachable' };
+
+/**
+ * Decide the next step after a targeted batch lands: navigate once the target
+ * row exists, otherwise keep requesting batches until it is found, filtered
+ * out, exhausted or capped.
+ *
+ * Kept here beside `decideHeadNavigation` rather than in the RPC client so both
+ * halves of one navigation state machine answer to the same rules — and so the
+ * attempt cap is testable without a fake message channel.
+ */
+export function decideHeadContinuation(context: HeadContinuationContext): HeadContinuationDecision {
+  if (context.isDisplayed) {
+    return { kind: 'scrollTo' };
+  }
+  if (context.isHiddenClientSide) {
+    return { kind: 'hiddenByFilter' };
+  }
+  if (!context.hasMore || context.attempts >= MAX_GO_TO_HEAD_LOADS) {
+    return { kind: 'unreachable' };
+  }
+  // History may have grown since HEAD was located — never request less than one
+  // batch past what is already loaded.
+  return { kind: 'loadMore', targetIndex: Math.max(context.targetIndex, context.loadedCount) };
+}
+
 /** User-facing toast messages for the non-navigating outcomes. */
 export const HEAD_NAVIGATION_MESSAGES = {
   hiddenByFilter: 'The HEAD commit is hidden by the current author or search filter.',

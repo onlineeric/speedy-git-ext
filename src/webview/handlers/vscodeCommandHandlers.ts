@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
+import { updateSpeedyGitSetting } from './updateSpeedyGitSetting.js';
 
 export const vscodeCommandHandlers = {
   openSettings: async (message) => {
@@ -15,12 +16,8 @@ export const vscodeCommandHandlers = {
   },
 
   setToolbarSetting: async (message) => {
-    // The settings-change listener in ExtensionController picks this up and
-    // broadcasts fresh settingsData to the webview, so no direct response here.
     const { setting, value } = message.payload;
-    await vscode.workspace
-      .getConfiguration('speedyGit')
-      .update(`toolbar.${setting}`, value, vscode.ConfigurationTarget.Global);
+    await updateSpeedyGitSetting(`toolbar.${setting}`, value);
   },
 
   copyToClipboard: async (message, context) => {

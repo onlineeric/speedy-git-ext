@@ -78,6 +78,59 @@ export interface AvatarLookupTask {
   hashes: string[];
 }
 
+/** One author found in a commit batch, with the commits worth asking about. */
+export interface AvatarLookupCandidate {
+  /** Lowercased author email — the cache key. */
+  email: string;
+  /** Candidate commits, first one first. See {@link AvatarLookupTask.hashes}. */
+  hashes: string[];
+}
+
+/** The minimum a commit has to offer for a candidate to be built from it. */
+export interface AvatarCommitSighting {
+  hash: string;
+  authorEmail: string;
+}
+
+/**
+ * Reduce a loaded commit batch to one lookup candidate per author.
+ *
+ * Two rules that are easy to undo by accident, which is why they live here with
+ * tests rather than inline on the load path:
+ *
+ * 1. **Oldest sighting first.** GitHub only knows commits that have been
+ *    *pushed*, and the newest rows in a batch are the ones most likely to be
+ *    local-only. Trying the author's oldest commit in the batch first is what
+ *    makes the first attempt usually succeed; reversing it spends the rate
+ *    limit on 422s. The newest is kept as a fallback for a rewritten history
+ *    where the old hash no longer exists on the remote.
+ * 2. **Empty emails are dropped.** `git commit --author="Name <>"` leaves the
+ *    email empty, and an account-scoped cache has nothing to key that on — so
+ *    it is skipped rather than spending a lookup and filing it under `""`.
+ *
+ * Commits are assumed newest-first, as the graph loads them.
+ */
+export function buildAvatarLookupCandidates(commits: readonly AvatarCommitSighting[]): AvatarLookupCandidate[] {
+  const byEmail = new Map<string, { newest: string; oldest: string }>();
+
+  for (const commit of commits) {
+    const email = commit.authorEmail.toLowerCase();
+    if (!email) continue;
+
+    const existing = byEmail.get(email);
+    if (existing) {
+      existing.oldest = commit.hash;
+    } else {
+      byEmail.set(email, { newest: commit.hash, oldest: commit.hash });
+    }
+  }
+
+  return [...byEmail].map(([email, { newest, oldest }]) => ({
+    email,
+    hashes: newest === oldest ? [oldest] : [oldest, newest],
+  }));
+}
+
 /** What a single lookup attempt learned. */
 export type AvatarLookupOutcome =
   /** GitHub returned an avatar for the commit's author. */

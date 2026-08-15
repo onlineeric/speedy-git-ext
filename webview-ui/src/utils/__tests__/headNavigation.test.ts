@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { decideHeadNavigation, type HeadLocationContext } from '../headNavigation';
+import {
+  decideHeadContinuation,
+  decideHeadNavigation,
+  MAX_GO_TO_HEAD_LOADS,
+  type HeadContinuationContext,
+  type HeadLocationContext,
+} from '../headNavigation';
 
 function context(overrides: Partial<HeadLocationContext> = {}): HeadLocationContext {
   return {
@@ -70,5 +76,63 @@ describe('decideHeadNavigation', () => {
   it('reports notInView when the position walk was skipped but the row has since gone', () => {
     // Raced with a refresh that dropped the row the backend confirmed.
     expect(decideHeadNavigation(context({ index: null, mergedIndex: -1 }))).toEqual({ kind: 'notInView' });
+  });
+});
+
+function continuation(overrides: Partial<HeadContinuationContext> = {}): HeadContinuationContext {
+  return {
+    isDisplayed: false,
+    isHiddenClientSide: false,
+    hasMore: true,
+    attempts: 1,
+    targetIndex: 1200,
+    loadedCount: 1000,
+    ...overrides,
+  };
+}
+
+describe('decideHeadContinuation', () => {
+  it('scrolls once the target row is displayed', () => {
+    expect(decideHeadContinuation(continuation({ isDisplayed: true }))).toEqual({ kind: 'scrollTo' });
+  });
+
+  it('prefers the displayed row over a filter that also hides it', () => {
+    expect(
+      decideHeadContinuation(continuation({ isDisplayed: true, isHiddenClientSide: true })),
+    ).toEqual({ kind: 'scrollTo' });
+  });
+
+  it('reports hiddenByFilter when the batch loaded the target but a filter hides it', () => {
+    expect(
+      decideHeadContinuation(continuation({ isHiddenClientSide: true })),
+    ).toEqual({ kind: 'hiddenByFilter' });
+  });
+
+  it('reports unreachable when history runs out before the target is found', () => {
+    expect(decideHeadContinuation(continuation({ hasMore: false }))).toEqual({ kind: 'unreachable' });
+  });
+
+  it('reports unreachable once the attempt cap is reached', () => {
+    expect(
+      decideHeadContinuation(continuation({ attempts: MAX_GO_TO_HEAD_LOADS })),
+    ).toEqual({ kind: 'unreachable' });
+  });
+
+  it('keeps loading while attempts remain below the cap', () => {
+    expect(
+      decideHeadContinuation(continuation({ attempts: MAX_GO_TO_HEAD_LOADS - 1 })),
+    ).toEqual({ kind: 'loadMore', targetIndex: 1200 });
+  });
+
+  it('requests the located target while it is still deeper than what is loaded', () => {
+    expect(
+      decideHeadContinuation(continuation({ targetIndex: 1200, loadedCount: 1000 })),
+    ).toEqual({ kind: 'loadMore', targetIndex: 1200 });
+  });
+
+  it('never requests less than what is already loaded when history grew past the target', () => {
+    expect(
+      decideHeadContinuation(continuation({ targetIndex: 1200, loadedCount: 1500 })),
+    ).toEqual({ kind: 'loadMore', targetIndex: 1500 });
   });
 });
