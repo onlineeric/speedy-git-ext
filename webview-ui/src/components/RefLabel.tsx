@@ -2,7 +2,7 @@ import { forwardRef, type ReactNode } from 'react';
 import type { TagMetadata, WorktreeInfo } from '@shared/types';
 import type { DisplayRef } from '../types/displayRefs';
 import { getRefBadgeContent, getRefTitle, remoteCountLabel, type RefBadgeIcon } from '../utils/refBadgeContent';
-import { getRefStyle } from '../utils/refStyle';
+import { getRefStyle, REF_BADGE_BASE_CLASS } from '../utils/refStyle';
 import { worktreeBadgeBorderColor } from '../utils/worktreeBadgeStyle';
 import { BranchIcon, CloudIcon, TagIcon, WorktreeIcon } from './icons';
 
@@ -32,7 +32,7 @@ export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
     return (
       <span
         ref={ref}
-        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs rounded ${borderClass}${fallbackColor}${className ? ` ${className}` : ''}`}
+        className={`${REF_BADGE_BASE_CLASS} ${borderClass}${fallbackColor}${className ? ` ${className}` : ''}`}
         title={title}
         {...rest}
         style={worktreeBadgeStyle}

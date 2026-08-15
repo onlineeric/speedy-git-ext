@@ -6,12 +6,15 @@ import { GraphContainer } from './components/GraphContainer';
 import { CommitDetailsPanel } from './components/CommitDetailsPanel';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { ToastContainer } from './components/ToastContainer';
+import { WhatsNewDialog } from './components/WhatsNewDialog';
 
 export function App() {
   const rootRef = useRef<HTMLDivElement>(null);
   const { detailsPanelOpen, detailsPanelPosition, mergedCommits, selectedCommitIndex } = useGraphStore();
   const activeToggleWidget = useGraphStore((state) => state.activeToggleWidget);
   const setActiveToggleWidget = useGraphStore((state) => state.setActiveToggleWidget);
+  const whatsNew = useGraphStore((state) => state.whatsNew);
+  const setWhatsNew = useGraphStore((state) => state.setWhatsNew);
   const setSelectedCommit = useGraphStore((state) => state.setSelectedCommit);
   const setCommitDetails = useGraphStore((state) => state.setCommitDetails);
   const setDetailsPanelOpen = useGraphStore((state) => state.setDetailsPanelOpen);
@@ -147,6 +150,17 @@ export function App() {
         </div>
         {showPanel && <CommitDetailsPanel />}
       </div>
+      {whatsNew && (
+        <WhatsNewDialog
+          open
+          version={whatsNew.version}
+          countdownSeconds={whatsNew.countdownSeconds}
+          onClose={() => {
+            setWhatsNew(null);
+            rpcClient.dismissWhatsNew();
+          }}
+        />
+      )}
       <ConfirmDialog
         open={pendingCommitCheckout !== null}
         onConfirm={() => {

@@ -5,6 +5,13 @@ interface IconProps {
   style?: React.CSSProperties;
 }
 
+/**
+ * Sizing for an icon sitting inside a run of body text, so prose can show the
+ * glyph it is talking about. Slightly larger than the text and baseline-aligned,
+ * which keeps the line height even instead of nudging the row taller.
+ */
+export const INLINE_ICON_CLASS = 'inline-block h-3.5 w-3.5 align-text-bottom';
+
 /** Git branch fork shape — 12×12, inherits text color via currentColor */
 export function BranchIcon({ className }: IconProps) {
   return (

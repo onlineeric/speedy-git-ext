@@ -1,5 +1,4 @@
-import { useGraphStore } from '../stores/graphStore';
-import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils';
+import { useFirstLaneBadgeStyle } from '../stores/graphSelectors';
 import {
   LEGEND_INLINE_ICON_PLACEHOLDER,
   REF_BADGE_LEGEND,
@@ -8,7 +7,7 @@ import {
   type RefBadgeLegendSample,
 } from '../utils/refBadgeLegend';
 import { dialogSectionLabelClassName } from './dialogStyles';
-import { GoToHeadIcon, HeadIcon } from './icons';
+import { GoToHeadIcon, HeadIcon, INLINE_ICON_CLASS } from './icons';
 import { RefLabel } from './RefLabel';
 
 interface RefBadgeLegendProps {
@@ -28,12 +27,9 @@ interface RefBadgeLegendProps {
  * graph actually draws rather than a picture of them.
  */
 export function RefBadgeLegend({ showHeading = true, className }: RefBadgeLegendProps) {
-  const graphColors = useGraphStore((state) => state.userSettings.graphColors);
   // Lane 0 — the color of the graph's first column, so a sample badge here is
-  // one the user has already seen. Read from the setting rather than hardcoded,
-  // since the palette is theirs to change.
-  const laneColor = getColor(0, resolvePalette(graphColors));
-  const laneColorStyle = getLaneColorStyle(laneColor);
+  // one the user has already seen on screen.
+  const { laneColor, laneColorStyle } = useFirstLaneBadgeStyle();
 
   return (
     <section className={className}>
@@ -73,7 +69,7 @@ function InlineIcon({ name }: { name: LegendInlineIcon }) {
   switch (name) {
     case 'goToHead':
       // Sized to the surrounding text rather than to the toolbar, so the line stays even.
-      return <GoToHeadIcon className="inline-block h-3.5 w-3.5 align-text-bottom" />;
+      return <GoToHeadIcon className={INLINE_ICON_CLASS} />;
   }
 }
 

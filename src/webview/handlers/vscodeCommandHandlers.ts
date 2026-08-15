@@ -35,7 +35,13 @@ export const vscodeCommandHandlers = {
   updatePersistedUIState: async (message, context) => {
     context.uiStateStore.savePersistedUIState(message.payload.uiState);
   },
+
+  // Recorded on close rather than on send, so a reload before the user read it
+  // shows the dialog again.
+  dismissWhatsNew: async (_message, context) => {
+    await context.markWhatsNewShown();
+  },
 } satisfies Pick<
   RequestHandlerMap,
-  'openSettings' | 'getSettings' | 'setToolbarSetting' | 'copyToClipboard' | 'openExternal' | 'updatePersistedUIState'
+  'openSettings' | 'getSettings' | 'setToolbarSetting' | 'copyToClipboard' | 'openExternal' | 'updatePersistedUIState' | 'dismissWhatsNew'
 >;

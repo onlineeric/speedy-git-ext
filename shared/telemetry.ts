@@ -86,6 +86,7 @@ export const UI_SURFACES = [
   'toolbar',
   'toolbarContextMenu',
   'helpDialog',
+  'whatsNewDialog',
   'panelToggle',
   'columnHeader',
   'avatarSettings',
@@ -101,6 +102,8 @@ export const UI_ACTIONS = [
   // Help dialog links (which support surface the user chose)
   'helpReportIssue', 'helpOpenRepository', 'helpOpenChangelog', 'helpOpenMarketplace',
   'helpCopyIssuesUrl',
+  // "What's new" dialog: which release-note link the user followed
+  'whatsNewOpenContribution',
   // Commit context menu
   'compareCommits', 'setCompareBase', 'compareWithBase',
   'checkoutCommit', 'createBranch', 'createTag', 'createWorktree',
@@ -144,6 +147,8 @@ export const DIALOG_IDS = [
   'removeRemote',
   // GitHub sign-in prompt for avatar lookups: confirmed = granted, cancelled = declined
   'avatarAuthorize',
+  // First-run release notes; only ever 'confirmed' — it has no cancelling action
+  'whatsNew',
 ] as const;
 
 export type DialogId = (typeof DIALOG_IDS)[number];

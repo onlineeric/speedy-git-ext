@@ -21,6 +21,7 @@ import { AvatarCacheStore } from '../services/AvatarCacheStore.js';
 import { AvatarRefreshQueue } from '../services/AvatarRefreshQueue.js';
 import { GitHubAuthService, type AvatarAuthChange } from '../services/GitHubAuthService.js';
 import { GitHubAvatarService } from '../services/GitHubAvatarService.js';
+import { WhatsNewStore } from '../services/WhatsNewStore.js';
 import { clampBatchCommitSize, DEFAULT_USER_SETTINGS } from '../../shared/types.js';
 import { EditorCommandService } from './EditorCommandService.js';
 import { GitServiceRegistry, type GitServiceSet } from './GitServiceRegistry.js';
@@ -47,6 +48,7 @@ export class WebviewProvider {
   private readonly avatarAuth: GitHubAuthService;
   private readonly avatarService: GitHubAvatarService;
   private readonly avatarQueue: AvatarRefreshQueue;
+  private readonly whatsNew: WhatsNewStore;
   private getSettingsHandler: (() => UserSettings) | undefined;
   private submoduleHandlers: SubmoduleNavigationHandlers | undefined;
   private onSwitchRepo: ((repoPath: string) => void) | undefined;
@@ -92,6 +94,7 @@ export class WebviewProvider {
     });
     this.uiStateStore = new PersistedUIStateStore(this.context, () => this.runtime.currentRepoPath);
     this.panelHost = new WebviewPanelHost(this.context, this.log);
+    this.whatsNew = new WhatsNewStore(this.context, this.log);
 
     // Avatar subsystem. Deliberately owned here rather than by RepoDataLoader:
     // the cache and queue are account-scoped and must outlive repo switches.
@@ -227,6 +230,8 @@ export class WebviewProvider {
 
     if (wasOpen) return;
 
+    this.sendWhatsNew();
+
     if (this.gitRepoDiscoveryService) {
       this.sendRepoList(
         this.gitRepoDiscoveryService.getRepos(),
@@ -276,6 +281,22 @@ export class WebviewProvider {
     }
   }
 
+  /**
+   * Offer the "What's new" dialog when this run qualifies. Sent only on a fresh
+   * panel open, never on a repo switch or refresh, and the webview stays silent
+   * if it has no content for the version — so nothing is stored here; the user
+   * closing the dialog is what records it as seen.
+   */
+  private sendWhatsNew(): void {
+    const { show, countdownSeconds } = this.whatsNew.decide();
+    if (!show) return;
+
+    this.postMessage({
+      type: 'whatsNew',
+      payload: { version: this.whatsNew.currentVersion, countdownSeconds },
+    });
+  }
+
   private sendAvatarAuthState(): void {
     const rateLimit = this.avatarService.getRateLimit();
     const limited = this.avatarService.isRateLimited(Date.now());
@@ -321,6 +342,7 @@ export class WebviewProvider {
       onDisplayRepo: (repoPath) => this.onDisplayRepo?.(repoPath),
       sendRepoList: (repos, activeRepoPath) => this.sendRepoList(repos, activeRepoPath),
       sendSettingsData: (settings) => this.sendSettingsData(settings),
+      markWhatsNewShown: () => this.whatsNew.markShown(),
     };
   }
 

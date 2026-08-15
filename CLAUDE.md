@@ -103,6 +103,7 @@ The `src/webview/` subsystem was split out of a former ~2400-line `WebviewProvid
 - `RepoDataLoader` — initial + deferred data, avatars, submodules
 - `PersistedUIStateStore` — UI state + per-repo table layout (column-width healing)
 - `OperationGuard` — in-progress checks (rebase/cherry-pick/revert/merge) → `GitError | null`
+- `WhatsNewStore` — is this the first run on this version (`globalState`, dev mode always shows)
 - `EditorCommandService` — VS Code diff/file/compare editors, worktree folder/reveal
 
 Rules:
@@ -205,6 +206,7 @@ Menu/dialog composition:
 - `components/ToolbarIconButton.tsx` — `TOGGLE_BUTTON_TONES` (`inactive`/`active`/`attention`), spread onto a toolbar button or a toolbar popover's trigger. Spread, not `className=`: the color is an inline style and only the hover state is a class
 - `components/CompareMenuItems.tsx`, `MenuCopySubmenu.tsx`, `MenuGroupSeparator.tsx`, `MenuSubTrigger.tsx` — shared menu fragments
 - `components/RefBadgeLegend.tsx` + `utils/refBadgeLegend.ts` — the "Badge Legend" section. Needs no props and no dialog context, so any dialog drops it in as `<RefBadgeLegend />`. Samples render through the real `RefLabel` in the graph's own lane-0 color, so the legend explains the badges the graph draws rather than a picture of them; a test asserts every `DisplayRef` type has a row
+- `components/whatsNewEntries.tsx` — **release notes are added here and nowhere else.** One entry per version, matched by *exact* `package.json` version; a version with no entry shows no dialog, which is how a release opts out. Content is a `ReactNode`, so an entry can embed live UI (5.10.0 embeds `RefBadgeLegend`) rather than describing it. A test asserts the shipping version has an entry — without it, a version-string typo silently means no dialog ever
 - `hooks/useDialogTelemetry.ts` — one confirmed/cancelled outcome per dialog open cycle
 - `hooks/useCopyFeedback.ts` — `copyToClipboard` + short "copied" flash, used by every copy button
 

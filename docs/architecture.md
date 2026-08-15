@@ -73,6 +73,8 @@ src/
 │   ├── AvatarCacheStore.ts       # Persistent email→avatar cache in globalState; debounced writes, LRU cap 1000 (512KB extension-state budget)
 │   ├── AvatarRefreshQueue.ts     # Paced background drain (1/sec), interruptible rate-limit pause, batched result posting
 │   ├── GitHubAuthService.ts      # Explicit opt-in gate for the GitHub session used by avatar lookups
+│   ├── WhatsNewStore.ts          # Owns the one fact the webview can't know: is this the first run on this version.
+│   │                             #   Dev mode always shows; globalState records the version only once the user closes it
 │   ├── GitConfigService.ts       # Git config reading
 │   └── TelemetryService.ts       # Consent-aware backend telemetry funnel; real + no-op implementations
 └── utils/
@@ -173,7 +175,10 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── CreateWorktreeDialog.tsx  RemoveWorktreeDialog.tsx
 ├── DiscardDialog.tsx  DiscardAllDialog.tsx  FilePickerDialog.tsx
 ├── RefBadgeLegend.tsx            # Standalone "Badge Legend" section; samples are real `RefLabel`s in lane-0 color
-│                                 #   so it can't drift from the graph. Needs no props — reusable in a What's New dialog
+│                                 #   so it can't drift from the graph. Needs no props — reused by the What's New dialog
+├── WhatsNewDialog.tsx            # First-run release notes; close button counts down before enabling (Esc/outside held too)
+├── whatsNewEntries.tsx           # Per-version release-note content, looked up by exact version. A version with no
+│                                 #   entry shows no dialog — that is how a release opts out
 └── HelpDialog.tsx                # "Help & Feedback": Badge Legend + GitHub Issues + docs/changelog/marketplace + version
 ```
 
@@ -204,6 +209,7 @@ hooks/
 ├── useTooltipHover.ts            # Tooltip positioning logic
 ├── useCopyFeedback.ts            # copyToClipboard + short "copied" flash, shared by every copy button
 ├── useSignatureColumnLoader.ts   # Async viewport-first signature verification loader (047)
+├── useCountdown.ts               # Deadline-based countdown (survives background throttling); + PURE `remainingSeconds`
 └── useDialogTelemetry.ts         # One confirmed/cancelled outcome per dialog open cycle
 
 types/displayRefs.ts              # Discriminated union for ref-label rendering (local-branch/remote-branch/tag/HEAD/…)
@@ -270,7 +276,9 @@ shared/
 ├── errors.ts                     # Result<T,E> monad, GitError class, GitErrorCode enum
 ├── gitRefValidation.ts           # git check-ref-format validator + tag/branch/remote wrappers — the same rules
 │                                 #   drive live dialog validation (frontend) and creation guards (backend)
-└── telemetry.ts                  # Closed telemetry catalogs, payload types, buckets, runtime validator
+├── telemetry.ts                  # Closed telemetry catalogs, payload types, buckets, runtime validator
+└── whatsNew.ts                   # PURE: whether the release-notes dialog opens on this run + the countdown lengths
+                                  #   (dev always shows, 2s; release shows once per version, 5s)
 
 telemetry.json                    # Machine-readable event manifest for VS Code telemetry inspection
 esbuild.config.mjs                # Production-only telemetry destination injection; empty in dev/test builds

@@ -170,6 +170,8 @@ export type RequestMessage =
   | { type: 'getContainingBranches'; payload: { hash: string } }
   // External browser
   | { type: 'openExternal'; payload: { url: string } }
+  /** User closed the "What's new" dialog; stops it reappearing for this version. */
+  | { type: 'dismissWhatsNew'; payload: Record<string, never> }
   // File actions
   | { type: 'openCurrentFile'; payload: { filePath: string } }
   // UI state persistence
@@ -257,6 +259,11 @@ export type ResponseMessage =
   | { type: 'worktreeEnvFiles'; payload: { requestId: number; ignoredEnvFiles: string[]; envFilesPresent: boolean } }
   | { type: 'containingBranches'; payload: { hash: string; branches: string[]; status: 'loaded' | 'error' } }
   | { type: 'persistedUIState'; payload: { uiState: PersistedUIState } }
+  /**
+   * Sent only on a run that qualifies — the webview does not decide *whether*,
+   * only whether it has content for `version` to show.
+   */
+  | { type: 'whatsNew'; payload: { version: string; countdownSeconds: number } }
   | { type: 'authorList'; payload: { authors: Author[] } }
   | { type: 'uncommittedChanges'; payload: UncommittedSummary }
   | { type: 'conflictState'; payload: ConflictState }
@@ -293,7 +300,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   stashAndCheckout: true, stashAndCheckoutCommit: true,
   getWorktreeList: true, resolveWorktreePath: true, getWorktreeEnvFiles: true, addWorktree: true,
   removeWorktree: true, pruneWorktree: true, openWorktree: true, revealWorktree: true,
-  getContainingBranches: true, openExternal: true,
+  getContainingBranches: true, openExternal: true, dismissWhatsNew: true,
   openCurrentFile: true, updatePersistedUIState: true, getAuthors: true,
   getUncommittedChanges: true,
   stageFiles: true, unstageFiles: true, stageAll: true, unstageAll: true,
@@ -315,6 +322,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
   pushResult: true, avatarUrls: true, avatarAuthState: true, avatarCacheCleared: true, tagMetadata: true, worktreeList: true, worktreePathResolved: true, worktreeEnvFiles: true, containingBranches: true,
   persistedUIState: true, authorList: true, uncommittedChanges: true, conflictState: true,
+  whatsNew: true,
   initialData: true,
   compareResult: true, compareError: true,
 };

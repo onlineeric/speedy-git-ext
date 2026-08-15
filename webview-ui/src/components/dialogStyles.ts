@@ -45,6 +45,17 @@ export const dialogContentClassName =
 /** Shape and disabled behaviour every variant shares; only the colors differ. */
 const buttonBaseClassName = 'px-3 py-1.5 text-sm rounded disabled:cursor-default disabled:opacity-50';
 
+/**
+ * The dimmed look of a disabled button, for a control that is *not* using the
+ * `disabled` attribute because it still needs to be focusable — `aria-disabled`
+ * with a guarded handler.
+ *
+ * Kept beside the base so the two definitions of "unavailable" cannot drift; a
+ * browser gives no `:disabled` pseudo-class to an aria-disabled control, so
+ * without this the button would look fully active while refusing to act.
+ */
+export const buttonInertClassName = 'cursor-default opacity-50';
+
 export const buttonPrimaryClassName =
   `${buttonBaseClassName} bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]`;
 

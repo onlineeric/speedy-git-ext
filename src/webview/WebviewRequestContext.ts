@@ -38,4 +38,6 @@ export interface WebviewRequestContext {
   onDisplayRepo(repoPath: string): void;
   sendRepoList(repos: RepoInfo[], activeRepoPath: string): void;
   sendSettingsData(settings: UserSettings): void;
+  /** Persist that the running version's "What's new" dialog has been seen. */
+  markWhatsNewShown(): Promise<void>;
 }

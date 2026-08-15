@@ -355,6 +355,9 @@ class RpcClient {
       case 'conflictState':
         store.setConflictState(message.payload);
         break;
+      case 'whatsNew':
+        store.setWhatsNew(message.payload);
+        break;
       case 'initialData':
         store.setInitialData(message.payload);
         store.setIsLoadingRepo(false);
@@ -787,6 +790,10 @@ class RpcClient {
   // External browser
   openExternal(url: string) {
     this.send({ type: 'openExternal', payload: { url } });
+  }
+
+  dismissWhatsNew() {
+    this.send({ type: 'dismissWhatsNew', payload: {} });
   }
 
   // Pagination
