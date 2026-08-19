@@ -1,1 +1,1 @@
-ln -sf CLAUDE.md AGENTS.md
+ln -f CLAUDE.md AGENTS.md

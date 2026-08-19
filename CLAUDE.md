@@ -1,8 +1,6 @@
 # CLAUDE.md / AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-(If you are Codex CLI or other AI coding agents, this is loaded via AGENTS.md.)
+Agent instructions for this repository. `CLAUDE.md` and `AGENTS.md` are hard links to one file — Claude Code reads `CLAUDE.md`, other agents read `AGENTS.md`. `AGENTS.md` is gitignored; after cloning run `ln CLAUDE.md AGENTS.md` (bash) or the `New-Item -ItemType HardLink` equivalent (PowerShell).
 
 ## Build & Development Commands
 
