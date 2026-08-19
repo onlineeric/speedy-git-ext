@@ -435,8 +435,8 @@ class RpcClient {
     this.send({ type: 'copyToClipboard', payload: { text } });
   }
 
-  openDiff(hash: string, filePath: string, parentHash?: string, status?: FileChangeStatus) {
-    this.send({ type: 'openDiff', payload: { hash, filePath, parentHash, status } });
+  openDiff(hash: string, filePath: string, parentHash?: string, status?: FileChangeStatus, isSubmodule?: boolean) {
+    this.send({ type: 'openDiff', payload: { hash, filePath, parentHash, status, isSubmodule } });
   }
 
   /**
@@ -452,7 +452,7 @@ class RpcClient {
     this.send({ type: 'cancelCompare', payload: { requestId } });
   }
 
-  openCompareDiff(payload: { filePath: string; aHash: string | null; bHash: string | null; status: FileChangeStatus; title: string }) {
+  openCompareDiff(payload: { filePath: string; aHash: string | null; bHash: string | null; status: FileChangeStatus; title: string; isSubmodule?: boolean }) {
     this.send({ type: 'openCompareDiff', payload });
   }
 

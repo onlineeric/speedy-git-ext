@@ -169,6 +169,29 @@ to spend that budget as rarely as possible:
 - The View settings dialog's open state lives in `graphStore` (`viewSettingsOpen`) because the Author
   column header's gear opens the same dialog.
 
+### Submodules — A Gitlink Has No Content Here
+
+A submodule is a tree entry with mode `160000` whose hash names a commit in the **submodule's**
+object database, not this repo's. Git reports a changed submodule as an ordinary changed path, so
+nothing distinguishes it from a file until you try to read it — and then every content read fails
+("bad object"). Swallowing that failure as empty is what made issue #184's diff blank on both sides.
+
+- **Never assume a changed path is a file.** `FileChange.isSubmodule` (set only when true) comes
+  from `--raw`'s mode fields and porcelain v2's `S` field. It is why `getDiffFileChanges` and
+  `compareRefs` use `git diff --raw` rather than `--name-status`: the mode is the only signal, and
+  `--raw` carries it in the call we already make. `--raw`'s two shas are *not* usable — `git diff`
+  abbreviates them, `diff-tree` does not, and the working-tree side is all zeroes.
+- **Content reads answer with the pointer line.** `getCommitFile` / `getStagedFileContent` fall back
+  to `Subproject commit <hash>` — what `git diff` itself prints — on the failure path only, so an
+  ordinary diff pays no extra spawn. The diff editor derives the `-`/`+` from the two sides. Any new
+  diff entry point routed through `GitShowContentProvider` inherits this for free; one that reads
+  content its own way must handle gitlinks itself.
+- **The working tree is a directory, so it needs the `worktree` URI sentinel** — `vscode.diff`
+  cannot open a folder, and a `file://` URI there is the second half of the same bug. Resolve its
+  pointer via `git submodule status`, **never** `git -C <path> rev-parse HEAD`: an uninitialized
+  submodule is an empty directory, so rev-parse walks up and silently answers with the *parent*
+  repo's HEAD.
+
 ### Colors — Always Use VS Code Theme Tokens
 
 **Every color in the webview must come from a `var(--vscode-*)` theme token.** The webview is

@@ -1,11 +1,21 @@
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
-import type { CommitDetails, CompareMode, CompareResult, ConflictType, FileChange, FileChangeStatus, SlotValue, UncommittedSummary } from '../../shared/types.js';
+import type { CommitDetails, CompareMode, CompareResult, ConflictType, FileChange, FileChangeStatus, FileStageState, SlotValue, UncommittedSummary } from '../../shared/types.js';
 import { EMPTY_TREE_HASH } from '../../shared/types.js';
 import { validateHash, validateFilePath } from '../utils/gitValidation.js';
 
 const NULL_CHAR = '\x00';
+
+/**
+ * Tree entry mode for a gitlink — a submodule pointer rather than a blob.
+ *
+ * Git reports a changed submodule as an ordinary changed path, so the mode is the
+ * only thing in its output that tells the two apart. That matters because a gitlink
+ * names a commit in the *submodule's* object database: this repo can resolve the
+ * path to a hash but has no object behind it, so every content read fails.
+ */
+const SUBMODULE_MODE = '160000';
 
 /** Format for git show: full commit metadata with %x00 (git's null-byte placeholder) as separators.
  *  We use %x00 instead of literal \x00 because Node.js spawn rejects args containing null bytes. */
@@ -48,7 +58,7 @@ export class GitDiffService {
       ? ['diff-tree', '--no-commit-id', '--numstat', '-r', '-z', `${hash}^1`, hash]
       : ['diff-tree', '--no-commit-id', '--numstat', '-r', '--root', '-z', hash];
     const [filesResult, statsResult] = await Promise.all([
-      this.getDiffNameStatus(hash, isMerge),
+      this.getDiffFileChanges(hash, isMerge),
       this.executor.execute({ args: numstatArgs, cwd: this.workspacePath }),
     ]);
 
@@ -71,7 +81,7 @@ export class GitDiffService {
     });
   }
 
-  async getDiffNameStatus(hash: string, isMerge = false): Promise<Result<FileChange[]>> {
+  async getDiffFileChanges(hash: string, isMerge = false): Promise<Result<FileChange[]>> {
     const hashCheck = validateHash(hash);
     if (!hashCheck.success) return hashCheck;
 
@@ -79,8 +89,8 @@ export class GitDiffService {
     // because diff-tree's default combined diff shows empty for clean merges.
     // For non-merge commits, --root handles the initial commit (no parent).
     const args = isMerge
-      ? ['diff-tree', '--no-commit-id', '-r', '--name-status', '-z', `${hash}^1`, hash]
-      : ['diff-tree', '--no-commit-id', '-r', '--name-status', '--root', '-z', hash];
+      ? ['diff-tree', '--no-commit-id', '-r', '--raw', '-z', `${hash}^1`, hash]
+      : ['diff-tree', '--no-commit-id', '-r', '--raw', '--root', '-z', hash];
     const result = await this.executor.execute({
       args,
       cwd: this.workspacePath,
@@ -90,7 +100,7 @@ export class GitDiffService {
       return result;
     }
 
-    const files = parseDiffNameStatus(result.value.stdout);
+    const files = parseDiffRaw(result.value.stdout);
     return ok(files);
   }
 
@@ -105,11 +115,20 @@ export class GitDiffService {
       cwd: this.workspacePath,
     });
 
-    if (!result.success) {
-      return result;
+    if (result.success) {
+      return ok(result.value.stdout);
     }
 
-    return ok(result.value.stdout);
+    // `git show <rev>:<path>` fails for a submodule at *every* revision: the path
+    // resolves fine, but the hash it resolves to is a commit in the submodule's own
+    // object database, so this repo reports "bad object". There is no content here to
+    // read — the pointer line is the whole of what the parent repo recorded.
+    const pointer = await this.readSubmodulePointerAt(hash, filePath);
+    if (pointer !== null) {
+      return ok(formatSubmodulePointer(pointer));
+    }
+
+    return result;
   }
 
   /** Returns the staged (index) version of a file, equivalent to `git show :<path>`. */
@@ -122,11 +141,64 @@ export class GitDiffService {
       cwd: this.workspacePath,
     });
 
+    if (result.success) {
+      return ok(result.value.stdout);
+    }
+
+    // Same gitlink problem as `getCommitFile`, one level down: the index stores the
+    // submodule as a mode-160000 entry, which `git show :<path>` cannot render either.
+    const pointer = await this.readStagedSubmodulePointer(filePath);
+    if (pointer !== null) {
+      return ok(formatSubmodulePointer(pointer));
+    }
+
+    return result;
+  }
+
+  /**
+   * The working-tree side of a submodule diff: the pointer line for the commit the
+   * submodule's own checkout currently sits on.
+   *
+   * Empty string when there is nothing to show — the path is not a submodule, or is one
+   * that was never initialized, so no commit is checked out to point at.
+   */
+  async getWorkingTreeSubmoduleContent(filePath: string): Promise<Result<string>> {
+    const pathCheck = validateFilePath(filePath);
+    if (!pathCheck.success) return pathCheck;
+
+    const result = await this.executor.execute({
+      args: ['submodule', 'status', '--', filePath],
+      cwd: this.workspacePath,
+    });
+
     if (!result.success) {
       return result;
     }
 
-    return ok(result.value.stdout);
+    const pointer = parseSubmoduleStatusPointer(result.value.stdout);
+    return ok(pointer === null ? '' : formatSubmodulePointer(pointer));
+  }
+
+  /** The commit a submodule points at in `rev`'s tree, or `null` if that path is not a gitlink there. */
+  private async readSubmodulePointerAt(rev: string, filePath: string): Promise<string | null> {
+    const result = await this.executor.execute({
+      args: ['ls-tree', '--end-of-options', rev, '--', filePath],
+      cwd: this.workspacePath,
+    });
+
+    if (!result.success) return null;
+    return parseLsTreeGitlink(result.value.stdout);
+  }
+
+  /** The commit a submodule points at in the index, or `null` if that path is not a gitlink there. */
+  private async readStagedSubmodulePointer(filePath: string): Promise<string | null> {
+    const result = await this.executor.execute({
+      args: ['ls-files', '-s', '--', filePath],
+      cwd: this.workspacePath,
+    });
+
+    if (!result.success) return null;
+    return parseLsFilesGitlink(result.value.stdout);
   }
 
   async openExternalDirDiff(hash: string, parentHash?: string): Promise<Result<string>> {
@@ -280,7 +352,7 @@ export class GitDiffService {
     };
 
     const [namesResult, statsResult] = await Promise.all([
-      this.executor.execute({ args: buildArgs(['--name-status']), cwd: this.workspacePath, abortSignal }),
+      this.executor.execute({ args: buildArgs(['--raw']), cwd: this.workspacePath, abortSignal }),
       this.executor.execute({ args: buildArgs(['--numstat']), cwd: this.workspacePath, abortSignal }),
     ]);
 
@@ -291,7 +363,7 @@ export class GitDiffService {
       this.log.warn(`numstat failed for compare; continuing without per-file counts: ${statsResult.error.message}`);
     }
 
-    const files = parseDiffNameStatus(namesResult.value.stdout);
+    const files = parseDiffRaw(namesResult.value.stdout);
     let totalAdditions = 0;
     let totalDeletions = 0;
     if (statsResult.success) {
@@ -404,7 +476,20 @@ function parseCommitMeta(output: string): Omit<CommitDetails, 'files' | 'stats'>
   };
 }
 
-function parseDiffNameStatus(output: string): FileChange[] {
+/**
+ * Parses `git diff --raw -z` / `git diff-tree --raw -z` output.
+ *
+ * Each entry is one metadata token followed by one path (two for renames/copies):
+ *
+ *   :<srcmode> <dstmode> <srcsha> <dstsha> <status>\0<path>\0
+ *
+ * `--raw` rather than `--name-status` purely for the modes — they are what identifies a
+ * submodule (see {@link SUBMODULE_MODE}), and `--name-status` reports one identically to
+ * an edited file. The two shas are deliberately ignored: `git diff` abbreviates them and
+ * `git diff-tree` does not, and the working-tree side is all zeroes, so no caller can
+ * treat them as a usable commit id. Pointers are resolved on demand instead.
+ */
+function parseDiffRaw(output: string): FileChange[] {
   if (!output.trim()) {
     return [];
   }
@@ -414,29 +499,113 @@ function parseDiffNameStatus(output: string): FileChange[] {
 
   let i = 0;
   while (i < parts.length) {
-    const statusCode = parts[i];
+    const meta = parts[i];
+    if (!meta || !meta.startsWith(':')) break;
+
+    // Header fields are single-space separated and never contain spaces themselves,
+    // so positional indexing is safe; the path arrives as its own NUL-delimited token.
+    const fields = meta.slice(1).split(' ');
+    const srcMode = fields[0];
+    const dstMode = fields[1];
+    const statusCode = fields[4];
     if (!statusCode) break;
 
     const status = mapStatusCode(statusCode[0]);
+    // Either side is enough: an added submodule has no src mode, a removed one no dst.
+    const isSubmodule = srcMode === SUBMODULE_MODE || dstMode === SUBMODULE_MODE;
 
     if (statusCode[0] === 'R' || statusCode[0] === 'C') {
       // Rename/Copy has two paths: old and new
       const oldPath = parts[i + 1];
       const newPath = parts[i + 2];
       if (oldPath && newPath) {
-        files.push({ path: newPath, oldPath, status });
+        files.push(buildFileChange(newPath, status, isSubmodule, oldPath));
       }
       i += 3;
     } else {
       const path = parts[i + 1];
       if (path) {
-        files.push({ path, status });
+        files.push(buildFileChange(path, status, isSubmodule));
       }
       i += 2;
     }
   }
 
   return files;
+}
+
+/**
+ * The single line git itself renders for a gitlink, so the diff editor shows exactly the
+ * `-Subproject commit <old>` / `+Subproject commit <new>` pair `git diff` prints. The two
+ * sides are plain text to the editor; it derives the +/- itself.
+ */
+function formatSubmodulePointer(commitHash: string): string {
+  return `Subproject commit ${commitHash}\n`;
+}
+
+/** Reads the gitlink hash out of a `git ls-tree` line (`160000 commit <sha>\t<path>`). */
+function parseLsTreeGitlink(output: string): string | null {
+  const [meta] = (output.split('\n')[0] ?? '').split('\t');
+  const [mode, type, hash] = (meta ?? '').trim().split(/ +/);
+  if (mode !== SUBMODULE_MODE || type !== 'commit' || !hash) return null;
+  return hash;
+}
+
+/** Reads the gitlink hash out of a `git ls-files -s` line (`160000 <sha> 0\t<path>`). */
+function parseLsFilesGitlink(output: string): string | null {
+  const [meta] = (output.split('\n')[0] ?? '').split('\t');
+  const [mode, hash] = (meta ?? '').trim().split(/ +/);
+  if (mode !== SUBMODULE_MODE || !hash) return null;
+  return hash;
+}
+
+/**
+ * Reads the checked-out commit out of `git submodule status` (`[ +-U]<sha> <path> (<ref>)`).
+ *
+ * The leading flag is the point of using this over `git -C <path> rev-parse HEAD`: an
+ * uninitialized submodule is just an empty directory, so rev-parse there walks up and
+ * cheerfully answers with the *parent* repo's HEAD. '-' marks that case, and we return
+ * null rather than a hash belonging to the wrong repository.
+ */
+function parseSubmoduleStatusPointer(output: string): string | null {
+  const line = output.split('\n')[0];
+  if (!line) return null;
+
+  const flag = line[0];
+  if (flag === '-') return null;
+
+  const hash = (flag === ' ' || flag === '+' || flag === 'U' ? line.slice(1) : line).trim().split(/ +/)[0];
+  return hash ? hash : null;
+}
+
+/** Builds a `FileChange`, leaving `isSubmodule` off entirely unless it is true. */
+function buildFileChange(
+  path: string,
+  status: FileChangeStatus,
+  isSubmodule: boolean,
+  oldPath?: string
+): FileChange {
+  const file: FileChange = { path, status };
+  if (oldPath !== undefined) file.oldPath = oldPath;
+  if (isSubmodule) file.isSubmodule = true;
+  return file;
+}
+
+/** Attaches a stage state to a `FileChange` built by {@link buildFileChange}. */
+function withStageState(file: FileChange, stageState: FileStageState): FileChange {
+  file.stageState = stageState;
+  return file;
+}
+
+/**
+ * Whether a `git status --porcelain=v2` entry describes a submodule.
+ *
+ * Field 3 of every '1'/'2' entry is the submodule field: 'N...' for anything else,
+ * 'S<c><m><u>' for a submodule. Positional because the header fields are single-space
+ * separated and space-free — only the trailing path can contain spaces.
+ */
+function isSubmoduleStatusEntry(token: string): boolean {
+  return token.split(' ')[2]?.startsWith('S') ?? false;
 }
 
 function mapStatusCode(code: string): FileChangeStatus {
@@ -714,23 +883,25 @@ function parseStatusPorcelainV2(output: string): {
       // Ordinary changed entry — 8 header fields before path
       const xy = token.substring(2, 4);
       const path = token.substring(afterNthSpace(token, 8));
+      const isSubmodule = isSubmoduleStatusEntry(token);
       if (xy[0] !== '.') {
-        stagedFiles.push({ path, status: statusLetterToFileStatus(xy[0]), stageState: 'staged' });
+        stagedFiles.push(withStageState(buildFileChange(path, statusLetterToFileStatus(xy[0]), isSubmodule), 'staged'));
       }
       if (xy[1] !== '.') {
-        unstagedFiles.push({ path, status: statusLetterToFileStatus(xy[1]), stageState: 'unstaged' });
+        unstagedFiles.push(withStageState(buildFileChange(path, statusLetterToFileStatus(xy[1]), isSubmodule), 'unstaged'));
       }
     } else if (token.startsWith('2 ')) {
       // Rename/copy entry — 9 header fields before path, next token is origPath
       const xy = token.substring(2, 4);
       const path = token.substring(afterNthSpace(token, 9));
       const origPath = tokens[i + 1] ?? '';
+      const isSubmodule = isSubmoduleStatusEntry(token);
       i++; // consume origPath token
       if (xy[0] !== '.') {
-        stagedFiles.push({ path, oldPath: origPath, status: xy[0] === 'R' ? 'renamed' : 'copied', stageState: 'staged' });
+        stagedFiles.push(withStageState(buildFileChange(path, xy[0] === 'R' ? 'renamed' : 'copied', isSubmodule, origPath), 'staged'));
       }
       if (xy[1] !== '.') {
-        unstagedFiles.push({ path, oldPath: origPath, status: statusLetterToFileStatus(xy[1]), stageState: 'unstaged' });
+        unstagedFiles.push(withStageState(buildFileChange(path, statusLetterToFileStatus(xy[1]), isSubmodule, origPath), 'unstaged'));
       }
     } else if (token.startsWith('u ')) {
       // Unmerged entries are handled separately via detectConflictState — skip here

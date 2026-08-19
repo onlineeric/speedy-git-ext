@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-08-15**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-08-19**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -20,7 +20,7 @@ src/
 ├── extension.ts                  # Entry point; creates telemetry service, registers speedyGit.showGraph
 ├── ExtensionController.ts        # Orchestrates services, repo discovery, settings, session telemetry
 ├── WebviewProvider.ts            # Compatibility re-export of webview/WebviewProvider
-├── GitShowContentProvider.ts     # git-show:// URI protocol for diffs
+├── GitShowContentProvider.ts     # git-show:// URI protocol for diffs; `staged`/`worktree` authority sentinels
 ├── webview/                      # Backend webview subsystem (refactored from the old ~2400-line WebviewProvider)
 │   ├── WebviewProvider.ts        # Thin public facade used by ExtensionController; composes the objects below
 │   ├── WebviewPanelHost.ts       # VS Code panel lifecycle, HTML/CSP/nonce, postMessage, visibility
@@ -54,7 +54,7 @@ src/
 │   ├── GitExecutor.ts            # Spawns git processes, 30s timeout — the only place git is invoked
 │   ├── GitLogService.ts          # Parses git log (null-byte format), branches, branches-containing-a-commit. Default 500 commits.
 │   │                             #   Also walks stash base commits, so a stash survives its branch moving
-│   ├── GitDiffService.ts         # Commit details, file changes, file content at revision
+│   ├── GitDiffService.ts         # Commit details, file changes, file content at revision; submodule (gitlink) pointers
 │   ├── GitBranchService.ts       # Checkout, create, rename, delete, fast-forward branches
 │   ├── GitRemoteService.ts       # Fetch, pull, remote management
 │   ├── GitHistoryService.ts      # Rebase, reset operations
@@ -190,7 +190,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── MultiSelectDropdown.tsx           # Generic multi-select popover with pinned actions
 ├── MultiBranchDropdown.tsx           # Branch-specific wrapper, grouped local/remote
 ├── FilterableSingleSelectDropdown.tsx# Generic searchable single-select (repo/submodule pickers)
-├── FileChangeShared.tsx              # Row/badge/action-icon primitives + shouldShowChangeCounts
+├── FileChangeShared.tsx              # Row/badge/action-icon primitives + shouldShowChangeCounts + SubmoduleBadge
 ├── FileChangesTreeView.tsx           # Tree rendering over fileTreeBuilder output
 └── datepicker-overrides.css          # react-datepicker theming
 ```

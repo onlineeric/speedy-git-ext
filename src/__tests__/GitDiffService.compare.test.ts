@@ -11,9 +11,9 @@ describe('GitDiffService.compareRefs parser', () => {
     const service = new GitDiffService('/repo', mockLog);
     const executeSpy = vi.spyOn(service['executor'], 'execute').mockImplementation(async (opts) => {
       const cmd = opts.args.join(' ');
-      if (cmd.startsWith('diff --name-status')) {
+      if (cmd.startsWith('diff --raw')) {
         // Two regular files: M and A
-        return { success: true, value: { stdout: `M${NUL}src/foo.ts${NUL}A${NUL}src/bar.ts${NUL}`, stderr: '' } };
+        return { success: true, value: { stdout: `:100644 100644 aaaaaaa bbbbbbb M${NUL}src/foo.ts${NUL}:000000 100644 0000000 ccccccc A${NUL}src/bar.ts${NUL}`, stderr: '' } };
       }
       if (cmd.startsWith('diff --numstat')) {
         return { success: true, value: { stdout: `5\t3\tsrc/foo.ts${NUL}10\t0\tsrc/bar.ts${NUL}`, stderr: '' } };
@@ -45,8 +45,8 @@ describe('GitDiffService.compareRefs parser', () => {
     const service = new GitDiffService('/repo', mockLog);
     vi.spyOn(service['executor'], 'execute').mockImplementation(async (opts) => {
       const cmd = opts.args.join(' ');
-      if (cmd.startsWith('diff --name-status')) {
-        return { success: true, value: { stdout: `M${NUL}assets/logo.png${NUL}`, stderr: '' } };
+      if (cmd.startsWith('diff --raw')) {
+        return { success: true, value: { stdout: `:100644 100644 aaaaaaa bbbbbbb M${NUL}assets/logo.png${NUL}`, stderr: '' } };
       }
       if (cmd.startsWith('diff --numstat')) {
         return { success: true, value: { stdout: `-\t-\tassets/logo.png${NUL}`, stderr: '' } };
@@ -73,8 +73,8 @@ describe('GitDiffService.compareRefs parser', () => {
     const service = new GitDiffService('/repo', mockLog);
     vi.spyOn(service['executor'], 'execute').mockImplementation(async (opts) => {
       const cmd = opts.args.join(' ');
-      if (cmd.startsWith('diff --name-status')) {
-        return { success: true, value: { stdout: `R100${NUL}src/old.ts${NUL}src/new.ts${NUL}`, stderr: '' } };
+      if (cmd.startsWith('diff --raw')) {
+        return { success: true, value: { stdout: `:100644 100644 aaaaaaa bbbbbbb R100${NUL}src/old.ts${NUL}src/new.ts${NUL}`, stderr: '' } };
       }
       if (cmd.startsWith('diff --numstat')) {
         return { success: true, value: { stdout: `0\t0\t${NUL}src/old.ts${NUL}src/new.ts${NUL}`, stderr: '' } };
@@ -104,7 +104,7 @@ describe('GitDiffService.compareRefs parser', () => {
       if (cmd.startsWith('merge-base')) {
         return { success: false, error: { message: 'no merge base', code: 'COMMAND_FAILED', name: 'GitError', toJSON: () => ({}) } as never };
       }
-      if (cmd.startsWith('diff --name-status')) {
+      if (cmd.startsWith('diff --raw')) {
         return { success: true, value: { stdout: '', stderr: '' } };
       }
       if (cmd.startsWith('diff --numstat')) {

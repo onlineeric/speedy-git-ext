@@ -278,6 +278,7 @@ function CompareBody({ result }: { result: CompareResult }) {
       bHash: result.bResolvedHash,
       status: file.status,
       title: `${slotLabel(result.a)} → ${slotLabel(result.b)} · ${file.path}`,
+      isSubmodule: file.isSubmodule,
     });
   };
 
@@ -670,7 +671,7 @@ function FileChangesList({
       if (file.stageState === 'staged') {
         rpcClient.openStagedDiff(file.path);
       } else {
-        rpcClient.openDiff(details.hash, file.path, undefined, file.status);
+        rpcClient.openDiff(details.hash, file.path, undefined, file.status, file.isSubmodule);
       }
       return;
     }
