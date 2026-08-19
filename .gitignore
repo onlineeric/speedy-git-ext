@@ -11,3 +11,4 @@ test-repo-submodules/
 Thumbs.db
 .worktrees/
 .claude/.gitignore/
+AGENTS.md
