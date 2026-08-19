@@ -5,6 +5,7 @@ import { BranchIcon, CloudIcon } from './icons';
 import { SubmoduleBadge } from './FileChangeShared';
 import { InlineRefBadge } from './InlineRefBadge';
 import { RefBadgeLegend } from './RefBadgeLegend';
+import { dialogSectionLabelClassName } from './dialogStyles';
 import { ADDED_COLOR, DELETED_COLOR } from '../utils/themeColors';
 
 const ADDED_LINE_STYLE = { color: ADDED_COLOR };
@@ -53,6 +54,7 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
     content: (
       <>
         <section className="rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+          <h3 className={dialogSectionLabelClassName}>Thanks to our contributor</h3>
           <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
             This release comes from a report by{' '}
             <ExternalLink url="https://github.com/jinho9265">@jinho9265</ExternalLink> in{' '}
