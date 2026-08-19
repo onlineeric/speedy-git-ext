@@ -17,6 +17,9 @@ const NULL_CHAR = '\x00';
  */
 const SUBMODULE_MODE = '160000';
 
+/** What git appends to a submodule pointer whose checkout has uncommitted tracked changes. */
+const SUBMODULE_DIRTY_SUFFIX = '-dirty';
+
 /** Format for git show: full commit metadata with %x00 (git's null-byte placeholder) as separators.
  *  We use %x00 instead of literal \x00 because Node.js spawn rejects args containing null bytes. */
 const SHOW_FORMAT = '%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x00%s%x00%b';
@@ -123,6 +126,11 @@ export class GitDiffService {
     // resolves fine, but the hash it resolves to is a commit in the submodule's own
     // object database, so this repo reports "bad object". There is no content here to
     // read — the pointer line is the whole of what the parent repo recorded.
+    //
+    // Reached on any read failure, not only a gitlink: an added file's parent side and a
+    // deleted file's child side fail too, and each pays one `ls-tree` that answers null.
+    // That is one spawn on a path that was already returning an error, never on a
+    // successful read, so no diff that renders content is slowed by it.
     const pointer = await this.readSubmodulePointerAt(hash, filePath);
     if (pointer !== null) {
       return ok(formatSubmodulePointer(pointer));
@@ -157,7 +165,12 @@ export class GitDiffService {
 
   /**
    * The working-tree side of a submodule diff: the pointer line for the commit the
-   * submodule's own checkout currently sits on.
+   * submodule's own checkout currently sits on, carrying git's own `-dirty` suffix when
+   * that checkout has uncommitted work in it.
+   *
+   * The suffix is not decoration: a submodule can be listed as changed *without* its
+   * pointer moving, and without it both sides of the diff would read the same hash — the
+   * blank-looking diff this whole path exists to stop showing.
    *
    * Empty string when there is nothing to show — the path is not a submodule, or is one
    * that was never initialized, so no commit is checked out to point at.
@@ -176,7 +189,28 @@ export class GitDiffService {
     }
 
     const pointer = parseSubmoduleStatusPointer(result.value.stdout);
-    return ok(pointer === null ? '' : formatSubmodulePointer(pointer));
+    if (pointer === null) return ok('');
+
+    const isDirty = await this.isSubmoduleCheckoutDirty(filePath);
+    return ok(formatSubmodulePointer(isDirty ? `${pointer}${SUBMODULE_DIRTY_SUFFIX}` : pointer));
+  }
+
+  /**
+   * Whether the submodule's own checkout has modified tracked content — exactly what git
+   * turns into the `-dirty` suffix.
+   *
+   * Asked of the *parent's* status rather than `git -C <path> status`, for the same reason
+   * the pointer comes from `git submodule status`: an uninitialized submodule is an empty
+   * directory, so a command run inside it walks up and answers for the parent repo.
+   */
+  private async isSubmoduleCheckoutDirty(filePath: string): Promise<boolean> {
+    const result = await this.executor.execute({
+      args: ['status', '--porcelain=v2', '-z', '--', filePath],
+      cwd: this.workspacePath,
+    });
+
+    if (!result.success) return false;
+    return hasModifiedSubmoduleContent(result.value.stdout);
   }
 
   /** The commit a submodule points at in `rev`'s tree, or `null` if that path is not a gitlink there. */
@@ -566,16 +600,37 @@ function parseLsFilesGitlink(output: string): string | null {
  * uninitialized submodule is just an empty directory, so rev-parse there walks up and
  * cheerfully answers with the *parent* repo's HEAD. '-' marks that case, and we return
  * null rather than a hash belonging to the wrong repository.
+ *
+ * 'U' — the submodule is in a merge conflict — is refused for a related reason: git prints
+ * an all-zero sha there rather than a commit, and rendering `Subproject commit 0000…` would
+ * be a hash that names nothing at all.
  */
 function parseSubmoduleStatusPointer(output: string): string | null {
   const line = output.split('\n')[0];
   if (!line) return null;
 
   const flag = line[0];
-  if (flag === '-') return null;
+  if (flag === '-' || flag === 'U') return null;
 
-  const hash = (flag === ' ' || flag === '+' || flag === 'U' ? line.slice(1) : line).trim().split(/ +/)[0];
+  const hash = (flag === ' ' || flag === '+' ? line.slice(1) : line).trim().split(/ +/)[0];
   return hash ? hash : null;
+}
+
+/**
+ * Whether a `git status --porcelain=v2 -z` run reports modified tracked content inside a
+ * submodule — the one flag git renders as the pointer's `-dirty` suffix.
+ *
+ * Field 3 of a '1'/'2' entry is 'S<c><m><u>' for a submodule (see
+ * {@link isSubmoduleStatusEntry}); the 'm' slot is tracked modifications. Untracked-only
+ * content sets 'u' instead, and git does not call that dirty here, so neither do we.
+ */
+function hasModifiedSubmoduleContent(output: string): boolean {
+  return output.split(NULL_CHAR).some((token) => {
+    // Only '1'/'2' entries carry the field; the other tokens include bare paths, which
+    // could otherwise have a third space-separated word that happens to start with 'S'.
+    if (!token.startsWith('1 ') && !token.startsWith('2 ')) return false;
+    return isSubmoduleStatusEntry(token) && token.split(' ')[2]?.[2] === 'M';
+  });
 }
 
 /** Builds a `FileChange`, leaving `isSubmodule` off entirely unless it is true. */

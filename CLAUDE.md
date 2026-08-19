@@ -190,7 +190,9 @@ nothing distinguishes it from a file until you try to read it — and then every
   cannot open a folder, and a `file://` URI there is the second half of the same bug. Resolve its
   pointer via `git submodule status`, **never** `git -C <path> rev-parse HEAD`: an uninitialized
   submodule is an empty directory, so rev-parse walks up and silently answers with the *parent*
-  repo's HEAD.
+  repo's HEAD. That side also carries git's `-dirty` suffix, taken from the parent status entry's
+  `S<c><m><u>` field: a submodule is listed as changed whenever its checkout is dirty, pointer moved
+  or not, so without the suffix both sides read the same hash and the diff looks blank again.
 
 ### Colors — Always Use VS Code Theme Tokens
 

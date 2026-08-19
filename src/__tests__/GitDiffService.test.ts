@@ -334,6 +334,50 @@ describe('GitDiffService submodule (gitlink) handling', () => {
     const result = await service.getWorkingTreeSubmoduleContent('sub');
     if (result.success) expect(result.value).toBe('');
   });
+
+  it("returns nothing for a conflicted submodule ('U'), whose printed sha is all zeroes", async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: { stdout: `U${'0'.repeat(40)} sub\n`, stderr: '' },
+    });
+
+    const result = await service.getWorkingTreeSubmoduleContent('sub');
+    if (result.success) expect(result.value).toBe('');
+  });
+
+  /** `submodule status` first, then the parent's status for the dirty flag. */
+  const mockWorktreeReads = (service: GitDiffService, statusStdout: string) =>
+    vi.spyOn(service['executor'], 'execute').mockImplementation(async (opts) => {
+      const stdout = opts.args[0] === 'submodule' ? ` ${GITLINK_SHA} sub (heads/main)\n` : statusStdout;
+      return { success: true, value: { stdout, stderr: '' } };
+    });
+
+  it("appends git's '-dirty' when the submodule checkout has modified tracked content", async () => {
+    // Without the suffix this diff reads `Subproject commit X` on both sides — the blank
+    // diff of issue #184, for a submodule listed as changed without its pointer moving.
+    const service = new GitDiffService('/repo', mockLog);
+    mockWorktreeReads(service, `1 .M S.M. 160000 160000 160000 ${GITLINK_SHA} ${GITLINK_SHA} sub${NUL}`);
+
+    const result = await service.getWorkingTreeSubmoduleContent('sub');
+    if (result.success) expect(result.value).toBe(`Subproject commit ${GITLINK_SHA}-dirty\n`);
+  });
+
+  it('leaves untracked-only submodule content clean, as git does', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    mockWorktreeReads(service, `1 .M S..U 160000 160000 160000 ${GITLINK_SHA} ${GITLINK_SHA} sub${NUL}`);
+
+    const result = await service.getWorkingTreeSubmoduleContent('sub');
+    if (result.success) expect(result.value).toBe(`Subproject commit ${GITLINK_SHA}\n`);
+  });
+
+  it('leaves a pointer-only change clean', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    mockWorktreeReads(service, `1 .M SC.. 160000 160000 160000 ${GITLINK_SHA} ${GITLINK_SHA} sub${NUL}`);
+
+    const result = await service.getWorkingTreeSubmoduleContent('sub');
+    if (result.success) expect(result.value).toBe(`Subproject commit ${GITLINK_SHA}\n`);
+  });
 });
 
 describe('GitDiffService.getStagedFileContent', () => {
