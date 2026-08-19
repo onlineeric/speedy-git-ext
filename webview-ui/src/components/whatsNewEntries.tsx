@@ -2,8 +2,13 @@ import type { ReactNode } from 'react';
 import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
 import { BranchIcon, CloudIcon } from './icons';
+import { SubmoduleBadge } from './FileChangeShared';
 import { InlineRefBadge } from './InlineRefBadge';
 import { RefBadgeLegend } from './RefBadgeLegend';
+import { ADDED_COLOR, DELETED_COLOR } from '../utils/themeColors';
+
+const ADDED_LINE_STYLE = { color: ADDED_COLOR };
+const DELETED_LINE_STYLE = { color: DELETED_COLOR };
 
 /**
  * One release's "What's new" content.
@@ -42,6 +47,43 @@ function ExternalLink({ url, children }: { url: string; children: ReactNode }) {
  * no other opt-out.
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
+  {
+    version: '5.10.1',
+    headline: 'Submodule changes now show which commit the submodule moved to.',
+    content: (
+      <>
+        <section className="rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+            This release comes from a report by{' '}
+            <ExternalLink url="https://github.com/jinho9265">@jinho9265</ExternalLink> in{' '}
+            <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/184">#184</ExternalLink>
+            , who not only found that submodule diffs opened empty but worked out exactly why and
+            what the fix should look like. Their first issue — thank you!
+          </p>
+        </section>
+
+        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          Opening a commit that moves a submodule to a new commit used to show a diff that was blank
+          on both sides. A submodule is not a file: this repository stores only a pointer to a commit
+          that lives in the submodule’s own repository, so there was never any content here to show.
+          Both sides now show that pointer, just as <code>git diff</code> does — so the diff tells you
+          which commit the submodule moved from and to.
+        </p>
+
+        <pre className="mt-3 overflow-x-auto rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2 text-xs leading-relaxed">
+          <span style={DELETED_LINE_STYLE}>- Subproject commit f4b7306bdab79fb7fc3fad64c2cf98667147d892</span>
+          {'\n'}
+          <span style={ADDED_LINE_STYLE}>+ Subproject commit ec5f862988547fabd5c10efa49c288469314e41a</span>
+        </pre>
+
+        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          Submodule rows are marked with a <SubmoduleBadge /> badge, since a two-line diff is
+          otherwise hard to tell from a broken one. Uncommitted submodule changes, which previously
+          could not be opened at all, now work the same way.
+        </p>
+      </>
+    ),
+  },
   {
     version: '5.10.0',
     headline: 'Branch badges now say where a branch lives with icons instead of words.',
