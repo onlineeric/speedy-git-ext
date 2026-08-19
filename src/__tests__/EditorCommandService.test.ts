@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GitServiceRegistry } from '../webview/GitServiceRegistry.js';
 import { EditorCommandService } from '../webview/EditorCommandService.js';
 import { WebviewRuntime } from '../webview/WebviewRuntime.js';
+import { UNCOMMITTED_HASH } from '../../shared/types.js';
 
 vi.mock('vscode', () => ({
   commands: {
@@ -65,6 +66,54 @@ describe('EditorCommandService', () => {
       expect.objectContaining({ authority: 'abcdef123456' }),
       expect.objectContaining({ authority: 'staged' }),
       'src/file.ts (Staged)',
+    );
+  });
+
+  it('routes the working-tree side of a submodule through the content provider, not a file URI', async () => {
+    const { service } = makeEditorCommandService({ repoPath: '/repo-a', headHash: 'abcdef123456' });
+
+    // A checked-out submodule is a directory. Handing `vscode.diff` a file:// URI for it
+    // is what produced issue #184's unopenable/blank working-tree diff.
+    await service.openDiffEditor(UNCOMMITTED_HASH, 'submodules/repo-a', undefined, 'modified', true);
+
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.diff',
+      expect.objectContaining({ authority: 'abcdef123456' }),
+      expect.objectContaining({ scheme: 'git-show', authority: 'worktree', query: 'submodules/repo-a' }),
+      'submodules/repo-a (Working Tree)',
+    );
+  });
+
+  it('still uses a plain file URI for an ordinary uncommitted file', async () => {
+    const { service } = makeEditorCommandService({ repoPath: '/repo-a' });
+
+    await service.openDiffEditor(UNCOMMITTED_HASH, 'src/file.ts', undefined, 'modified');
+
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.diff',
+      expect.anything(),
+      expect.objectContaining({ scheme: 'file' }),
+      'src/file.ts (Working Tree)',
+    );
+  });
+
+  it('uses the worktree sentinel for a submodule in a compare working-tree slot', async () => {
+    const { service } = makeEditorCommandService({ repoPath: '/repo-a' });
+
+    await service.openCompareDiffEditor({
+      filePath: 'submodules/repo-a',
+      aHash: 'a'.repeat(40),
+      bHash: null,
+      status: 'modified',
+      title: 'compare',
+      isSubmodule: true,
+    });
+
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.diff',
+      expect.objectContaining({ authority: 'a'.repeat(40) }),
+      expect.objectContaining({ authority: 'worktree' }),
+      'compare',
     );
   });
 

@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import type { FileChange } from '@shared/types';
 import type { FileTreeNode } from '../utils/fileTreeBuilder';
 import { buildFileTree, getDescendantFilePaths } from '../utils/fileTreeBuilder';
-import { FileStatusBadge, FileChangeIndicators, FileActionIcons } from './FileChangeShared';
+import { FileStatusBadge, FileChangeIndicators, FileActionIcons, SubmoduleBadge } from './FileChangeShared';
 
 interface FileChangesTreeViewProps {
   files: FileChange[];
@@ -268,6 +268,7 @@ function FileNode({
           </span>
         )}
       </span>
+      {file.isSubmodule && <SubmoduleBadge />}
       <FileChangeIndicators file={file} />
       {!hideActions && commitHash && (
         <FileActionIcons

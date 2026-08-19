@@ -282,6 +282,15 @@ export interface FileChange {
   additions?: number;
   deletions?: number;
   stageState?: FileStageState;
+  /**
+   * The path is a submodule (a gitlink, tree mode 160000), not a file.
+   *
+   * Set only when true, so it costs nothing on the wire for the ordinary case.
+   * Callers must not ask this repo for the path's *content*: a gitlink names a
+   * commit in the submodule's own object database, which this repo does not
+   * store. See `GitDiffService.getCommitFile`.
+   */
+  isSubmodule?: boolean;
 }
 
 export type FileChangeStatus =

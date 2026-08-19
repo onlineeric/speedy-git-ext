@@ -27,9 +27,9 @@ export class EditorCommandService {
     return result.success ? result.value : '';
   }
 
-  async openDiffEditor(hash: string, filePath: string, parentHash?: string, status?: FileChangeStatus): Promise<void> {
+  async openDiffEditor(hash: string, filePath: string, parentHash?: string, status?: FileChangeStatus, isSubmodule?: boolean): Promise<void> {
     if (hash === UNCOMMITTED_HASH) {
-      await this.openUncommittedDiff(filePath, status);
+      await this.openUncommittedDiff(filePath, status, isSubmodule);
       return;
     }
 
@@ -113,13 +113,18 @@ export class EditorCommandService {
     bHash: string | null;
     status: FileChangeStatus;
     title: string;
+    isSubmodule?: boolean;
   }): Promise<void> {
     void payload.status;
     const fileName = payload.filePath.split('/').pop() ?? payload.filePath;
 
     const buildUri = (hash: string | null): vscode.Uri => {
       if (hash === null) {
-        return vscode.Uri.file(path.join(this.runtime.currentRepoPath, payload.filePath));
+        // Working-tree slot. A submodule has no file to point at here — see
+        // `buildWorktreeSubmoduleUri`.
+        return payload.isSubmodule
+          ? buildWorktreeSubmoduleUri(payload.filePath, fileName)
+          : vscode.Uri.file(path.join(this.runtime.currentRepoPath, payload.filePath));
       }
       return vscode.Uri.from({
         scheme: 'git-show',
@@ -173,7 +178,7 @@ export class EditorCommandService {
     return folders?.[0]?.uri.fsPath;
   }
 
-  private async openUncommittedDiff(filePath: string, status?: FileChangeStatus): Promise<void> {
+  private async openUncommittedDiff(filePath: string, status?: FileChangeStatus, isSubmodule?: boolean): Promise<void> {
     const fileName = filePath.split('/').pop() ?? filePath;
     const absolutePath = path.join(this.runtime.currentRepoPath, filePath);
 
@@ -202,7 +207,8 @@ export class EditorCommandService {
       return;
     }
 
-    await this.tryOpenDiff(leftUri, vscode.Uri.file(absolutePath), `${filePath} (Working Tree)`, `Diff editor failed for uncommitted file: ${filePath}`);
+    const rightUri = isSubmodule ? buildWorktreeSubmoduleUri(filePath, fileName) : vscode.Uri.file(absolutePath);
+    await this.tryOpenDiff(leftUri, rightUri, `${filePath} (Working Tree)`, `Diff editor failed for uncommitted file: ${filePath}`);
   }
 
   private async tryOpenDiff(leftUri: vscode.Uri, rightUri: vscode.Uri, title: string, warning: string): Promise<void> {
@@ -224,4 +230,22 @@ export class EditorCommandService {
 
     return resolvedPath;
   }
+}
+
+/**
+ * The working-tree side of a *submodule* diff, routed through the `git-show` content
+ * provider instead of a `file://` URI.
+ *
+ * A checked-out submodule is a directory, so `vscode.diff` cannot open it as a text
+ * document at all — the diff either fails or shows nothing. The provider answers the
+ * `worktree` sentinel with the submodule's current pointer line, which is the same thing
+ * `git diff` renders for that side.
+ */
+function buildWorktreeSubmoduleUri(filePath: string, fileName: string): vscode.Uri {
+  return vscode.Uri.from({
+    scheme: 'git-show',
+    authority: 'worktree',
+    path: `/Working Tree: ${fileName}`,
+    query: filePath,
+  });
 }

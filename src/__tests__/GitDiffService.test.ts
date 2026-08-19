@@ -61,18 +61,22 @@ describe('GitDiffService.getCommitDetails', () => {
   });
 });
 
-describe('GitDiffService.getDiffNameStatus', () => {
+describe('GitDiffService.getDiffFileChanges', () => {
   it('parses simple modified/added/deleted entries', async () => {
     const service = new GitDiffService('/repo', mockLog);
     vi.spyOn(service['executor'], 'execute').mockResolvedValue({
       success: true,
       value: {
-        stdout: ['M', 'src/a.ts', 'A', 'src/new.ts', 'D', 'old.ts'].join(NUL) + NUL,
+        stdout: [
+          ':100644 100644 aaaaaaa bbbbbbb M', 'src/a.ts',
+          ':000000 100644 0000000 ccccccc A', 'src/new.ts',
+          ':100644 000000 ddddddd 0000000 D', 'old.ts',
+        ].join(NUL) + NUL,
         stderr: '',
       },
     });
 
-    const result = await service.getDiffNameStatus('abc1234');
+    const result = await service.getDiffFileChanges('abc1234');
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.value).toEqual([
@@ -88,12 +92,12 @@ describe('GitDiffService.getDiffNameStatus', () => {
     vi.spyOn(service['executor'], 'execute').mockResolvedValue({
       success: true,
       value: {
-        stdout: ['R100', 'old/path.ts', 'new/path.ts'].join(NUL) + NUL,
+        stdout: [':100644 100644 aaaaaaa bbbbbbb R100', 'old/path.ts', 'new/path.ts'].join(NUL) + NUL,
         stderr: '',
       },
     });
 
-    const result = await service.getDiffNameStatus('abc1234');
+    const result = await service.getDiffFileChanges('abc1234');
     if (result.success) {
       expect(result.value).toEqual([
         { path: 'new/path.ts', oldPath: 'old/path.ts', status: 'renamed' },
@@ -106,12 +110,12 @@ describe('GitDiffService.getDiffNameStatus', () => {
     vi.spyOn(service['executor'], 'execute').mockResolvedValue({
       success: true,
       value: {
-        stdout: ['C75', 'src/a.ts', 'src/b.ts'].join(NUL) + NUL,
+        stdout: [':100644 100644 aaaaaaa bbbbbbb C75', 'src/a.ts', 'src/b.ts'].join(NUL) + NUL,
         stderr: '',
       },
     });
 
-    const result = await service.getDiffNameStatus('abc1234');
+    const result = await service.getDiffFileChanges('abc1234');
     if (result.success) {
       expect(result.value[0].status).toBe('copied');
       expect(result.value[0].oldPath).toBe('src/a.ts');
@@ -125,11 +129,11 @@ describe('GitDiffService.getDiffNameStatus', () => {
       value: { stdout: '', stderr: '' },
     });
 
-    await service.getDiffNameStatus('abc1234', false);
+    await service.getDiffFileChanges('abc1234', false);
     expect(spy.mock.calls[0][0].args).toContain('--root');
 
     spy.mockClear();
-    await service.getDiffNameStatus('abc1234', true);
+    await service.getDiffFileChanges('abc1234', true);
     expect(spy.mock.calls[0][0].args).toContain('abc1234^1');
     expect(spy.mock.calls[0][0].args).not.toContain('--root');
   });
@@ -141,7 +145,7 @@ describe('GitDiffService.getDiffNameStatus', () => {
       value: { stdout: '', stderr: '' },
     });
 
-    const result = await service.getDiffNameStatus('abc1234');
+    const result = await service.getDiffFileChanges('abc1234');
     if (result.success) expect(result.value).toEqual([]);
   });
 });
@@ -167,6 +171,212 @@ describe('GitDiffService.getCommitFile', () => {
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({
       args: ['show', 'abc1234:src/foo.ts'],
     }));
+  });
+});
+
+describe('GitDiffService submodule (gitlink) handling', () => {
+  const GITLINK_SHA = 'ec5f862988547fabd5c10efa49c288469314e41a';
+  const PARENT_SHA = 'f4b7306bdab79fb7fc3fad64c2cf98667147d892';
+
+  /** What `git show <rev>:<gitlink>` really does — the path resolves, the object does not exist here. */
+  const badObject = () => ({
+    success: false as const,
+    error: new GitError('fatal: bad object abc1234:sub', 'COMMAND_FAILED'),
+  });
+
+  it('flags a changed submodule via the 160000 mode in --raw output', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: {
+        stdout: [
+          `:160000 160000 ${PARENT_SHA} ${GITLINK_SHA} M`, 'submodules/repo-a',
+          ':100644 100644 aaaaaaa bbbbbbb M', 'src/a.ts',
+        ].join(NUL) + NUL,
+        stderr: '',
+      },
+    });
+
+    const result = await service.getDiffFileChanges('abc1234');
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value).toEqual([
+        { path: 'submodules/repo-a', status: 'modified', isSubmodule: true },
+        { path: 'src/a.ts', status: 'modified' },
+      ]);
+    }
+  });
+
+  it('flags an added submodule, whose src mode is 000000', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: {
+        stdout: [`:000000 160000 0000000 ${GITLINK_SHA} A`, 'sub'].join(NUL) + NUL,
+        stderr: '',
+      },
+    });
+
+    const result = await service.getDiffFileChanges('abc1234');
+    if (result.success) expect(result.value[0]).toEqual({ path: 'sub', status: 'added', isSubmodule: true });
+  });
+
+  it('flags a removed submodule, whose dst mode is 000000', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: {
+        stdout: [`:160000 000000 ${GITLINK_SHA} 0000000 D`, 'sub'].join(NUL) + NUL,
+        stderr: '',
+      },
+    });
+
+    const result = await service.getDiffFileChanges('abc1234');
+    if (result.success) expect(result.value[0]).toEqual({ path: 'sub', status: 'deleted', isSubmodule: true });
+  });
+
+  it('renders the pointer line when git show fails on a gitlink (issue #184)', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    const spy = vi.spyOn(service['executor'], 'execute')
+      .mockResolvedValueOnce(badObject())
+      .mockResolvedValueOnce({
+        success: true,
+        value: { stdout: `160000 commit ${GITLINK_SHA}\tsubmodules/repo-a\n`, stderr: '' },
+      });
+
+    const result = await service.getCommitFile('abc1234', 'submodules/repo-a');
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.value).toBe(`Subproject commit ${GITLINK_SHA}\n`);
+    expect(spy.mock.calls[1][0].args).toEqual(['ls-tree', '--end-of-options', 'abc1234', '--', 'submodules/repo-a']);
+  });
+
+  it('renders the pointer for the parent side too, so neither side of the diff is blank', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute')
+      .mockResolvedValueOnce(badObject())
+      .mockResolvedValueOnce({
+        success: true,
+        value: { stdout: `160000 commit ${PARENT_SHA}\tsubmodules/repo-a\n`, stderr: '' },
+      });
+
+    const result = await service.getCommitFile('abc1234~1', 'submodules/repo-a');
+    if (result.success) expect(result.value).toBe(`Subproject commit ${PARENT_SHA}\n`);
+  });
+
+  it('keeps the original error for a path that is genuinely absent, not a gitlink', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute')
+      .mockResolvedValueOnce(badObject())
+      // `git ls-tree` prints nothing for a path that is not in that tree.
+      .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } });
+
+    const result = await service.getCommitFile('abc1234', 'deleted.ts');
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe('COMMAND_FAILED');
+  });
+
+  it('does not mistake an ordinary blob for a gitlink', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute')
+      .mockResolvedValueOnce(badObject())
+      .mockResolvedValueOnce({
+        success: true,
+        value: { stdout: '100644 blob b962408116cab8dd7132dc0d9ceae1a0f9ac8db8\treadme.md\n', stderr: '' },
+      });
+
+    const result = await service.getCommitFile('abc1234', 'readme.md');
+    expect(result.success).toBe(false);
+  });
+
+  it('renders the staged pointer from ls-files when git show :<path> fails', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    const spy = vi.spyOn(service['executor'], 'execute')
+      .mockResolvedValueOnce(badObject())
+      .mockResolvedValueOnce({
+        success: true,
+        value: { stdout: `160000 ${GITLINK_SHA} 0\tsub\n`, stderr: '' },
+      });
+
+    const result = await service.getStagedFileContent('sub');
+    if (result.success) expect(result.value).toBe(`Subproject commit ${GITLINK_SHA}\n`);
+    expect(spy.mock.calls[1][0].args).toEqual(['ls-files', '-s', '--', 'sub']);
+  });
+
+  it('reads the working-tree pointer from submodule status', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: { stdout: ` ${GITLINK_SHA} sub (heads/main)\n`, stderr: '' },
+    });
+
+    const result = await service.getWorkingTreeSubmoduleContent('sub');
+    if (result.success) expect(result.value).toBe(`Subproject commit ${GITLINK_SHA}\n`);
+  });
+
+  it("strips submodule status's '+' flag for a checkout that differs from the index", async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: { stdout: `+${GITLINK_SHA} sub (heads/main)\n`, stderr: '' },
+    });
+
+    const result = await service.getWorkingTreeSubmoduleContent('sub');
+    if (result.success) expect(result.value).toBe(`Subproject commit ${GITLINK_SHA}\n`);
+  });
+
+  it("returns nothing for an uninitialized submodule ('-'), never the parent's HEAD", async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: { stdout: `-${GITLINK_SHA} sub\n`, stderr: '' },
+    });
+
+    const result = await service.getWorkingTreeSubmoduleContent('sub');
+    if (result.success) expect(result.value).toBe('');
+  });
+
+  it("returns nothing for a conflicted submodule ('U'), whose printed sha is all zeroes", async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: { stdout: `U${'0'.repeat(40)} sub\n`, stderr: '' },
+    });
+
+    const result = await service.getWorkingTreeSubmoduleContent('sub');
+    if (result.success) expect(result.value).toBe('');
+  });
+
+  /** `submodule status` first, then the parent's status for the dirty flag. */
+  const mockWorktreeReads = (service: GitDiffService, statusStdout: string) =>
+    vi.spyOn(service['executor'], 'execute').mockImplementation(async (opts) => {
+      const stdout = opts.args[0] === 'submodule' ? ` ${GITLINK_SHA} sub (heads/main)\n` : statusStdout;
+      return { success: true, value: { stdout, stderr: '' } };
+    });
+
+  it("appends git's '-dirty' when the submodule checkout has modified tracked content", async () => {
+    // Without the suffix this diff reads `Subproject commit X` on both sides — the blank
+    // diff of issue #184, for a submodule listed as changed without its pointer moving.
+    const service = new GitDiffService('/repo', mockLog);
+    mockWorktreeReads(service, `1 .M S.M. 160000 160000 160000 ${GITLINK_SHA} ${GITLINK_SHA} sub${NUL}`);
+
+    const result = await service.getWorkingTreeSubmoduleContent('sub');
+    if (result.success) expect(result.value).toBe(`Subproject commit ${GITLINK_SHA}-dirty\n`);
+  });
+
+  it('leaves untracked-only submodule content clean, as git does', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    mockWorktreeReads(service, `1 .M S..U 160000 160000 160000 ${GITLINK_SHA} ${GITLINK_SHA} sub${NUL}`);
+
+    const result = await service.getWorkingTreeSubmoduleContent('sub');
+    if (result.success) expect(result.value).toBe(`Subproject commit ${GITLINK_SHA}\n`);
+  });
+
+  it('leaves a pointer-only change clean', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    mockWorktreeReads(service, `1 .M SC.. 160000 160000 160000 ${GITLINK_SHA} ${GITLINK_SHA} sub${NUL}`);
+
+    const result = await service.getWorkingTreeSubmoduleContent('sub');
+    if (result.success) expect(result.value).toBe(`Subproject commit ${GITLINK_SHA}\n`);
   });
 });
 
@@ -262,6 +472,29 @@ describe('GitDiffService.getUncommittedSummary', () => {
       expect(result.value.unstagedFiles).toHaveLength(2); // bar.ts + untracked newfile
       expect(result.value.untrackedCount).toBe(1);
       expect(result.value.conflictType).toBeUndefined();
+    }
+  });
+
+  it("flags a submodule row from porcelain v2's 'S' field, leaving files as 'N'", async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    const tokens = [
+      '1 M. SC.. 160000 160000 160000 0000 0000 submodules/repo-a',
+      '1 .M N... 100644 100644 100644 0000 0000 src/bar.ts',
+    ];
+
+    vi.spyOn(service['executor'], 'execute')
+      .mockResolvedValueOnce({ success: true, value: { stdout: tokens.join(NUL) + NUL, stderr: '' } })
+      .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
+      .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })
+      .mockResolvedValueOnce({ success: false, error: new GitError('no merge', 'COMMAND_FAILED') })
+      .mockResolvedValueOnce({ success: false, error: new GitError('no rebase', 'COMMAND_FAILED') })
+      .mockResolvedValueOnce({ success: false, error: new GitError('no cp', 'COMMAND_FAILED') });
+
+    const result = await service.getUncommittedSummary();
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.stagedFiles[0]).toMatchObject({ path: 'submodules/repo-a', isSubmodule: true });
+      expect(result.value.unstagedFiles[0].isSubmodule).toBeUndefined();
     }
   });
 

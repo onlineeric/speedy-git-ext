@@ -1,6 +1,10 @@
 import * as vscode from 'vscode';
 import type { GitDiffService } from './services/GitDiffService.js';
 
+/** Authority sentinels standing in for a revision that has no commit hash. */
+const STAGED_AUTHORITY = 'staged';
+const WORKTREE_AUTHORITY = 'worktree';
+
 /**
  * Provides file content at a specific git revision for VS Code's diff editor.
  * Handles URIs with the scheme: git-show://COMMIT_HASH/path/to/file?COMMIT_HASH
@@ -21,9 +25,23 @@ export class GitShowContentProvider implements vscode.TextDocumentContentProvide
       throw new Error(`Invalid git-show URI: missing ${!hash ? 'hash' : 'file path'} (uri: ${uri.toString()})`);
     }
 
+    // Working-tree side of a *submodule* diff — authority is the sentinel "worktree".
+    // Ordinary files use a plain file:// URI for this side; a submodule cannot, because
+    // its working-tree form is a directory, which `vscode.diff` has no way to open.
+    if (hash === WORKTREE_AUTHORITY) {
+      const worktreeResult = await this.gitDiffService.getWorkingTreeSubmoduleContent(filePath);
+      if (!worktreeResult.success) {
+        if (worktreeResult.error.code === 'COMMAND_FAILED') {
+          return '';
+        }
+        throw new Error(`Failed to read submodule ${filePath}: ${worktreeResult.error.message}`);
+      }
+      return worktreeResult.value;
+    }
+
     // Staged (index) version — authority is the sentinel "staged" instead of a commit hash.
     // Uses `git show :<path>` to retrieve the exact content that would be committed.
-    if (hash === 'staged') {
+    if (hash === STAGED_AUTHORITY) {
       const stagedResult = await this.gitDiffService.getStagedFileContent(filePath);
       if (!stagedResult.success) {
         if (stagedResult.error.code === 'COMMAND_FAILED') {

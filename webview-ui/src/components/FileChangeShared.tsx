@@ -61,6 +61,27 @@ export function FileStatusBadge({ status }: { status: FileChange['status'] }) {
   );
 }
 
+const SUBMODULE_BADGE_STYLE = { color: ACCENT_COLOR, backgroundColor: tint(ACCENT_COLOR) };
+
+/**
+ * Marks a row as a submodule pointer rather than a file.
+ *
+ * Without it the diff these rows open is inexplicable: a submodule change is only ever
+ * the two `Subproject commit <hash>` lines, because the parent repo stores a pointer and
+ * not the submodule's content. The badge is what makes that two-line diff make sense.
+ */
+export function SubmoduleBadge() {
+  return (
+    <span
+      className="shrink-0 rounded px-1 text-[10px] font-semibold uppercase tracking-wide"
+      style={SUBMODULE_BADGE_STYLE}
+      title="Submodule — the diff shows which commit it points at"
+    >
+      sub
+    </span>
+  );
+}
+
 export function FileChangeIndicators({ file }: { file: FileChange }) {
   const showCounts = shouldShowChangeCounts(file);
 
@@ -143,6 +164,7 @@ export function FileChangeRow({
           </span>
         )}
       </span>
+      {file.isSubmodule && <SubmoduleBadge />}
       <FileChangeIndicators file={file} />
       {!hideActions && (
         <FileActionIcons
@@ -268,7 +290,9 @@ export function FileActionIcons({
             <FileCodeIcon />
           </button>
         )}
-        {file.status !== 'deleted' && (
+        {/* A submodule's working-tree form is a directory, so there is no current
+            *file* version to open — offering the button would only ever fail. */}
+        {file.status !== 'deleted' && !file.isSubmodule && (
           <button
             className="rounded p-0.5 text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)]"
             onClick={handleOpenCurrent}

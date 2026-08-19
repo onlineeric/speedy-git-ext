@@ -169,6 +169,31 @@ to spend that budget as rarely as possible:
 - The View settings dialog's open state lives in `graphStore` (`viewSettingsOpen`) because the Author
   column header's gear opens the same dialog.
 
+### Submodules — A Gitlink Has No Content Here
+
+A submodule is a tree entry with mode `160000` whose hash names a commit in the **submodule's**
+object database, not this repo's. Git reports a changed submodule as an ordinary changed path, so
+nothing distinguishes it from a file until you try to read it — and then every content read fails
+("bad object"). Swallowing that failure as empty is what made issue #184's diff blank on both sides.
+
+- **Never assume a changed path is a file.** `FileChange.isSubmodule` (set only when true) comes
+  from `--raw`'s mode fields and porcelain v2's `S` field. It is why `getDiffFileChanges` and
+  `compareRefs` use `git diff --raw` rather than `--name-status`: the mode is the only signal, and
+  `--raw` carries it in the call we already make. `--raw`'s two shas are *not* usable — `git diff`
+  abbreviates them, `diff-tree` does not, and the working-tree side is all zeroes.
+- **Content reads answer with the pointer line.** `getCommitFile` / `getStagedFileContent` fall back
+  to `Subproject commit <hash>` — what `git diff` itself prints — on the failure path only, so an
+  ordinary diff pays no extra spawn. The diff editor derives the `-`/`+` from the two sides. Any new
+  diff entry point routed through `GitShowContentProvider` inherits this for free; one that reads
+  content its own way must handle gitlinks itself.
+- **The working tree is a directory, so it needs the `worktree` URI sentinel** — `vscode.diff`
+  cannot open a folder, and a `file://` URI there is the second half of the same bug. Resolve its
+  pointer via `git submodule status`, **never** `git -C <path> rev-parse HEAD`: an uninitialized
+  submodule is an empty directory, so rev-parse walks up and silently answers with the *parent*
+  repo's HEAD. That side also carries git's `-dirty` suffix, taken from the parent status entry's
+  `S<c><m><u>` field: a submodule is listed as changed whenever its checkout is dirty, pointer moved
+  or not, so without the suffix both sides read the same hash and the diff looks blank again.
+
 ### Colors — Always Use VS Code Theme Tokens
 
 **Every color in the webview must come from a `var(--vscode-*)` theme token.** The webview is
@@ -208,7 +233,7 @@ Menu/dialog composition:
 - `components/ToolbarIconButton.tsx` — `TOGGLE_BUTTON_TONES` (`inactive`/`active`/`attention`), spread onto a toolbar button or a toolbar popover's trigger. Spread, not `className=`: the color is an inline style and only the hover state is a class
 - `components/CompareMenuItems.tsx`, `MenuCopySubmenu.tsx`, `MenuGroupSeparator.tsx`, `MenuSubTrigger.tsx` — shared menu fragments
 - `components/RefBadgeLegend.tsx` + `utils/refBadgeLegend.ts` — the "Badge Legend" section. Needs no props and no dialog context, so any dialog drops it in as `<RefBadgeLegend />`. Samples render through the real `RefLabel` in the graph's own lane-0 color, so the legend explains the badges the graph draws rather than a picture of them; a test asserts every `DisplayRef` type has a row
-- `components/whatsNewEntries.tsx` — **release notes are added here and nowhere else.** One entry per version, matched by *exact* `package.json` version; a version with no entry shows no dialog, which is how a release opts out. Content is a `ReactNode`, so an entry can embed live UI (5.10.0 embeds `RefBadgeLegend`) rather than describing it. A test asserts the shipping version has an entry — without it, a version-string typo silently means no dialog ever
+- `components/whatsNewEntries.tsx` — **release notes are added here and nowhere else.** One entry per version, matched by *exact* `package.json` version; a version with no entry shows no dialog, which is how a release opts out. Content is a `ReactNode`, so an entry can embed live UI (5.10.0 embeds `RefBadgeLegend`) rather than describing it. **Never add an entry on your own judgement — showing the dialog is the maintainer's call, made per release and stated explicitly.** Default to no entry, so no dialog interrupts anyone, and add one only when asked to. Do not infer it from the shape of the release: "this is a feature so it needs notes" / "this is only a fix so it doesn't" is exactly the wrong rule, because whether a release is worth interrupting for depends on things the diff doesn't show. A test therefore cannot require an entry for the shipping version; it instead asserts every entry's version is an exact `N.N.N` string, which is what catches the typo that would otherwise mean no dialog ever
 - `hooks/useDialogTelemetry.ts` — one confirmed/cancelled outcome per dialog open cycle
 - `hooks/useCopyFeedback.ts` — `copyToClipboard` + short "copied" flash, used by every copy button
 

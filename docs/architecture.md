@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-08-15**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-08-19**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -20,7 +20,7 @@ src/
 ├── extension.ts                  # Entry point; creates telemetry service, registers speedyGit.showGraph
 ├── ExtensionController.ts        # Orchestrates services, repo discovery, settings, session telemetry
 ├── WebviewProvider.ts            # Compatibility re-export of webview/WebviewProvider
-├── GitShowContentProvider.ts     # git-show:// URI protocol for diffs
+├── GitShowContentProvider.ts     # git-show:// URI protocol for diffs; `staged`/`worktree` authority sentinels
 ├── webview/                      # Backend webview subsystem (refactored from the old ~2400-line WebviewProvider)
 │   ├── WebviewProvider.ts        # Thin public facade used by ExtensionController; composes the objects below
 │   ├── WebviewPanelHost.ts       # VS Code panel lifecycle, HTML/CSP/nonce, postMessage, visibility
@@ -54,7 +54,7 @@ src/
 │   ├── GitExecutor.ts            # Spawns git processes, 30s timeout — the only place git is invoked
 │   ├── GitLogService.ts          # Parses git log (null-byte format), branches, branches-containing-a-commit. Default 500 commits.
 │   │                             #   Also walks stash base commits, so a stash survives its branch moving
-│   ├── GitDiffService.ts         # Commit details, file changes, file content at revision
+│   ├── GitDiffService.ts         # Commit details, file changes, file content at revision; submodule (gitlink) pointers
 │   ├── GitBranchService.ts       # Checkout, create, rename, delete, fast-forward branches
 │   ├── GitRemoteService.ts       # Fetch, pull, remote management
 │   ├── GitHistoryService.ts      # Rebase, reset operations
@@ -75,7 +75,8 @@ src/
 │   ├── AvatarRefreshQueue.ts     # Paced background drain (1/sec), interruptible rate-limit pause, batched result posting
 │   ├── GitHubAuthService.ts      # Explicit opt-in gate for the GitHub session used by avatar lookups
 │   ├── WhatsNewStore.ts          # Owns the one fact the webview can't know: is this the first run on this version.
-│   │                             #   Dev mode always shows; globalState records the version only once the user closes it
+│   │                             #   Dev mode always shows and records nothing — the debug host shares one globalState
+│   │                             #   with the installed extension; release records the version once the user closes it
 │   ├── GitConfigService.ts       # Git config reading
 │   └── TelemetryService.ts       # Consent-aware backend telemetry funnel; real + no-op implementations
 └── utils/
@@ -189,7 +190,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── MultiSelectDropdown.tsx           # Generic multi-select popover with pinned actions
 ├── MultiBranchDropdown.tsx           # Branch-specific wrapper, grouped local/remote
 ├── FilterableSingleSelectDropdown.tsx# Generic searchable single-select (repo/submodule pickers)
-├── FileChangeShared.tsx              # Row/badge/action-icon primitives + shouldShowChangeCounts
+├── FileChangeShared.tsx              # Row/badge/action-icon primitives + shouldShowChangeCounts + SubmoduleBadge
 ├── FileChangesTreeView.tsx           # Tree rendering over fileTreeBuilder output
 └── datepicker-overrides.css          # react-datepicker theming
 ```
@@ -279,7 +280,8 @@ shared/
 │                                 #   drive live dialog validation (frontend) and creation guards (backend)
 ├── telemetry.ts                  # Closed telemetry catalogs, payload types, buckets, runtime validator
 └── whatsNew.ts                   # PURE: whether the release-notes dialog opens on this run + the countdown lengths
-                                  #   (dev always shows, 2s; release shows once per version, 5s)
+                                  #   (dev always shows, 2s; release shows once per version, 5s), and whether a
+                                  #   dismissal may be recorded at all (never in dev — shared globalState)
 
 telemetry.json                    # Machine-readable event manifest for VS Code telemetry inspection
 esbuild.config.mjs                # Production-only telemetry destination injection; empty in dev/test builds

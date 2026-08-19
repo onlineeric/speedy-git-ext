@@ -39,7 +39,7 @@ export type RequestMessage =
   | { type: 'checkoutCommit'; payload: { hash: string } }
   | { type: 'fetch'; payload: { remote?: string; prune?: boolean; filters?: Partial<GraphFilters> } }
   | { type: 'copyToClipboard'; payload: { text: string } }
-  | { type: 'openDiff'; payload: { hash: string; filePath: string; parentHash?: string; status?: FileChangeStatus } }
+  | { type: 'openDiff'; payload: { hash: string; filePath: string; parentHash?: string; status?: FileChangeStatus; isSubmodule?: boolean } }
   | { type: 'openFile'; payload: { hash: string; filePath: string } }
   | { type: 'refresh'; payload: { filters?: Partial<GraphFilters> } }
   // Branch ops
@@ -191,7 +191,7 @@ export type RequestMessage =
   // Compare refs (042-compare-refs)
   | { type: 'compareRefs'; payload: { a: SlotValue; b: SlotValue; mode: CompareMode; requestId: string } }
   | { type: 'cancelCompare'; payload: { requestId: string } }
-  | { type: 'openCompareDiff'; payload: { filePath: string; aHash: string | null; bHash: string | null; status: FileChangeStatus; title: string } }
+  | { type: 'openCompareDiff'; payload: { filePath: string; aHash: string | null; bHash: string | null; status: FileChangeStatus; title: string; isSubmodule?: boolean } }
   /**
    * Fire-and-forget UI telemetry report (049-usage-telemetry). One-way by
    * contract: the webview never awaits it and the handler never posts a

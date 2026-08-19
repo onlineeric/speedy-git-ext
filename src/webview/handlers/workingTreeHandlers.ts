@@ -59,7 +59,7 @@ export const workingTreeHandlers = {
   },
 
   openDiff: async (message, context) => {
-    await context.editorCommands.openDiffEditor(message.payload.hash, message.payload.filePath, message.payload.parentHash, message.payload.status);
+    await context.editorCommands.openDiffEditor(message.payload.hash, message.payload.filePath, message.payload.parentHash, message.payload.status, message.payload.isSubmodule);
   },
 
   openFile: async (message, context) => {
