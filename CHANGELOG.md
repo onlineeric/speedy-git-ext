@@ -4,6 +4,16 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.10.1] - pre-release - 2026-08-19
+
+### Fixed
+- **A commit that moves a submodule to a new commit no longer opens an empty diff.** The file list correctly showed the submodule path as modified, but clicking it opened a diff editor that was blank on both sides, with nothing to say what had changed or why there was nothing there. The cause is that a submodule is not a file: the parent repository records only a pointer to a commit that lives in the submodule's own repository, and never stores its content. Asking this repository for that content therefore fails at every commit — not just the newest one — and the failure was being treated as "the file is empty" rather than "there is no file here". Both sides now show the pointer itself, `Subproject commit <hash>`, exactly as `git diff` renders a submodule change, so the diff shows which commit the submodule moved from and to. This applies wherever a submodule can appear: a commit's file list, staged and uncommitted changes, the Compare panel, and Open file at this commit.
+- **Uncommitted submodule changes could not be opened at all.** For everything else the working-tree side of a diff is the file on disk, but a checked-out submodule is a directory, and the diff editor has no way to open one — so this case failed rather than merely showing blank. It now resolves the commit the submodule is currently checked out at and shows that as the pointer. A submodule that has never been initialized has nothing checked out, and that side is simply left empty rather than reporting a commit from the wrong repository.
+- **Submodule rows are now marked as such** with a small **sub** badge in the file list and file tree, since a diff consisting of two `Subproject commit` lines is otherwise hard to tell from a broken one. The "Open current version" button no longer appears on those rows, because there is no file for it to open.
+
+### Credits
+- Reported by [@jinho9265](https://github.com/jinho9265) in [#184](https://github.com/onlineeric/speedy-git-ext/issues/184), with a diagnosis that correctly identified the submodule pointer as the reason the diff came back empty. Thank you!
+
 ## [5.10.0] - pre-release - 2026-08-15
 
 ### Added
