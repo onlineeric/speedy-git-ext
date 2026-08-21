@@ -217,6 +217,10 @@ export class GitRevertService {
     const result = await this.executor.execute({
       args: ['revert', '--continue'],
       cwd: this.workspacePath,
+      // Whether `--continue` opens an editor depends on the `--no-edit`/`--no-commit`
+      // intent the sequencer recorded when the revert started — state a command we
+      // may not have run (the user's terminal) wrote. `GitExecutor`'s default
+      // `GIT_EDITOR` makes that distinction moot.
     });
     if (!result.success) return result;
     return ok('Revert continued successfully.');

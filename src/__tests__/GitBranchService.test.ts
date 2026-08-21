@@ -225,3 +225,103 @@ describe('GitBranchService reserved-name guards', () => {
     expect(executeSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('GitBranchService.merge', () => {
+  const ok = { success: true as const, value: { stdout: '', stderr: '' } };
+
+  function makeService() {
+    const service = new GitBranchService('/repo', mockLog);
+    return { service, execute: vi.spyOn(service['executor'], 'execute') };
+  }
+
+  it('merges any commit-ish, not just a branch name', async () => {
+    const { service, execute } = makeService();
+    execute.mockResolvedValue(ok);
+
+    for (const ref of ['feature-x', 'origin/feature-x', 'v1.2.0', 'a1b2c3d4e5f6']) {
+      const result = await service.merge(ref);
+      expect(result.success).toBe(true);
+      expect(execute).toHaveBeenLastCalledWith(
+        expect.objectContaining({ args: ['merge', ref] })
+      );
+    }
+  });
+
+  it('orders the option flags ahead of the ref', async () => {
+    const { service, execute } = makeService();
+    execute.mockResolvedValue(ok);
+
+    await service.merge('feature-x', false, true, true);
+
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({ args: ['merge', '--no-commit', '--no-ff', '--squash', 'feature-x'] })
+    );
+  });
+
+  it('reports a conflict that wrote MERGE_HEAD as recoverable', async () => {
+    const { service, execute } = makeService();
+    const { GitError } = await import('../../shared/errors.js');
+    execute.mockImplementation(async ({ args }) =>
+      args[0] === 'rev-parse'
+        ? ok
+        : { success: false, error: new GitError('failed', 'COMMAND_FAILED', 'git merge x', 'CONFLICT (content): Merge conflict in a.txt') }
+    );
+
+    const result = await service.merge('feature-x');
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe('MERGE_CONFLICT');
+  });
+
+  it('reports a conflict with no MERGE_HEAD — a squash merge — as unrecoverable', async () => {
+    const { service, execute } = makeService();
+    const { GitError } = await import('../../shared/errors.js');
+    execute.mockImplementation(async ({ args }) =>
+      args[0] === 'rev-parse'
+        ? { success: false, error: new GitError('no MERGE_HEAD', 'COMMAND_FAILED') }
+        : { success: false, error: new GitError('failed', 'COMMAND_FAILED', 'git merge --squash x', 'CONFLICT (content): Merge conflict in a.txt') }
+    );
+
+    const result = await service.merge('feature-x', false, true);
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.code).toBe('MERGE_CONFLICT_NO_RECOVERY');
+  });
+
+  it('passes a non-conflict failure through untouched', async () => {
+    const { service, execute } = makeService();
+    const { GitError } = await import('../../shared/errors.js');
+    const original = new GitError('merge: nope - not something we can merge', 'COMMAND_FAILED');
+    execute.mockImplementation(async ({ args }) =>
+      args[0] === 'rev-parse' ? { success: false, error: new GitError('no MERGE_HEAD', 'COMMAND_FAILED') } : { success: false, error: original }
+    );
+
+    const result = await service.merge('nope');
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error).toBe(original);
+  });
+
+  it('accepts the prepared merge message instead of waiting on an editor', async () => {
+    const { service, execute } = makeService();
+    execute.mockResolvedValue(ok);
+
+    await service.continueMerge();
+
+    // The no-op editor itself comes from GitExecutor (see its own test); this only
+    // guards against a future env here shadowing it.
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ args: ['merge', '--continue'] }));
+    expect(execute.mock.calls[0][0].env).toBeUndefined();
+  });
+
+  it('reads MERGE_HEAD as the merge-in-progress signal', async () => {
+    const { service, execute } = makeService();
+    const { GitError } = await import('../../shared/errors.js');
+
+    execute.mockResolvedValue(ok);
+    expect(await service.getMergeState()).toEqual({ success: true, value: 'in-progress' });
+
+    execute.mockResolvedValue({ success: false, error: new GitError('x', 'COMMAND_FAILED') });
+    expect(await service.getMergeState()).toEqual({ success: true, value: 'idle' });
+  });
+});

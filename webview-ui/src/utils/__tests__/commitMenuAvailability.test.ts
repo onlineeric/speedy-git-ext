@@ -28,6 +28,7 @@ describe('getCommitMenuAvailability', () => {
       canReset: true,
       canRevert: true,
       canDrop: true,
+      canMerge: true,
     });
   });
 
@@ -93,5 +94,25 @@ describe('getCommitMenuAvailability', () => {
     expect(availability.isStash).toBe(true);
     expect(availability.canRevert).toBe(false);
     expect(availability.canDrop).toBe(false);
+  });
+
+  it('cannot merge a stash entry or the commit the branch is already on', () => {
+    const stash = makeCommit('abc', ['parent'], [{ name: 'stash@{0}', type: 'stash' }]);
+    expect(getCommitMenuAvailability({ commit: stash, ...ON_BRANCH }).canMerge).toBe(false);
+    expect(getCommitMenuAvailability({ commit: makeCommit('head'), ...ON_BRANCH }).canMerge).toBe(false);
+  });
+
+  it('offers merge for a merge commit, and in detached HEAD', () => {
+    // Nothing about `git merge <commit>` cares that the target is itself a merge,
+    // and detached HEAD merges just as happily as a branch does.
+    const mergeCommit = makeCommit('abc', ['p1', 'p2']);
+    expect(getCommitMenuAvailability({ commit: mergeCommit, ...ON_BRANCH }).canMerge).toBe(true);
+    expect(
+      getCommitMenuAvailability({
+        commit: makeCommit('abc'),
+        currentBranchHash: null,
+        isOnFirstParentChain: false,
+      }).canMerge
+    ).toBe(true);
   });
 });

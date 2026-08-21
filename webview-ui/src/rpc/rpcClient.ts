@@ -257,6 +257,9 @@ class RpcClient {
       case 'revertState':
         store.setRevertInProgress(message.payload.state === 'in-progress');
         break;
+      case 'mergeState':
+        store.setMergeInProgress(message.payload.state === 'in-progress');
+        break;
       case 'rebaseState':
         store.setLoading(false);
         store.setRebaseInProgress(message.payload.state === 'in-progress');
@@ -587,6 +590,14 @@ class RpcClient {
 
   revert(hash: string, options: RevertOptions) {
     this.send({ type: 'revert', payload: { hash, options } });
+  }
+
+  continueMerge() {
+    this.send({ type: 'continueMerge', payload: {} });
+  }
+
+  abortMerge() {
+    this.send({ type: 'abortMerge', payload: {} });
   }
 
   continueRevert() {

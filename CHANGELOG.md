@@ -4,6 +4,21 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.11.0] - pre-release - 2026-08-21
+
+### Added
+- **Merge is now offered on a commit row, not only on a branch badge.** Right-clicking a branch badge has always had "Merge into Current Branch", but right-clicking a commit did not — even though `git merge` takes a commit hash exactly as readily as it takes a branch name, and merging a specific commit is the natural move whenever the point you want is not the tip of anything: a commit somewhere back along a branch, or one on a branch whose badge is not on screen. The commit row menu now carries the same item, with the same dialog and the same `--squash` / `--no-commit` / `--no-ff` options, and merges the commit's full hash rather than the shortened one shown in the row — an abbreviation is only guaranteed unique within the commits currently loaded, while git resolves it against the whole repository. It is hidden only where it could not mean anything: on a stash entry, which is applied rather than merged, and on the commit the current branch is already sitting on. Merging an ancestor is left alone rather than pre-judged, because git already has a good answer for it — "Already up to date".
+- **Merge is now offered for remote branches and tags too.** `git merge origin/main` and `git merge v1.2.0` are ordinary merges, but the badge menu previously offered merge only for local branches, so the only way to reach either was the terminal. Both now show "Merge into Current Branch", and a remote branch is merged as `<remote>/<name>` rather than by its bare name, which would have silently picked up the local branch of the same name if one existed.
+- **A conflicted merge can now be finished or thrown away from the graph.** A merge that stopped on a conflict previously produced an error toast and nothing else — the conflicted files appeared in the working-tree panel, but "Continue Merge" and "Abort Merge" existed only for rebase and revert. Both now appear in the commit and badge menus for as long as the merge is paused, and every other action that would collide with it is disabled while it is, exactly as during a rebase. A merge left paused when the window was closed is picked up again on the next load, so the two items are there when you come back to it.
+
+### Changed
+- **A merge conflict now says which kind of conflict it is.** Git leaves two quite different states behind: an ordinary merge parks in git's own merge state and can be continued or aborted, while a conflicted `--squash` writes no `MERGE_HEAD` at all — for it, both `git merge --continue` and `git merge --abort` fail outright, and the only way out is to resolve the conflict and commit the result yourself. The two are now told apart by the state git actually left rather than by the wording of its output, and each says what it can and cannot do, instead of the raw git message that says neither.
+- **Starting a merge while another operation is running now gives the same message as everything else.** Git refuses a merge in the middle of a rebase, cherry-pick, revert or merge, but it refuses in its own plumbing wording. Merge now goes through the same in-progress check as rebase and revert, so the refusal reads the way the rest of the extension's do.
+
+### Fixed
+- **The branch badge's merge item is now disabled while another git operation is in progress,** matching the rebase item directly below it. It was previously the only action in that menu that stayed clickable during a rebase or cherry-pick, so the only thing that stopped it was git.
+- **Continue Revert now states that it must not open an editor.** Git does not open one here in practice, so nothing was visibly broken — but that rested on the intent recorded when the revert started, which may have been started in a terminal rather than by the extension. Nothing the extension runs is attached to one, so an editor launch would have hung until the command timed out. Continuing a rebase already said so explicitly; reverting and merging now do too.
+
 ## [5.10.1] - pre-release - 2026-08-19
 
 ### Fixed

@@ -49,6 +49,43 @@ function ExternalLink({ url, children }: { url: string; children: ReactNode }) {
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
   {
+    version: '5.11.0',
+    headline: 'You can now merge from a commit, a remote branch or a tag — not just a local branch.',
+    content: (
+      <>
+        <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          Merging used to be offered only when you right-clicked a local branch badge. It is now on
+          three more places, each running the merge you would type yourself:
+        </p>
+
+        <ul className="mt-3 space-y-2 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">Any commit row.</strong> Right-click a
+            commit and pick <em>Merge into Current Branch</em>. Useful when the point you want is not
+            the tip of a branch — or when that branch’s badge is not on screen.
+          </li>
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">A remote branch badge.</strong> Merges{' '}
+            <code>origin/main</code> itself, not a local branch that happens to share the name.
+          </li>
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">A tag badge.</strong> Merge a release
+            tag straight into the branch you are on.
+          </li>
+        </ul>
+
+        <section className="mt-4 rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+          <h3 className={dialogSectionLabelClassName}>If a merge hits a conflict</h3>
+          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+            <em>Continue Merge</em> and <em>Abort Merge</em> now appear in the right-click menus for as
+            long as the merge is paused, so you can finish it or back out without leaving the graph.
+            They are still there if you close the window and come back.
+          </p>
+        </section>
+      </>
+    ),
+  },
+  {
     version: '5.10.1',
     headline: 'Submodule changes now show which commit the submodule moved to.',
     content: (

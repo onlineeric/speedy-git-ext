@@ -20,7 +20,12 @@ import { useGraphStore } from './graphStore';
  */
 export function useOperationInProgress(): boolean {
   return useGraphStore(
-    (s) => s.loading || s.rebaseInProgress || s.cherryPickInProgress || s.revertInProgress
+    (s) =>
+      s.loading ||
+      s.rebaseInProgress ||
+      s.cherryPickInProgress ||
+      s.revertInProgress ||
+      s.mergeInProgress
   );
 }
 

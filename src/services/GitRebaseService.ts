@@ -163,9 +163,12 @@ export class GitRebaseService {
 
   async continueRebase(): Promise<Result<string>> {
     this.log.info('Continue rebase');
+    // A paused interactive rebase still needs its own message editor for the
+    // reword/squash steps ahead; without one, `GitExecutor`'s default no-op editor
+    // accepts each prepared message unchanged.
     const editorEnv = this.activeTmpDir
       ? { GIT_EDITOR: toShellPath(path.join(this.activeTmpDir, 'editor.sh')) }
-      : { GIT_EDITOR: 'true' };
+      : undefined;
     const result = await this.executor.execute({
       args: ['rebase', '--continue'],
       cwd: this.workspacePath,

@@ -441,6 +441,15 @@ export type CherryPickState = 'idle' | 'in-progress';
 
 export type RevertState = 'idle' | 'in-progress';
 
+/**
+ * Whether a merge is paused mid-conflict (`MERGE_HEAD` present).
+ *
+ * A squash merge never writes `MERGE_HEAD`, so a conflicted `--squash` reads as
+ * `idle` here — correctly, since `git merge --continue`/`--abort` do not apply
+ * to it. See `MERGE_CONFLICT_NO_RECOVERY`.
+ */
+export type MergeState = 'idle' | 'in-progress';
+
 /** Mode for the Revert Commit dialog. */
 export type RevertMode = 'commit' | 'no-commit' | 'edit-message';
 

@@ -26,6 +26,7 @@ export type TelemetryEventName =
 const TRACKED_OPERATION_LIST = [
   'checkoutBranch', 'checkoutCommit', 'stashAndCheckout', 'stashAndCheckoutCommit',
   'createBranch', 'renameBranch', 'deleteBranch', 'deleteRemoteBranch', 'mergeBranch',
+  'continueMerge', 'abortMerge',
   'fastForwardLocalBranch', 'push', 'pull', 'fetch',
   'addRemote', 'removeRemote', 'editRemote',
   'createTag', 'deleteTag', 'pushTag',
@@ -109,6 +110,9 @@ export const UI_ACTIONS = [
   'checkoutCommit', 'createBranch', 'createTag', 'createWorktree',
   'cherryPick', 'rebase', 'interactiveRebase',
   'revert', 'continueRevert', 'abortRevert', 'dropCommit',
+  // `merge` itself is listed with the badge menus below — the commit row now
+  // offers it too, and one action id covers both surfaces.
+  'continueMerge', 'abortMerge',
   'copyHash', 'copyShortHash', 'copyMessage',
   'resetSoft', 'resetMixed', 'resetHard',
   // Branch / remote-branch / tag badge menus

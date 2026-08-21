@@ -87,6 +87,8 @@ export class GitCherryPickService {
     const result = await this.executor.execute({
       args: ['cherry-pick', '--continue'],
       cwd: this.workspacePath,
+      // `--continue` commits the resolved pick through the commit message editor,
+      // which `GitExecutor`'s default `GIT_EDITOR` accepts unchanged.
     });
     if (!result.success) return result;
     return ok('Cherry-pick continued successfully.');

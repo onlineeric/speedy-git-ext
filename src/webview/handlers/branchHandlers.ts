@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { isCheckoutConflict } from '../../services/GitBranchService.js';
+import type { Result } from '../../../shared/errors.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
+import type { WebviewRequestContext } from '../WebviewRequestContext.js';
 
 export const branchHandlers = {
   checkoutBranch: async (message, context) => {
@@ -190,18 +192,34 @@ export const branchHandlers = {
   },
 
   mergeBranch: async (message, context) => {
+    // Git refuses a merge mid-rebase/cherry-pick/revert/merge anyway, but with a
+    // raw plumbing message. The guard answers the same refusal in the wording the
+    // rest of the UI uses.
+    const operationError = await context.operationGuard.getOperationInProgressError();
+    if (operationError) {
+      context.postMessage({ type: 'error', payload: { error: operationError } });
+      return;
+    }
     const result = await context.services.current().gitBranchService.merge(
       message.payload.branch,
       message.payload.noFastForward,
       message.payload.squash,
       message.payload.noCommit,
     );
-    if (result.success) {
-      context.postMessage({ type: 'success', payload: { message: result.value } });
-      await context.refreshCoordinator.reload();
-    } else {
-      context.postMessage({ type: 'error', payload: { error: result.error } });
-    }
+    await postMergeResult(context, result);
+  },
+
+  continueMerge: async (_message, context) => {
+    const result = await context.services.current().gitBranchService.continueMerge();
+    await postMergeResult(context, result);
+  },
+
+  abortMerge: async (_message, context) => {
+    // Shares `postMergeResult`: an abort that fails leaves the merge exactly where
+    // it was, and asking git for the state afterwards keeps the conflict UI up
+    // without a second copy of that reasoning here.
+    const result = await context.services.current().gitBranchService.abortMerge();
+    await postMergeResult(context, result);
   },
 } satisfies Pick<
   RequestHandlerMap,
@@ -215,4 +233,47 @@ export const branchHandlers = {
   | 'deleteBranch'
   | 'deleteRemoteBranch'
   | 'mergeBranch'
+  | 'continueMerge'
+  | 'abortMerge'
 >;
+
+/**
+ * Report the outcome of a merge attempt, and keep `mergeState` in step with it.
+ *
+ * Start, Continue and Abort share this: each either finishes the merge, parks it
+ * in a resolvable conflict, or fails without changing where the merge stands.
+ *
+ * The state is read back from git rather than inferred from the outcome, because
+ * the outcome does not determine it. A *successful* `--no-commit` merge leaves
+ * `MERGE_HEAD` behind and still needs Continue/Abort; a Continue that failed
+ * because the user already committed the merge by hand leaves none, and inferring
+ * "still in progress" there would strand every other menu action behind
+ * `useOperationInProgress`. A conflicted `--squash` writes no `MERGE_HEAD` at all,
+ * so it reads as idle — correctly, since neither command applies to it.
+ */
+async function postMergeResult(
+  context: WebviewRequestContext,
+  result: Result<string>,
+): Promise<void> {
+  if (result.success) {
+    context.postMessage({ type: 'success', payload: { message: result.value } });
+  } else {
+    context.postMessage({ type: 'error', payload: { error: result.error } });
+  }
+
+  // Read before the reload, not after: the Continue/Abort items are what the user
+  // reaches for next, and nothing about the probe depends on a 500-commit load.
+  const state = await context.services.current().gitBranchService.getMergeState();
+  if (state.success) {
+    context.postMessage({ type: 'mergeState', payload: { state: state.value } });
+  }
+
+  // Both conflict outcomes leave conflicted files in the working tree, and those
+  // only appear in the working-tree panel after a reload. A merge that failed
+  // without conflicting changed nothing, so it does not pay for one.
+  const conflicted = !result.success
+    && (result.error.code === 'MERGE_CONFLICT' || result.error.code === 'MERGE_CONFLICT_NO_RECOVERY');
+  if (result.success || conflicted) {
+    await context.refreshCoordinator.reload();
+  }
+}

@@ -161,7 +161,7 @@ describe('GitRebaseService.abortRebase / continueRebase', () => {
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ args: ['rebase', '--abort'] }));
   });
 
-  it('continueRebase passes GIT_EDITOR=true when no active tmpDir', async () => {
+  it('continueRebase leaves the editor to GitExecutor when there is no active tmpDir', async () => {
     const service = new GitRebaseService('/repo', mockLog);
     const spy = vi.spyOn(service['executor'], 'execute').mockResolvedValue({
       success: true,
@@ -169,9 +169,8 @@ describe('GitRebaseService.abortRebase / continueRebase', () => {
     });
 
     await service.continueRebase();
-    expect(spy).toHaveBeenCalledWith(expect.objectContaining({
-      args: ['rebase', '--continue'],
-      env: { GIT_EDITOR: 'true' },
-    }));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ args: ['rebase', '--continue'] }));
+    // No override: the executor's default no-op editor accepts each prepared message.
+    expect(spy.mock.calls[0][0].env).toBeUndefined();
   });
 });

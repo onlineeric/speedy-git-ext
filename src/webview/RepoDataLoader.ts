@@ -221,6 +221,7 @@ export class RepoDataLoader {
       rebaseState: 'idle',
       rebaseConflictInfo: null,
       revertState: 'idle',
+      mergeState: 'idle',
       errors,
     };
 
@@ -260,6 +261,7 @@ export class RepoDataLoader {
       worktreesSettled,
       stashesSettled,
       revertStateSettled,
+      mergeStateSettled,
       tagMetadataSettled,
     ] = await Promise.allSettled([
       services.gitDiffService.getUncommittedSummary(),
@@ -267,6 +269,7 @@ export class RepoDataLoader {
       services.gitWorktreeService.listWorktrees(),
       services.gitStashService.getStashes(),
       services.gitRevertService.getRevertState(),
+      services.gitBranchService.getMergeState(),
       services.gitTagService.getTagMetadata(),
     ]);
 
@@ -282,6 +285,7 @@ export class RepoDataLoader {
     const worktrees = unwrapSettledResult(worktreesSettled, 'worktrees', errors, reportLoadError);
     const stashes = unwrapSettledResult(stashesSettled, 'stashes', errors, reportLoadError);
     const revertState = unwrapSettledResult(revertStateSettled, 'revertState', errors, reportLoadError);
+    const mergeState = unwrapSettledResult(mergeStateSettled, 'mergeState', errors, reportLoadError);
     const tagMetadata = unwrapSettledResult(tagMetadataSettled, 'tagMetadata', errors, reportLoadError);
 
     if (uncommittedChanges) {
@@ -298,6 +302,9 @@ export class RepoDataLoader {
     }
     if (revertState) {
       this.deps.postMessage({ type: 'revertState', payload: { state: revertState } });
+    }
+    if (mergeState) {
+      this.deps.postMessage({ type: 'mergeState', payload: { state: mergeState } });
     }
     if (tagMetadata) {
       const metadata: Record<string, TagMetadata> = {};

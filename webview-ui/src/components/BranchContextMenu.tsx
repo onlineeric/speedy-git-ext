@@ -23,6 +23,7 @@ import { PushTagDialog } from './PushTagDialog';
 import { InputDialog } from './InputDialog';
 import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 import { MergeDialog } from './MergeDialog';
+import { getRefMergeSource } from '../utils/refMergeSource';
 import { PushDialog } from './PushDialog';
 import { CheckoutWithPullDialog } from './CheckoutWithPullDialog';
 import { CreateWorktreeDialog, type WorktreeSource } from './CreateWorktreeDialog';
@@ -126,6 +127,8 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
   // displayRefToRefInfo never emits type 'head', so we match by name against the store.
   const headBranch = useCurrentLocalBranch();
   const isCurrentBranch = !!(headBranch && headBranch.name === refInfo.name && !refInfo.remote);
+
+  const mergeSource = getRefMergeSource(refInfo, isCurrentBranch);
 
   const checkoutState = useMemo(() => getBranchCheckoutState(refInfo, branches), [refInfo, branches]);
 
@@ -290,8 +293,11 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
                   <MenuItem onSelect={handleCheckout}>Checkout {refInfo.name}</MenuItem>
                 )}
 
-                {isLocalBranch && !isCurrentBranch && (
-                  <MenuItem onSelect={() => { track('merge'); setMergeDialogOpen(true); }}>
+                {mergeSource && (
+                  <MenuItem
+                    disabled={isOperationInProgress}
+                    onSelect={() => { track('merge'); setMergeDialogOpen(true); }}
+                  >
                     Merge into Current Branch
                   </MenuItem>
                 )}
@@ -526,15 +532,18 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
       />
 
       {/* Merge dialog */}
-      <MergeDialog
-        open={mergeDialogOpen}
-        branchName={refInfo.name}
-        onConfirm={(options) => {
-          setMergeDialogOpen(false);
-          rpcClient.mergeBranch(refInfo.name, options);
-        }}
-        onCancel={() => setMergeDialogOpen(false)}
-      />
+      {mergeSource && (
+        <MergeDialog
+          open={mergeDialogOpen}
+          kind={mergeSource.kind}
+          sourceRef={mergeSource.ref}
+          onConfirm={(options) => {
+            setMergeDialogOpen(false);
+            rpcClient.mergeBranch(mergeSource.ref, options);
+          }}
+          onCancel={() => setMergeDialogOpen(false)}
+        />
+      )}
 
       {/* Checkout with pull dialog (dual-branch case) */}
       <CheckoutWithPullDialog

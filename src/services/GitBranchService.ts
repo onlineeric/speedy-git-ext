@@ -3,6 +3,8 @@ import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, err, ok } from '../../shared/errors.js';
 import { validateLocalBranchName, validateRefName } from '../utils/gitValidation.js';
 import { mapWorktreeConflictError } from '../utils/worktreeErrors.js';
+import { gitErrorDetail, isConflictStderr } from '../utils/gitParsers.js';
+import type { MergeState } from '../../shared/types.js';
 
 function isBranchNotFullyMerged(stderr: string | undefined): boolean {
   return stderr?.includes('is not fully merged') ?? false;
@@ -229,10 +231,30 @@ export class GitBranchService {
     return ok(`Deleted remote branch '${remote}/${name}'`);
   }
 
-  async merge(branch: string, noFastForward?: boolean, squash?: boolean, noCommit?: boolean): Promise<Result<string>> {
-    this.log.info(`Merge branch: ${branch}${noFastForward ? ' --no-ff' : ''}${squash ? ' --squash' : ''}${noCommit ? ' --no-commit' : ''}`);
-    const branchCheck = validateRefName(branch);
-    if (!branchCheck.success) return branchCheck;
+  /**
+   * Whether a merge is paused with `MERGE_HEAD` written — the only state
+   * `git merge --continue` / `--abort` can act on.
+   */
+  async getMergeState(): Promise<Result<MergeState>> {
+    const result = await this.executor.execute({
+      args: ['rev-parse', '--verify', '--quiet', 'MERGE_HEAD'],
+      cwd: this.workspacePath,
+    });
+    return ok(result.success ? 'in-progress' : 'idle');
+  }
+
+  /**
+   * Merge any commit-ish into the current branch.
+   *
+   * `ref` is deliberately not "a branch": git merges branches, remote-tracking
+   * branches, tags and raw commit hashes through the same command, and the UI
+   * offers all four. Nothing here narrows that — see `validateRefName`, which
+   * only rejects what git itself would refuse to parse as a ref.
+   */
+  async merge(ref: string, noFastForward?: boolean, squash?: boolean, noCommit?: boolean): Promise<Result<string>> {
+    this.log.info(`Merge: ${ref}${noFastForward ? ' --no-ff' : ''}${squash ? ' --squash' : ''}${noCommit ? ' --no-commit' : ''}`);
+    const refCheck = validateRefName(ref);
+    if (!refCheck.success) return refCheck;
 
     const args = ['merge'];
     if (noCommit) {
@@ -241,10 +263,65 @@ export class GitBranchService {
       args.push('--no-ff');
     }
     if (squash) args.push('--squash');
-    args.push(branch);
+    args.push(ref);
 
     const result = await this.executor.execute({ args, cwd: this.workspacePath });
+    if (!result.success) return this.toMergeError(result.error);
+    return ok(`Merged '${ref}' into current branch`);
+  }
+
+  /**
+   * Classify a failed merge.
+   *
+   * `MERGE_HEAD` is the discriminator rather than the stderr text, because the
+   * two conflict outcomes need different UI: an ordinary conflicted merge parks
+   * in git's merge state and is finished with Continue or thrown away with
+   * Abort, while a conflicted `--squash` writes no `MERGE_HEAD` at all — for it,
+   * `git merge --continue` and `--abort` both fail with "MERGE_HEAD missing",
+   * so offering them would be a dead end. The stderr check is only a fallback
+   * for the (rare) conflict git reports before writing the file.
+   */
+  private async toMergeError(error: GitError): Promise<Result<string>> {
+    const state = await this.getMergeState();
+    if (state.success && state.value === 'in-progress') {
+      return err(new GitError(
+        'Merge paused due to conflict. Resolve the conflicts in the Source Control panel, then continue or abort the merge.',
+        'MERGE_CONFLICT',
+        error.command,
+        error.stderr
+      ));
+    }
+    if (isConflictStderr(gitErrorDetail(error))) {
+      return err(new GitError(
+        'Merge stopped due to conflict. Resolve the conflicts in the Source Control panel and commit the result manually — this merge left no MERGE_HEAD behind, so there is no Continue or Abort step.',
+        'MERGE_CONFLICT_NO_RECOVERY',
+        error.command,
+        error.stderr
+      ));
+    }
+    return err(error);
+  }
+
+  async continueMerge(): Promise<Result<string>> {
+    this.log.info('Continue merge');
+    const result = await this.executor.execute({
+      args: ['merge', '--continue'],
+      cwd: this.workspacePath,
+      // The editor `--continue` would open for the prepared merge message is
+      // suppressed by `GitExecutor`'s default `GIT_EDITOR`, so the message is
+      // accepted unchanged.
+    });
+    if (!result.success) return this.toMergeError(result.error);
+    return ok('Merge continued successfully.');
+  }
+
+  async abortMerge(): Promise<Result<string>> {
+    this.log.info('Abort merge');
+    const result = await this.executor.execute({
+      args: ['merge', '--abort'],
+      cwd: this.workspacePath,
+    });
     if (!result.success) return result;
-    return ok(`Merged '${branch}' into current branch`);
+    return ok('Merge aborted.');
   }
 }
