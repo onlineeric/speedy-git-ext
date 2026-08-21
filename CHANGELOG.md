@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - **The branch badge's merge item is now disabled while another git operation is in progress,** matching the rebase item directly below it. It was previously the only action in that menu that stayed clickable during a rebase or cherry-pick, so the only thing that stopped it was git.
+- **Continue Revert now states that it must not open an editor.** Git does not open one here in practice, so nothing was visibly broken — but that rested on the intent recorded when the revert started, which may have been started in a terminal rather than by the extension. Nothing the extension runs is attached to one, so an editor launch would have hung until the command timed out. Continuing a rebase already said so explicitly; reverting and merging now do too.
 
 ## [5.10.1] - pre-release - 2026-08-19
 

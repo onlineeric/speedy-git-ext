@@ -217,6 +217,14 @@ export class GitRevertService {
     const result = await this.executor.execute({
       args: ['revert', '--continue'],
       cwd: this.workspacePath,
+      // Nothing here is attached to a terminal, so an editor launch would block
+      // until the executor's timeout kills it. Verified on git 2.43 that
+      // `--continue` does *not* open one — the sequencer replays the `--no-edit`
+      // or `--no-commit` intent recorded when the revert started — but that is
+      // undocumented behaviour resting on state written by a command we may not
+      // have run (the revert may have been started in a terminal). Stating the
+      // intent is a spawn-time env var, and matches `continueRebase`/`continueMerge`.
+      env: { GIT_EDITOR: 'true' },
     });
     if (!result.success) return result;
     return ok('Revert continued successfully.');

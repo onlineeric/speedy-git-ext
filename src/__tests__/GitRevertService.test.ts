@@ -414,6 +414,17 @@ describe('GitRevertService', () => {
         expect.objectContaining({ args: ['revert', '--continue'] })
       );
     });
+
+    it('never leaves an editor able to block the spawn', async () => {
+      const executeSpy = vi.spyOn(service['executor'], 'execute')
+        .mockResolvedValue({ success: true, value: { stdout: '', stderr: '' } });
+
+      await service.continueRevert();
+
+      expect(executeSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ env: { GIT_EDITOR: 'true' } })
+      );
+    });
   });
 
   describe('abortRevert', () => {
