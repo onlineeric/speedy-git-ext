@@ -12,14 +12,32 @@ import {
   dialogContentStyle,
 } from './dialogStyles';
 
+/**
+ * What is being merged in. Git merges all four through the same command, so this
+ * only decides the wording — the ref itself is passed through untouched.
+ */
+export type MergeSourceKind = 'branch' | 'remote-branch' | 'tag' | 'commit';
+
+const TITLE_BY_KIND: Record<MergeSourceKind, string> = {
+  branch: 'Merge Branch',
+  'remote-branch': 'Merge Remote Branch',
+  tag: 'Merge Tag',
+  commit: 'Merge Commit',
+};
+
 interface MergeDialogProps {
   open: boolean;
-  branchName: string;
+  /** The ref git is given — a branch name, `remote/name`, a tag or a commit hash. */
+  sourceRef: string;
+  /** How the ref is shown to the user; defaults to the ref itself. */
+  sourceLabel?: string;
+  kind: MergeSourceKind;
   onConfirm: (options: MergeOptions) => void;
   onCancel: () => void;
 }
 
-export function MergeDialog({ open, branchName, onConfirm, onCancel }: MergeDialogProps) {
+export function MergeDialog({ open, sourceRef, sourceLabel, kind, onConfirm, onCancel }: MergeDialogProps) {
+  const label = sourceLabel ?? sourceRef;
   const dialogTelemetry = useDialogTelemetry('merge', open);
   const [squash, setSquash] = useState(false);
   const [noCommit, setNoCommit] = useState(false);
@@ -50,10 +68,10 @@ export function MergeDialog({ open, branchName, onConfirm, onCancel }: MergeDial
           style={dialogContentStyle}
         >
           <AlertDialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">
-            Merge Branch
+            {TITLE_BY_KIND[kind]}
           </AlertDialog.Title>
           <AlertDialog.Description className="mt-2 text-sm text-[var(--vscode-descriptionForeground)]">
-            Merge &apos;{branchName}&apos; into the current branch?
+            Merge &apos;{label}&apos; into the current branch?
           </AlertDialog.Description>
 
           <div className="mt-4 space-y-3">
@@ -64,7 +82,7 @@ export function MergeDialog({ open, branchName, onConfirm, onCancel }: MergeDial
                 onChange={(e) => setSquash(e.target.checked)}
                 className="w-4 h-4 accent-[var(--vscode-button-background)]"
               />
-              <span className="text-sm text-[var(--vscode-foreground)]"><InlineCode>--squash</InlineCode>: combines all changes from the target branch into a single change on the current branch without creating a merge commit</span>
+              <span className="text-sm text-[var(--vscode-foreground)]"><InlineCode>--squash</InlineCode>: combines all incoming changes into a single change on the current branch without creating a merge commit</span>
             </label>
 
             <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -90,7 +108,7 @@ export function MergeDialog({ open, branchName, onConfirm, onCancel }: MergeDial
           </div>
 
           <div className="mt-4">
-            <CommandPreview command={buildMergeCommand({ branch: branchName, squash, noCommit, noFastForward: noCommit ? true : noFastForward })} />
+            <CommandPreview command={buildMergeCommand({ ref: sourceRef, squash, noCommit, noFastForward: noCommit ? true : noFastForward })} />
           </div>
 
           <div className="flex justify-end gap-2 mt-4">

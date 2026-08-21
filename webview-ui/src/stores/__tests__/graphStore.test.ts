@@ -46,6 +46,7 @@ const makeInitialDataPayload = (commits: Commit[]): InitialDataPayload => ({
   rebaseState: 'idle',
   rebaseConflictInfo: null,
   revertState: 'idle',
+  mergeState: 'idle',
   errors: [],
 });
 

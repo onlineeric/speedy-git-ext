@@ -8,7 +8,8 @@ export interface PushCommandOptions {
 }
 
 export interface MergeCommandOptions {
-  branch: string;
+  /** Any commit-ish: a branch, `remote/branch`, a tag or a commit hash. */
+  ref: string;
   noCommit: boolean;
   noFastForward: boolean;
   squash?: boolean;
@@ -101,7 +102,7 @@ export function buildMergeCommand(options: MergeCommandOptions): string {
   } else if (options.noFastForward) {
     parts.push('--no-ff');
   }
-  parts.push(options.branch);
+  parts.push(options.ref);
   return parts.join(' ');
 }
 

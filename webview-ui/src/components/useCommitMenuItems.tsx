@@ -3,6 +3,7 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 import type {
   CherryPickOptions,
   Commit,
+  MergeOptions,
   CommitParentInfo,
   RebaseEntry,
   ResetMode,
@@ -24,6 +25,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { CreateBranchDialog } from './CreateBranchDialog';
 import { TagCreationDialog } from './TagCreationDialog';
 import { CherryPickDialog } from './CherryPickDialog';
+import { MergeDialog } from './MergeDialog';
 import { InteractiveRebaseDialog } from './InteractiveRebaseDialog';
 import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 import { RevertDialog } from './RevertDialog';
@@ -216,12 +218,14 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   const [pendingResetMode, setPendingResetMode] = useState<ResetMode | null>(null);
   const [cherryPickCommits, setCherryPickCommits] = useState<Commit[]>([]);
   const [rebaseOntoConfirmOpen, setRebaseOntoConfirmOpen] = useState(false);
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
 
   const branches = useGraphStore((s) => s.branches);
   const selectedCommits = useGraphStore((s) => s.selectedCommits);
   const commits = useGraphStore((s) => s.commits);
   const clearSelectedCommits = useGraphStore((s) => s.clearSelectedCommits);
   const revertInProgress = useGraphStore((s) => s.revertInProgress);
+  const mergeInProgress = useGraphStore((s) => s.mergeInProgress);
   // Transient busy states only *disable* items — they stay visible so the user
   // can still see the option exists.
   const isOperationInProgress = useOperationInProgress();
@@ -301,6 +305,13 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
     setSlotsAndCompare(a, b);
   };
 
+  const handleMergeConfirm = (options: MergeOptions) => {
+    setMergeDialogOpen(false);
+    // The full hash, not the abbreviation: the abbreviation is only unique in the
+    // loaded window, and git resolves it against the whole object database.
+    rpcClient.mergeBranch(commit.hash, options);
+  };
+
   const handleResetSelect = (mode: ResetMode) => {
     if (mode === 'hard' || hasRemoteUpstream) {
       setPendingResetMode(mode);
@@ -368,6 +379,20 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
         )
       )}
 
+      {/* Row menu only: every badge menu already offers merge for its own ref just
+         above this group, so the commit-flavoured twin would be a duplicate. */}
+      {isRowMenu && availability.canMerge && (
+        <MenuItem
+          disabled={isOperationInProgress}
+          onSelect={() => {
+            track('merge');
+            setMergeDialogOpen(true);
+          }}
+        >
+          Merge into Current Branch
+        </MenuItem>
+      )}
+
       {availability.canRebase && (
         <>
           {/* The badge menu's parent already offers the ref-flavoured rebase. */}
@@ -401,6 +426,19 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
           </MenuItem>
           <MenuItem onSelect={() => { track('abortRevert'); rpcClient.abortRevert(); }}>
             Abort Revert
+          </MenuItem>
+        </>
+      )}
+
+      {/* Shown in badge menus too: a paused merge has to be escapable from
+         whichever menu the user happens to open. */}
+      {mergeInProgress && (
+        <>
+          <MenuItem onSelect={() => { track('continueMerge'); rpcClient.continueMerge(); }}>
+            Continue Merge
+          </MenuItem>
+          <MenuItem onSelect={() => { track('abortMerge'); rpcClient.abortMerge(); }}>
+            Abort Merge
           </MenuItem>
         </>
       )}
@@ -569,6 +607,17 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
         onConfirm={handleCherryPickConfirm}
         onCancel={() => setCherryPickOpen(false)}
       />
+
+      {isRowMenu && (
+        <MergeDialog
+          open={mergeDialogOpen}
+          kind="commit"
+          sourceRef={commit.hash}
+          sourceLabel={commit.abbreviatedHash}
+          onConfirm={handleMergeConfirm}
+          onCancel={() => setMergeDialogOpen(false)}
+        />
+      )}
 
       {isRowMenu && (
         <RebaseConfirmDialog

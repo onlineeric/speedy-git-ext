@@ -122,6 +122,8 @@ interface GraphStore {
   rebaseInProgress: boolean;
   rebaseConflictInfo: RebaseConflictInfo | undefined;
   revertInProgress: boolean;
+  /** A merge is paused mid-conflict, so Continue/Abort Merge apply. */
+  mergeInProgress: boolean;
   signatureCache: Record<string, CommitSignatureInfo | null>;
   signatureLoading: Record<string, boolean>;
   /** Cheap presence results for the signature column, keyed by hash (047). */
@@ -269,6 +271,7 @@ interface GraphStore {
   setRebaseInProgress: (inProgress: boolean) => void;
   setRebaseConflictInfo: (info: RebaseConflictInfo | undefined) => void;
   setRevertInProgress: (inProgress: boolean) => void;
+  setMergeInProgress: (inProgress: boolean) => void;
   setSignatureInfo: (hash: string, info: CommitSignatureInfo | null) => void;
   clearSignatureCache: () => void;
   setSignatureLoading: (hash: string, loading: boolean) => void;
@@ -398,6 +401,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   rebaseInProgress: false,
   rebaseConflictInfo: undefined,
   revertInProgress: false,
+  mergeInProgress: false,
   signatureCache: {},
   signatureLoading: {},
   signaturePresence: {},
@@ -698,6 +702,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setRebaseInProgress: (rebaseInProgress) => set({ rebaseInProgress }),
   setRebaseConflictInfo: (rebaseConflictInfo) => set({ rebaseConflictInfo }),
   setRevertInProgress: (revertInProgress) => set({ revertInProgress }),
+  setMergeInProgress: (mergeInProgress) => set({ mergeInProgress }),
   setSignatureInfo: (hash, info) => set((state) => ({
     signatureCache: { ...state.signatureCache, [hash]: info },
     signatureLoading: { ...state.signatureLoading, [hash]: false },
@@ -1207,13 +1212,14 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       worktreeList: worktrees,
       worktreeListLoading: false,
       ...worktreeLookups,
-      // NOTE: cherry-pick / rebase / revert in-progress flags are intentionally NOT
-      // set here. The `initialData` payload always carries synthetic `'idle'` values
+      // NOTE: cherry-pick / rebase / revert / merge in-progress flags are intentionally
+      // NOT set here. The `initialData` payload always carries synthetic `'idle'` values
       // (the backend resolves the real state asynchronously in `sendDeferredRepoData`).
       // Applying them here would flip an active operation's banner to "idle" on every
       // watcher-triggered refresh until the deferred `cherryPickState`/`rebaseState`/
-      // `revertState` messages restore it — a visible flicker. Those dedicated messages
-      // are the single source of truth; store defaults cover the first load.
+      // `revertState`/`mergeState` messages restore it — a visible flicker. Those
+      // dedicated messages are the single source of truth; store defaults cover the
+      // first load.
       mergedCommits,
       topology,
       hiddenCommitHashes,

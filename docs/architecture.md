@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-08-19**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-08-21**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -35,7 +35,7 @@ src/
 │   ├── OperationGuard.ts         # In-progress checks (rebase/cherry-pick/revert/merge) → GitError | null
 │   └── handlers/                 # Domain RPC handlers; fetch services from the registry at call time
 │       ├── graphDataHandlers.ts  # getCommits/loadMore/getBranches/getCommitDetails/getAuthors/refresh
-│       ├── branchHandlers.ts     # checkout/create/rename/delete/merge/fast-forward branch
+│       ├── branchHandlers.ts     # checkout/create/rename/delete/fast-forward branch; merge + continue/abort merge (guarded, conflict-aware)
 │       ├── remoteHandlers.ts     # fetch/push/pull, add/edit/remove remote
 │       ├── tagHandlers.ts        # create/delete/push tag (optional chained push, remote delete, force — 048)
 │       ├── stashHandlers.ts      # get/apply/pop/drop/create stash
@@ -55,7 +55,7 @@ src/
 │   ├── GitLogService.ts          # Parses git log (null-byte format), branches, branches-containing-a-commit. Default 500 commits.
 │   │                             #   Also walks stash base commits, so a stash survives its branch moving
 │   ├── GitDiffService.ts         # Commit details, file changes, file content at revision; submodule (gitlink) pointers
-│   ├── GitBranchService.ts       # Checkout, create, rename, delete, fast-forward branches
+│   ├── GitBranchService.ts       # Checkout, create, rename, delete, fast-forward branches; merge any commit-ish + merge state/continue/abort
 │   ├── GitRemoteService.ts       # Fetch, pull, remote management
 │   ├── GitHistoryService.ts      # Rebase, reset operations
 │   ├── GitRebaseService.ts       # Interactive rebase with drag-drop reordering
@@ -170,6 +170,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── CommandPreview.tsx            # Live git command preview shown in dialogs
 ├── FieldError.tsx                # Validation message under inputs (pairs with aria-invalid/aria-describedby)
 ├── MergeDialog.tsx  RebaseConfirmDialog.tsx  CherryPickDialog.tsx  RevertDialog.tsx
+│                                 #   MergeDialog takes any commit-ish (branch / remote branch / tag / commit) + a kind for wording
 ├── DropCommitDialog.tsx  InteractiveRebaseDialog.tsx + InteractiveRebaseRow.tsx (@dnd-kit sortable)
 ├── CreateBranchDialog.tsx  DeleteBranchDialog.tsx  CheckoutWithPullDialog.tsx
 ├── TagCreationDialog.tsx  DeleteTagDialog.tsx  PushTagDialog.tsx
@@ -227,7 +228,7 @@ utils/
 ├── commitReachability.ts         # Branch reachability per commit; checkers cached by commit-list identity (WeakMap)
 ├── commitRefs.ts                 # Row predicates by ref decoration (findHeadCommit/findHeadCommitHash,
 │                                 #   isStashPseudoCommit) — used by topology, uncommitted parent, tooltip, Go to HEAD
-├── commitMenuAvailability.ts     # Which commit actions apply (rebase/reset/revert/drop/cherry-pick)
+├── commitMenuAvailability.ts     # Which commit actions apply (rebase/reset/revert/drop/cherry-pick/merge)
 ├── headNavigation.ts             # "Go to HEAD" decision logic + toast messages
 ├── rowVisibility.ts              # Scroll-offset maths for revealing a row when the details panel resizes the viewport
 ├── commitVisibility.ts           # Visibility/filter predicates for the virtualized row list

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { isCheckoutConflict } from '../../services/GitBranchService.js';
+import type { Result } from '../../../shared/errors.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 
 export const branchHandlers = {
@@ -190,16 +191,37 @@ export const branchHandlers = {
   },
 
   mergeBranch: async (message, context) => {
+    // Git refuses a merge mid-rebase/cherry-pick/revert/merge anyway, but with a
+    // raw plumbing message. The guard answers the same refusal in the wording the
+    // rest of the UI uses.
+    const operationError = await context.operationGuard.getOperationInProgressError();
+    if (operationError) {
+      context.postMessage({ type: 'error', payload: { error: operationError } });
+      return;
+    }
     const result = await context.services.current().gitBranchService.merge(
       message.payload.branch,
       message.payload.noFastForward,
       message.payload.squash,
       message.payload.noCommit,
     );
+    await postMergeResult(context, result);
+  },
+
+  continueMerge: async (_message, context) => {
+    const result = await context.services.current().gitBranchService.continueMerge();
+    await postMergeResult(context, result);
+  },
+
+  abortMerge: async (_message, context) => {
+    const result = await context.services.current().gitBranchService.abortMerge();
     if (result.success) {
       context.postMessage({ type: 'success', payload: { message: result.value } });
       await context.refreshCoordinator.reload();
+      context.postMessage({ type: 'mergeState', payload: { state: 'idle' } });
     } else {
+      // An abort that fails leaves the merge exactly where it was, so the
+      // conflict UI must stay up rather than be torn down.
       context.postMessage({ type: 'error', payload: { error: result.error } });
     }
   },
@@ -215,4 +237,33 @@ export const branchHandlers = {
   | 'deleteBranch'
   | 'deleteRemoteBranch'
   | 'mergeBranch'
+  | 'continueMerge'
+  | 'abortMerge'
 >;
+
+/**
+ * Report the outcome of a merge attempt, and keep `mergeState` in step with it.
+ *
+ * Start and Continue share this: both either finish the merge, park it in a
+ * resolvable conflict, or fail without changing where the merge stands. Only
+ * `MERGE_CONFLICT` means git wrote `MERGE_HEAD` and Continue/Abort now apply —
+ * `MERGE_CONFLICT_NO_RECOVERY` (a conflicted `--squash`) deliberately does not,
+ * because neither command would work on it.
+ */
+async function postMergeResult(
+  context: Parameters<typeof branchHandlers.mergeBranch>[1],
+  result: Result<string>,
+): Promise<void> {
+  if (result.success) {
+    context.postMessage({ type: 'success', payload: { message: result.value } });
+    await context.refreshCoordinator.reload();
+    context.postMessage({ type: 'mergeState', payload: { state: 'idle' } });
+    return;
+  }
+  context.postMessage({ type: 'error', payload: { error: result.error } });
+  if (result.error.code === 'MERGE_CONFLICT') {
+    context.postMessage({ type: 'mergeState', payload: { state: 'in-progress' } });
+    // The conflicted files only appear in the working-tree panel after a reload.
+    await context.refreshCoordinator.reload();
+  }
+}

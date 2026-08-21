@@ -54,28 +54,37 @@ describe('buildPushCommand', () => {
 
 describe('buildMergeCommand', () => {
   it('builds default merge command', () => {
-    expect(buildMergeCommand({ branch: 'feature', noCommit: false, noFastForward: false }))
+    expect(buildMergeCommand({ ref: 'feature', noCommit: false, noFastForward: false }))
       .toBe('git merge feature');
   });
 
   it('includes --no-ff alone', () => {
-    expect(buildMergeCommand({ branch: 'feature', noCommit: false, noFastForward: true }))
+    expect(buildMergeCommand({ ref: 'feature', noCommit: false, noFastForward: true }))
       .toBe('git merge --no-ff feature');
   });
 
   it('includes --no-commit with implied --no-ff', () => {
-    expect(buildMergeCommand({ branch: 'feature', noCommit: true, noFastForward: false }))
+    expect(buildMergeCommand({ ref: 'feature', noCommit: true, noFastForward: false }))
       .toBe('git merge --no-commit --no-ff feature');
   });
 
   it('includes --squash', () => {
-    expect(buildMergeCommand({ branch: 'feature', noCommit: false, noFastForward: false, squash: true }))
+    expect(buildMergeCommand({ ref: 'feature', noCommit: false, noFastForward: false, squash: true }))
       .toBe('git merge --squash feature');
   });
 
   it('combines --squash with --no-commit', () => {
-    expect(buildMergeCommand({ branch: 'feature', noCommit: true, noFastForward: false, squash: true }))
+    expect(buildMergeCommand({ ref: 'feature', noCommit: true, noFastForward: false, squash: true }))
       .toBe('git merge --squash --no-commit --no-ff feature');
+  });
+
+  it('takes any commit-ish, not just a branch name', () => {
+    expect(buildMergeCommand({ ref: 'a1b2c3d', noCommit: false, noFastForward: false }))
+      .toBe('git merge a1b2c3d');
+    expect(buildMergeCommand({ ref: 'origin/feature', noCommit: false, noFastForward: true }))
+      .toBe('git merge --no-ff origin/feature');
+    expect(buildMergeCommand({ ref: 'v1.2.0', noCommit: false, noFastForward: false }))
+      .toBe('git merge v1.2.0');
   });
 });
 

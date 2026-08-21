@@ -19,6 +19,7 @@ export interface CommitMenuAvailability {
   canRevert: boolean;
   canDrop: boolean;
   canReset: boolean;
+  canMerge: boolean;
 }
 
 export interface CommitMenuContext {
@@ -62,5 +63,12 @@ export function getCommitMenuAvailability({
     // are excluded on both counts: dropping one is ambiguous rather than a
     // rewrite, and one sitting in between would be flattened by the replay.
     canDrop: !isRootCommit && !isMergeCommit && !isStash && isOnFirstParentChain,
+    // `git merge <commit>` is as valid as `git merge <branch>`, so the only cases
+    // ruled out are the ones where it could not mean anything: a stash entry is a
+    // pseudo-commit rather than a ref you can merge, and merging the commit the
+    // current branch already sits on is git's own no-op. Anything else — including
+    // an ancestor, which git answers with "Already up to date" — is left to git to
+    // answer rather than pre-judged here.
+    canMerge: !isStash && !isHeadCommit,
   };
 }

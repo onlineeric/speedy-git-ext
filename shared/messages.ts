@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, AvatarAuthState, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata, ToolbarBooleanSetting } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, MergeState, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, AvatarAuthState, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata, ToolbarBooleanSetting } from './types.js';
 
 /** Payload for the batched initial data message */
 export interface InitialDataPayload {
@@ -25,6 +25,7 @@ export interface InitialDataPayload {
   rebaseState: RebaseState;
   rebaseConflictInfo: RebaseConflictInfo | null;
   revertState: RevertState;
+  mergeState: MergeState;
   /** Data source errors (empty if all succeeded) */
   errors: string[];
 }
@@ -48,6 +49,8 @@ export type RequestMessage =
   | { type: 'deleteBranch'; payload: { name: string; force?: boolean; deleteRemote?: { remote: string; name: string } } }
   | { type: 'deleteRemoteBranch'; payload: { remote: string; name: string } }
   | { type: 'mergeBranch'; payload: { branch: string; noFastForward?: boolean; squash?: boolean; noCommit?: boolean } }
+  | { type: 'continueMerge'; payload: Record<string, never> }
+  | { type: 'abortMerge'; payload: Record<string, never> }
   // Remote ops
   | { type: 'push'; payload: { remote: string; branch: string; setUpstream?: boolean; forceMode?: PushForceMode } }
   | { type: 'pull'; payload: { remote?: string; branch?: string; rebase?: boolean } }
@@ -211,6 +214,7 @@ export type ResponseMessage =
   | { type: 'stashes'; payload: { stashes: StashEntry[] } }
   | { type: 'cherryPickState'; payload: { state: CherryPickState } }
   | { type: 'revertState'; payload: { state: RevertState } }
+  | { type: 'mergeState'; payload: { state: MergeState } }
   | { type: 'rebaseState'; payload: { state: RebaseState; conflictInfo?: RebaseConflictInfo } }
   | { type: 'rebaseCommits'; payload: { entries: RebaseEntry[] } }
   | { type: 'signatureInfo'; payload: { hash: string; signature: CommitSignatureInfo | null } }
@@ -280,7 +284,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   checkoutBranch: true, checkoutCommit: true, fetch: true, copyToClipboard: true,
   openDiff: true, openFile: true, refresh: true,
   createBranch: true, renameBranch: true, deleteBranch: true,
-  deleteRemoteBranch: true, mergeBranch: true,
+  deleteRemoteBranch: true, mergeBranch: true, continueMerge: true, abortMerge: true,
   push: true, pull: true, fastForwardLocalBranch: true, getRemotes: true, addRemote: true,
   removeRemote: true, editRemote: true,
   createTag: true, deleteTag: true, pushTag: true,
@@ -313,7 +317,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commits: true, branches: true, commitDetails: true,
   error: true, loading: true, success: true,
-  remotes: true, stashes: true, cherryPickState: true, revertState: true,
+  remotes: true, stashes: true, cherryPickState: true, revertState: true, mergeState: true,
   rebaseState: true, rebaseCommits: true, signatureInfo: true,
   signaturePresence: true, signaturePresenceFailed: true, signaturesVerified: true,
   commitPushedResult: true, commitParents: true,

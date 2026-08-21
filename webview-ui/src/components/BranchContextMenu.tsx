@@ -22,7 +22,7 @@ import { DeleteTagDialog } from './DeleteTagDialog';
 import { PushTagDialog } from './PushTagDialog';
 import { InputDialog } from './InputDialog';
 import { RebaseConfirmDialog } from './RebaseConfirmDialog';
-import { MergeDialog } from './MergeDialog';
+import { MergeDialog, type MergeSourceKind } from './MergeDialog';
 import { PushDialog } from './PushDialog';
 import { CheckoutWithPullDialog } from './CheckoutWithPullDialog';
 import { CreateWorktreeDialog, type WorktreeSource } from './CreateWorktreeDialog';
@@ -126,6 +126,23 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
   // displayRefToRefInfo never emits type 'head', so we match by name against the store.
   const headBranch = useCurrentLocalBranch();
   const isCurrentBranch = !!(headBranch && headBranch.name === refInfo.name && !refInfo.remote);
+
+  // Merge source. `git merge` takes any commit-ish, so a tag and a remote-tracking
+  // branch are as mergeable as a local one — the only badge that isn't is a stash,
+  // which is applied rather than merged (FR-017 keeps it out of ref actions), and
+  // the branch already checked out, which would merge itself. A remote branch has
+  // to be named `<remote>/<name>`; `refInfo.name` alone is the local branch, if one
+  // exists at all.
+  const mergeKind: MergeSourceKind | null = isCurrentBranch
+    ? null
+    : isLocalBranch
+      ? 'branch'
+      : isRemoteBranch
+        ? 'remote-branch'
+        : isTag
+          ? 'tag'
+          : null;
+  const mergeRef = isRemoteBranch ? displayName : refInfo.name;
 
   const checkoutState = useMemo(() => getBranchCheckoutState(refInfo, branches), [refInfo, branches]);
 
@@ -290,8 +307,11 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
                   <MenuItem onSelect={handleCheckout}>Checkout {refInfo.name}</MenuItem>
                 )}
 
-                {isLocalBranch && !isCurrentBranch && (
-                  <MenuItem onSelect={() => { track('merge'); setMergeDialogOpen(true); }}>
+                {mergeKind && (
+                  <MenuItem
+                    disabled={isOperationInProgress}
+                    onSelect={() => { track('merge'); setMergeDialogOpen(true); }}
+                  >
                     Merge into Current Branch
                   </MenuItem>
                 )}
@@ -526,15 +546,18 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
       />
 
       {/* Merge dialog */}
-      <MergeDialog
-        open={mergeDialogOpen}
-        branchName={refInfo.name}
-        onConfirm={(options) => {
-          setMergeDialogOpen(false);
-          rpcClient.mergeBranch(refInfo.name, options);
-        }}
-        onCancel={() => setMergeDialogOpen(false)}
-      />
+      {mergeKind && (
+        <MergeDialog
+          open={mergeDialogOpen}
+          kind={mergeKind}
+          sourceRef={mergeRef}
+          onConfirm={(options) => {
+            setMergeDialogOpen(false);
+            rpcClient.mergeBranch(mergeRef, options);
+          }}
+          onCancel={() => setMergeDialogOpen(false)}
+        />
+      )}
 
       {/* Checkout with pull dialog (dual-branch case) */}
       <CheckoutWithPullDialog
