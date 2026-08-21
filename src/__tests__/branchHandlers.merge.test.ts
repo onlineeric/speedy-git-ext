@@ -10,11 +10,17 @@ vi.mock('vscode', () => ({
 function makeContext(
   gitBranchService: Record<string, unknown>,
   operationInProgress: GitError | null = null,
+  /** What git reports once the command has run — the handler reads it back. */
+  mergeStateAfter: 'idle' | 'in-progress' = 'idle',
 ) {
   const postMessage = vi.fn();
   const reload = vi.fn().mockResolvedValue(undefined);
+  const services = {
+    getMergeState: vi.fn().mockResolvedValue(ok(mergeStateAfter)),
+    ...gitBranchService,
+  };
   const context = {
-    services: { current: () => ({ gitBranchService }) },
+    services: { current: () => ({ gitBranchService: services }) },
     postMessage,
     operationGuard: { getOperationInProgressError: vi.fn().mockResolvedValue(operationInProgress) },
     refreshCoordinator: { reload },
@@ -64,7 +70,7 @@ describe('branchHandlers.mergeBranch', () => {
     const gitBranchService = {
       merge: vi.fn().mockResolvedValue(err(new GitError('Merge paused due to conflict.', 'MERGE_CONFLICT'))),
     };
-    const { context, postMessage, reload } = makeContext(gitBranchService);
+    const { context, postMessage, reload } = makeContext(gitBranchService, null, 'in-progress');
 
     await branchHandlers.mergeBranch(mergeRequest('feature-x'), context);
 
@@ -77,11 +83,37 @@ describe('branchHandlers.mergeBranch', () => {
     const gitBranchService = {
       merge: vi.fn().mockResolvedValue(err(new GitError('Merge stopped due to conflict.', 'MERGE_CONFLICT_NO_RECOVERY'))),
     };
-    const { context, postMessage } = makeContext(gitBranchService);
+    const { context, postMessage, reload } = makeContext(gitBranchService);
 
     await branchHandlers.mergeBranch(mergeRequest('feature-x'), context);
 
-    expect(mergeStates(postMessage)).toEqual([]);
+    expect(mergeStates(postMessage)).toEqual(['idle']);
+    // It still conflicted, so the working-tree panel is stale either way.
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reload for a merge that failed without touching anything', async () => {
+    const gitBranchService = {
+      merge: vi.fn().mockResolvedValue(err(new GitError('local changes would be overwritten', 'COMMAND_FAILED'))),
+    };
+    const { context, reload } = makeContext(gitBranchService);
+
+    await branchHandlers.mergeBranch(mergeRequest('feature-x'), context);
+
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('reports a successful --no-commit merge as still in progress', async () => {
+    const gitBranchService = { merge: vi.fn().mockResolvedValue(ok("Merged 'feature-x' into current branch")) };
+    // `--no-commit` succeeds but leaves MERGE_HEAD, so Continue/Abort still apply.
+    const { context, postMessage } = makeContext(gitBranchService, null, 'in-progress');
+
+    await branchHandlers.mergeBranch(
+      { type: 'mergeBranch', payload: { branch: 'feature-x', noCommit: true } },
+      context,
+    );
+
+    expect(mergeStates(postMessage)).toEqual(['in-progress']);
   });
 
   it('clears the state and reloads on success', async () => {
@@ -111,7 +143,7 @@ describe('branchHandlers continueMerge / abortMerge', () => {
     const gitBranchService = {
       continueMerge: vi.fn().mockResolvedValue(err(new GitError('still conflicted', 'MERGE_CONFLICT'))),
     };
-    const { context, postMessage } = makeContext(gitBranchService);
+    const { context, postMessage } = makeContext(gitBranchService, null, 'in-progress');
 
     await branchHandlers.continueMerge({ type: 'continueMerge', payload: {} }, context);
 
@@ -122,12 +154,25 @@ describe('branchHandlers continueMerge / abortMerge', () => {
     const gitBranchService = {
       abortMerge: vi.fn().mockResolvedValue(err(new GitError('fatal: there is no merge to abort', 'COMMAND_FAILED'))),
     };
-    const { context, postMessage } = makeContext(gitBranchService);
+    const { context, postMessage } = makeContext(gitBranchService, null, 'in-progress');
 
     await branchHandlers.abortMerge({ type: 'abortMerge', payload: {} }, context);
 
-    expect(mergeStates(postMessage)).toEqual([]);
+    expect(mergeStates(postMessage)).toEqual(['in-progress']);
     expect(postMessage.mock.calls.some(([m]) => m.type === 'error')).toBe(true);
+  });
+
+  it('drops out of the merge state when Continue fails on an already-finished merge', async () => {
+    const gitBranchService = {
+      continueMerge: vi.fn().mockResolvedValue(err(new GitError('fatal: MERGE_HEAD missing', 'COMMAND_FAILED'))),
+    };
+    // The user resolved and committed in the Source Control panel, so git has no
+    // merge left. Reporting "in progress" here would strand every other action.
+    const { context, postMessage } = makeContext(gitBranchService, null, 'idle');
+
+    await branchHandlers.continueMerge({ type: 'continueMerge', payload: {} }, context);
+
+    expect(mergeStates(postMessage)).toEqual(['idle']);
   });
 
   it('clears the state when Abort succeeds', async () => {

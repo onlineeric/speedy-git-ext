@@ -214,16 +214,11 @@ export const branchHandlers = {
   },
 
   abortMerge: async (_message, context) => {
+    // Shares `postMergeResult`: an abort that fails leaves the merge exactly where
+    // it was, and asking git for the state afterwards keeps the conflict UI up
+    // without a second copy of that reasoning here.
     const result = await context.services.current().gitBranchService.abortMerge();
-    if (result.success) {
-      context.postMessage({ type: 'success', payload: { message: result.value } });
-      await context.refreshCoordinator.reload();
-      context.postMessage({ type: 'mergeState', payload: { state: 'idle' } });
-    } else {
-      // An abort that fails leaves the merge exactly where it was, so the
-      // conflict UI must stay up rather than be torn down.
-      context.postMessage({ type: 'error', payload: { error: result.error } });
-    }
+    await postMergeResult(context, result);
   },
 } satisfies Pick<
   RequestHandlerMap,
@@ -244,11 +239,16 @@ export const branchHandlers = {
 /**
  * Report the outcome of a merge attempt, and keep `mergeState` in step with it.
  *
- * Start and Continue share this: both either finish the merge, park it in a
- * resolvable conflict, or fail without changing where the merge stands. Only
- * `MERGE_CONFLICT` means git wrote `MERGE_HEAD` and Continue/Abort now apply —
- * `MERGE_CONFLICT_NO_RECOVERY` (a conflicted `--squash`) deliberately does not,
- * because neither command would work on it.
+ * Start, Continue and Abort share this: each either finishes the merge, parks it
+ * in a resolvable conflict, or fails without changing where the merge stands.
+ *
+ * The state is read back from git rather than inferred from the outcome, because
+ * the outcome does not determine it. A *successful* `--no-commit` merge leaves
+ * `MERGE_HEAD` behind and still needs Continue/Abort; a Continue that failed
+ * because the user already committed the merge by hand leaves none, and inferring
+ * "still in progress" there would strand every other menu action behind
+ * `useOperationInProgress`. A conflicted `--squash` writes no `MERGE_HEAD` at all,
+ * so it reads as idle — correctly, since neither command applies to it.
  */
 async function postMergeResult(
   context: Parameters<typeof branchHandlers.mergeBranch>[1],
@@ -256,14 +256,21 @@ async function postMergeResult(
 ): Promise<void> {
   if (result.success) {
     context.postMessage({ type: 'success', payload: { message: result.value } });
-    await context.refreshCoordinator.reload();
-    context.postMessage({ type: 'mergeState', payload: { state: 'idle' } });
-    return;
+  } else {
+    context.postMessage({ type: 'error', payload: { error: result.error } });
   }
-  context.postMessage({ type: 'error', payload: { error: result.error } });
-  if (result.error.code === 'MERGE_CONFLICT') {
-    context.postMessage({ type: 'mergeState', payload: { state: 'in-progress' } });
-    // The conflicted files only appear in the working-tree panel after a reload.
+
+  // Both conflict outcomes leave conflicted files in the working tree, and those
+  // only appear in the working-tree panel after a reload. A merge that failed
+  // without conflicting changed nothing, so it does not pay for one.
+  const conflicted = !result.success
+    && (result.error.code === 'MERGE_CONFLICT' || result.error.code === 'MERGE_CONFLICT_NO_RECOVERY');
+  if (result.success || conflicted) {
     await context.refreshCoordinator.reload();
+  }
+
+  const state = await context.services.current().gitBranchService.getMergeState();
+  if (state.success) {
+    context.postMessage({ type: 'mergeState', payload: { state: state.value } });
   }
 }
