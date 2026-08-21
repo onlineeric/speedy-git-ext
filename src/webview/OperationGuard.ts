@@ -18,17 +18,18 @@ export class OperationGuard {
 
     // Two independent `rev-parse` probes: spawn them together and decide in
     // priority order afterwards, so a guarded operation pays one round trip
-    // rather than two serialized ones.
-    const [revertState, mergeHeadCheck] = await Promise.all([
+    // rather than two serialized ones. Each asks the service that owns the
+    // operation, so what counts as "paused" is defined once per operation.
+    const [revertState, mergeState] = await Promise.all([
       services.gitRevertService.getRevertState(),
-      services.gitLogService.verifyRef('MERGE_HEAD'),
+      services.gitBranchService.getMergeState(),
     ]);
 
     if (revertState.success && revertState.value === 'in-progress') {
       return new GitError('Another git operation is already in progress (revert). Finish it before starting this action.', 'OPERATION_IN_PROGRESS');
     }
 
-    if (mergeHeadCheck.success && mergeHeadCheck.value) {
+    if (mergeState.success && mergeState.value === 'in-progress') {
       return new GitError('Another git operation is already in progress (merge). Finish it before starting this action.', 'OPERATION_IN_PROGRESS');
     }
 

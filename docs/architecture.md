@@ -247,6 +247,8 @@ utils/
 ├── fileTreeBuilder.ts            # Flat file list → tree structure
 ├── radioAvailability.ts          # Enable/disable logic for mutually-exclusive options
 ├── mergeRefs.ts                  # Merges local/remote refs into DisplayRef[]
+├── refMergeSource.ts             # Whether a ref badge can be merged and under what name — a remote branch
+│                                 #   must be handed to `git merge` as `<remote>/<name>`, never the bare name
 ├── signatureGlyph.ts             # SignatureStatus → glyph/color (047); the single status→color map, reused by the details-panel labels
 ├── worktreeBadgeStyle.ts         # Worktree badge styling (046); hardcoded colors are deliberate — contrast vs. user lane colors
 ├── worktreeDisplay.ts            # Worktree list formatting/derivation (046)

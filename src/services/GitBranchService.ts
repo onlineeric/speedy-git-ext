@@ -307,9 +307,9 @@ export class GitBranchService {
     const result = await this.executor.execute({
       args: ['merge', '--continue'],
       cwd: this.workspacePath,
-      // `git merge --continue` opens an editor for the merge message it already
-      // prepared; `true` accepts it unchanged instead of hanging until timeout.
-      env: { GIT_EDITOR: 'true' },
+      // The editor `--continue` would open for the prepared merge message is
+      // suppressed by `GitExecutor`'s default `GIT_EDITOR`, so the message is
+      // accepted unchanged.
     });
     if (!result.success) return this.toMergeError(result.error);
     return ok('Merge continued successfully.');

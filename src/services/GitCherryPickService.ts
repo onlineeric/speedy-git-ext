@@ -87,12 +87,8 @@ export class GitCherryPickService {
     const result = await this.executor.execute({
       args: ['cherry-pick', '--continue'],
       cwd: this.workspacePath,
-      // `git cherry-pick --continue` commits the resolved pick through the commit
-      // message editor. Nothing here is attached to a terminal, so launching one
-      // would block until the executor's 30s timeout kills it and the user would
-      // see a TIMEOUT instead of a finished cherry-pick. Same reasoning as
-      // `continueRevert` / `continueMerge` / `continueRebase`.
-      env: { GIT_EDITOR: 'true' },
+      // `--continue` commits the resolved pick through the commit message editor,
+      // which `GitExecutor`'s default `GIT_EDITOR` accepts unchanged.
     });
     if (!result.success) return result;
     return ok('Cherry-pick continued successfully.');

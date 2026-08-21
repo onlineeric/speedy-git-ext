@@ -4,6 +4,33 @@ import { GitExecutor } from '../services/GitExecutor.js';
 
 const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as LogOutputChannel;
 
+describe('GitExecutor editor default', () => {
+  // Nothing the extension spawns is attached to a terminal, so a command that opens
+  // an editor would hang until the timeout. The executor makes that impossible for
+  // every command rather than per subcommand.
+  it('spawns git with a no-op editor by default', async () => {
+    const executor = new GitExecutor(mockLog);
+
+    const result = await executor.execute({ args: ['var', 'GIT_EDITOR'], cwd: process.cwd() });
+
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.value.stdout.trim()).toBe('true');
+  });
+
+  it('lets a caller that needs a real editor override it', async () => {
+    const executor = new GitExecutor(mockLog);
+
+    const result = await executor.execute({
+      args: ['var', 'GIT_EDITOR'],
+      cwd: process.cwd(),
+      env: { GIT_EDITOR: 'my-editor.sh' },
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.value.stdout.trim()).toBe('my-editor.sh');
+  });
+});
+
 describe('GitExecutor abort handling', () => {
   it('short-circuits when abortSignal is already aborted before execute is called', async () => {
     const executor = new GitExecutor(mockLog);

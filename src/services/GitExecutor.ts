@@ -57,7 +57,15 @@ export class GitExecutor {
     this.log.debug(`Executing: ${cmdString}`);
     const startTime = Date.now();
 
-    const spawnEnv = env ? { ...process.env, ...env } : undefined;
+    // Nothing here is attached to a terminal, so any git command that would open
+    // an editor (`merge`/`revert`/`cherry-pick`/`rebase --continue`, `commit`,
+    // `tag -a`, `pull --no-rebase`) blocks until the timeout above kills it and
+    // surfaces as `TIMEOUT` rather than as a finished operation. That is a property
+    // of how this extension spawns git, not of any one subcommand, so the
+    // no-op editor is the default for every spawn. Caller `env` is spread after it,
+    // so a command that genuinely needs an editor — the interactive rebase's
+    // sequence and message scripts — still overrides it.
+    const spawnEnv = { ...process.env, GIT_EDITOR: 'true', ...env };
 
     return new Promise((resolve) => {
       const gitProcess = spawn('git', args, {

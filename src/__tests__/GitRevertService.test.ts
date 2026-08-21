@@ -415,15 +415,15 @@ describe('GitRevertService', () => {
       );
     });
 
-    it('never leaves an editor able to block the spawn', async () => {
+    it('never overrides the executor\'s no-op editor', async () => {
       const executeSpy = vi.spyOn(service['executor'], 'execute')
         .mockResolvedValue({ success: true, value: { stdout: '', stderr: '' } });
 
       await service.continueRevert();
 
-      expect(executeSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ env: { GIT_EDITOR: 'true' } })
-      );
+      // GitExecutor supplies GIT_EDITOR for every spawn (see its own test); this
+      // only guards against a future env here shadowing it.
+      expect(executeSpy.mock.calls[0][0].env).toBeUndefined();
     });
   });
 

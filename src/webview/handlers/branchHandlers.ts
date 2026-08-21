@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { isCheckoutConflict } from '../../services/GitBranchService.js';
 import type { Result } from '../../../shared/errors.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
+import type { WebviewRequestContext } from '../WebviewRequestContext.js';
 
 export const branchHandlers = {
   checkoutBranch: async (message, context) => {
@@ -251,13 +252,20 @@ export const branchHandlers = {
  * so it reads as idle — correctly, since neither command applies to it.
  */
 async function postMergeResult(
-  context: Parameters<typeof branchHandlers.mergeBranch>[1],
+  context: WebviewRequestContext,
   result: Result<string>,
 ): Promise<void> {
   if (result.success) {
     context.postMessage({ type: 'success', payload: { message: result.value } });
   } else {
     context.postMessage({ type: 'error', payload: { error: result.error } });
+  }
+
+  // Read before the reload, not after: the Continue/Abort items are what the user
+  // reaches for next, and nothing about the probe depends on a 500-commit load.
+  const state = await context.services.current().gitBranchService.getMergeState();
+  if (state.success) {
+    context.postMessage({ type: 'mergeState', payload: { state: state.value } });
   }
 
   // Both conflict outcomes leave conflicted files in the working tree, and those
@@ -267,10 +275,5 @@ async function postMergeResult(
     && (result.error.code === 'MERGE_CONFLICT' || result.error.code === 'MERGE_CONFLICT_NO_RECOVERY');
   if (result.success || conflicted) {
     await context.refreshCoordinator.reload();
-  }
-
-  const state = await context.services.current().gitBranchService.getMergeState();
-  if (state.success) {
-    context.postMessage({ type: 'mergeState', payload: { state: state.value } });
   }
 }

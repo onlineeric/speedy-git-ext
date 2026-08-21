@@ -58,7 +58,7 @@ VS Code extension with **backend** (Node.js extension host) and **frontend** (Re
 | Path | Role |
 | --- | --- |
 | `src/` | Backend — esbuild → `dist/extension.js` (CJS, node18) |
-| `src/services/` | One `Git<Domain>Service` per git area; all repo-bound, all returning `Result<T, GitError>`. `GitExecutor` is the only place git is actually spawned (30s timeout) |
+| `src/services/` | One `Git<Domain>Service` per git area; all repo-bound, all returning `Result<T, GitError>`. `GitExecutor` is the only place git is actually spawned (30s timeout, and a no-op `GIT_EDITOR` by default, so no command can hang waiting on an editor — pass `env` to override where a real one is needed) |
 | `src/webview/` | Backend webview subsystem (see below) |
 | `webview-ui/src/` | Frontend — Vite + React → `dist/webview/` |
 | `shared/` | Types shared across the boundary: `types.ts`, `messages.ts` (RPC unions), `errors.ts` (`Result`/`GitError`), `gitRefValidation.ts`, `telemetry.ts` |
@@ -117,6 +117,7 @@ These exist because the rule they encode is subtle or shared across several call
 
 - `utils/refNameField.ts` — live ref-name validation state, error suppressed while the field is pristine. Used by Create Tag/Branch/Worktree/Remote dialogs
 - `utils/commitMenuAvailability.ts` — which commit actions apply (rebase/reset/revert/drop/cherry-pick/merge); shared by the commit row menu and the badge "Commit actions" submenu
+- `utils/refMergeSource.ts` — the ref-badge half of the same question: whether a badge can be merged and **under what name**. A remote branch must reach `git merge` as `<remote>/<name>`; the bare name silently resolves to a same-named local branch
 - `utils/refBadgeContent.ts` — a ref badge's label, icons and tooltip. **The two branch glyphs are a system**: the fork means "exists locally", the cloud means "exists on a remote", so a branch that is both leads with the union (`⑂☁ main`) and the scheme is legible without hovering. Both glyphs *lead*, which keeps the cloud on the same side of the name in every badge and leaves the trailing slot to the worktree icon alone. Remote *names* live only in the tooltip; 2+ remotes add a count to the cloud (`⑂☁2 main`), because a badge should spend row width only on what can't be inferred. Adding a cloud that means anything else breaks the encoding
 - `utils/commitRefs.ts` — identify a row by its ref decorations (`findHeadCommit`, `isStashPseudoCommit`); used by topology, the uncommitted node's parent, the tooltip and Go to HEAD
 - `utils/headNavigation.ts` — pure "Go to HEAD" decision logic + its toast messages, covering **both halves**: `decideHeadNavigation` for the `locateHead` answer and `decideHeadContinuation` for each follow-up batch (including the attempt cap). Both return the same decision kinds, so `rpcClient` executes them through one function — a rule added to only one half puts the two back out of step

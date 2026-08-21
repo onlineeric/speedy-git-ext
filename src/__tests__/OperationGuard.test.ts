@@ -16,9 +16,9 @@ function createGuard(overrides: Record<string, unknown> = {}) {
       getRevertState: vi.fn().mockResolvedValue({ success: true, value: 'idle' }),
       ...(overrides.gitRevertService as object),
     },
-    gitLogService: {
-      verifyRef: vi.fn().mockResolvedValue({ success: true, value: false }),
-      ...(overrides.gitLogService as object),
+    gitBranchService: {
+      getMergeState: vi.fn().mockResolvedValue({ success: true, value: 'idle' }),
+      ...(overrides.gitBranchService as object),
     },
   } as never);
 
@@ -58,8 +58,8 @@ describe('OperationGuard', () => {
     }).getOperationInProgressError()).resolves.toMatchObject({ message: expect.stringContaining('revert') });
 
     await expect(createGuard({
-      gitLogService: {
-        verifyRef: vi.fn().mockResolvedValue({ success: true, value: true }),
+      gitBranchService: {
+        getMergeState: vi.fn().mockResolvedValue({ success: true, value: 'in-progress' }),
       },
     }).getOperationInProgressError()).resolves.toMatchObject({ message: expect.stringContaining('merge') });
   });

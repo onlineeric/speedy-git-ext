@@ -308,9 +308,10 @@ describe('GitBranchService.merge', () => {
 
     await service.continueMerge();
 
-    expect(execute).toHaveBeenCalledWith(
-      expect.objectContaining({ args: ['merge', '--continue'], env: { GIT_EDITOR: 'true' } })
-    );
+    // The no-op editor itself comes from GitExecutor (see its own test); this only
+    // guards against a future env here shadowing it.
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ args: ['merge', '--continue'] }));
+    expect(execute.mock.calls[0][0].env).toBeUndefined();
   });
 
   it('reads MERGE_HEAD as the merge-in-progress signal', async () => {
