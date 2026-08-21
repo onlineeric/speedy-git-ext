@@ -64,10 +64,15 @@ export function WhatsNewDialog({ version, countdownSeconds, open, onClose }: Wha
           onPointerDownOutside={(event) => locked && event.preventDefault()}
           onInteractOutside={(event) => locked && event.preventDefault()}
         >
-          <Dialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">
+          {/* The headline carries the dialog's title weight, not the version line:
+              "What's new in v5.11.0" is the same every release and says nothing,
+              while the headline is the one sentence worth reading. So the version
+              sits above it as a small label and the headline gets `text-base
+              font-semibold`, the size every other dialog title in the app uses. */}
+          <Dialog.Title className="text-xs font-medium text-[var(--vscode-descriptionForeground)]">
             What’s new in v{entry.version}
           </Dialog.Title>
-          <Dialog.Description className="mt-1 text-sm text-[var(--vscode-descriptionForeground)]">
+          <Dialog.Description className="mt-1 text-base font-semibold leading-snug text-[var(--vscode-foreground)]">
             {entry.headline}
           </Dialog.Description>
 

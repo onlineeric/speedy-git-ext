@@ -74,11 +74,6 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           </li>
         </ul>
 
-        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
-          All four use the same dialog, with the same <code>--squash</code>, <code>--no-commit</code>{' '}
-          and <code>--no-ff</code> options, and show the exact command before you run it.
-        </p>
-
         <section className="mt-4 rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
           <h3 className={dialogSectionLabelClassName}>If a merge hits a conflict</h3>
           <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
