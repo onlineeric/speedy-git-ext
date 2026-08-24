@@ -54,7 +54,7 @@ Out of scope for this idea:
 | Authorship / signature notes | **Signature note only**, shown when the commit is signed. No authorship note. |
 | HEAD moved while the dialog was open | **Refuse and keep the dialog open**, preserving what the user typed. |
 | How the blocked state looks | **Silently disabled**, matching every other item; the backend guard stays as a second line of defence. |
-| Release | Both pieces in **5.12.0**. What's New entry for amend; the fix is changelog-only. |
+| Release | Both pieces in **5.12.0**. What's New entry covers the amend feature only — fixes never go in What's New, they go in the changelog. |
 
 The staged-changes default deliberately differs from plain `git commit --amend`, which absorbs the
 index. Silently swallowing files staged for the *next* commit is the classic amend footgun, and here
@@ -192,7 +192,8 @@ today, which is why the bug exists and why amend needs the same capability.
 
 It is **built first**, as its own change, because it introduces the full-message read that amend then
 consumes rather than inventing. It **ships in the same release** as amend, documented in the
-changelog; it does not get its own What's New entry.
+changelog only — it is not mentioned in the What's New dialog at all, since that dialog carries new
+features and never fixes.
 
 ## Why all four in-progress states are blocked
 
@@ -221,6 +222,10 @@ If the rebase edit-stop workflow is ever built, this rule is the thing to reopen
 - The reword body-loss fix — built first, changelog only.
 - Amend Last Commit — with a **What's New entry**, covering the item itself, the include-staged
   checkbox and the force-push option, and setting expectations about rewriting published commits.
+
+The What's New entry describes the **new feature only**. Fixes never appear in it — not the reword
+fix, not any other — regardless of how significant they are. The changelog is where fixes are
+recorded; the dialog exists to introduce what is new, not to report what was wrong.
 
 ## Left for the implementation spec
 
