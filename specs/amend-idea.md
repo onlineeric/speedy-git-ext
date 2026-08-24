@@ -225,7 +225,9 @@ If the rebase edit-stop workflow is ever built, this rule is the thing to reopen
 
 The What's New entry describes the **new feature only**. Fixes never appear in it — not the reword
 fix, not any other — regardless of how significant they are. The changelog is where fixes are
-recorded; the dialog exists to introduce what is new, not to report what was wrong.
+recorded; the dialog exists to introduce what is new, not to report what was wrong. As always, the
+final content and whether the dialog shows at all is settled in the maintainer's pre-release What's
+New pass, not decided from this document.
 
 ## Left for the implementation spec
 
