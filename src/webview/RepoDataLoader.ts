@@ -99,8 +99,14 @@ export class RepoDataLoader {
   // In-flight init, so concurrent loads coalesce onto one attempt. Cleared once
   // settled; a failed attempt (null repo) is retried on the next load.
   private gitHubRepoInit: Promise<GitHubRepoRef | null> | null = null;
-  /** Keeps the once-per-repo orientation log out of every auto-refresh. */
-  private loggedGitHubRepoState = false;
+  /**
+   * Which orientation line has already been logged for this repo, so it stays out
+   * of every auto-refresh. Tracks the *state* rather than a plain "logged" flag:
+   * the answer can change within one repo — adding an `origin` remote flips
+   * "unavailable" to "enabled" — and that flip is precisely what the line exists
+   * to report.
+   */
+  private loggedGitHubRepoState: 'none' | 'unavailable' | 'enabled' = 'none';
   /** Last `avatarUrls` payload posted, so an auto-refresh can skip an identical one. */
   private lastAvatarUrlsSignature: string | null = null;
   /** Bumped on every repo switch, so an in-flight resolution can tell it is stale. */
@@ -115,7 +121,7 @@ export class RepoDataLoader {
     this.repoGeneration += 1;
     this.gitHubRepo = null;
     this.gitHubRepoInit = null;
-    this.loggedGitHubRepoState = false;
+    this.loggedGitHubRepoState = 'none';
     // The cache survives the switch, but the posted map is what *this* repo's
     // authors need — clear it so the new repo's avatars are always sent.
     this.lastAvatarUrlsSignature = null;
@@ -374,8 +380,8 @@ export class RepoDataLoader {
       // Log once per repo, not per load: without this the feature simply does
       // nothing and there is no way to tell whether it is broken or just not
       // applicable here.
-      if (!this.loggedGitHubRepoState) {
-        this.loggedGitHubRepoState = true;
+      if (this.loggedGitHubRepoState !== 'unavailable') {
+        this.loggedGitHubRepoState = 'unavailable';
         this.deps.log.info(
           'GitHub avatars unavailable: no `origin` remote pointing at github.com. '
           + 'Falling back to Gravatar and initials.',
@@ -408,8 +414,8 @@ export class RepoDataLoader {
       sightings.push({ email, owner: repo.owner, repo: repo.repo, hashes });
     }
 
-    if (!this.loggedGitHubRepoState) {
-      this.loggedGitHubRepoState = true;
+    if (this.loggedGitHubRepoState !== 'enabled') {
+      this.loggedGitHubRepoState = 'enabled';
       this.deps.log.info(
         `GitHub avatars enabled for ${repo.owner}/${repo.repo} `
         + `(${this.deps.isAvatarAuthorized() ? 'authorized, 5000 lookups/hr' : 'not authorized, 60 lookups/hr shared per IP'}), `
