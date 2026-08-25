@@ -109,7 +109,7 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
   const track = (action: UiAction) => trackUiInteraction(menuSurface, action);
 
   // The commit this badge points at, supplying the Commit / Create / Copy groups.
-  const commitMenu = useCommitMenuItems({ commit, surface: menuSurface, variant: 'badge', badgeRef: refInfo });
+  const commitMenu = useCommitMenuItems({ commit, surface: menuSurface, variant: 'badge' });
 
   // Tag push/delete-from-remote target: the configured default remote, or undefined
   // when no remote exists (which hides the remote-bearing affordances). FR-009.

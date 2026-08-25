@@ -190,8 +190,16 @@ export function AmendCommitDialog({ open, commit, surface, onClose }: AmendCommi
           <Dialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">
             Amend Last Commit
           </Dialog.Title>
+          {/* Names the branch that moves, because the menu item does not: amend is
+             offered from every badge on this row, and a badge for some *other*
+             branch sitting on the same tip would otherwise leave which ref
+             follows the rewrite to be inferred. Nothing is named in detached
+             HEAD, where only HEAD moves. */}
           <Dialog.Description className="mt-1 text-sm text-[var(--vscode-descriptionForeground)]">
             Rewrites <code className="font-mono">{commit.abbreviatedHash}</code>, the commit currently checked out.
+            {currentLocalBranch && (
+              <> <code className="font-mono">{currentLocalBranch.name}</code> will move to the amended commit.</>
+            )}
           </Dialog.Description>
 
           <div className="mt-4 space-y-3">

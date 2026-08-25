@@ -1,4 +1,4 @@
-import type { Branch, Commit, RefInfo } from '@shared/types';
+import type { Branch, Commit } from '@shared/types';
 import { findHeadCommit, isStashPseudoCommit } from './commitRefs';
 
 /**
@@ -82,34 +82,6 @@ export function getCommitMenuAvailability({
     // entry is a pseudo-commit and cannot be amended.
     canAmend: isCheckedOutTip && !isStash,
   };
-}
-
-/** How a badge menu should present the amend item. */
-export type AmendBadgeVisibility = 'enabled' | 'disabled' | 'hidden';
-
-/**
- * How a ref badge's menu should offer amend.
- *
- * `git commit` takes no branch argument — it moves whatever HEAD points at — so
- * the only badge that can *run* an amend is the checked-out branch's own. From a
- * second local branch sharing the tip, the amend would rewrite the checked-out
- * branch and leave that one where it is, which is a menu naming one ref and
- * moving another.
- *
- * But hiding it there reads as a bug: the item is present on one branch badge
- * and absent on its neighbour, with nothing to say why. So a local branch badge
- * shows it **disabled**, carrying the explanation, while badge kinds that never
- * invited the reading — remote-tracking, tag, stash, HEAD — leave it out
- * entirely rather than parking a permanently dead item in menus where amend was
- * never a plausible move.
- */
-export function getAmendBadgeVisibility(
-  refInfo: RefInfo | undefined,
-  currentBranchName: string | undefined
-): AmendBadgeVisibility {
-  if (refInfo?.type !== 'branch') return 'hidden';
-  // Undefined means detached HEAD, where no branch badge is the checked-out one.
-  return refInfo.name === currentBranchName ? 'enabled' : 'disabled';
 }
 
 /**

@@ -22,21 +22,3 @@ export function describeForcePushFailure(rawError: string): string {
     ? `The commit was amended locally, but the force push was rejected. ${detail}`
     : 'The commit was amended locally, but the force push was rejected.';
 }
-
-/**
- * Why a branch badge that is not the checked-out one shows amend disabled.
- *
- * Says where the amend *can* be run from, not just that it cannot be run here —
- * the item is disabled on this badge, but the operation is available on the same
- * row, so a refusal that stops at "no" would send the user looking for something
- * that is already in front of them.
- */
-export function describeAmendBadgeBlock(
-  badgeBranchName: string,
-  currentBranchName: string | undefined
-): string {
-  if (currentBranchName === undefined) {
-    return `No branch is checked out, so amending would move HEAD alone — not ${badgeBranchName}. Use the commit row to amend.`;
-  }
-  return `Amending rewrites the commit HEAD points at, so it would move ${currentBranchName}, not ${badgeBranchName}. Use ${currentBranchName}'s badge or the commit row.`;
-}

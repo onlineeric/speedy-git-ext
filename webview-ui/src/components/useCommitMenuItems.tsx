@@ -6,7 +6,6 @@ import type {
   MergeOptions,
   CommitParentInfo,
   RebaseEntry,
-  RefInfo,
   ResetMode,
   RevertOptions,
   SlotValue,
@@ -19,12 +18,7 @@ import { trackUiInteraction } from '../utils/telemetry';
 import { buildCheckoutCommand, buildResetCommand } from '../utils/gitCommandBuilder';
 import { setSlotsAndCompare } from '../utils/compareDispatch';
 import { getReachabilityChecker } from '../utils/commitReachability';
-import {
-  getAmendBadgeVisibility,
-  getCommitMenuAvailability,
-  hasRemoteCounterpart,
-} from '../utils/commitMenuAvailability';
-import { describeAmendBadgeBlock } from '../utils/amendMessages';
+import { getCommitMenuAvailability, hasRemoteCounterpart } from '../utils/commitMenuAvailability';
 import { isStashPseudoCommit } from '../utils/commitRefs';
 import { CompareMenuItems } from './CompareMenuItems';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -60,12 +54,6 @@ interface UseCommitMenuItemsOptions {
   /** Hosting menu surface for UI telemetry (049-usage-telemetry). */
   surface: UiSurface;
   variant: CommitMenuVariant;
-  /**
-   * The badge this menu was opened from (`badge` variant only). Needed because
-   * one item — amend — is offered on a single badge rather than on all of them;
-   * see `isCheckedOutBranchBadge`.
-   */
-  badgeRef?: RefInfo;
 }
 
 function buildResetDescription(
@@ -238,7 +226,7 @@ function useAmendCommit(commit: Commit, surface: UiSurface) {
  * item in with the commit's copy items. Dialogs are returned apart from the
  * items because they must render outside the menu portal.
  */
-export function useCommitMenuItems({ commit, surface, variant, badgeRef }: UseCommitMenuItemsOptions) {
+export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuItemsOptions) {
   const [checkoutCommitConfirmOpen, setCheckoutCommitConfirmOpen] = useState(false);
   const [createBranchOpen, setCreateBranchOpen] = useState(false);
   const [createTagOpen, setCreateTagOpen] = useState(false);
@@ -290,16 +278,6 @@ export function useCommitMenuItems({ commit, surface, variant, badgeRef }: UseCo
   );
 
   const availability = getCommitMenuAvailability({ commit, currentBranchHash, isOnFirstParentChain });
-
-  // Amend moves whatever HEAD points at, so a badge menu offers it for real on
-  // one badge only. The other local branch badges on the same tip still show it,
-  // disabled and carrying the reason — present on one badge and absent on its
-  // neighbour is the shape that reads as a bug.
-  const amendBadgeVisibility = isRowMenu
-    ? 'enabled'
-    : getAmendBadgeVisibility(badgeRef, currentLocalBranch?.name);
-  const showAmend = availability.canAmend && amendBadgeVisibility !== 'hidden';
-  const amendBlockedHere = amendBadgeVisibility === 'disabled';
 
   const isMultiSelectActive =
     isRowMenu && selectedCommits.length > 1 && selectedCommits.includes(commit.hash);
@@ -392,24 +370,22 @@ export function useCommitMenuItems({ commit, surface, variant, badgeRef }: UseCo
         Checkout this commit
       </MenuItem>
 
-      {/* Only on the row git has checked out, and on that branch's own badge.
-         Disabled — never hidden — while another operation is in progress,
-         matching every other operation-dependent item; the backend guard stays
+      {/* Offered wherever the checked-out tip is: the row menu and every badge on
+         that row. Which badge was opened does not change what happens — all the
+         badges on a row sit on the same commit, and amend rewrites that commit —
+         so this behaves like the other current-branch actions in this menu
+         (Revert, Drop, Reset) rather than being singled out. Disabled, never
+         hidden, while another operation is in progress; the backend guard stays
          as the second line of defence for one started in a terminal. */}
-      {showAmend && (
+      {availability.canAmend && (
         <MenuItem
-          disabled={isOperationInProgress || amendBlockedHere}
-          title={
-            amendBlockedHere && badgeRef
-              ? describeAmendBadgeBlock(badgeRef.name, currentLocalBranch?.name)
-              : undefined
-          }
+          disabled={isOperationInProgress}
           onSelect={() => {
             track('amendCommit');
             amend.start();
           }}
         >
-          {amendBlockedHere ? 'Amend Last Commit... (current branch only)' : 'Amend Last Commit...'}
+          Amend Last Commit...
         </MenuItem>
       )}
 

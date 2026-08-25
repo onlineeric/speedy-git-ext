@@ -42,7 +42,7 @@ Out of scope for this idea:
 
 | Question | Decision |
 | --- | --- |
-| Entry point | The HEAD commit row menu, plus the badge of the branch that is checked out *(revised 2026-08-25)*. Not the uncommitted node, not the details panel. |
+| Entry point | The HEAD commit row menu, plus every ref badge on that row *(revised 2026-08-25)*. Not the uncommitted node, not the details panel. |
 | Dialog shape | One "Amend Last Commit…" dialog: message field + "include staged changes" checkbox. |
 | Staged changes default | **Off.** The dialog shows the staged count but never absorbs staged work unless asked. |
 | Force push | A checkbox **inside** the dialog, default off, labelled "Force Push after amended". |
@@ -73,22 +73,20 @@ The item appears on the row git currently has checked out, and — on badge menu
 branch that is checked out. It is available in detached HEAD (git amends there perfectly well), on a
 merge commit (parents are preserved), and on a root commit. It never appears on a stash entry.
 
-**Only that one badge can run it** *(revised 2026-08-25)*. `git commit` takes no branch argument: it
-moves whatever HEAD points at. So when two branches sit on the tip, amending from the `feature` badge
-would rewrite the checked-out branch and leave `feature` where it is — the menu would name one ref and
-move another.
+**Every badge on that row offers it** *(revised 2026-08-25, after testing a narrower rule)*. Which
+badge was opened changes nothing about what happens: all the badges on a row sit on the same commit,
+and amend rewrites that commit. It therefore behaves like the other current-branch actions already in
+those menus — Revert, Drop, Reset, Checkout this commit — rather than being singled out.
 
-The other **local branch** badges on that tip still show the item, **disabled**, labelled
-`Amend Last Commit... (current branch only)` and carrying a tooltip naming which branch would actually
-move. Present on one branch badge and absent on the one beside it is the shape that reads as a bug —
-the same reason every operation-dependent item here is disabled rather than hidden. The tooltip points
-at where the amend *can* be run from, since it is available on that very row; a refusal that stops at
-"no" only sends the user hunting for something already in front of them.
+Two narrower rules were built and rejected first. Restricting it to the checked-out branch's own badge
+left the item present on one branch badge and absent on the one beside it, which reads as a bug rather
+than as a rule. Showing it *disabled* there, with the reason attached, explained a restriction that
+nothing else in the same menu follows, and felt worse in use than either alternative.
 
-Remote-tracking, tag and stash badges leave it out entirely. Amending a tag is not a thing, so those
-menus never invited the reading and a permanently dead item in them would be noise rather than an
-explanation. In detached HEAD no branch badge is the checked-out one, so every branch badge on the tip
-shows the disabled form; the row menu still runs it.
+What the narrow rules were guarding against is real but belongs elsewhere: when a second branch sits on
+the tip, the amend moves the checked-out branch and leaves that one behind. That is a property of amend
+itself, identical from the row menu, so it is answered where the decision is made — the dialog names
+the branch that will move. See *The dialog*.
 
 While a rebase, merge, revert or cherry-pick is in progress the item is **disabled, not hidden** —
 the house rule for every operation-dependent item, so an option never vanishes during a refresh. No
@@ -102,6 +100,10 @@ that is the case the backend refusal exists for — not the normal path.
 
 ### The dialog
 
+- **Which branch moves** — the dialog says so by name *(revised 2026-08-25)*. `git commit` takes no
+  branch argument; it moves whatever HEAD points at. With a second branch on the same tip that is
+  worth stating rather than leaving to be inferred, and it is the one place a user is about to act on
+  the answer. Nothing is named in detached HEAD, where only HEAD moves.
 - **Message** — a multi-line field, prefilled with the commit's *complete* existing message, subject
   and body, exactly as git stores it. The dialog must not reflow, re-wrap or trim a message the user
   did not edit. Confirming with an empty message is not allowed.

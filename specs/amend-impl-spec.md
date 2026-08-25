@@ -305,20 +305,14 @@ pushing.
 beside `useDropCommit` (`:168`), returning `{ start, dialog }` in the same shape, and add its dialog
 to the returned `dialogs` bundle.
 
-The item goes in `commitItems`, rendered when `availability.canAmend` and the badge answer is not
-`hidden`. `getAmendBadgeVisibility(badgeRef, currentLocalBranch?.name)` in `commitMenuAvailability.ts`
-returns `enabled` / `disabled` / `hidden`; the row menu is always `enabled` *(revised 2026-08-25)*. The
-item is `disabled` when that answer is `disabled` **or** `isOperationInProgress`, matching
-checkout/merge/rebase, and takes the `(current branch only)` label suffix plus a `title` from
-`describeAmendBadgeBlock` in the former case. `MenuItem` forwards `title` through its rest props, and
-Radix renders a disabled item as a div, so the tooltip still shows.
+The item goes in `commitItems`, rendered whenever `availability.canAmend` — the row menu and every
+badge menu alike, with no badge-specific gate *(revised 2026-08-25)*. `disabled={isOperationInProgress}`,
+matching checkout/merge/rebase. Two narrower rules (checked-out-badge-only, then that plus a disabled
+form elsewhere) were built and removed; see the idea spec's *Availability* for why. The ambiguity they
+addressed is handled in the dialog instead, which names the branch that will move.
 
-`BranchContextMenu` passes its `refInfo` through as the new optional `badgeRef` option, because
-`canAmend` is a property of the *row* and the badge menu needs a ref-flavoured question on top of it.
-Every other badge on the tip row names a ref the amend does not move (see the idea spec's
-*Availability*), so only that one badge gets the item. The dialog also takes the hosting `surface`,
-so `amendIncludeStaged` / `amendForcePush` are attributed to the menu they were actually used from
-rather than a hardcoded `commitMenu`.
+The dialog takes the hosting `surface`, so `amendIncludeStaged` / `amendForcePush` are attributed to
+the menu they were actually used from rather than a hardcoded `commitMenu`.
 
 `start` **opens the dialog first, then fetches** *(review 2026-08-25)*. Do not copy `useDropCommit`'s
 resolve-then-open pattern here: that hook awaits one cheap call, whereas amend has several inputs, and
@@ -383,12 +377,10 @@ Manual, against `~/repos/test-repo` (see CLAUDE.md for the repo layout):
     move the remote underneath and confirm the rejection message is the translated one.
 11b. Local-only branch sharing a tip with a published branch: **no** warning and **no** force-push
     checkbox, even though `isCommitPushed` is true for that commit.
-11c. Two branches on the tip: the checked-out branch's badge offers amend; the other branch's badge
-    shows it disabled with the `(current branch only)` suffix and a tooltip naming which branch would
-    move; a remote-tracking badge and a tag badge omit it entirely. After amending, the other branch
-    stays on the old commit — git's own behaviour, and the old commit is still reachable through it.
-11d. Detached HEAD with a branch badge on the tip: that badge shows the disabled form, and its
-    tooltip says no branch is checked out. The row menu still amends.
+11c. Two branches on the tip: every badge on that row offers amend, and the dialog names the
+    checked-out branch as the one that will move. After amending, the other branch stays on the old
+    commit — git's own behaviour, and the old commit is still reachable through it.
+11d. Detached HEAD: badges on the tip still offer amend, and the dialog names no branch.
 12. Signed commit (if a signing key is configured): signature note shows.
 
 ## Documentation and release tasks

@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Branch, Commit, RefInfo } from '@shared/types';
-import {
-  getAmendBadgeVisibility,
-  getCommitMenuAvailability,
-  hasRemoteCounterpart,
-} from '../commitMenuAvailability';
+import { getCommitMenuAvailability, hasRemoteCounterpart } from '../commitMenuAvailability';
 
 function makeCommit(hash: string, parents: string[] = ['parent'], refs: RefInfo[] = []): Commit {
   return {
@@ -162,33 +158,6 @@ describe('canAmend', () => {
       { type: 'stash', name: 'stash@{0}' },
     ]);
     expect(getCommitMenuAvailability({ commit: stash, ...ON_BRANCH }).canAmend).toBe(false);
-  });
-});
-
-describe('getAmendBadgeVisibility', () => {
-  it('enables the item on the checked-out branch\'s own badge', () => {
-    expect(getAmendBadgeVisibility({ name: 'main', type: 'branch' }, 'main')).toBe('enabled');
-  });
-
-  it('disables — rather than hides — another local branch sharing the same tip', () => {
-    // Amending from here would rewrite `main` and leave `feature` behind, so it
-    // cannot run; but hiding it on one branch badge and showing it on the next
-    // reads as a bug, so the item stays with its reason attached.
-    expect(getAmendBadgeVisibility({ name: 'feature', type: 'branch' }, 'main')).toBe('disabled');
-  });
-
-  it('disables every branch badge in detached HEAD, where none is checked out', () => {
-    expect(getAmendBadgeVisibility({ name: 'main', type: 'branch' }, undefined)).toBe('disabled');
-  });
-
-  it('hides it on badge kinds that never invited the reading', () => {
-    for (const type of ['remote', 'tag', 'stash', 'head'] as const) {
-      expect(getAmendBadgeVisibility({ name: 'main', type, remote: 'origin' }, 'main')).toBe('hidden');
-    }
-  });
-
-  it('hides it when there is no badge at all (the row menu passes none)', () => {
-    expect(getAmendBadgeVisibility(undefined, 'main')).toBe('hidden');
   });
 });
 
