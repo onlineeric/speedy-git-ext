@@ -49,6 +49,54 @@ function ExternalLink({ url, children }: { url: string; children: ReactNode }) {
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
   {
+    version: '5.12.0',
+    headline: 'You can now amend the last commit without leaving the graph.',
+    content: (
+      <>
+        <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          Right-click the commit you have checked out and pick{' '}
+          <em>Amend Last Commit…</em>. The dialog opens with that commit’s existing message already in
+          it — the whole message, body and trailers included, not just the first line.
+        </p>
+
+        <ul className="mt-3 space-y-2 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">Fix the message.</strong> The most
+            common reason to amend, and on its own it changes nothing else.
+          </li>
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">Fold in staged files — only if you
+            ask.</strong> A checkbox tells you how many files are staged, and it is{' '}
+            <em>off</em> by default. Plain <code>git commit --amend</code> swallows whatever is in the
+            index; here, files you staged for the <em>next</em> commit stay staged for it.
+          </li>
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">Force push afterwards.</strong> When
+            the commit is already on a remote and your branch tracks one, a checkbox offers the push
+            as a second step. The command preview spells out what it runs —{' '}
+            <code>--force-with-lease</code>.
+          </li>
+        </ul>
+
+        <section className="mt-4 rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+          <h3 className={dialogSectionLabelClassName}>Amending a commit you have pushed</h3>
+          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+            Amending replaces the commit rather than adding to it, so a commit that is already on a
+            remote will need a force push before the two agree again. The dialog says so before you
+            confirm, and names the branch that will move — worth reading if more than one branch sits
+            on the commit, because only the checked-out one follows the rewrite.
+          </p>
+        </section>
+
+        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          Amending runs your <code>pre-commit</code> and <code>commit-msg</code> hooks, even when only
+          the message changed. If they take a while the dialog says it is waiting on them and lets you
+          stop waiting, rather than looking frozen.
+        </p>
+      </>
+    ),
+  },
+  {
     version: '5.11.0',
     headline: 'You can now merge from a commit, a remote branch or a tag — not just a local branch.',
     content: (
