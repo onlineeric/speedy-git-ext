@@ -5,6 +5,7 @@ import { TRACKED_OPERATIONS, type TrackedOperation } from '../../shared/telemetr
 import type { WebviewRequestContext } from './WebviewRequestContext.js';
 import { avatarHandlers } from './handlers/avatarHandlers.js';
 import { branchHandlers } from './handlers/branchHandlers.js';
+import { commitHandlers } from './handlers/commitHandlers.js';
 import { compareHandlers } from './handlers/compareHandlers.js';
 import { graphDataHandlers } from './handlers/graphDataHandlers.js';
 import { historyHandlers } from './handlers/historyHandlers.js';
@@ -34,6 +35,7 @@ export const requestHandlers = {
   ...tagHandlers,
   ...stashHandlers,
   ...historyHandlers,
+  ...commitHandlers,
   ...signatureHandlers,
   ...submoduleHandlers,
   ...worktreeHandlers,

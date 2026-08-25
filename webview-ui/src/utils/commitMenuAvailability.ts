@@ -1,5 +1,5 @@
 import type { Commit } from '@shared/types';
-import { isStashPseudoCommit } from './commitRefs';
+import { findHeadCommit, isStashPseudoCommit } from './commitRefs';
 
 /**
  * Which commit operations apply to a given commit.
@@ -20,6 +20,8 @@ export interface CommitMenuAvailability {
   canDrop: boolean;
   canReset: boolean;
   canMerge: boolean;
+  /** `git commit --amend` rewrites the checked-out tip, so only that row offers it. */
+  canAmend: boolean;
 }
 
 export interface CommitMenuContext {
@@ -43,6 +45,12 @@ export function getCommitMenuAvailability({
   const isMergeCommit = commit.parents.length > 1;
   const isRootCommit = commit.parents.length === 0;
   const isHeadCommit = currentBranchHash !== null && commit.hash === currentBranchHash;
+  // Deliberately NOT `isHeadCommit`: that one is "the current branch points
+  // here", derived from `currentBranchHash`, and it is null in detached HEAD.
+  // This one is "git has this commit checked out", read from the head ref, which
+  // is exactly the case the two disagree on — and git amends in detached HEAD
+  // perfectly well, so keying amend off the branch would make it vanish there.
+  const isCheckedOutTip = findHeadCommit([commit]) !== undefined;
 
   // Rebasing onto, and resetting to, both mean "move the current branch here",
   // so they become available under exactly the same condition: a branch exists
@@ -70,5 +78,8 @@ export function getCommitMenuAvailability({
     // an ancestor, which git answers with "Already up to date" — is left to git to
     // answer rather than pre-judged here.
     canMerge: !isStash && !isHeadCommit,
+    // Merge commits (parents are preserved) and root commits are fine; a stash
+    // entry is a pseudo-commit and cannot be amended.
+    canAmend: isCheckedOutTip && !isStash,
   };
 }

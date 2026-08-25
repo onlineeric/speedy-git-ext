@@ -30,6 +30,7 @@ import { InteractiveRebaseDialog } from './InteractiveRebaseDialog';
 import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 import { RevertDialog } from './RevertDialog';
 import { DropCommitDialog } from './DropCommitDialog';
+import { AmendCommitDialog } from './AmendCommitDialog';
 import { CreateWorktreeDialog } from './CreateWorktreeDialog';
 import { MenuItem } from './MenuItem';
 import { MenuSubTrigger } from './MenuSubTrigger';
@@ -197,6 +198,23 @@ function useDropCommit(commit: Commit) {
 }
 
 /**
+ * Amend cluster: unlike the drop cluster above, this one opens the dialog
+ * *first* and lets it fetch. Drop awaits a single cheap call before opening;
+ * amend has several inputs, and holding the dialog shut behind the slowest of
+ * them would make the item feel broken. The dialog renders at once and fills in
+ * as its answers land.
+ */
+function useAmendCommit(commit: Commit) {
+  const [open, setOpen] = useState(false);
+
+  const dialog = open ? (
+    <AmendCommitDialog open commit={commit} onClose={() => setOpen(false)} />
+  ) : null;
+
+  return { start: () => setOpen(true), dialog };
+}
+
+/**
  * Every action that applies to a commit, grouped the way menus present them,
  * plus the dialogs they drive.
  *
@@ -235,6 +253,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   const interactiveRebase = useInteractiveRebase(commit.hash);
   const revert = useRevertCommit(commit);
   const drop = useDropCommit(commit);
+  const amend = useAmendCommit(commit);
 
   const track = (action: UiAction) => trackUiInteraction(surface, action);
 
@@ -352,6 +371,22 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
       >
         Checkout this commit
       </MenuItem>
+
+      {/* Row menu only: the entry point is the commit row, and only the row git
+         has checked out. Disabled — never hidden — while another operation is in
+         progress, matching every other operation-dependent item; the backend
+         guard stays as the second line of defence for one started in a terminal. */}
+      {isRowMenu && availability.canAmend && (
+        <MenuItem
+          disabled={isOperationInProgress}
+          onSelect={() => {
+            track('amendCommit');
+            amend.start();
+          }}
+        >
+          Amend Last Commit...
+        </MenuItem>
+      )}
 
       {/* Merge commits cherry-pick individually; a multi-select cherry-picks the
          whole selection (disabled if it contains a merge commit); otherwise the
@@ -633,6 +668,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
       {interactiveRebase.dialog}
       {revert.dialog}
       {drop.dialog}
+      {amend.dialog}
     </>
   );
 

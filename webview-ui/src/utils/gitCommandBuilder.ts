@@ -151,6 +151,26 @@ export function buildDropCommitCommand(options: DropCommitCommandOptions): strin
   return `git rebase -i ${options.hash}~1  # drop ${options.hash}`;
 }
 
+export interface AmendCommandOptions {
+  /** Fold the current index into the commit, rather than amending the message alone. */
+  includeStaged: boolean;
+}
+
+/**
+ * The amend command, in whichever of its two forms the dialog is set to.
+ *
+ * `--only` with no pathspec is the "leave the index alone" form: the message
+ * changes and staged files stay staged. Without it git absorbs the index, which
+ * is plain amend's behaviour. The message itself never appears — it goes to git
+ * through a file, and a multi-line message would not survive being shown inline.
+ */
+export function buildAmendCommand(options: AmendCommandOptions): string {
+  const parts = ['git commit --amend'];
+  if (!options.includeStaged) parts.push('--only');
+  parts.push('-F <message file>');
+  return parts.join(' ');
+}
+
 export function buildCheckoutCommand(options: CheckoutCommandOptions): string {
   const parts = ['git checkout', options.branch];
   if (options.pull) parts.push('&& git pull');

@@ -60,19 +60,28 @@ export class GitRebaseService {
     const hashCheck = validateHash(baseHash);
     if (!hashCheck.success) return hashCheck;
 
+    // `-z` terminates each commit record with NUL instead of a newline, which is
+    // what makes `%B` readable at all: the raw message is multi-line, so a
+    // newline-delimited stream cannot say where one commit ends and the next
+    // begins. Fields inside a record stay unit-separated.
     const result = await this.executor.execute({
-      args: ['log', '--reverse', '--ancestry-path', '--format=%H\x1f%h\x1f%s', `${baseHash}..HEAD`, '--'],
+      args: ['log', '--reverse', '--ancestry-path', '-z', '--format=%H\x1f%h\x1f%s\x1f%B', `${baseHash}..HEAD`, '--'],
       cwd: this.workspacePath,
     });
     if (!result.success) return result;
 
-    const lines = result.value.stdout.trim().split('\n').filter(Boolean);
-    const entries: RebaseEntry[] = lines.map((line) => {
-      const [hash, abbreviatedHash, ...subjectParts] = line.split('\x1f');
+    const records = result.value.stdout.split('\0').filter((record) => record.length > 0);
+    const entries: RebaseEntry[] = records.map((record) => {
+      // The message is last, so any `\x1f` it happens to contain rejoins into it
+      // rather than shifting the fields before it.
+      const [hash, abbreviatedHash, subject, ...messageParts] = record.split('\x1f');
       return {
         hash: hash.trim(),
         abbreviatedHash: abbreviatedHash.trim(),
-        subject: subjectParts.join('\x1f').trim(),
+        subject: subject.trim(),
+        // Only trailing newlines go: internal blank lines separate paragraphs
+        // and trailers, and are content.
+        message: messageParts.join('\x1f').replace(/\n+$/, ''),
         action: 'pick',
       };
     });

@@ -34,6 +34,8 @@ const TRACKED_OPERATION_LIST = [
   'resetBranch', 'cherryPick', 'abortCherryPick', 'continueCherryPick',
   'revert', 'continueRevert', 'abortRevert',
   'rebase', 'interactiveRebase', 'abortRebase', 'continueRebase', 'dropCommit',
+  // `getCommitMessage` is a read and `cancelAmend` is a control message; neither is an operation.
+  'amendCommit',
   'updateSubmodule', 'initSubmodule',
   'addWorktree', 'removeWorktree', 'pruneWorktree', 'openWorktree',
   'stageFiles', 'unstageFiles', 'stageAll', 'unstageAll', 'discardFiles', 'discardAllUnstaged',
@@ -114,6 +116,12 @@ export const UI_ACTIONS = [
   // offers it too, and one action id covers both surfaces.
   'continueMerge', 'abortMerge',
   'copyHash', 'copyShortHash', 'copyMessage',
+  // Amend Last Commit. The two options are their own actions rather than
+  // properties on the operation event, which carries a fixed property set with
+  // nowhere to hang them; each is emitted on confirm only when its box was
+  // checked, so a plain message-only amend emits neither and the message-only
+  // share stays derivable from the operation count.
+  'amendCommit', 'amendIncludeStaged', 'amendForcePush',
   'resetSoft', 'resetMixed', 'resetHard',
   // Branch / remote-branch / tag badge menus
   'checkout', 'merge', 'renameBranch', 'push', 'pull', 'fastForward',
@@ -145,7 +153,7 @@ export const DIALOG_IDS = [
   'createBranch', 'renameBranch', 'deleteBranch', 'deleteRemoteBranch',
   'merge', 'push', 'fastForward',
   'createTag', 'deleteTag', 'pushTag',
-  'cherryPick', 'revert', 'reset', 'rebase', 'interactiveRebase', 'dropCommit',
+  'cherryPick', 'revert', 'reset', 'rebase', 'interactiveRebase', 'dropCommit', 'amendCommit',
   'stash', 'dropStash', 'discard', 'discardAll', 'filePicker',
   'createWorktree', 'removeWorktree', 'pruneWorktree',
   'removeRemote',

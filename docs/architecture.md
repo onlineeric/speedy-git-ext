@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-08-21**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-08-25**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -40,6 +40,7 @@ src/
 │       ├── tagHandlers.ts        # create/delete/push tag (optional chained push, remote delete, force — 048)
 │       ├── stashHandlers.ts      # get/apply/pop/drop/create stash
 │       ├── historyHandlers.ts    # reset/cherry-pick/revert/rebase + continue/abort, dropCommit
+│       ├── commitHandlers.ts     # getCommitMessage (%B), amendCommit (guarded, HEAD-verified), cancelAmend
 │       ├── signatureHandlers.ts  # presence detection, verification, signature help
 │       ├── submoduleHandlers.ts  # submodule ops + switchRepo/displayRepo navigation
 │       ├── worktreeHandlers.ts   # list/resolve/add/remove/prune/open/reveal worktree
@@ -64,6 +65,8 @@ src/
 │   ├── GitTagService.ts          # Create/delete/push tags (incl. remote delete, force), tag metadata from refs/tags (048)
 │   ├── GitStashService.ts        # Apply, pop, drop stash entries
 │   ├── GitIndexService.ts        # Stage/unstage, discard, commit (uncommitted-node operations)
+│   ├── GitCommitService.ts       # Read a commit's full message; amend HEAD (--only / -F, 60s hook ceiling,
+│                                 #   expectedHead guard, cancel outcome observed from HEAD not assumed)
 │   ├── GitWorktreeService.ts     # Worktree list/add/remove
 │   ├── GitSignatureService.ts    # GPG/SSH signature verification
 │   ├── GitSubmoduleService.ts    # Submodule status, init, update
@@ -172,6 +175,8 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── MergeDialog.tsx  RebaseConfirmDialog.tsx  CherryPickDialog.tsx  RevertDialog.tsx
 │                                 #   MergeDialog takes any commit-ish (branch / remote branch / tag / commit) + a kind for wording
 ├── DropCommitDialog.tsx  InteractiveRebaseDialog.tsx + InteractiveRebaseRow.tsx (@dnd-kit sortable)
+├── AmendCommitDialog.tsx         # Amend Last Commit: full-message box, include-staged / force-push options,
+│                                 #   published + signature notes, hook-wait state; stays open on every failure
 ├── CreateBranchDialog.tsx  DeleteBranchDialog.tsx  CheckoutWithPullDialog.tsx
 ├── TagCreationDialog.tsx  DeleteTagDialog.tsx  PushTagDialog.tsx
 ├── PushDialog.tsx  RemoteManagementDialog.tsx  StashDialog.tsx
@@ -228,7 +233,7 @@ utils/
 ├── commitReachability.ts         # Branch reachability per commit; checkers cached by commit-list identity (WeakMap)
 ├── commitRefs.ts                 # Row predicates by ref decoration (findHeadCommit/findHeadCommitHash,
 │                                 #   isStashPseudoCommit) — used by topology, uncommitted parent, tooltip, Go to HEAD
-├── commitMenuAvailability.ts     # Which commit actions apply (rebase/reset/revert/drop/cherry-pick/merge)
+├── commitMenuAvailability.ts     # Which commit actions apply (rebase/reset/revert/drop/cherry-pick/merge/amend)
 ├── headNavigation.ts             # "Go to HEAD" decision logic + toast messages
 ├── rowVisibility.ts              # Scroll-offset maths for revealing a row when the details panel resizes the viewport
 ├── commitVisibility.ts           # Visibility/filter predicates for the virtualized row list
@@ -238,6 +243,8 @@ utils/
 ├── compareMarker.ts              # Per-row "B"ase / "T"arget badge derivation
 ├── externalRefParser.ts          # Parse typed commit-ish expressions (HEAD~3, origin/main^2, …)
 ├── resolveDefaultRemote.ts       # Pick `origin` else first-alpha remote
+├── amendMessages.ts              # Post-amend force-push wording; translates git's `stale info` lease rejection
+├── rebaseSquashMessages.ts       # Combined message per squash group — full messages, never subjects
 ├── branchSelection.ts            # getBranchKey (bare name vs remote/name) + additive select-all-local
 ├── mergedCommits.ts              # Detect merged-branch commit grouping for badges
 ├── refNameField.ts               # Live ref-name validation state (error suppressed while pristine)

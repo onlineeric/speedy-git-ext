@@ -37,6 +37,16 @@ class RpcClient {
   private pendingParentLookups = new Map<number, { resolve: (parents: CommitParentInfo[]) => void; reject: (error: Error) => void }>();
   private parentRequestIdByHash = new Map<string, number>();
   private pendingPush: { resolve: (message: string) => void; reject: (error: Error) => void } | null = null;
+  private pendingCommitMessages = new Map<string, { resolve: (message: string) => void; reject: (error: Error) => void }>();
+  /**
+   * One-shot: re-select the head row once the next reloaded commit list lands.
+   *
+   * An amend always changes the tip's hash, and `setCommits` keeps the selection
+   * only while its hash still resolves — so without this an amend would clear the
+   * selection every time. Resolved from the head ref rather than from a hash the
+   * backend hands back, which keeps it correct in detached HEAD too.
+   */
+  private selectHeadOnNextLoad = false;
   /** One-shot slot for a `resolveWorktreePath` request awaiting its `worktreePathResolved` response. */
   private pendingWorktreePath: { requestId: number; resolve: (value: { path: string }) => void; reject: (error: Error) => void } | null = null;
   /** One-shot slot for a `getWorktreeEnvFiles` request awaiting its `worktreeEnvFiles` response. */
@@ -94,6 +104,7 @@ class RpcClient {
     switch (message.type) {
       case 'commits':
         store.setCommits(message.payload.commits);
+        this.applyPendingHeadSelection();
         if (message.payload.totalLoadedWithoutFilter !== undefined) {
           store.setTotalLoadedWithoutFilter(message.payload.totalLoadedWithoutFilter);
         }
@@ -192,6 +203,14 @@ class RpcClient {
           const { reject } = this.pendingDialogAction;
           this.pendingDialogAction = null;
           reject(errorMessage);
+        }
+        break;
+      }
+      case 'commitMessage': {
+        const pending = this.pendingCommitMessages.get(message.payload.hash);
+        if (pending) {
+          this.pendingCommitMessages.delete(message.payload.hash);
+          pending.resolve(message.payload.message);
         }
         break;
       }
@@ -370,6 +389,7 @@ class RpcClient {
       case 'initialData':
         store.setInitialData(message.payload);
         store.setIsLoadingRepo(false);
+        this.applyPendingHeadSelection();
         if (message.payload.errors.length > 0) {
           store.setError(`Some data sources failed: ${message.payload.errors.join('; ')}`);
         }
@@ -655,6 +675,44 @@ class RpcClient {
     this.send({ type: 'dropCommit', payload: { hash } });
   }
 
+  /** A commit's complete raw message, for prefilling the amend dialog. */
+  getCommitMessage(hash: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      this.pendingCommitMessages.set(hash, { resolve, reject });
+      this.send({ type: 'getCommitMessage', payload: { hash } });
+    });
+  }
+
+  /**
+   * Amend the tip commit, resolving when the backend answers.
+   *
+   * Rejects with the backend's own message on failure — the dialog shows it and
+   * stays open, so the typed message survives a hook that rejects it.
+   */
+  amendCommit(message: string, includeStaged: boolean, expectedHead: string): Promise<void> {
+    const done = this.awaitNextDialogAction();
+    this.send({ type: 'amendCommit', payload: { message, includeStaged, expectedHead } });
+    return done;
+  }
+
+  /** Stop waiting on a slow amend. Ends our wait; the hooks git spawned keep running. */
+  cancelAmend() {
+    this.send({ type: 'cancelAmend', payload: {} });
+  }
+
+  /** Follow the selection to the head row once the next reloaded commit list lands. */
+  selectHeadAfterNextLoad() {
+    this.selectHeadOnNextLoad = true;
+  }
+
+  private applyPendingHeadSelection() {
+    if (!this.selectHeadOnNextLoad) return;
+    this.selectHeadOnNextLoad = false;
+    const store = useGraphStore.getState();
+    const headHash = findHeadCommitHash(store.mergedCommits);
+    if (headHash) store.setSelectedCommit(headHash);
+  }
+
   isCommitPushed(hash: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
       this.pendingPushedChecks.set(hash, { resolve, reject });
@@ -680,6 +738,11 @@ class RpcClient {
       pending.reject(error);
     }
     this.pendingPushedChecks.clear();
+
+    for (const pending of this.pendingCommitMessages.values()) {
+      pending.reject(error);
+    }
+    this.pendingCommitMessages.clear();
 
     for (const pending of this.pendingParentLookups.values()) {
       pending.reject(error);

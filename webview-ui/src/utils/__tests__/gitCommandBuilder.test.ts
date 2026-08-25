@@ -7,6 +7,7 @@ import {
   buildResetCommand,
   buildRevertCommand,
   buildDropCommitCommand,
+  buildAmendCommand,
   buildCheckoutCommand,
   buildTagCommand,
   buildPushTagCommand,
@@ -191,6 +192,26 @@ describe('buildDropCommitCommand', () => {
   it('builds rebase-based drop command', () => {
     expect(buildDropCommitCommand({ hash: 'abc1234' }))
       .toBe('git rebase -i abc1234~1  # drop abc1234');
+  });
+});
+
+describe('buildAmendCommand', () => {
+  it('keeps the index out of a message-only amend with --only', () => {
+    const command = buildAmendCommand({ includeStaged: false });
+    expect(command).toContain('--amend');
+    expect(command).toContain('--only');
+    expect(command).toContain('-F');
+  });
+
+  it('drops --only when the staged changes are being folded in', () => {
+    const command = buildAmendCommand({ includeStaged: true });
+    expect(command).toContain('--amend');
+    expect(command).not.toContain('--only');
+    expect(command).toContain('-F');
+  });
+
+  it('never inlines the message — it reaches git through a file', () => {
+    expect(buildAmendCommand({ includeStaged: false })).not.toContain('-m');
   });
 });
 

@@ -30,7 +30,10 @@ export const InteractiveRebaseRow = memo(function InteractiveRebaseRow({
     const action = e.target.value as RebaseAction;
     onChange(entry.hash, {
       action,
-      rewordMessage: action === 'reword' ? (entry.rewordMessage ?? entry.subject) : undefined,
+      // The complete message, not the subject: the box's contents become the
+      // commit's entire new message, so seeding it with the subject alone would
+      // drop the body and trailers of anything the user did not retype.
+      rewordMessage: action === 'reword' ? (entry.rewordMessage ?? entry.message) : undefined,
     });
   };
 
@@ -94,7 +97,7 @@ export const InteractiveRebaseRow = memo(function InteractiveRebaseRow({
         <textarea
           value={entry.rewordMessage ?? ''}
           onChange={handleRewordChange}
-          rows={2}
+          rows={4}
           placeholder="New commit message..."
           className="w-full text-xs p-1 rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] resize-y"
         />

@@ -17,6 +17,8 @@ function makeCommit(hash: string, parents: string[] = ['parent'], refs: RefInfo[
 
 const ON_BRANCH = { currentBranchHash: 'head', isOnFirstParentChain: true };
 
+const HEAD_REF: RefInfo[] = [{ type: 'head', name: 'HEAD' }];
+
 describe('getCommitMenuAvailability', () => {
   it('offers the full set for an ordinary commit on the current branch', () => {
     const availability = getCommitMenuAvailability({ commit: makeCommit('abc'), ...ON_BRANCH });
@@ -114,5 +116,47 @@ describe('getCommitMenuAvailability', () => {
         isOnFirstParentChain: false,
       }).canMerge
     ).toBe(true);
+  });
+});
+
+describe('canAmend', () => {
+  it('offers amend on the row git has checked out', () => {
+    const commit = makeCommit('head', ['parent'], HEAD_REF);
+    expect(getCommitMenuAvailability({ commit, ...ON_BRANCH }).canAmend).toBe(true);
+  });
+
+  it('withholds amend from every other row', () => {
+    const commit = makeCommit('abc');
+    expect(getCommitMenuAvailability({ commit, ...ON_BRANCH }).canAmend).toBe(false);
+  });
+
+  it('offers amend in detached HEAD, where the branch-derived head is null', () => {
+    const commit = makeCommit('abc', ['parent'], HEAD_REF);
+    const availability = getCommitMenuAvailability({
+      commit,
+      currentBranchHash: null,
+      isOnFirstParentChain: false,
+    });
+
+    // The two head notions deliberately disagree here: no branch points at this
+    // commit, but git has it checked out, and git amends there perfectly well.
+    expect(availability.isHeadCommit).toBe(false);
+    expect(availability.canAmend).toBe(true);
+  });
+
+  it('offers amend on a merge tip (parents are preserved) and on a root commit', () => {
+    const merge = makeCommit('head', ['p1', 'p2'], HEAD_REF);
+    expect(getCommitMenuAvailability({ commit: merge, ...ON_BRANCH }).canAmend).toBe(true);
+
+    const root = makeCommit('head', [], HEAD_REF);
+    expect(getCommitMenuAvailability({ commit: root, ...ON_BRANCH }).canAmend).toBe(true);
+  });
+
+  it('never offers amend on a stash entry', () => {
+    const stash = makeCommit('head', ['parent'], [
+      { type: 'head', name: 'HEAD' },
+      { type: 'stash', name: 'stash@{0}' },
+    ]);
+    expect(getCommitMenuAvailability({ commit: stash, ...ON_BRANCH }).canAmend).toBe(false);
   });
 });

@@ -89,6 +89,17 @@ export type RequestMessage =
   | { type: 'verifySignatures'; payload: { hashes: string[] } }
   | { type: 'openSignatureHelp'; payload: Record<string, never> }
   | { type: 'dropCommit'; payload: { hash: string } }
+  // Commit ops (amend)
+  /** Read a commit's complete raw message, to prefill the amend dialog. */
+  | { type: 'getCommitMessage'; payload: { hash: string } }
+  /**
+   * Rewrite the tip commit. `expectedHead` is the hash the dialog was opened
+   * against — the amend is refused rather than re-targeted if HEAD has moved,
+   * because `git commit --amend` rewrites whatever HEAD is when it runs.
+   */
+  | { type: 'amendCommit'; payload: { message: string; includeStaged: boolean; expectedHead: string } }
+  /** Stop waiting on a running amend (its hooks may be slow). Ends the wait, not the hooks. */
+  | { type: 'cancelAmend'; payload: Record<string, never> }
   | { type: 'isCommitPushed'; payload: { hash: string } }
   | { type: 'getCommitParents'; payload: { hashes: string[] } }
   // Authors
@@ -224,6 +235,7 @@ export type ResponseMessage =
   | { type: 'signaturesVerified'; payload: { results: Record<string, CommitSignatureInfo | null> } }
   | { type: 'commitPushedResult'; payload: { hash: string; pushed: boolean } }
   | { type: 'commitParents'; payload: { parents: CommitParentInfo[] } }
+  | { type: 'commitMessage'; payload: { hash: string; message: string } }
   | { type: 'commitsAppended'; payload: { commits: Commit[]; hasMore: boolean; generation: number; totalLoadedWithoutFilter?: number } }
   | { type: 'prefetchError'; payload: { error: GitError | { message: string } } }
   /**
@@ -296,6 +308,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   abortRebase: true, continueRebase: true,
   getSignatureInfo: true, detectSignaturePresence: true, verifySignatures: true, openSignatureHelp: true,
   dropCommit: true, isCommitPushed: true, getCommitParents: true,
+  getCommitMessage: true, amendCommit: true, cancelAmend: true,
   loadMoreCommits: true, locateHead: true, openSettings: true, switchRepo: true, displayRepo: true,
   getSettings: true, setToolbarSetting: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
   getAvatarAuthState: true, requestGitHubAuth: true, removeGitHubAuth: true, setAvatarRefreshDays: true,
@@ -320,7 +333,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   remotes: true, stashes: true, cherryPickState: true, revertState: true, mergeState: true,
   rebaseState: true, rebaseCommits: true, signatureInfo: true,
   signaturePresence: true, signaturePresenceFailed: true, signaturesVerified: true,
-  commitPushedResult: true, commitParents: true,
+  commitPushedResult: true, commitParents: true, commitMessage: true,
   commitsAppended: true, prefetchError: true, headLocation: true, headLocationFailed: true, repoList: true,
   checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
