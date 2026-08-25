@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeForcePushFailure } from '../amendMessages';
+import { describeAmendBadgeBlock, describeForcePushFailure } from '../amendMessages';
 
 describe('describeForcePushFailure', () => {
   it('always says the amend itself succeeded', () => {
@@ -25,5 +25,25 @@ describe('describeForcePushFailure', () => {
     expect(describeForcePushFailure('   ')).toBe(
       'The commit was amended locally, but the force push was rejected.'
     );
+  });
+});
+
+describe('describeAmendBadgeBlock', () => {
+  it('names which branch would actually move, and which would not', () => {
+    const message = describeAmendBadgeBlock('feature', 'main');
+    expect(message).toContain('would move main, not feature');
+  });
+
+  it('points at somewhere the amend can still be run from', () => {
+    // The item is disabled on this badge, but the operation is available on the
+    // same row — a refusal that stopped at "no" would send the user hunting for
+    // something already in front of them.
+    expect(describeAmendBadgeBlock('feature', 'main')).toContain("main's badge or the commit row");
+  });
+
+  it('says HEAD moves alone when no branch is checked out', () => {
+    const message = describeAmendBadgeBlock('feature', undefined);
+    expect(message).toContain('No branch is checked out');
+    expect(message).toContain('commit row');
   });
 });

@@ -20,10 +20,11 @@ import { buildCheckoutCommand, buildResetCommand } from '../utils/gitCommandBuil
 import { setSlotsAndCompare } from '../utils/compareDispatch';
 import { getReachabilityChecker } from '../utils/commitReachability';
 import {
+  getAmendBadgeVisibility,
   getCommitMenuAvailability,
   hasRemoteCounterpart,
-  isCheckedOutBranchBadge,
 } from '../utils/commitMenuAvailability';
+import { describeAmendBadgeBlock } from '../utils/amendMessages';
 import { isStashPseudoCommit } from '../utils/commitRefs';
 import { CompareMenuItems } from './CompareMenuItems';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -290,12 +291,15 @@ export function useCommitMenuItems({ commit, surface, variant, badgeRef }: UseCo
 
   const availability = getCommitMenuAvailability({ commit, currentBranchHash, isOnFirstParentChain });
 
-  // Amend moves whatever HEAD points at, so on a badge menu it is offered by the
-  // one badge that names that ref — never by a second local branch sharing the
-  // tip, a remote-tracking ref or a tag, none of which the amend would move.
-  const showAmend =
-    availability.canAmend &&
-    (isRowMenu || isCheckedOutBranchBadge(badgeRef, currentLocalBranch?.name));
+  // Amend moves whatever HEAD points at, so a badge menu offers it for real on
+  // one badge only. The other local branch badges on the same tip still show it,
+  // disabled and carrying the reason — present on one badge and absent on its
+  // neighbour is the shape that reads as a bug.
+  const amendBadgeVisibility = isRowMenu
+    ? 'enabled'
+    : getAmendBadgeVisibility(badgeRef, currentLocalBranch?.name);
+  const showAmend = availability.canAmend && amendBadgeVisibility !== 'hidden';
+  const amendBlockedHere = amendBadgeVisibility === 'disabled';
 
   const isMultiSelectActive =
     isRowMenu && selectedCommits.length > 1 && selectedCommits.includes(commit.hash);
@@ -394,13 +398,18 @@ export function useCommitMenuItems({ commit, surface, variant, badgeRef }: UseCo
          as the second line of defence for one started in a terminal. */}
       {showAmend && (
         <MenuItem
-          disabled={isOperationInProgress}
+          disabled={isOperationInProgress || amendBlockedHere}
+          title={
+            amendBlockedHere && badgeRef
+              ? describeAmendBadgeBlock(badgeRef.name, currentLocalBranch?.name)
+              : undefined
+          }
           onSelect={() => {
             track('amendCommit');
             amend.start();
           }}
         >
-          Amend Last Commit...
+          {amendBlockedHere ? 'Amend Last Commit... (current branch only)' : 'Amend Last Commit...'}
         </MenuItem>
       )}
 

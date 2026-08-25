@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Branch, Commit, RefInfo } from '@shared/types';
 import {
+  getAmendBadgeVisibility,
   getCommitMenuAvailability,
   hasRemoteCounterpart,
-  isCheckedOutBranchBadge,
 } from '../commitMenuAvailability';
 
 function makeCommit(hash: string, parents: string[] = ['parent'], refs: RefInfo[] = []): Commit {
@@ -165,33 +165,30 @@ describe('canAmend', () => {
   });
 });
 
-describe('isCheckedOutBranchBadge', () => {
-  it('accepts the badge of the branch git has checked out', () => {
-    expect(isCheckedOutBranchBadge({ name: 'main', type: 'branch' }, 'main')).toBe(true);
+describe('getAmendBadgeVisibility', () => {
+  it('enables the item on the checked-out branch\'s own badge', () => {
+    expect(getAmendBadgeVisibility({ name: 'main', type: 'branch' }, 'main')).toBe('enabled');
   });
 
-  it('rejects another local branch sharing the same tip', () => {
-    // Amending from here would rewrite `main` and leave `feature` behind, so the
-    // badge would name a ref the operation does not move.
-    expect(isCheckedOutBranchBadge({ name: 'feature', type: 'branch' }, 'main')).toBe(false);
+  it('disables — rather than hides — another local branch sharing the same tip', () => {
+    // Amending from here would rewrite `main` and leave `feature` behind, so it
+    // cannot run; but hiding it on one branch badge and showing it on the next
+    // reads as a bug, so the item stays with its reason attached.
+    expect(getAmendBadgeVisibility({ name: 'feature', type: 'branch' }, 'main')).toBe('disabled');
   });
 
-  it('rejects a remote-tracking badge even for the same branch name', () => {
-    expect(isCheckedOutBranchBadge({ name: 'main', type: 'remote', remote: 'origin' }, 'main')).toBe(false);
+  it('disables every branch badge in detached HEAD, where none is checked out', () => {
+    expect(getAmendBadgeVisibility({ name: 'main', type: 'branch' }, undefined)).toBe('disabled');
   });
 
-  it('rejects tag, stash and HEAD badges', () => {
-    for (const type of ['tag', 'stash', 'head'] as const) {
-      expect(isCheckedOutBranchBadge({ name: 'main', type }, 'main')).toBe(false);
+  it('hides it on badge kinds that never invited the reading', () => {
+    for (const type of ['remote', 'tag', 'stash', 'head'] as const) {
+      expect(getAmendBadgeVisibility({ name: 'main', type, remote: 'origin' }, 'main')).toBe('hidden');
     }
   });
 
-  it('rejects everything in detached HEAD, where no branch is checked out', () => {
-    expect(isCheckedOutBranchBadge({ name: 'main', type: 'branch' }, undefined)).toBe(false);
-  });
-
-  it('rejects a missing badge (the row menu passes none)', () => {
-    expect(isCheckedOutBranchBadge(undefined, 'main')).toBe(false);
+  it('hides it when there is no badge at all (the row menu passes none)', () => {
+    expect(getAmendBadgeVisibility(undefined, 'main')).toBe('hidden');
   });
 });
 

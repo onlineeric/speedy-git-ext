@@ -73,11 +73,22 @@ The item appears on the row git currently has checked out, and — on badge menu
 branch that is checked out. It is available in detached HEAD (git amends there perfectly well), on a
 merge commit (parents are preserved), and on a root commit. It never appears on a stash entry.
 
-**Only that one badge** *(revised 2026-08-25)*. `git commit` takes no branch argument: it moves
-whatever HEAD points at. So when two branches sit on the tip, amending from the `feature` badge would
-rewrite the checked-out branch and leave `feature` where it is — the menu would name one ref and move
-another. A remote-tracking badge and a tag badge are the same problem, and a tag is not a branch at
-all. Detached HEAD therefore has no badge that offers it; the row menu still does.
+**Only that one badge can run it** *(revised 2026-08-25)*. `git commit` takes no branch argument: it
+moves whatever HEAD points at. So when two branches sit on the tip, amending from the `feature` badge
+would rewrite the checked-out branch and leave `feature` where it is — the menu would name one ref and
+move another.
+
+The other **local branch** badges on that tip still show the item, **disabled**, labelled
+`Amend Last Commit... (current branch only)` and carrying a tooltip naming which branch would actually
+move. Present on one branch badge and absent on the one beside it is the shape that reads as a bug —
+the same reason every operation-dependent item here is disabled rather than hidden. The tooltip points
+at where the amend *can* be run from, since it is available on that very row; a refusal that stops at
+"no" only sends the user hunting for something already in front of them.
+
+Remote-tracking, tag and stash badges leave it out entirely. Amending a tag is not a thing, so those
+menus never invited the reading and a permanently dead item in them would be noise rather than an
+explanation. In detached HEAD no branch badge is the checked-out one, so every branch badge on the tip
+shows the disabled form; the row menu still runs it.
 
 While a rebase, merge, revert or cherry-pick is in progress the item is **disabled, not hidden** —
 the house rule for every operation-dependent item, so an option never vanishes during a refresh. No

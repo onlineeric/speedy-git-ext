@@ -233,7 +233,8 @@ utils/
 ├── commitReachability.ts         # Branch reachability per commit; checkers cached by commit-list identity (WeakMap)
 ├── commitRefs.ts                 # Row predicates by ref decoration (findHeadCommit/findHeadCommitHash,
 │                                 #   isStashPseudoCommit) — used by topology, uncommitted parent, tooltip, Go to HEAD
-├── commitMenuAvailability.ts     # Which commit actions apply (rebase/reset/revert/drop/cherry-pick/merge/amend)
+├── commitMenuAvailability.ts     # Which commit actions apply (rebase/reset/revert/drop/cherry-pick/merge/amend);
+│                                 #   also amend's per-badge enabled/disabled/hidden answer + branch-has-remote test
 ├── headNavigation.ts             # "Go to HEAD" decision logic + toast messages
 ├── rowVisibility.ts              # Scroll-offset maths for revealing a row when the details panel resizes the viewport
 ├── commitVisibility.ts           # Visibility/filter predicates for the virtualized row list
@@ -243,7 +244,8 @@ utils/
 ├── compareMarker.ts              # Per-row "B"ase / "T"arget badge derivation
 ├── externalRefParser.ts          # Parse typed commit-ish expressions (HEAD~3, origin/main^2, …)
 ├── resolveDefaultRemote.ts       # Pick `origin` else first-alpha remote
-├── amendMessages.ts              # Post-amend force-push wording; translates git's `stale info` lease rejection
+├── amendMessages.ts              # Post-amend force-push wording (translates git's `stale info` lease
+│                                 #   rejection) + why a non-current branch badge shows amend disabled
 ├── rebaseSquashMessages.ts       # Combined message per squash group — full messages, never subjects
 ├── branchSelection.ts            # getBranchKey (bare name vs remote/name) + additive select-all-local
 ├── mergedCommits.ts              # Detect merged-branch commit grouping for badges

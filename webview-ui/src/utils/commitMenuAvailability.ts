@@ -84,22 +84,32 @@ export function getCommitMenuAvailability({
   };
 }
 
+/** How a badge menu should present the amend item. */
+export type AmendBadgeVisibility = 'enabled' | 'disabled' | 'hidden';
+
 /**
- * Whether a ref badge is the badge of the branch git currently has checked out.
+ * How a ref badge's menu should offer amend.
  *
- * Amend is offered on badge menus only for this one badge. Every other badge on
- * the tip row — a second local branch, a remote-tracking ref, a tag — names a ref
- * the amend does **not** move: `git commit` takes no branch argument, it moves
- * whatever HEAD points at, so amending from a `feature` badge would rewrite the
- * checked-out branch and leave `feature` where it is. The badge you opened and
- * the ref that moves have to be the same one, or the menu lies about its target.
+ * `git commit` takes no branch argument — it moves whatever HEAD points at — so
+ * the only badge that can *run* an amend is the checked-out branch's own. From a
+ * second local branch sharing the tip, the amend would rewrite the checked-out
+ * branch and leave that one where it is, which is a menu naming one ref and
+ * moving another.
+ *
+ * But hiding it there reads as a bug: the item is present on one branch badge
+ * and absent on its neighbour, with nothing to say why. So a local branch badge
+ * shows it **disabled**, carrying the explanation, while badge kinds that never
+ * invited the reading — remote-tracking, tag, stash, HEAD — leave it out
+ * entirely rather than parking a permanently dead item in menus where amend was
+ * never a plausible move.
  */
-export function isCheckedOutBranchBadge(
+export function getAmendBadgeVisibility(
   refInfo: RefInfo | undefined,
   currentBranchName: string | undefined
-): boolean {
-  if (!refInfo || currentBranchName === undefined) return false;
-  return refInfo.type === 'branch' && refInfo.name === currentBranchName;
+): AmendBadgeVisibility {
+  if (refInfo?.type !== 'branch') return 'hidden';
+  // Undefined means detached HEAD, where no branch badge is the checked-out one.
+  return refInfo.name === currentBranchName ? 'enabled' : 'disabled';
 }
 
 /**
