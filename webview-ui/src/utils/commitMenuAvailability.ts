@@ -1,4 +1,4 @@
-import type { Commit } from '@shared/types';
+import type { Branch, Commit, RefInfo } from '@shared/types';
 import { findHeadCommit, isStashPseudoCommit } from './commitRefs';
 
 /**
@@ -82,4 +82,40 @@ export function getCommitMenuAvailability({
     // entry is a pseudo-commit and cannot be amended.
     canAmend: isCheckedOutTip && !isStash,
   };
+}
+
+/**
+ * Whether a ref badge is the badge of the branch git currently has checked out.
+ *
+ * Amend is offered on badge menus only for this one badge. Every other badge on
+ * the tip row — a second local branch, a remote-tracking ref, a tag — names a ref
+ * the amend does **not** move: `git commit` takes no branch argument, it moves
+ * whatever HEAD points at, so amending from a `feature` badge would rewrite the
+ * checked-out branch and leave `feature` where it is. The badge you opened and
+ * the ref that moves have to be the same one, or the menu lies about its target.
+ */
+export function isCheckedOutBranchBadge(
+  refInfo: RefInfo | undefined,
+  currentBranchName: string | undefined
+): boolean {
+  if (!refInfo || currentBranchName === undefined) return false;
+  return refInfo.type === 'branch' && refInfo.name === currentBranchName;
+}
+
+/**
+ * Whether a local branch has a remote-tracking counterpart.
+ *
+ * Deliberately not the same question as "is this commit published", which
+ * `isCommitPushed` answers by asking whether *any* remote branch contains the
+ * commit. The two come apart whenever an unpublished branch shares a tip with a
+ * published one — and there the commit is on a remote while the branch is not,
+ * so a "force push after this" affordance would be offering to publish a branch
+ * for the first time under the name of a force push.
+ */
+export function hasRemoteCounterpart(
+  branches: readonly Branch[],
+  localBranchName: string | undefined
+): boolean {
+  if (localBranchName === undefined) return false;
+  return branches.some((branch) => !!branch.remote && branch.name === localBranchName);
 }

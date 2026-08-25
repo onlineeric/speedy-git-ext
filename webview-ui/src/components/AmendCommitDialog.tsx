@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { Commit } from '@shared/types';
+import type { UiSurface } from '@shared/telemetry';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { useCurrentLocalBranch } from '../stores/graphSelectors';
 import { trackUiInteraction } from '../utils/telemetry';
 import { describeForcePushFailure } from '../utils/amendMessages';
+import { hasRemoteCounterpart } from '../utils/commitMenuAvailability';
 import { buildAmendCommand, buildPushCommand } from '../utils/gitCommandBuilder';
 import { resolveDefaultRemote } from '../utils/resolveDefaultRemote';
 import { CommandPreview } from './CommandPreview';
@@ -21,6 +23,8 @@ import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 interface AmendCommitDialogProps {
   open: boolean;
   commit: Commit;
+  /** Menu surface the dialog was opened from, for UI telemetry. */
+  surface: UiSurface;
   onClose: () => void;
 }
 
@@ -44,7 +48,7 @@ const warningClassName =
 const errorClassName =
   'rounded border border-[var(--vscode-inputValidation-errorBorder)] bg-[var(--vscode-inputValidation-errorBackground)] px-3 py-2 text-sm whitespace-pre-wrap text-[var(--vscode-inputValidation-errorForeground,var(--vscode-foreground))]';
 
-export function AmendCommitDialog({ open, commit, onClose }: AmendCommitDialogProps) {
+export function AmendCommitDialog({ open, commit, surface, onClose }: AmendCommitDialogProps) {
   const dialogTelemetry = useDialogTelemetry('amendCommit', open);
 
   const [message, setMessage] = useState('');
@@ -107,7 +111,14 @@ export function AmendCommitDialog({ open, commit, onClose }: AmendCommitDialogPr
 
   useEffect(() => () => clearTimeout(hookNoticeTimer.current), []);
 
-  const canForcePush = isPublished && currentLocalBranch !== null;
+  // Two separate questions, and they come apart: `isPublished` says the *commit*
+  // is on a remote, which stays true when an unpublished branch merely shares a
+  // tip with a published one. Offering a force push there would publish the
+  // current branch for the first time — under a label that says force push, on a
+  // branch whose absence of a remote is precisely what makes it private. So the
+  // affordance needs both: the commit is out there, and this branch is too.
+  const currentBranchIsPublished = hasRemoteCounterpart(branches, currentLocalBranch?.name);
+  const canForcePush = isPublished && currentBranchIsPublished && currentLocalBranch !== null;
   const trimmedMessage = message.trim();
   const confirmDisabled = !messageLoaded || trimmedMessage.length === 0 || isAmending;
 
@@ -124,8 +135,8 @@ export function AmendCommitDialog({ open, commit, onClose }: AmendCommitDialogPr
 
   const handleConfirm = async () => {
     dialogTelemetry.confirmed();
-    if (includeStaged) trackUiInteraction('commitMenu', 'amendIncludeStaged');
-    if (canForcePush && forcePush) trackUiInteraction('commitMenu', 'amendForcePush');
+    if (includeStaged) trackUiInteraction(surface, 'amendIncludeStaged');
+    if (canForcePush && forcePush) trackUiInteraction(surface, 'amendForcePush');
 
     setError(null);
     setIsAmending(true);
@@ -214,7 +225,12 @@ export function AmendCommitDialog({ open, commit, onClose }: AmendCommitDialogPr
               </label>
             )}
 
-            {isPublished && (
+            {/* Gated on the same pair as the checkbox. When the commit is published
+               only through some *other* branch's remote, this branch's amend
+               rewrites nothing that is out there — the published copy is left
+               untouched on its own ref — so "you will need to force push" would
+               simply be untrue. */}
+            {isPublished && currentBranchIsPublished && (
               <p className={warningClassName}>
                 This commit already exists on a remote. Amending rewrites it, so the remote and your
                 branch will disagree until you force push.

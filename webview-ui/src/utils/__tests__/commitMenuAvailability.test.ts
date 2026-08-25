@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { Commit, RefInfo } from '@shared/types';
-import { getCommitMenuAvailability } from '../commitMenuAvailability';
+import type { Branch, Commit, RefInfo } from '@shared/types';
+import {
+  getCommitMenuAvailability,
+  hasRemoteCounterpart,
+  isCheckedOutBranchBadge,
+} from '../commitMenuAvailability';
 
 function makeCommit(hash: string, parents: string[] = ['parent'], refs: RefInfo[] = []): Commit {
   return {
@@ -158,5 +162,61 @@ describe('canAmend', () => {
       { type: 'stash', name: 'stash@{0}' },
     ]);
     expect(getCommitMenuAvailability({ commit: stash, ...ON_BRANCH }).canAmend).toBe(false);
+  });
+});
+
+describe('isCheckedOutBranchBadge', () => {
+  it('accepts the badge of the branch git has checked out', () => {
+    expect(isCheckedOutBranchBadge({ name: 'main', type: 'branch' }, 'main')).toBe(true);
+  });
+
+  it('rejects another local branch sharing the same tip', () => {
+    // Amending from here would rewrite `main` and leave `feature` behind, so the
+    // badge would name a ref the operation does not move.
+    expect(isCheckedOutBranchBadge({ name: 'feature', type: 'branch' }, 'main')).toBe(false);
+  });
+
+  it('rejects a remote-tracking badge even for the same branch name', () => {
+    expect(isCheckedOutBranchBadge({ name: 'main', type: 'remote', remote: 'origin' }, 'main')).toBe(false);
+  });
+
+  it('rejects tag, stash and HEAD badges', () => {
+    for (const type of ['tag', 'stash', 'head'] as const) {
+      expect(isCheckedOutBranchBadge({ name: 'main', type }, 'main')).toBe(false);
+    }
+  });
+
+  it('rejects everything in detached HEAD, where no branch is checked out', () => {
+    expect(isCheckedOutBranchBadge({ name: 'main', type: 'branch' }, undefined)).toBe(false);
+  });
+
+  it('rejects a missing badge (the row menu passes none)', () => {
+    expect(isCheckedOutBranchBadge(undefined, 'main')).toBe(false);
+  });
+});
+
+describe('hasRemoteCounterpart', () => {
+  const branches: Branch[] = [
+    { name: 'main', current: false, hash: 'aaa' },
+    { name: 'main', remote: 'origin', current: false, hash: 'aaa' },
+    { name: 'feature', current: true, hash: 'aaa' },
+  ];
+
+  it('is true for a branch with a remote-tracking entry', () => {
+    expect(hasRemoteCounterpart(branches, 'main')).toBe(true);
+  });
+
+  it('is false for a local-only branch even when it shares a tip with a published one', () => {
+    // `feature` and `origin/main` sit on the same commit here: the commit is
+    // published, the branch is not, and only the branch governs the force push.
+    expect(hasRemoteCounterpart(branches, 'feature')).toBe(false);
+  });
+
+  it('is false when no branch is checked out', () => {
+    expect(hasRemoteCounterpart(branches, undefined)).toBe(false);
+  });
+
+  it('is false for a name no branch carries', () => {
+    expect(hasRemoteCounterpart(branches, 'nope')).toBe(false);
   });
 });

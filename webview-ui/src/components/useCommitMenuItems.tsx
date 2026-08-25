@@ -6,6 +6,7 @@ import type {
   MergeOptions,
   CommitParentInfo,
   RebaseEntry,
+  RefInfo,
   ResetMode,
   RevertOptions,
   SlotValue,
@@ -18,7 +19,11 @@ import { trackUiInteraction } from '../utils/telemetry';
 import { buildCheckoutCommand, buildResetCommand } from '../utils/gitCommandBuilder';
 import { setSlotsAndCompare } from '../utils/compareDispatch';
 import { getReachabilityChecker } from '../utils/commitReachability';
-import { getCommitMenuAvailability } from '../utils/commitMenuAvailability';
+import {
+  getCommitMenuAvailability,
+  hasRemoteCounterpart,
+  isCheckedOutBranchBadge,
+} from '../utils/commitMenuAvailability';
 import { isStashPseudoCommit } from '../utils/commitRefs';
 import { CompareMenuItems } from './CompareMenuItems';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -54,6 +59,12 @@ interface UseCommitMenuItemsOptions {
   /** Hosting menu surface for UI telemetry (049-usage-telemetry). */
   surface: UiSurface;
   variant: CommitMenuVariant;
+  /**
+   * The badge this menu was opened from (`badge` variant only). Needed because
+   * one item — amend — is offered on a single badge rather than on all of them;
+   * see `isCheckedOutBranchBadge`.
+   */
+  badgeRef?: RefInfo;
 }
 
 function buildResetDescription(
@@ -204,11 +215,11 @@ function useDropCommit(commit: Commit) {
  * them would make the item feel broken. The dialog renders at once and fills in
  * as its answers land.
  */
-function useAmendCommit(commit: Commit) {
+function useAmendCommit(commit: Commit, surface: UiSurface) {
   const [open, setOpen] = useState(false);
 
   const dialog = open ? (
-    <AmendCommitDialog open commit={commit} onClose={() => setOpen(false)} />
+    <AmendCommitDialog open commit={commit} surface={surface} onClose={() => setOpen(false)} />
   ) : null;
 
   return { start: () => setOpen(true), dialog };
@@ -226,7 +237,7 @@ function useAmendCommit(commit: Commit) {
  * item in with the commit's copy items. Dialogs are returned apart from the
  * items because they must render outside the menu portal.
  */
-export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuItemsOptions) {
+export function useCommitMenuItems({ commit, surface, variant, badgeRef }: UseCommitMenuItemsOptions) {
   const [checkoutCommitConfirmOpen, setCheckoutCommitConfirmOpen] = useState(false);
   const [createBranchOpen, setCreateBranchOpen] = useState(false);
   const [createTagOpen, setCreateTagOpen] = useState(false);
@@ -253,14 +264,12 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   const interactiveRebase = useInteractiveRebase(commit.hash);
   const revert = useRevertCommit(commit);
   const drop = useDropCommit(commit);
-  const amend = useAmendCommit(commit);
+  const amend = useAmendCommit(commit, surface);
 
   const track = (action: UiAction) => trackUiInteraction(surface, action);
 
   const isRowMenu = variant === 'row';
-  const hasRemoteUpstream =
-    currentLocalBranch !== null &&
-    branches.some((b) => b.name === currentLocalBranch.name && !!b.remote);
+  const hasRemoteUpstream = hasRemoteCounterpart(branches, currentLocalBranch?.name);
 
   // Built from the *unfiltered* commit list: which operations apply is a question
   // about git history, not about what the author/text filters happen to be showing.
@@ -280,6 +289,13 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   );
 
   const availability = getCommitMenuAvailability({ commit, currentBranchHash, isOnFirstParentChain });
+
+  // Amend moves whatever HEAD points at, so on a badge menu it is offered by the
+  // one badge that names that ref — never by a second local branch sharing the
+  // tip, a remote-tracking ref or a tag, none of which the amend would move.
+  const showAmend =
+    availability.canAmend &&
+    (isRowMenu || isCheckedOutBranchBadge(badgeRef, currentLocalBranch?.name));
 
   const isMultiSelectActive =
     isRowMenu && selectedCommits.length > 1 && selectedCommits.includes(commit.hash);
@@ -372,11 +388,11 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
         Checkout this commit
       </MenuItem>
 
-      {/* Row menu only: the entry point is the commit row, and only the row git
-         has checked out. Disabled — never hidden — while another operation is in
-         progress, matching every other operation-dependent item; the backend
-         guard stays as the second line of defence for one started in a terminal. */}
-      {isRowMenu && availability.canAmend && (
+      {/* Only on the row git has checked out, and on that branch's own badge.
+         Disabled — never hidden — while another operation is in progress,
+         matching every other operation-dependent item; the backend guard stays
+         as the second line of defence for one started in a terminal. */}
+      {showAmend && (
         <MenuItem
           disabled={isOperationInProgress}
           onSelect={() => {

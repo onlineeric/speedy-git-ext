@@ -256,6 +256,7 @@ does. Each input tolerates failure by omitting its element.
 | Full message | new `rpcClient.getCommitMessage(hash)` |
 | Staged count | `useGraphStore` → `uncommittedCounts.stagedCount` (already in the store) |
 | Published | existing `rpcClient.isCommitPushed(hash)` (same call `useDropCommit` makes) |
+| Branch published | `hasRemoteCounterpart(branches, currentLocalBranch?.name)` — store-only *(added 2026-08-25)* |
 | Signature | `useGraphStore` → `signaturePresence[hash]`, **not** the `getSignatureInfo` RPC *(review 2026-08-25)* |
 
 The signature note only needs to know the commit *is* signed, and `signaturePresence`
@@ -266,8 +267,8 @@ rather than firing the RPC.
 
 Elements, in order: message textarea; "Include N staged file(s)" checkbox (only when
 `stagedCount > 0`, default **off**); published warning; signature note (only when signed);
-"Force Push after amended" checkbox (only when published **and** a current local branch exists,
-default off); command preview; buttons.
+"Force Push after amended" checkbox (only when published **and** the current local branch has a
+remote counterpart, default off); command preview; buttons.
 
 Confirm is disabled when the message trims to empty.
 
@@ -304,9 +305,17 @@ pushing.
 beside `useDropCommit` (`:168`), returning `{ start, dialog }` in the same shape, and add its dialog
 to the returned `dialogs` bundle.
 
-The item goes in `commitItems`, rendered only when `isRowMenu && availability.canAmend`, with
-`disabled={isOperationInProgress}` — matching checkout/merge/rebase. The badge menu (`variant: 'badge'`)
-does not get it: the entry point is the commit row menu only.
+The item goes in `commitItems`, rendered when `availability.canAmend` and either the menu is the row
+menu or the badge is the checked-out branch's own — `isCheckedOutBranchBadge(badgeRef, currentLocalBranch?.name)`
+in `commitMenuAvailability.ts` *(revised 2026-08-25)*. `disabled={isOperationInProgress}`, matching
+checkout/merge/rebase.
+
+`BranchContextMenu` passes its `refInfo` through as the new optional `badgeRef` option, because
+`canAmend` is a property of the *row* and the badge menu needs a ref-flavoured question on top of it.
+Every other badge on the tip row names a ref the amend does not move (see the idea spec's
+*Availability*), so only that one badge gets the item. The dialog also takes the hosting `surface`,
+so `amendIncludeStaged` / `amendForcePush` are attributed to the menu they were actually used from
+rather than a hardcoded `commitMenu`.
 
 `start` **opens the dialog first, then fetches** *(review 2026-08-25)*. Do not copy `useDropCommit`'s
 resolve-then-open pattern here: that hook awaits one cheap call, whereas amend has several inputs, and
@@ -369,6 +378,11 @@ Manual, against `~/repos/test-repo` (see CLAUDE.md for the repo layout):
     typed message is still there.
 11. Published branch: warning shows, force-push checkbox appears, `--force-with-lease` succeeds; then
     move the remote underneath and confirm the rejection message is the translated one.
+11b. Local-only branch sharing a tip with a published branch: **no** warning and **no** force-push
+    checkbox, even though `isCommitPushed` is true for that commit.
+11c. Two branches on the tip: the checked-out branch's badge offers amend; the other branch's badge,
+    a remote-tracking badge and a tag badge do not. After amending, the other branch stays on the
+    old commit — git's own behaviour, and the old commit is still reachable through it.
 12. Signed commit (if a signing key is configured): signature note shows.
 
 ## Documentation and release tasks
@@ -395,6 +409,14 @@ Manual, against `~/repos/test-repo` (see CLAUDE.md for the repo layout):
   `commit.gpgsign` is set, dropped otherwise. Hence the note.
 - **Amend keeps the original author** and records the amender as committer. Deliberately unsurfaced;
   `--reset-author` is out of scope.
+- **`isCommitPushed` answers about the commit, not the branch** *(added 2026-08-25)*. It runs
+  `git branch -r --contains`, so it stays true when an unpublished branch merely shares a tip with a
+  published one. The force-push checkbox and the published warning are therefore gated on
+  `isCommitPushed && hasRemoteCounterpart(...)`; without the second half, confirming would publish a
+  private branch for the first time under a force-push label. The pair is still an approximation —
+  it does not verify that *this* branch's remote ref contains the commit, which would need a query
+  narrowed to `<remote>/<branch>` rather than the shared `isCommitPushed` RPC that Drop Commit also
+  uses. Accepted for 5.12.0; the residual case is a branch whose own remote is behind the tip.
 - **The force push targets origin-or-first, which need not be the branch's upstream** *(review
   2026-08-25)*. `isCommitPushed` answers "exists on *some* remote", and `resolveDefaultRemote` picks
   `origin` else first-alphabetical, so a branch tracking a non-`origin` remote can have its amend

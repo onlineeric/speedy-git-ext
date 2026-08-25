@@ -42,14 +42,14 @@ Out of scope for this idea:
 
 | Question | Decision |
 | --- | --- |
-| Entry point | HEAD commit row menu only. Not the uncommitted node, not the details panel. |
+| Entry point | The HEAD commit row menu, plus the badge of the branch that is checked out *(revised 2026-08-25)*. Not the uncommitted node, not the details panel. |
 | Dialog shape | One "Amend Last Commit…" dialog: message field + "include staged changes" checkbox. |
 | Staged changes default | **Off.** The dialog shows the staged count but never absorbs staged work unless asked. |
 | Force push | A checkbox **inside** the dialog, default off, labelled "Force Push after amended". |
 | Reword body-loss fix | **Built first** — it introduces the full-message read amend depends on — but **released together** with amend in 5.12.0. |
 | Another operation in progress | **Blocked** during rebase, merge, revert and cherry-pick — all four. |
 | Force-push flavour | **`--force-with-lease`**, always. The real flag is visible in the command preview. |
-| Push checkbox when nothing is published | **Hidden.** It appears only when the commit being amended exists on a remote. |
+| Push checkbox when nothing is published | **Hidden.** It appears only when the commit being amended exists on a remote **and the checked-out branch itself has a remote counterpart** *(revised 2026-08-25)*. |
 | Slow hooks | **60-second ceiling** (up from the usual 30) plus a "waiting on hooks" state **with a Cancel button**. |
 | What cancel/timeout reports | **What actually happened**, read from HEAD after the fact — never an assumption *(review 2026-08-25)*. |
 | Dialog on any failure | **Stays open with the typed message intact**, not just on the HEAD-moved refusal *(review 2026-08-25)*. |
@@ -69,9 +69,15 @@ only, and anything staged stays staged for the next commit.
 
 ### Availability
 
-The item appears on the row git currently has checked out, and nowhere else. It is available in
-detached HEAD (git amends there perfectly well), on a merge commit (parents are preserved), and on a
-root commit. It never appears on a stash entry.
+The item appears on the row git currently has checked out, and — on badge menus — on the badge of the
+branch that is checked out. It is available in detached HEAD (git amends there perfectly well), on a
+merge commit (parents are preserved), and on a root commit. It never appears on a stash entry.
+
+**Only that one badge** *(revised 2026-08-25)*. `git commit` takes no branch argument: it moves
+whatever HEAD points at. So when two branches sit on the tip, amending from the `feature` badge would
+rewrite the checked-out branch and leave `feature` where it is — the menu would name one ref and move
+another. A remote-tracking badge and a tag badge are the same problem, and a tag is not a branch at
+all. Detached HEAD therefore has no badge that offers it; the row menu still does.
 
 While a rebase, merge, revert or cherry-pick is in progress the item is **disabled, not hidden** —
 the house rule for every operation-dependent item, so an option never vanishes during a refresh. No
@@ -99,9 +105,18 @@ that is the case the backend refusal exists for — not the normal path.
   consequence a user can *see* afterwards — the Signature column changes — so it is the one worth
   saying out loud. It applies to your own signed commits as much as to anyone else's.
 - **Force Push after amended** — a checkbox, default off, meaning `--force-with-lease`. Shown only
-  when the commit being amended is published on a remote and there is a branch to push. Hidden in
-  detached HEAD, when there are no remotes, and when the commit was never pushed — in that last case
-  its absence is itself the signal that this commit is yours alone.
+  when the commit being amended is published on a remote **and the checked-out branch has a remote
+  counterpart of its own** *(revised 2026-08-25)*. Hidden in detached HEAD, when there are no remotes,
+  and when the commit was never pushed — in that last case its absence is itself the signal that this
+  commit is yours alone.
+
+  The second half of that condition is not redundant. "Is the commit published" and "is the branch
+  published" come apart whenever an unpublished branch shares a tip with a published one: the commit
+  is on `origin/main`, the checked-out `feature` is on no remote at all. Offering a force push there
+  would publish `feature` for the first time — under a label that says force push, on a branch whose
+  absence of a remote is exactly what made it private. The published *warning* is gated on the same
+  pair, because in that case this branch's amend rewrites nothing that is out there: the published
+  copy stays untouched on its own ref, so "you will need to force push" would simply be untrue.
 - **Command preview** — the dialog shows the git command it will run, in the same style every other
   Speedy Git operation dialog does, and the preview updates live as the checkboxes change.
 
