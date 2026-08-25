@@ -3,19 +3,17 @@
  * button stays disabled.
  *
  * The decision is pure and lives here rather than in the extension host so it
- * can be tested without a `vscode` stub, and so the countdown constants are
- * defined once for the backend that sends them and the webview that counts them
- * down.
+ * can be tested without a `vscode` stub, and so the countdown is defined once
+ * for the backend that sends it and the webview that counts it down.
  */
-
-/** Close stays disabled this long in a released build, so the dialog is read rather than reflexively dismissed. */
-export const WHATS_NEW_COUNTDOWN_SECONDS = 5;
 
 /**
- * Shorter under F5 debugging, where the dialog opens on *every* launch — a
- * 5-second wait each time would make the extension tedious to develop against.
+ * Close stays disabled this long, so the dialog is read rather than reflexively
+ * dismissed. One value for every build: three seconds is short enough that F5
+ * debugging — where the dialog opens on *every* launch — does not need its own
+ * shorter one.
  */
-export const WHATS_NEW_DEV_COUNTDOWN_SECONDS = 2;
+export const WHATS_NEW_COUNTDOWN_SECONDS = 3;
 
 export interface WhatsNewDecision {
   show: boolean;
@@ -47,12 +45,8 @@ export function decideWhatsNew({
   lastShownVersion,
   isDevelopment,
 }: WhatsNewDecisionInput): WhatsNewDecision {
-  if (isDevelopment) {
-    return { show: true, countdownSeconds: WHATS_NEW_DEV_COUNTDOWN_SECONDS };
-  }
-
   return {
-    show: lastShownVersion !== currentVersion,
+    show: isDevelopment || lastShownVersion !== currentVersion,
     countdownSeconds: WHATS_NEW_COUNTDOWN_SECONDS,
   };
 }
