@@ -1,7 +1,8 @@
 # Idea Spec: Amend Last Commit
 
 Date: 2026-08-24
-Status: Idea — all questions resolved. Ready to be turned into an implementation spec.
+Status: Idea — all questions resolved. Reviewed 2026-08-25 against the implementation spec; the
+revisions from that pass are marked *(review 2026-08-25)*.
 Scope note: this document is intentionally free of technical detail. Services, message types, file
 layout and tests belong in the implementation spec that follows it.
 
@@ -50,6 +51,8 @@ Out of scope for this idea:
 | Force-push flavour | **`--force-with-lease`**, always. The real flag is visible in the command preview. |
 | Push checkbox when nothing is published | **Hidden.** It appears only when the commit being amended exists on a remote. |
 | Slow hooks | **60-second ceiling** (up from the usual 30) plus a "waiting on hooks" state **with a Cancel button**. |
+| What cancel/timeout reports | **What actually happened**, read from HEAD after the fact — never an assumption *(review 2026-08-25)*. |
+| Dialog on any failure | **Stays open with the typed message intact**, not just on the HEAD-moved refusal *(review 2026-08-25)*. |
 | Undo / reflog hint | **Quiet success.** No recovery hint; the graph refreshes and that is all. |
 | Authorship / signature notes | **Signature note only**, shown when the commit is signed. No authorship note. |
 | HEAD moved while the dialog was open | **Refuse and keep the dialog open**, preserving what the user typed. |
@@ -119,6 +122,10 @@ intact and says HEAD has moved and the dialog must be reopened to amend the curr
 re-targeted automatically — someone reaching for Enter will not read a banner explaining that the
 commit under the operation just changed.
 
+Keeping the dialog open is the rule for **every** failure, not only this one *(review 2026-08-25)*: a
+hook that rejects the message at second 40 must not take the message with it. The dialog closes on
+success and on cancel-the-dialog, never on an error.
+
 ### While it runs
 
 Committing runs `pre-commit` and `commit-msg` hooks — including for a message-only reword, since git
@@ -131,11 +138,16 @@ tens of seconds, and hook output is not visible to the user.
   repo's own tooling rather than as a frozen extension. Fast repos never see it.
 - That state carries a **Cancel** button. The ceiling is deliberately short, so Cancel is what keeps a
   genuinely slow hook from being a dead end.
-- Cancel, and the ceiling, both mean the same thing and must say it plainly: **the commit was not
-  created** (hooks run before the commit is written), and the hook process itself keeps running — we
-  stop waiting on it, we do not stop it. Tools like lint-staged may still be modifying files
-  afterwards. "Did my history get rewritten or not?" is the worst state to leave a user in, and this
-  wording is what prevents it.
+- Cancel and the ceiling both end our *wait*, and neither can state the outcome from first
+  principles. Hooks run before the commit is written, so **almost always** nothing was created — but
+  killing git in the window between the commit object being written and the process exiting leaves
+  the amend done. "Did my history get rewritten or not?" is the worst state to leave a user in, and
+  an assumption that is wrong one time in a hundred is exactly how a user ends up there. So the
+  outcome is **observed, not assumed**: after cancelling or timing out, HEAD is re-read and compared
+  with the commit the dialog was opened against, and the message says which of the two actually
+  happened *(review 2026-08-25)*.
+- Either way the message must also say that the hook process itself keeps running — we stopped
+  waiting on it, we did not stop it. Tools like lint-staged may still be modifying files afterwards.
 
 ### After confirming
 
@@ -172,8 +184,13 @@ Amend is a user-initiated git operation and gets the same treatment as every oth
 
 - A tracked operation event for the amend itself, with outcome and duration.
 - A dialog outcome event — confirmed or cancelled — for the open/close cycle.
-- The two option booleans (include-staged, force-push) recorded as reviewed booleans, so the ratio of
-  message-only rewords to content amends, and how often force push is chained, is visible.
+- The two options (include-staged, force-push) surfaced as their own **catalog UI actions**, emitted
+  on confirm only when the box was checked *(review 2026-08-25)*. They are not properties on the
+  amend event: the operation event carries a fixed property set, so there is nowhere to hang them.
+  The ratio of message-only rewords to content amends stays derivable — a plain amend emits neither
+  action, so the operation count is the denominator. What this shape gives up is the *pairing*: the
+  two arrive as independent counts, so an amend that used both options cannot be told from two amends
+  that each used one. That is accepted rather than worked around.
 - The force push, if it runs, reports as the existing push operation — it is not folded into the
   amend's own outcome, which keeps the split-outcome case legible in the data.
 

@@ -1,6 +1,6 @@
 # Implementation Spec: Amend Last Commit (5.12.0)
 
-Date: 2026-08-24
+Date: 2026-08-24 — revised 2026-08-25 after a design review; revisions marked *(review 2026-08-25)*.
 Product decisions: `specs/amend-idea.md` — that document owns *what* and *why*; this one owns *how*.
 Where they disagree, the idea spec wins and this file is wrong.
 
@@ -130,7 +130,15 @@ trimmed once. This is the same read Part A introduced, for a single commit.
    behaviour: `--amend --only -F` rewrites the message without absorbing the index, and leaves staged
    files staged.
 4. `timeout: 60_000` (not the 30s default) and `abortSignal` passed through.
-5. `finally` — remove the temp directory.
+5. **On `CANCELLED` or `TIMEOUT`, re-read HEAD before reporting** *(review 2026-08-25)*. Killing git
+   almost always means no commit was written — hooks run first — but the window between the commit
+   object being written and the process exiting is real, and a wrong answer here is the worst
+   possible one. So compare a fresh `git rev-parse HEAD` with `expectedHead` and return the outcome
+   observed, not assumed: unchanged → the amend did not happen; changed → it did, despite the
+   cancel. Both carry the same rider, that the hook process may still be running. Return this as a
+   distinguishable result the dialog can word correctly (e.g. a `GitError` whose code stays
+   `CANCELLED`/`TIMEOUT` but whose message states the observed outcome).
+6. `finally` — remove the temp directory.
 
 Do **not** pass an `env` override. `GitExecutor` already installs a no-op `GIT_EDITOR`, which is
 exactly right here: `--amend` without `-F` would otherwise open an editor, silently accept the
@@ -187,7 +195,9 @@ New file `src/webview/handlers/commitHandlers.ts`, registered in `WebviewMessage
      as the last refresh, so this catches an operation started in a terminal moments ago.
   2. Create an `AbortController`, store it on the handler module the way `compareHandlers.ts:8` does,
      and pass its signal into the service.
-  3. On success: post `success`, then `await context.refreshCoordinator.reload()`.
+  3. On success: post `success`, then `await context.refreshCoordinator.reload()`. The reload alone
+     is **not** enough to keep the selection — see B.8's *After a successful amend* *(review
+     2026-08-25)*.
   4. On failure: post `error` with the `GitError` unchanged.
   5. Clear the stored controller in a `finally`.
 - `cancelAmend` — abort the stored controller if present. The executor resolves the in-flight call
@@ -197,13 +207,22 @@ New file `src/webview/handlers/commitHandlers.ts`, registered in `WebviewMessage
 
 `webview-ui/src/utils/commitMenuAvailability.ts` — add `canAmend` to `CommitMenuAvailability`.
 
-It must key off the **head ref**, not `currentBranchHash`:
+It must key off the **head ref**, not `currentBranchHash`, and it must do so through the existing
+helper rather than a second inline copy of the same predicate *(review 2026-08-25)*:
 
 ```ts
-const isHeadRef = commit.refs.some((ref) => ref.type === 'head');
+import { findHeadCommit, isStashPseudoCommit } from './commitRefs';
 // …
-canAmend: isHeadRef && !isStash,
+const isCheckedOutTip = findHeadCommit([commit]) !== undefined;
+// …
+canAmend: isCheckedOutTip && !isStash,
 ```
+
+Name it `isCheckedOutTip`, **not** `isHeadRef`. The file already has `isHeadCommit`, derived from
+`currentBranchHash`, and the two deliberately disagree in detached HEAD — `isHeadCommit` is "the
+current branch points here", `isCheckedOutTip` is "git has this commit checked out". Two similarly
+named booleans that disagree in one specific case need names that say which case, or the file reads
+as if it cannot decide what HEAD means. Add a comment saying detached HEAD is exactly that case.
 
 `currentBranchHash` is `null` in detached HEAD, where git amends perfectly well — keying off it would
 make the item vanish exactly there. Merge commits (parents preserved) and root commits are allowed;
@@ -227,14 +246,23 @@ New `webview-ui/src/components/AmendCommitDialog.tsx`. Follow `PushDialog.tsx` f
 `Dialog.Content` with `dialogContentClassName` + `dialogContentStyle`, `dialogOverlayClassName`,
 button variants from `dialogStyles.ts`, `CommandPreview`, and `useDialogTelemetry('amendCommit', open)`.
 
-State loaded when the dialog opens (all three tolerate failure and simply omit their element):
+**The dialog opens immediately and fills in asynchronously** *(review 2026-08-25)*. It must not wait
+on its inputs before rendering: the message textarea starts disabled with a loading state and becomes
+editable when the message arrives, and every other element simply does not render until its input
+does. Each input tolerates failure by omitting its element.
 
 | Input | Source |
 | --- | --- |
 | Full message | new `rpcClient.getCommitMessage(hash)` |
-| Staged count | `useGraphStore` → `uncommittedCounts.stagedCount` |
+| Staged count | `useGraphStore` → `uncommittedCounts.stagedCount` (already in the store) |
 | Published | existing `rpcClient.isCommitPushed(hash)` (same call `useDropCommit` makes) |
-| Signature | existing `getSignatureInfo` RPC |
+| Signature | `useGraphStore` → `signaturePresence[hash]`, **not** the `getSignatureInfo` RPC *(review 2026-08-25)* |
+
+The signature note only needs to know the commit *is* signed, and `signaturePresence`
+(`graphStore.ts:130`) already holds that — it is populated for the Signature column. `getSignatureInfo`
+runs `%G?` plus `cat-file` and can spawn gpg, which is the one input here slow enough to matter. If
+presence is absent from the store (column never loaded, or a presence read failed), omit the note
+rather than firing the RPC.
 
 Elements, in order: message textarea; "Include N staged file(s)" checkbox (only when
 `stagedCount > 0`, default **off**); published warning; signature note (only when signed);
@@ -243,10 +271,25 @@ default off); command preview; buttons.
 
 Confirm is disabled when the message trims to empty.
 
+**The dialog stays open on every failure**, preserving the typed message *(review 2026-08-25)* — not
+only on `HEAD_MOVED`. A `commit-msg` hook that rejects the message at second 40 must leave the user
+holding their message, not send them back to retype it. The dialog closes on success, and on the
+user's own cancel-the-dialog; an error never closes it.
+
 **While running.** After ~3s show the "waiting on hooks" state with a Cancel button wired to
-`rpcClient.cancelAmend()`. Cancel and the 60s ceiling produce the same user-facing statement: the
-commit was **not** created, and the hook process itself keeps running — we stopped waiting on it, we
-did not stop it.
+`rpcClient.cancelAmend()`. Cancel and the 60s ceiling both report **what B.1 step 5 observed**, never
+a fixed sentence *(review 2026-08-25)*: HEAD unchanged means the commit was not created, HEAD changed
+means the amend completed despite the cancel. Both add that the hook process itself keeps running —
+we stopped waiting on it, we did not stop it. If the observed outcome says the amend completed, the
+dialog closes and the graph reloads exactly as it does on the success path.
+
+**After a successful amend**, the selection must follow to the rewritten commit *(review
+2026-08-25)*. `refreshCoordinator.reload()` alone drops it: the amend always changes the hash, and
+`graphStore.ts:529` keeps `selectedCommit` only when its hash still resolves
+(`selectedCommitIndex >= 0 ? selectedCommit : undefined`), so an amend would clear the selection every
+time. After the reloaded commits land, re-select via `findHeadCommitHash(commits)` from
+`utils/commitRefs.ts` — the same head-ref predicate B.6 uses, so it is right in detached HEAD too, and
+it needs no new hash plumbing through the `success` response (whose payload is a message string only).
 
 **On success**, if force push was checked: call
 `rpcClient.pushAsync(remote, branch, false, 'force-with-lease')` where `remote` comes from
@@ -265,8 +308,10 @@ The item goes in `commitItems`, rendered only when `isRowMenu && availability.ca
 `disabled={isOperationInProgress}` — matching checkout/merge/rebase. The badge menu (`variant: 'badge'`)
 does not get it: the entry point is the commit row menu only.
 
-`start` fetches the message, pushed state and signature, then opens the dialog — mirroring
-`useDropCommit`'s resolve-then-open pattern.
+`start` **opens the dialog first, then fetches** *(review 2026-08-25)*. Do not copy `useDropCommit`'s
+resolve-then-open pattern here: that hook awaits one cheap call, whereas amend has several inputs, and
+awaiting them all would hold the dialog shut behind the slowest one. See B.8 — the dialog renders at
+once and fills in as answers arrive.
 
 ### B.10 — Telemetry
 
@@ -279,6 +324,10 @@ as properties**. They are expressed as catalog actions instead:
 - `UI_ACTIONS` += `'amendCommit'` (menu item clicked), `'amendIncludeStaged'`, `'amendForcePush'`.
   The latter two are emitted on confirm **only when checked**, on the `commitMenu` surface. A plain
   message-only amend emits neither, so the message-only share is derivable from the operation count.
+  Known limitation, accepted rather than worked around *(review 2026-08-25)*: the two arrive as
+  independent counts, so one amend using both options is indistinguishable from two amends each using
+  one. `specs/amend-idea.md`'s telemetry section was corrected to describe this shape — it previously
+  called for "reviewed booleans", which the fixed property set has nowhere to carry.
 
 Update `telemetry.json` and the focused telemetry tests. Nothing derived from repository content is
 recorded: no message, no counts, no branch or remote names, no hashes.
@@ -313,11 +362,14 @@ Manual, against `~/repos/test-repo` (see CLAUDE.md for the repo layout):
    the backend guard also refuses.
 7. Open the dialog, commit from VS Code's SCM view, then confirm: refused, dialog stays open, typed
    text intact.
-8. Add a `pre-commit` hook that sleeps 10s: waiting state appears; Cancel ends the wait and no commit
-   is created.
-9. Published branch: warning shows, force-push checkbox appears, `--force-with-lease` succeeds; then
-   move the remote underneath and confirm the rejection message is the translated one.
-10. Signed commit (if a signing key is configured): signature note shows.
+8. Add a `pre-commit` hook that sleeps 10s: waiting state appears; Cancel ends the wait, and the
+   reported outcome matches what HEAD actually shows (B.1 step 5).
+9. Amend any commit and confirm the **selection lands on the rewritten tip**, not nowhere (B.8).
+10. Add a `commit-msg` hook that always exits 1: the amend fails, the dialog **stays open**, and the
+    typed message is still there.
+11. Published branch: warning shows, force-push checkbox appears, `--force-with-lease` succeeds; then
+    move the remote underneath and confirm the rejection message is the translated one.
+12. Signed commit (if a signing key is configured): signature note shows.
 
 ## Documentation and release tasks
 
@@ -343,6 +395,17 @@ Manual, against `~/repos/test-repo` (see CLAUDE.md for the repo layout):
   `commit.gpgsign` is set, dropped otherwise. Hence the note.
 - **Amend keeps the original author** and records the amender as committer. Deliberately unsurfaced;
   `--reset-author` is out of scope.
+- **The force push targets origin-or-first, which need not be the branch's upstream** *(review
+  2026-08-25)*. `isCommitPushed` answers "exists on *some* remote", and `resolveDefaultRemote` picks
+  `origin` else first-alphabetical, so a branch tracking a non-`origin` remote can have its amend
+  force-pushed at the wrong one. Accepted for 5.12.0: `Branch` (`shared/types.ts:218-223`) carries no
+  upstream field, and `PushDialog.tsx:29` already picks the remote exactly this way, so amend is
+  consistent with the push UI the user already knows. Adding `%(upstream:remotename)` to `Branch` is
+  the fix if this is ever reported; it is a shared-type change and out of scope here.
+- **The `expectedHead` check narrows the race, it does not close it.** `rev-parse` and `commit` are
+  two spawns, so a commit landing between them is still possible *(review 2026-08-25)*. The window is
+  milliseconds against a user-driven risk measured in seconds, which is why the check is worth having
+  — but do not describe it in user-facing text as a guarantee that HEAD cannot move.
 - **`--force-with-lease` is only as strong as the remote-tracking ref.** Speedy Git's auto-refresh
   does not fetch (`RefreshCoordinator` re-reads local state only), but VS Code's `git.autofetch` does,
   and it erodes the lease. Do not describe the lease as an absolute guarantee in any user-facing text.
