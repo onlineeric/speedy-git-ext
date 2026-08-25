@@ -7,7 +7,7 @@ import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { InteractiveRebaseConfig, RebaseConflictInfo, RebaseEntry, RebaseState } from '../../shared/types.js';
 import { validateHash, validateRefName } from '../utils/gitValidation.js';
-import { isConflictStderr } from '../utils/gitParsers.js';
+import { isConflictStderr, trimCommitMessage } from '../utils/gitParsers.js';
 
 /** Convert Windows backslash paths to forward slashes for Git shell compatibility */
 function toShellPath(p: string): string {
@@ -79,9 +79,7 @@ export class GitRebaseService {
         hash: hash.trim(),
         abbreviatedHash: abbreviatedHash.trim(),
         subject: subject.trim(),
-        // Only trailing newlines go: internal blank lines separate paragraphs
-        // and trailers, and are content.
-        message: messageParts.join('\x1f').replace(/\n+$/, ''),
+        message: trimCommitMessage(messageParts.join('\x1f')),
         action: 'pick',
       };
     });

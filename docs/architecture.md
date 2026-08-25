@@ -83,7 +83,8 @@ src/
 │   ├── GitConfigService.ts       # Git config reading
 │   └── TelemetryService.ts       # Consent-aware backend telemetry funnel; real + no-op implementations
 └── utils/
-    ├── gitParsers.ts             # Parse git log lines, refs (%D), branch list, stash base (%P); classify git stderr (conflict, nothing-to-apply)
+    ├── gitParsers.ts             # Parse git log lines, refs (%D), branch list, stash base (%P); classify git stderr
+    │                             #   (conflict, nothing-to-apply); trimCommitMessage (%B trailing-newline rule)
     ├── gitQueries.ts             # Shared read-only git queries. isDirtyWorkingTree counts untracked
     │                             #   files — for `worktree remove` only; never gate rebase/pick/revert on it
     ├── gitValidation.ts          # Input validation (backend wrappers over shared/gitRefValidation)
@@ -167,7 +168,8 @@ Menu building blocks — see `CLAUDE.md` for the reuse rules:
 All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome reporting.
 
 ```
-├── dialogStyles.ts               # Shared dialog width/resize + the primary/secondary/danger button variants (one shared base)
+├── dialogStyles.ts               # Shared dialog width/resize, the primary/secondary/danger button variants (one shared
+│                                 #   base) and the note/warning/error message boxes (one shared base)
 ├── ConfirmDialog.tsx             # Generic confirm (danger/warning variants) + CommandPreview
 ├── InputDialog.tsx               # Generic single-input dialog + FieldError
 ├── CommandPreview.tsx            # Live git command preview shown in dialogs
@@ -231,7 +233,7 @@ utils/
 ├── graphPaths.ts                 # SVG "rounded elbow" builders for lane-changing lines — lines cross row
 │                                 #   boundaries perfectly vertically so per-row SVG cells join without kinks (5.4.0)
 ├── commitReachability.ts         # Branch reachability per commit; checkers cached by commit-list identity (WeakMap)
-├── commitRefs.ts                 # Row predicates by ref decoration (findHeadCommit/findHeadCommitHash,
+├── commitRefs.ts                 # Row predicates by ref decoration (isHeadRow/findHeadCommit/findHeadCommitHash,
 │                                 #   isStashPseudoCommit) — used by topology, uncommitted parent, tooltip, Go to HEAD
 ├── commitMenuAvailability.ts     # Which commit actions apply (rebase/reset/revert/drop/cherry-pick/merge/amend)
 │                                 #   + hasRemoteCounterpart: does the checked-out branch have a remote (gates force push)

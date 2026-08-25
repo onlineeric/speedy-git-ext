@@ -37,6 +37,17 @@ export function gitErrorDetail(error: { stderr?: string; message?: string }): st
  * other two are stash internals that must never reach the graph. Both readers of
  * `git stash list` need this rule, so it lives here rather than twice inline.
  */
+/**
+ * A raw `%B` message as we store it: only trailing newlines go, because internal
+ * blank lines separate paragraphs and trailers and are content.
+ *
+ * Shared by every read of a complete commit message (amend prefill, interactive
+ * rebase entries) so the two cannot disagree about what "the message" is.
+ */
+export function trimCommitMessage(rawMessage: string): string {
+  return rawMessage.replace(/\n+$/, '');
+}
+
 export function parseStashBaseHash(parentField: string): string {
   return parentField.trim().split(' ')[0];
 }

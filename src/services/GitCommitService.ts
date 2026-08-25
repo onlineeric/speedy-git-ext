@@ -1,9 +1,7 @@
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
+import { trimCommitMessage } from '../utils/gitParsers.js';
 import { validateHash } from '../utils/gitValidation.js';
 
 /**
@@ -67,7 +65,7 @@ export class GitCommitService {
     });
     if (!result.success) return result;
 
-    return ok(result.value.stdout.replace(/\n+$/, ''));
+    return ok(trimCommitMessage(result.value.stdout));
   }
 
   /**
@@ -98,42 +96,37 @@ export class GitCommitService {
 
     this.log.info(`Amend HEAD (${includeStaged ? 'including staged changes' : 'message only'})`);
 
-    // The message goes through a file, never `-m`: it is multi-line and may hold
+    // The message is fed on stdin, never as `-m`: it is multi-line and may hold
     // quotes, backticks and non-ASCII, and `-F` additionally selects git's
     // `whitespace` cleanup instead of `strip`, so a body line starting with `#`
-    // survives instead of being read as a comment and deleted.
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'speedy-git-amend-'));
-    try {
-      const messagePath = path.join(tmpDir, 'COMMIT_EDITMSG');
-      fs.writeFileSync(messagePath, message, 'utf-8');
+    // survives instead of being read as a comment and deleted. `-F -` gets both
+    // without a temp file — the executor already writes and closes stdin.
+    //
+    // `--only` with no pathspec is what keeps the index out of the amend: the
+    // commit is rewritten from HEAD's own tree, and staged files stay staged for
+    // the next commit. Without it git absorbs the index, which is plain amend's
+    // behaviour and the classic amend footgun.
+    const args = ['commit', '--amend'];
+    if (!includeStaged) args.push('--only');
+    args.push('-F', '-');
 
-      // `--only` with no pathspec is what keeps the index out of the amend:
-      // the commit is rewritten from HEAD's own tree, and staged files stay
-      // staged for the next commit. Without it git absorbs the index, which is
-      // plain amend's behaviour and the classic amend footgun.
-      const args = ['commit', '--amend'];
-      if (!includeStaged) args.push('--only');
-      args.push('-F', messagePath);
+    // No `env` override: GitExecutor's no-op GIT_EDITOR is exactly right here
+    // (an amend without `-F` would otherwise open an editor, accept the
+    // unchanged message and "succeed"), and hooks need the inherited
+    // environment to find their tooling.
+    const result = await this.executor.execute({
+      args,
+      cwd: this.workspacePath,
+      stdin: message,
+      timeout: AMEND_TIMEOUT_MS,
+      abortSignal,
+    });
 
-      // No `env` override: GitExecutor's no-op GIT_EDITOR is exactly right here
-      // (an amend without `-F` would otherwise open an editor, accept the
-      // unchanged message and "succeed"), and hooks need the inherited
-      // environment to find their tooling.
-      const result = await this.executor.execute({
-        args,
-        cwd: this.workspacePath,
-        timeout: AMEND_TIMEOUT_MS,
-        abortSignal,
-      });
-
-      if (result.success) return ok('Commit amended.');
-      if (result.error.code === 'CANCELLED' || result.error.code === 'TIMEOUT') {
-        return this.describeInterruptedAmend(result.error, expectedHead);
-      }
-      return err(result.error);
-    } finally {
-      this.removeTmpDir(tmpDir);
+    if (result.success) return ok('Commit amended.');
+    if (result.error.code === 'CANCELLED' || result.error.code === 'TIMEOUT') {
+      return this.describeInterruptedAmend(result.error, expectedHead);
     }
+    return err(result.error);
   }
 
   /**
@@ -193,13 +186,5 @@ export class GitCommitService {
     });
     if (!result.success) return result;
     return ok(result.value.stdout.trim());
-  }
-
-  private removeTmpDir(tmpDir: string): void {
-    try {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    } catch (error) {
-      this.log.warn(`Failed to remove temporary amend directory: ${String(error)}`);
-    }
   }
 }

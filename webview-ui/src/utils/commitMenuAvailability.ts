@@ -1,5 +1,5 @@
 import type { Branch, Commit } from '@shared/types';
-import { findHeadCommit, isStashPseudoCommit } from './commitRefs';
+import { isHeadRow, isStashPseudoCommit } from './commitRefs';
 
 /**
  * Which commit operations apply to a given commit.
@@ -50,7 +50,7 @@ export function getCommitMenuAvailability({
   // This one is "git has this commit checked out", read from the head ref, which
   // is exactly the case the two disagree on — and git amends in detached HEAD
   // perfectly well, so keying amend off the branch would make it vanish there.
-  const isCheckedOutTip = findHeadCommit([commit]) !== undefined;
+  const isCheckedOutTip = isHeadRow(commit);
 
   // Rebasing onto, and resetting to, both mean "move the current branch here",
   // so they become available under exactly the same condition: a branch exists

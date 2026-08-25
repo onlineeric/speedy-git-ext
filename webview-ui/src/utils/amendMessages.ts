@@ -18,7 +18,6 @@ export function describeForcePushFailure(rawError: string): string {
   const detail = isLeaseRejection
     ? 'The remote branch moved since your last fetch, so the force push was refused rather than overwriting work you have not seen yet. Fetch and check what changed before force pushing again.'
     : trimmed;
-  return detail
-    ? `The commit was amended locally, but the force push was rejected. ${detail}`
-    : 'The commit was amended locally, but the force push was rejected.';
+  const lead = 'The commit was amended locally, but the force push was rejected.';
+  return detail ? `${lead} ${detail}` : lead;
 }

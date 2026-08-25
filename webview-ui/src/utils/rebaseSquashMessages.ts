@@ -18,13 +18,18 @@ export function buildSquashMessages(entries: RebaseEntry[]): SquashGroupMessage[
   let currentLeadHash: string | null = null;
   let currentMessages: string[] = [];
 
+  /** Close the group being built, if it actually combines more than one message. */
+  const flush = () => {
+    if (currentLeadHash && currentMessages.length > 1) {
+      groups.push({ groupLeadHash: currentLeadHash, combinedMessage: currentMessages.join('\n\n') });
+    }
+  };
+
   for (const entry of entries) {
     if (entry.action === 'drop') continue;
 
     if (entry.action === 'pick' || entry.action === 'reword') {
-      if (currentLeadHash && currentMessages.length > 1) {
-        groups.push({ groupLeadHash: currentLeadHash, combinedMessage: currentMessages.join('\n\n') });
-      }
+      flush();
       currentLeadHash = entry.hash;
       currentMessages = [entry.action === 'reword' && entry.rewordMessage ? entry.rewordMessage : entry.message];
     } else if (entry.action === 'squash') {
@@ -33,9 +38,7 @@ export function buildSquashMessages(entries: RebaseEntry[]): SquashGroupMessage[
     // fixup: silently discard
   }
 
-  if (currentLeadHash && currentMessages.length > 1) {
-    groups.push({ groupLeadHash: currentLeadHash, combinedMessage: currentMessages.join('\n\n') });
-  }
+  flush();
 
   return groups;
 }

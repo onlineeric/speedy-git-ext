@@ -1,15 +1,5 @@
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 
-/**
- * The controller for the amend currently in flight, if any.
- *
- * Module-level for the same reason `compareHandlers` keeps its compare
- * controller in the runtime: `cancelAmend` arrives as its own message, so the
- * thing it cancels has to outlive the dispatch that started it. Only one amend
- * can be running — the dialog is modal and there is only one HEAD.
- */
-let activeAmendController: AbortController | null = null;
-
 export const commitHandlers = {
   getCommitMessage: async (message, context) => {
     const result = await context.services.current().gitCommitService.getCommitMessage(message.payload.hash);
@@ -37,7 +27,7 @@ export const commitHandlers = {
     }
 
     const controller = new AbortController();
-    activeAmendController = controller;
+    context.runtime.activeAmendController = controller;
     try {
       const result = await context.services.current().gitCommitService.amendCommit({
         message: message.payload.message,
@@ -53,13 +43,15 @@ export const commitHandlers = {
         context.postMessage({ type: 'error', payload: { error: result.error } });
       }
     } finally {
-      if (activeAmendController === controller) activeAmendController = null;
+      if (context.runtime.activeAmendController === controller) {
+        context.runtime.activeAmendController = null;
+      }
     }
   },
 
-  cancelAmend: async (_message, _context) => {
+  cancelAmend: async (_message, context) => {
     // Ends our wait only. The hook process git spawned keeps running, which is
     // why the reported outcome is observed from HEAD rather than assumed.
-    activeAmendController?.abort();
+    context.runtime.activeAmendController?.abort();
   },
 } satisfies Pick<RequestHandlerMap, 'getCommitMessage' | 'amendCommit' | 'cancelAmend'>;

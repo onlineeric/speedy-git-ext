@@ -16,12 +16,14 @@ import {
   buttonSecondaryClassName,
   dialogContentClassName,
   dialogContentStyle,
+  dialogErrorClassName,
+  dialogNoteClassName,
   dialogOverlayClassName,
+  dialogWarningClassName,
 } from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface AmendCommitDialogProps {
-  open: boolean;
   commit: Commit;
   /** Menu surface the dialog was opened from, for UI telemetry. */
   surface: UiSurface;
@@ -39,25 +41,27 @@ interface AmendCommitDialogProps {
  */
 const HOOK_WAIT_NOTICE_MS = 3_000;
 
-const noteClassName =
-  'rounded border border-[var(--vscode-panel-border)] px-3 py-2 text-sm text-[var(--vscode-descriptionForeground)]';
+/**
+ * Idle, running, and running long enough to name the hooks. One value rather
+ * than two booleans: the fourth combination they could spell (waiting on hooks
+ * while not amending) does not exist, and every exit has to clear both.
+ */
+type AmendPhase = 'idle' | 'amending' | 'waitingOnHooks';
 
-const warningClassName =
-  'rounded border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-inputValidation-warningBackground)] px-3 py-2 text-sm text-[var(--vscode-inputValidation-warningForeground,var(--vscode-foreground))]';
+/**
+ * The dialog is mounted only while it is open (the menu renders it
+ * conditionally), so there is no closed state to model here: every open starts
+ * from the initial state below, and `Dialog.Root` is opened unconditionally.
+ */
+export function AmendCommitDialog({ commit, surface, onClose }: AmendCommitDialogProps) {
+  const dialogTelemetry = useDialogTelemetry('amendCommit', true);
 
-const errorClassName =
-  'rounded border border-[var(--vscode-inputValidation-errorBorder)] bg-[var(--vscode-inputValidation-errorBackground)] px-3 py-2 text-sm whitespace-pre-wrap text-[var(--vscode-inputValidation-errorForeground,var(--vscode-foreground))]';
-
-export function AmendCommitDialog({ open, commit, surface, onClose }: AmendCommitDialogProps) {
-  const dialogTelemetry = useDialogTelemetry('amendCommit', open);
-
-  const [message, setMessage] = useState('');
-  const [messageLoaded, setMessageLoaded] = useState(false);
+  // `null` until the message arrives — the one state that means "not loaded".
+  const [message, setMessage] = useState<string | null>(null);
   const [isPublished, setIsPublished] = useState(false);
   const [includeStaged, setIncludeStaged] = useState(false);
   const [forcePush, setForcePush] = useState(false);
-  const [isAmending, setIsAmending] = useState(false);
-  const [waitingOnHooks, setWaitingOnHooks] = useState(false);
+  const [phase, setPhase] = useState<AmendPhase>('idle');
   const [error, setError] = useState<string | null>(null);
   const hookNoticeTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -72,26 +76,17 @@ export function AmendCommitDialog({ open, commit, surface, onClose }: AmendCommi
 
   // The dialog renders immediately and fills in as answers arrive; each input
   // tolerates failure by leaving its element out rather than blocking the rest.
-  // No state reset here: the menu mounts this component only while it is open,
-  // so every open starts from the initial state above.
   useEffect(() => {
-    if (!open) return undefined;
     let cancelled = false;
 
     rpcClient.getCommitMessage(commit.hash).then(
       (fullMessage) => {
-        if (!cancelled) {
-          setMessage(fullMessage);
-          setMessageLoaded(true);
-        }
+        if (!cancelled) setMessage(fullMessage);
       },
       () => {
         // Fall back to the subject rather than an empty box: the user can still
         // amend, and an empty prefill would invite confirming away the message.
-        if (!cancelled) {
-          setMessage(commit.subject);
-          setMessageLoaded(true);
-        }
+        if (!cancelled) setMessage(commit.subject);
       },
     );
 
@@ -107,9 +102,11 @@ export function AmendCommitDialog({ open, commit, surface, onClose }: AmendCommi
     return () => {
       cancelled = true;
     };
-  }, [open, commit.hash, commit.subject]);
+  }, [commit.hash, commit.subject]);
 
   useEffect(() => () => clearTimeout(hookNoticeTimer.current), []);
+
+  const isAmending = phase !== 'idle';
 
   // Two separate questions, and they come apart: `isPublished` says the *commit*
   // is on a remote, which stays true when an unpublished branch merely shares a
@@ -117,40 +114,38 @@ export function AmendCommitDialog({ open, commit, surface, onClose }: AmendCommi
   // current branch for the first time — under a label that says force push, on a
   // branch whose absence of a remote is precisely what makes it private. So the
   // affordance needs both: the commit is out there, and this branch is too.
-  const currentBranchIsPublished = hasRemoteCounterpart(branches, currentLocalBranch?.name);
-  const canForcePush = isPublished && currentBranchIsPublished && currentLocalBranch !== null;
-  const trimmedMessage = message.trim();
-  const confirmDisabled = !messageLoaded || trimmedMessage.length === 0 || isAmending;
+  const canForcePush = isPublished && hasRemoteCounterpart(branches, currentLocalBranch?.name);
+  const confirmDisabled = message === null || message.trim().length === 0 || isAmending;
 
-  const amendCommand = buildAmendCommand({ includeStaged });
-  const pushCommand =
+  // One description of the push, so the previewed command and the push that runs
+  // cannot describe different things.
+  const pushTarget =
     canForcePush && forcePush && currentLocalBranch
-      ? buildPushCommand({
+      ? {
           remote: resolveDefaultRemote(branches),
           branch: currentLocalBranch.name,
           setUpstream: false,
-          forceMode: 'force-with-lease',
-        })
+          forceMode: 'force-with-lease' as const,
+        }
       : null;
 
   const handleConfirm = async () => {
     dialogTelemetry.confirmed();
     if (includeStaged) trackUiInteraction(surface, 'amendIncludeStaged');
-    if (canForcePush && forcePush) trackUiInteraction(surface, 'amendForcePush');
+    if (pushTarget) trackUiInteraction(surface, 'amendForcePush');
 
     setError(null);
-    setIsAmending(true);
-    hookNoticeTimer.current = setTimeout(() => setWaitingOnHooks(true), HOOK_WAIT_NOTICE_MS);
+    setPhase('amending');
+    hookNoticeTimer.current = setTimeout(() => setPhase('waitingOnHooks'), HOOK_WAIT_NOTICE_MS);
 
     try {
-      await rpcClient.amendCommit(message, includeStaged, commit.hash);
+      await rpcClient.amendCommit(message ?? '', includeStaged, commit.hash);
     } catch (amendError) {
       // Every failure keeps the dialog open with the typed message intact — a
       // `commit-msg` hook that rejects at second 40 must not take the message
       // with it. Only success and the user's own cancel close it.
-      setError(typeof amendError === 'string' ? amendError : String(amendError));
-      setIsAmending(false);
-      setWaitingOnHooks(false);
+      setError(String(amendError));
+      setPhase('idle');
       clearTimeout(hookNoticeTimer.current);
       return;
     }
@@ -161,13 +156,13 @@ export function AmendCommitDialog({ open, commit, surface, onClose }: AmendCommi
     rpcClient.selectHeadAfterNextLoad();
     onClose();
 
-    if (canForcePush && forcePush && currentLocalBranch) {
+    if (pushTarget) {
       try {
         await rpcClient.pushAsync(
-          resolveDefaultRemote(branches),
-          currentLocalBranch.name,
-          false,
-          'force-with-lease',
+          pushTarget.remote,
+          pushTarget.branch,
+          pushTarget.setUpstream,
+          pushTarget.forceMode,
         );
       } catch (pushError) {
         const raw = pushError instanceof Error ? pushError.message : String(pushError);
@@ -183,7 +178,7 @@ export function AmendCommitDialog({ open, commit, surface, onClose }: AmendCommi
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
+    <Dialog.Root open onOpenChange={handleOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className={dialogOverlayClassName} />
         <Dialog.Content className={dialogContentClassName} style={dialogContentStyle}>
@@ -209,11 +204,11 @@ export function AmendCommitDialog({ open, commit, surface, onClose }: AmendCommi
               </label>
               <textarea
                 id="amend-message"
-                value={messageLoaded ? message : ''}
+                value={message ?? ''}
                 onChange={(e) => setMessage(e.target.value)}
-                disabled={!messageLoaded || isAmending}
+                disabled={message === null || isAmending}
                 rows={8}
-                placeholder={messageLoaded ? 'Commit message…' : 'Loading commit message…'}
+                placeholder={message === null ? 'Loading commit message…' : 'Commit message…'}
                 className="w-full resize-y rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] p-2 font-mono text-sm text-[var(--vscode-input-foreground)] disabled:opacity-60"
               />
             </div>
@@ -233,20 +228,20 @@ export function AmendCommitDialog({ open, commit, surface, onClose }: AmendCommi
               </label>
             )}
 
-            {/* Gated on the same pair as the checkbox. When the commit is published
-               only through some *other* branch's remote, this branch's amend
-               rewrites nothing that is out there — the published copy is left
-               untouched on its own ref — so "you will need to force push" would
-               simply be untrue. */}
-            {isPublished && currentBranchIsPublished && (
-              <p className={warningClassName}>
+            {/* Gated on the same question as the checkbox below. When the commit is
+               published only through some *other* branch's remote, this branch's
+               amend rewrites nothing that is out there — the published copy is
+               left untouched on its own ref — so "you will need to force push"
+               would simply be untrue. */}
+            {canForcePush && (
+              <p className={dialogWarningClassName}>
                 This commit already exists on a remote. Amending rewrites it, so the remote and your
                 branch will disagree until you force push.
               </p>
             )}
 
             {isSigned && (
-              <p className={noteClassName}>
+              <p className={dialogNoteClassName}>
                 This commit is signed. Amending replaces the signature — re-signed with your own key
                 if you sign commits, unsigned otherwise.
               </p>
@@ -265,21 +260,21 @@ export function AmendCommitDialog({ open, commit, surface, onClose }: AmendCommi
               </label>
             )}
 
-            <CommandPreview command={amendCommand} />
-            {pushCommand && <CommandPreview command={pushCommand} showLabel={false} />}
+            <CommandPreview command={buildAmendCommand({ includeStaged })} />
+            {pushTarget && <CommandPreview command={buildPushCommand(pushTarget)} showLabel={false} />}
 
-            {waitingOnHooks && (
-              <p className={noteClassName}>
+            {phase === 'waitingOnHooks' && (
+              <p className={dialogNoteClassName}>
                 Waiting on this repository&apos;s commit hooks. They can take a while; cancelling
                 stops the wait, not the hooks themselves.
               </p>
             )}
 
-            {error && <p className={errorClassName}>{error}</p>}
+            {error && <p className={dialogErrorClassName}>{error}</p>}
           </div>
 
           <div className="mt-6 flex justify-end gap-2">
-            {waitingOnHooks ? (
+            {phase === 'waitingOnHooks' ? (
               <button type="button" onClick={() => rpcClient.cancelAmend()} className={buttonSecondaryClassName}>
                 Cancel wait
               </button>

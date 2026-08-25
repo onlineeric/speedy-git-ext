@@ -29,6 +29,12 @@ declare const acquireVsCodeApi: () => {
   setState: (state: unknown) => void;
 };
 
+/** Fail every request still waiting in a pending-request map, and empty it. */
+function rejectAll(pending: Map<unknown, { reject: (error: Error) => void }>, error: Error) {
+  for (const request of pending.values()) request.reject(error);
+  pending.clear();
+}
+
 class RpcClient {
   private vscode: ReturnType<typeof acquireVsCodeApi> | undefined;
   private initialized = false;
@@ -734,20 +740,9 @@ class RpcClient {
   private rejectPendingLookups(message: string) {
     const error = new Error(message);
 
-    for (const pending of this.pendingPushedChecks.values()) {
-      pending.reject(error);
-    }
-    this.pendingPushedChecks.clear();
-
-    for (const pending of this.pendingCommitMessages.values()) {
-      pending.reject(error);
-    }
-    this.pendingCommitMessages.clear();
-
-    for (const pending of this.pendingParentLookups.values()) {
-      pending.reject(error);
-    }
-    this.pendingParentLookups.clear();
+    rejectAll(this.pendingPushedChecks, error);
+    rejectAll(this.pendingCommitMessages, error);
+    rejectAll(this.pendingParentLookups, error);
     this.parentRequestIdByHash.clear();
   }
 

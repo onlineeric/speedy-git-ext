@@ -198,23 +198,6 @@ function useDropCommit(commit: Commit) {
 }
 
 /**
- * Amend cluster: unlike the drop cluster above, this one opens the dialog
- * *first* and lets it fetch. Drop awaits a single cheap call before opening;
- * amend has several inputs, and holding the dialog shut behind the slowest of
- * them would make the item feel broken. The dialog renders at once and fills in
- * as its answers land.
- */
-function useAmendCommit(commit: Commit, surface: UiSurface) {
-  const [open, setOpen] = useState(false);
-
-  const dialog = open ? (
-    <AmendCommitDialog open commit={commit} surface={surface} onClose={() => setOpen(false)} />
-  ) : null;
-
-  return { start: () => setOpen(true), dialog };
-}
-
-/**
  * Every action that applies to a commit, grouped the way menus present them,
  * plus the dialogs they drive.
  *
@@ -237,6 +220,11 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   const [cherryPickCommits, setCherryPickCommits] = useState<Commit[]>([]);
   const [rebaseOntoConfirmOpen, setRebaseOntoConfirmOpen] = useState(false);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  // Unlike the drop cluster, amend needs no hook of its own: it opens the dialog
+  // *first* and lets it fetch. Drop awaits a single cheap call before opening;
+  // amend has several inputs, and holding the dialog shut behind the slowest of
+  // them would make the item feel broken.
+  const [amendOpen, setAmendOpen] = useState(false);
 
   const branches = useGraphStore((s) => s.branches);
   const selectedCommits = useGraphStore((s) => s.selectedCommits);
@@ -253,7 +241,6 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   const interactiveRebase = useInteractiveRebase(commit.hash);
   const revert = useRevertCommit(commit);
   const drop = useDropCommit(commit);
-  const amend = useAmendCommit(commit, surface);
 
   const track = (action: UiAction) => trackUiInteraction(surface, action);
 
@@ -382,7 +369,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
           disabled={isOperationInProgress}
           onSelect={() => {
             track('amendCommit');
-            amend.start();
+            setAmendOpen(true);
           }}
         >
           Amend Last Commit...
@@ -669,7 +656,9 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
       {interactiveRebase.dialog}
       {revert.dialog}
       {drop.dialog}
-      {amend.dialog}
+      {amendOpen && (
+        <AmendCommitDialog commit={commit} surface={surface} onClose={() => setAmendOpen(false)} />
+      )}
     </>
   );
 

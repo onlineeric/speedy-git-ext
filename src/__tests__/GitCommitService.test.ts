@@ -1,22 +1,10 @@
 import type { LogOutputChannel } from 'vscode';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { GitCommitService } from '../services/GitCommitService.js';
 import { GitError, ok, err, type Result } from '../../shared/errors.js';
 import type { GitExecResult } from '../services/GitExecutor.js';
 
 const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as LogOutputChannel;
-
-vi.mock('fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('fs')>();
-  return {
-    ...actual,
-    mkdtempSync: vi.fn(() => '/tmp/speedy-git-amend-test'),
-    writeFileSync: vi.fn(),
-    rmSync: vi.fn(),
-  };
-});
-
-import * as fs from 'fs';
 
 const HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const MOVED_HEAD = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
@@ -42,11 +30,9 @@ function argsOfCommit(spy: ReturnType<typeof stubExecutor>): string[] | undefine
   return spy.mock.calls.map(([options]) => options.args).find((args) => args[0] === 'commit');
 }
 
-beforeEach(() => {
-  vi.mocked(fs.mkdtempSync).mockClear();
-  vi.mocked(fs.writeFileSync).mockClear();
-  vi.mocked(fs.rmSync).mockClear();
-});
+function commitCall(spy: ReturnType<typeof stubExecutor>) {
+  return spy.mock.calls.map(([options]) => options).find((options) => options.args[0] === 'commit');
+}
 
 describe('GitCommitService.getCommitMessage', () => {
   it('rejects an invalid hash before running anything', async () => {
@@ -87,9 +73,7 @@ describe('GitCommitService.amendCommit', () => {
 
     await service.amendCommit({ message: 'new', includeStaged: false, expectedHead: HEAD });
 
-    expect(argsOfCommit(spy)).toEqual([
-      'commit', '--amend', '--only', '-F', expect.stringContaining('COMMIT_EDITMSG'),
-    ]);
+    expect(argsOfCommit(spy)).toEqual(['commit', '--amend', '--only', '-F', '-']);
   });
 
   it('omits --only when the staged changes are being folded in', async () => {
@@ -103,17 +87,13 @@ describe('GitCommitService.amendCommit', () => {
     expect(args).toContain('-F');
   });
 
-  it('writes the message to a file rather than passing it as an argument', async () => {
+  it('feeds the message on stdin rather than passing it as an argument', async () => {
     const service = new GitCommitService('/repo', mockLog);
     const spy = stubExecutor(service, [HEAD]);
 
     await service.amendCommit({ message: 'Subject\n\n# body line', includeStaged: false, expectedHead: HEAD });
 
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('COMMIT_EDITMSG'),
-      'Subject\n\n# body line',
-      'utf-8',
-    );
+    expect(commitCall(spy)?.stdin).toBe('Subject\n\n# body line');
     expect(argsOfCommit(spy)).not.toContain('-m');
   });
 
@@ -123,21 +103,7 @@ describe('GitCommitService.amendCommit', () => {
 
     await service.amendCommit({ message: 'new', includeStaged: false, expectedHead: HEAD });
 
-    const commitCall = spy.mock.calls.map(([options]) => options).find((options) => options.args[0] === 'commit');
-    expect(commitCall?.timeout).toBe(60_000);
-  });
-
-  it('removes the temp directory on success and on failure', async () => {
-    const service = new GitCommitService('/repo', mockLog);
-    stubExecutor(service, [HEAD]);
-    await service.amendCommit({ message: 'new', includeStaged: false, expectedHead: HEAD });
-    expect(fs.rmSync).toHaveBeenCalledWith('/tmp/speedy-git-amend-test', { recursive: true, force: true });
-
-    vi.mocked(fs.rmSync).mockClear();
-    const failing = new GitCommitService('/repo', mockLog);
-    stubExecutor(failing, [HEAD], () => err(new GitError('hook rejected', 'COMMAND_FAILED')));
-    await failing.amendCommit({ message: 'new', includeStaged: false, expectedHead: HEAD });
-    expect(fs.rmSync).toHaveBeenCalledWith('/tmp/speedy-git-amend-test', { recursive: true, force: true });
+    expect(commitCall(spy)?.timeout).toBe(60_000);
   });
 
   it('surfaces an ordinary git failure unchanged', async () => {
