@@ -52,6 +52,8 @@ export const GIT_ERROR_CODES = [
   'MERGE_CONFLICT_NO_RECOVERY',
   'REBASE_CONFLICT',
   'OPERATION_IN_PROGRESS',
+  /** `git commit --amend` refused because HEAD moved after the dialog captured it. */
+  'HEAD_MOVED',
   'CANCELLED',
   'UNKNOWN',
 ] as const;

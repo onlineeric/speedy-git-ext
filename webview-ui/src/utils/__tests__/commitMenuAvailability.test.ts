@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Commit, RefInfo } from '@shared/types';
-import { getCommitMenuAvailability } from '../commitMenuAvailability';
+import type { Branch, Commit, RefInfo } from '@shared/types';
+import { getCommitMenuAvailability, hasRemoteCounterpart } from '../commitMenuAvailability';
 
 function makeCommit(hash: string, parents: string[] = ['parent'], refs: RefInfo[] = []): Commit {
   return {
@@ -16,6 +16,8 @@ function makeCommit(hash: string, parents: string[] = ['parent'], refs: RefInfo[
 }
 
 const ON_BRANCH = { currentBranchHash: 'head', isOnFirstParentChain: true };
+
+const HEAD_REF: RefInfo[] = [{ type: 'head', name: 'HEAD' }];
 
 describe('getCommitMenuAvailability', () => {
   it('offers the full set for an ordinary commit on the current branch', () => {
@@ -114,5 +116,73 @@ describe('getCommitMenuAvailability', () => {
         isOnFirstParentChain: false,
       }).canMerge
     ).toBe(true);
+  });
+});
+
+describe('canAmend', () => {
+  it('offers amend on the row git has checked out', () => {
+    const commit = makeCommit('head', ['parent'], HEAD_REF);
+    expect(getCommitMenuAvailability({ commit, ...ON_BRANCH }).canAmend).toBe(true);
+  });
+
+  it('withholds amend from every other row', () => {
+    const commit = makeCommit('abc');
+    expect(getCommitMenuAvailability({ commit, ...ON_BRANCH }).canAmend).toBe(false);
+  });
+
+  it('offers amend in detached HEAD, where the branch-derived head is null', () => {
+    const commit = makeCommit('abc', ['parent'], HEAD_REF);
+    const availability = getCommitMenuAvailability({
+      commit,
+      currentBranchHash: null,
+      isOnFirstParentChain: false,
+    });
+
+    // The two head notions deliberately disagree here: no branch points at this
+    // commit, but git has it checked out, and git amends there perfectly well.
+    expect(availability.isHeadCommit).toBe(false);
+    expect(availability.canAmend).toBe(true);
+  });
+
+  it('offers amend on a merge tip (parents are preserved) and on a root commit', () => {
+    const merge = makeCommit('head', ['p1', 'p2'], HEAD_REF);
+    expect(getCommitMenuAvailability({ commit: merge, ...ON_BRANCH }).canAmend).toBe(true);
+
+    const root = makeCommit('head', [], HEAD_REF);
+    expect(getCommitMenuAvailability({ commit: root, ...ON_BRANCH }).canAmend).toBe(true);
+  });
+
+  it('never offers amend on a stash entry', () => {
+    const stash = makeCommit('head', ['parent'], [
+      { type: 'head', name: 'HEAD' },
+      { type: 'stash', name: 'stash@{0}' },
+    ]);
+    expect(getCommitMenuAvailability({ commit: stash, ...ON_BRANCH }).canAmend).toBe(false);
+  });
+});
+
+describe('hasRemoteCounterpart', () => {
+  const branches: Branch[] = [
+    { name: 'main', current: false, hash: 'aaa' },
+    { name: 'main', remote: 'origin', current: false, hash: 'aaa' },
+    { name: 'feature', current: true, hash: 'aaa' },
+  ];
+
+  it('is true for a branch with a remote-tracking entry', () => {
+    expect(hasRemoteCounterpart(branches, 'main')).toBe(true);
+  });
+
+  it('is false for a local-only branch even when it shares a tip with a published one', () => {
+    // `feature` and `origin/main` sit on the same commit here: the commit is
+    // published, the branch is not, and only the branch governs the force push.
+    expect(hasRemoteCounterpart(branches, 'feature')).toBe(false);
+  });
+
+  it('is false when no branch is checked out', () => {
+    expect(hasRemoteCounterpart(branches, undefined)).toBe(false);
+  });
+
+  it('is false for a name no branch carries', () => {
+    expect(hasRemoteCounterpart(branches, 'nope')).toBe(false);
   });
 });

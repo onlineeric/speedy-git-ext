@@ -6,6 +6,7 @@ import type { GitCherryPickService } from '../services/GitCherryPickService.js';
 import type { GitDiffService } from '../services/GitDiffService.js';
 import type { GitHistoryService } from '../services/GitHistoryService.js';
 import type { GitIndexService } from '../services/GitIndexService.js';
+import type { GitCommitService } from '../services/GitCommitService.js';
 import type { GitLogService } from '../services/GitLogService.js';
 import type { GitRebaseService } from '../services/GitRebaseService.js';
 import type { GitRemoteService } from '../services/GitRemoteService.js';
@@ -70,6 +71,7 @@ export class WebviewProvider {
     gitSubmoduleService: GitSubmoduleService,
     gitWorktreeService: GitWorktreeService,
     gitIndexService: GitIndexService,
+    gitCommitService: GitCommitService,
     private readonly log: vscode.LogOutputChannel,
     private readonly telemetry: TelemetryService,
     private readonly gitRepoDiscoveryService?: GitRepoDiscoveryService,
@@ -91,6 +93,7 @@ export class WebviewProvider {
       gitSubmoduleService,
       gitWorktreeService,
       gitIndexService,
+      gitCommitService,
     });
     this.uiStateStore = new PersistedUIStateStore(this.context, () => this.runtime.currentRepoPath);
     this.panelHost = new WebviewPanelHost(this.context, this.log);
@@ -169,6 +172,7 @@ export class WebviewProvider {
     gitSubmoduleService: GitSubmoduleService,
     gitWorktreeService: GitWorktreeService,
     gitIndexService: GitIndexService,
+    gitCommitService: GitCommitService,
     currentRepoPath: string,
   ): void {
     this.services.update({
@@ -186,6 +190,7 @@ export class WebviewProvider {
       gitSubmoduleService,
       gitWorktreeService,
       gitIndexService,
+      gitCommitService,
     });
     this.runtime.resetRepoScopedState(currentRepoPath);
     this.uiStateStore.invalidateCache();

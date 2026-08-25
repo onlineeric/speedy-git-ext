@@ -3,7 +3,6 @@ import {
   decideWhatsNew,
   shouldRecordWhatsNew,
   WHATS_NEW_COUNTDOWN_SECONDS,
-  WHATS_NEW_DEV_COUNTDOWN_SECONDS,
 } from '../../shared/whatsNew.js';
 
 describe('decideWhatsNew', () => {
@@ -41,14 +40,13 @@ describe('decideWhatsNew', () => {
       expect(decision.show).toBe(true);
     });
 
-    it('waits a shorter time, because it opens on every launch', () => {
+    it('waits the same time as a released build — one countdown for every build', () => {
       const decision = decideWhatsNew({
         currentVersion: '5.10.0',
         lastShownVersion: undefined,
         isDevelopment: true,
       });
-      expect(decision.countdownSeconds).toBe(WHATS_NEW_DEV_COUNTDOWN_SECONDS);
-      expect(WHATS_NEW_DEV_COUNTDOWN_SECONDS).toBeLessThan(WHATS_NEW_COUNTDOWN_SECONDS);
+      expect(decision.countdownSeconds).toBe(WHATS_NEW_COUNTDOWN_SECONDS);
     });
   });
 });

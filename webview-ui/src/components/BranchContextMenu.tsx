@@ -14,6 +14,7 @@ import {
   buildRenameBranchCommand,
   buildStashAndCheckoutCommand,
 } from '../utils/gitCommandBuilder';
+import { hasRemoteCounterpart } from '../utils/commitMenuAvailability';
 import { resolveDefaultRemote, resolveDefaultRemoteName } from '../utils/resolveDefaultRemote';
 import { CompareMenuItems } from './CompareMenuItems';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -53,8 +54,7 @@ type BranchCheckoutState = 'local-only' | 'remote-only' | 'dual';
 function getBranchCheckoutState(refInfo: RefInfo, branches: ReturnType<typeof useGraphStore.getState>['branches']): BranchCheckoutState {
   if (refInfo.type === 'branch') {
     // Local branch — check if there's a matching remote counterpart
-    const hasRemote = branches.some((b) => b.remote && b.name === refInfo.name);
-    return hasRemote ? 'dual' : 'local-only';
+    return hasRemoteCounterpart(branches, refInfo.name) ? 'dual' : 'local-only';
   }
   if (refInfo.type === 'remote' && refInfo.remote) {
     // Remote branch — check if there's a local branch with the same name

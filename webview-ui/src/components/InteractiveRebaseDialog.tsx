@@ -23,6 +23,7 @@ import {
 } from '@dnd-kit/sortable';
 import type { RebaseEntry, SquashGroupMessage, InteractiveRebaseConfig } from '@shared/types';
 import { InteractiveRebaseRow } from './InteractiveRebaseRow';
+import { buildSquashMessages } from '../utils/rebaseSquashMessages';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
@@ -35,33 +36,6 @@ interface InteractiveRebaseDialogProps {
 }
 
 type Step = 1 | 2 | 3;
-
-function buildSquashMessages(entries: RebaseEntry[]): SquashGroupMessage[] {
-  const groups: SquashGroupMessage[] = [];
-  let currentLeadHash: string | null = null;
-  let currentMessages: string[] = [];
-
-  for (const entry of entries) {
-    if (entry.action === 'drop') continue;
-
-    if (entry.action === 'pick' || entry.action === 'reword') {
-      if (currentLeadHash && currentMessages.length > 1) {
-        groups.push({ groupLeadHash: currentLeadHash, combinedMessage: currentMessages.join('\n\n') });
-      }
-      currentLeadHash = entry.hash;
-      currentMessages = [entry.action === 'reword' && entry.rewordMessage ? entry.rewordMessage : entry.subject];
-    } else if (entry.action === 'squash') {
-      currentMessages.push(entry.subject);
-    }
-    // fixup: silently discard
-  }
-
-  if (currentLeadHash && currentMessages.length > 1) {
-    groups.push({ groupLeadHash: currentLeadHash, combinedMessage: currentMessages.join('\n\n') });
-  }
-
-  return groups;
-}
 
 function validateStep1(entries: RebaseEntry[]): string | null {
   const nonDropped = entries.filter((e) => e.action !== 'drop');

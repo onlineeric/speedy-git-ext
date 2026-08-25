@@ -69,15 +69,15 @@ describe('GitRebaseService.getRebaseCommits', () => {
     if (!result.success) expect(result.error.code).toBe('VALIDATION_ERROR');
   });
 
-  it('parses log output into RebaseEntry[] with default action="pick"', async () => {
+  it('parses NUL-delimited log output into RebaseEntry[] with default action="pick"', async () => {
     const service = new GitRebaseService('/repo', mockLog);
     vi.spyOn(service['executor'], 'execute').mockResolvedValue({
       success: true,
       value: {
         stdout: [
-          'aaa1111\x1faaa1111\x1ffirst',
-          'bbb2222\x1fbbb2222\x1fsecond',
-        ].join('\n'),
+          'aaa1111\x1faaa1111\x1ffirst\x1ffirst\n',
+          'bbb2222\x1fbbb2222\x1fsecond\x1fsecond\n',
+        ].join('\0') + '\0',
         stderr: '',
       },
     });
@@ -86,10 +86,63 @@ describe('GitRebaseService.getRebaseCommits', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.value).toEqual([
-        { hash: 'aaa1111', abbreviatedHash: 'aaa1111', subject: 'first', action: 'pick' },
-        { hash: 'bbb2222', abbreviatedHash: 'bbb2222', subject: 'second', action: 'pick' },
+        { hash: 'aaa1111', abbreviatedHash: 'aaa1111', subject: 'first', message: 'first', action: 'pick' },
+        { hash: 'bbb2222', abbreviatedHash: 'bbb2222', subject: 'second', message: 'second', action: 'pick' },
       ]);
     }
+  });
+
+  it('reads the full message, not the subject: bodies, comment lines and trailers survive', async () => {
+    const service = new GitRebaseService('/repo', mockLog);
+    const fullMessage = [
+      'Add the widget',
+      '',
+      'Explains why, over several lines.',
+      '# not a comment once it is in the message',
+      '',
+      'Co-authored-by: Someone <someone@example.com>',
+    ].join('\n');
+    vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: {
+        stdout: `aaa1111\x1faaa1111\x1fAdd the widget\x1f${fullMessage}\n\0`,
+        stderr: '',
+      },
+    });
+
+    const result = await service.getRebaseCommits('abc1234');
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value).toHaveLength(1);
+      expect(result.value[0].subject).toBe('Add the widget');
+      // The whole thing — not truncated at the first newline, and the blank
+      // lines that separate body from trailers are kept.
+      expect(result.value[0].message).toBe(fullMessage);
+    }
+  });
+
+  it('trims only trailing newlines from the message', async () => {
+    const service = new GitRebaseService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: { stdout: 'aaa1111\x1faaa1111\x1fsubject\x1fsubject\n\nbody\n\n\n\0', stderr: '' },
+    });
+
+    const result = await service.getRebaseCommits('abc1234');
+    if (result.success) expect(result.value[0].message).toBe('subject\n\nbody');
+  });
+
+  it('requests a NUL-delimited %B log', async () => {
+    const service = new GitRebaseService('/repo', mockLog);
+    const spy = vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: { stdout: '', stderr: '' },
+    });
+
+    await service.getRebaseCommits('abc1234');
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({
+      args: ['log', '--reverse', '--ancestry-path', '-z', '--format=%H\x1f%h\x1f%s\x1f%B', 'abc1234..HEAD', '--'],
+    }));
   });
 
   it('returns empty array when no commits between base and HEAD', async () => {

@@ -20,7 +20,17 @@ interface DecoratedRow {
  * given list — it may be deeper than the loaded batches, or hidden by a filter.
  */
 export function findHeadCommit<T extends DecoratedRow>(commits: readonly T[]): T | undefined {
-  return commits.find((commit) => commit.refs?.some((ref) => ref.type === 'head'));
+  return commits.find(isHeadRow);
+}
+
+/**
+ * Whether this row is the one git has checked out, asked of a single row.
+ *
+ * Not the same question as "the current branch points here": this one reads the
+ * head ref, so it stays true in detached HEAD, where there is no branch to point.
+ */
+export function isHeadRow(commit: DecoratedRow): boolean {
+  return commit.refs?.some((ref) => ref.type === 'head') ?? false;
 }
 
 /** Hash of {@link findHeadCommit}, or null when HEAD is not in the given list. */

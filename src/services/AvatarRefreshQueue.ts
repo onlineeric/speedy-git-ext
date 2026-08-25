@@ -56,6 +56,13 @@ export class AvatarRefreshQueue {
   private inFlight: string | null = null;
   private running = false;
   private disposed = false;
+  /**
+   * Bumped by {@link clear}, so a lookup already in flight can tell that the
+   * record it read no longer exists. Same pattern as
+   * `GitHubAvatarService.rateLimitGeneration`: a private counter guarding this
+   * class's own async writes.
+   */
+  private clearGeneration = 0;
   /** Whether the webview was last told the queue is paused on the rate limit. */
   private rateLimitAnnounced = false;
   /** Ends the wait the loop is currently in; null when it is not in one. */
@@ -164,10 +171,23 @@ export class AvatarRefreshQueue {
     const hash = task.hashes[0];
     if (hash === undefined) return;
 
+    const generation = this.clearGeneration;
     const outcome = await this.deps.avatarService.lookupCommitAuthorAvatar(
       { owner: task.owner, repo: task.repo, hash },
       this.deps.auth.getToken(),
     );
+
+    // The cache was cleared while this lookup was in flight, so `record` and every
+    // decision below belong to a cache that no longer exists. Writing the outcome
+    // back would resurrect the record with today's stamp — and the reload that
+    // follows a clear has already re-queued this email, so its second lookup would
+    // then find an unchanged URL and post nothing, leaving that author showing
+    // initials until the refresh window elapses. Drop it instead; the re-queued
+    // lookup is the one that answers.
+    if (generation !== this.clearGeneration) {
+      this.deps.log.debug(`Avatar lookup ${task.email}: discarded — cache cleared while in flight`);
+      return;
+    }
 
     // One line per lookup: the only place that records what GitHub actually
     // said about a given author. Local log channel only — emails and hashes
@@ -324,6 +344,11 @@ export class AvatarRefreshQueue {
     // author until the next reload. Forgetting the in-flight email costs at most one
     // duplicate lookup in that race and keeps the clear honest.
     this.inFlight = null;
+    // Forgetting the email is only half of it: the in-flight lookup would still
+    // write its pre-clear answer into the fresh cache, which is exactly what makes
+    // the re-queued lookup post nothing. `processOne` drops the outcome when this
+    // moves under it.
+    this.clearGeneration += 1;
     this.pendingResults = {};
   }
 

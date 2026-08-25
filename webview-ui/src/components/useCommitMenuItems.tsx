@@ -18,7 +18,7 @@ import { trackUiInteraction } from '../utils/telemetry';
 import { buildCheckoutCommand, buildResetCommand } from '../utils/gitCommandBuilder';
 import { setSlotsAndCompare } from '../utils/compareDispatch';
 import { getReachabilityChecker } from '../utils/commitReachability';
-import { getCommitMenuAvailability } from '../utils/commitMenuAvailability';
+import { getCommitMenuAvailability, hasRemoteCounterpart } from '../utils/commitMenuAvailability';
 import { isStashPseudoCommit } from '../utils/commitRefs';
 import { CompareMenuItems } from './CompareMenuItems';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -30,6 +30,7 @@ import { InteractiveRebaseDialog } from './InteractiveRebaseDialog';
 import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 import { RevertDialog } from './RevertDialog';
 import { DropCommitDialog } from './DropCommitDialog';
+import { AmendCommitDialog } from './AmendCommitDialog';
 import { CreateWorktreeDialog } from './CreateWorktreeDialog';
 import { MenuItem } from './MenuItem';
 import { MenuSubTrigger } from './MenuSubTrigger';
@@ -219,6 +220,11 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   const [cherryPickCommits, setCherryPickCommits] = useState<Commit[]>([]);
   const [rebaseOntoConfirmOpen, setRebaseOntoConfirmOpen] = useState(false);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  // Unlike the drop cluster, amend needs no hook of its own: it opens the dialog
+  // *first* and lets it fetch. Drop awaits a single cheap call before opening;
+  // amend has several inputs, and holding the dialog shut behind the slowest of
+  // them would make the item feel broken.
+  const [amendOpen, setAmendOpen] = useState(false);
 
   const branches = useGraphStore((s) => s.branches);
   const selectedCommits = useGraphStore((s) => s.selectedCommits);
@@ -239,9 +245,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   const track = (action: UiAction) => trackUiInteraction(surface, action);
 
   const isRowMenu = variant === 'row';
-  const hasRemoteUpstream =
-    currentLocalBranch !== null &&
-    branches.some((b) => b.name === currentLocalBranch.name && !!b.remote);
+  const hasRemoteUpstream = hasRemoteCounterpart(branches, currentLocalBranch?.name);
 
   // Built from the *unfiltered* commit list: which operations apply is a question
   // about git history, not about what the author/text filters happen to be showing.
@@ -352,6 +356,25 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
       >
         Checkout this commit
       </MenuItem>
+
+      {/* Offered wherever the checked-out tip is: the row menu and every badge on
+         that row. Which badge was opened does not change what happens — all the
+         badges on a row sit on the same commit, and amend rewrites that commit —
+         so this behaves like the other current-branch actions in this menu
+         (Revert, Drop, Reset) rather than being singled out. Disabled, never
+         hidden, while another operation is in progress; the backend guard stays
+         as the second line of defence for one started in a terminal. */}
+      {availability.canAmend && (
+        <MenuItem
+          disabled={isOperationInProgress}
+          onSelect={() => {
+            track('amendCommit');
+            setAmendOpen(true);
+          }}
+        >
+          Amend Last Commit...
+        </MenuItem>
+      )}
 
       {/* Merge commits cherry-pick individually; a multi-select cherry-picks the
          whole selection (disabled if it contains a merge commit); otherwise the
@@ -633,6 +656,9 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
       {interactiveRebase.dialog}
       {revert.dialog}
       {drop.dialog}
+      {amendOpen && (
+        <AmendCommitDialog commit={commit} surface={surface} onClose={() => setAmendOpen(false)} />
+      )}
     </>
   );
 

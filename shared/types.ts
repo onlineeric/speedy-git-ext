@@ -508,6 +508,14 @@ export interface RebaseEntry {
   hash: string;
   abbreviatedHash: string;
   subject: string;
+  /**
+   * Complete raw commit message (`%B`), trailing newlines trimmed.
+   *
+   * Separate from `subject` because the two are used for different things: the
+   * todo line and the row label are the subject, while anything that *writes* a
+   * message back — reword, squash — must carry the body and trailers too.
+   */
+  message: string;
   action: RebaseAction;
   rewordMessage?: string;
 }

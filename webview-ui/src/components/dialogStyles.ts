@@ -93,3 +93,23 @@ export const buttonDangerClassName =
  */
 export const dialogSectionLabelClassName =
   'mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--vscode-descriptionForeground)]';
+
+/**
+ * The three inline message boxes a dialog uses to say something about what is
+ * about to happen: a neutral note, a warning, and a failure that came back.
+ *
+ * Shared for the same reason the button variants are — the token triples were
+ * being re-spelled per dialog and had already drifted in text size and in
+ * whether the foreground token carried a fallback.
+ */
+const dialogMessageBaseClassName = 'rounded border px-3 py-2 text-sm';
+
+export const dialogNoteClassName =
+  `${dialogMessageBaseClassName} border-[var(--vscode-panel-border)] text-[var(--vscode-descriptionForeground)]`;
+
+export const dialogWarningClassName =
+  `${dialogMessageBaseClassName} border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-inputValidation-warningBackground)] text-[var(--vscode-inputValidation-warningForeground,var(--vscode-foreground))]`;
+
+/** Wraps on newlines: git's own text reaches here with its line breaks intact. */
+export const dialogErrorClassName =
+  `${dialogMessageBaseClassName} whitespace-pre-wrap border-[var(--vscode-inputValidation-errorBorder)] bg-[var(--vscode-inputValidation-errorBackground)] text-[var(--vscode-inputValidation-errorForeground,var(--vscode-foreground))]`;

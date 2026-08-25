@@ -1,5 +1,6 @@
 import type { GitBranchService } from '../services/GitBranchService.js';
 import type { GitCherryPickService } from '../services/GitCherryPickService.js';
+import type { GitCommitService } from '../services/GitCommitService.js';
 import type { GitDiffService } from '../services/GitDiffService.js';
 import type { GitHistoryService } from '../services/GitHistoryService.js';
 import type { GitIndexService } from '../services/GitIndexService.js';
@@ -28,6 +29,7 @@ export interface GitServiceSet {
   gitSubmoduleService: GitSubmoduleService;
   gitWorktreeService: GitWorktreeService;
   gitIndexService: GitIndexService;
+  gitCommitService: GitCommitService;
 }
 
 export class GitServiceRegistry {
