@@ -20,9 +20,42 @@ export function worktreeBranchLabel(worktree: WorktreeInfo): string {
   return worktreeLocalBranch(worktree) ?? 'detached';
 }
 
-export function worktreeFolderName(worktreePath: string): string {
-  const normalized = worktreePath.replace(/\\/g, '/').replace(/\/+$/, '');
+/** Normalize to `/` separators and drop any trailing separator, for display. */
+function toDisplayPath(value: string): string {
+  return value.replace(/\\/g, '/').replace(/\/+$/, '');
+}
+
+/** True for a drive-letter-rooted path (`C:/…`), the only case-insensitive shape here. */
+function isWindowsPath(value: string): boolean {
+  return /^[A-Za-z]:\//.test(value);
+}
+
+/**
+ * The label for a worktree folder.
+ *
+ * A worktree inside the configured base dir is labelled by its path *below* that
+ * base dir, because nesting makes the last segment ambiguous — `exp/branch1` and
+ * `feat/branch1` would otherwise both read as `branch1`. One outside the base dir
+ * keeps its last segment: there is no meaningful path to show it relative to.
+ */
+export function worktreeFolderName(worktreePath: string, baseDir?: string | null): string {
+  const normalized = toDisplayPath(worktreePath);
   if (!normalized) return worktreePath;
+
+  if (baseDir) {
+    const base = toDisplayPath(baseDir);
+    // Windows paths compare case-insensitively: git reports a worktree path as it was
+    // recorded, the base dir is resolved separately, and the two routinely disagree on
+    // drive-letter or folder casing. Comparing them literally would silently drop every
+    // nested label back to its ambiguous last segment.
+    const prefixMatches = isWindowsPath(base)
+      ? normalized.toLowerCase().startsWith(base.toLowerCase() + '/')
+      : normalized.startsWith(base + '/');
+    if (base && normalized.length > base.length + 1 && prefixMatches) {
+      return normalized.slice(base.length + 1);
+    }
+  }
+
   return normalized.split('/').pop() || normalized;
 }
 
@@ -80,9 +113,9 @@ export function prioritizeWorktreeDisplayRefs(
     .map(({ displayRef }) => displayRef);
 }
 
-export function detachedWorktreeBadgeText(worktrees: WorktreeInfo[]): string {
+export function detachedWorktreeBadgeText(worktrees: WorktreeInfo[], baseDir?: string | null): string {
   if (worktrees.length === 1) {
-    return `detached ${worktreeFolderName(worktrees[0].path)}`;
+    return `detached ${worktreeFolderName(worktrees[0].path, baseDir)}`;
   }
   return `detached ×${worktrees.length}`;
 }

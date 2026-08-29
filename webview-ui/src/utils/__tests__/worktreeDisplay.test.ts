@@ -108,3 +108,38 @@ describe('worktreeDisplay', () => {
     ])).toBe('detached ×2');
   });
 });
+
+describe('worktreeFolderName — base-dir-relative labels', () => {
+  it('labels a nested worktree by its path below the base dir', () => {
+    expect(worktreeFolderName('/repo.worktrees/exp/branch1', '/repo.worktrees')).toBe('exp/branch1');
+    expect(worktreeFolderName('/repo.worktrees/feat/branch1', '/repo.worktrees')).toBe('feat/branch1');
+  });
+
+  it('leaves a flat worktree inside the base dir reading as before', () => {
+    expect(worktreeFolderName('/repo.worktrees/scratch', '/repo.worktrees')).toBe('scratch');
+  });
+
+  it('falls back to the last segment outside the base dir, or with no base dir', () => {
+    expect(worktreeFolderName('/elsewhere/wt', '/repo.worktrees')).toBe('wt');
+    expect(worktreeFolderName('/repo.worktrees/exp/branch1', null)).toBe('branch1');
+    expect(worktreeFolderName('/repo.worktrees/exp/branch1')).toBe('branch1');
+  });
+
+  it('is not fooled by a sibling folder sharing the base dir prefix', () => {
+    expect(worktreeFolderName('/repo.worktrees-old/exp/branch1', '/repo.worktrees')).toBe('branch1');
+  });
+
+  it('renders Windows paths with `/` separators', () => {
+    expect(worktreeFolderName('C:\\repo.worktrees\\feat\\topic', 'C:\\repo.worktrees')).toBe('feat/topic');
+  });
+
+  it('matches a Windows base dir whose casing differs from the reported path', () => {
+    expect(worktreeFolderName('c:\\Repo.Worktrees\\feat\\topic', 'C:\\repo.worktrees')).toBe('feat/topic');
+  });
+
+  it('threads the base dir through the detached badge text', () => {
+    expect(
+      detachedWorktreeBadgeText([makeWorktree({ path: '/repo.worktrees/exp/19eae44a9d' })], '/repo.worktrees'),
+    ).toBe('detached exp/19eae44a9d');
+  });
+});

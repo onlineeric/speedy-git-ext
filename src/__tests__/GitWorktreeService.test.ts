@@ -1,7 +1,7 @@
 import type { LogOutputChannel } from 'vscode';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { existsSync } from 'node:fs';
-import { readdir, copyFile } from 'node:fs/promises';
+import { readdir, copyFile, lstat, rmdir } from 'node:fs/promises';
 import { GitWorktreeService } from '../services/GitWorktreeService.js';
 import { GitError, err, ok } from '../../shared/errors.js';
 import type { GitExecOptions, GitExecResult } from '../services/GitExecutor.js';
@@ -14,6 +14,9 @@ vi.mock('node:fs', () => ({
 vi.mock('node:fs/promises', () => ({
   readdir: vi.fn(),
   copyFile: vi.fn(),
+  // Used by the empty-parent cleanup that runs after a successful remove/prune.
+  lstat: vi.fn(async () => ({ isDirectory: () => true })),
+  rmdir: vi.fn(async () => undefined),
 }));
 
 /** Minimal Dirent stub for stubbing `readdir(..., { withFileTypes: true })`. */
@@ -36,6 +39,21 @@ function stubExecutor(
 function listOutput(lines: string[]): Result<GitExecResult> {
   return ok({ stdout: lines.join('\n'), stderr: '' });
 }
+
+/** Stub `git worktree list` with one main worktree plus any extra linked ones. */
+function withMainWorktree(service: GitWorktreeService, mainPath: string, extraPaths: string[] = []) {
+  stubExecutor(service, (args) => {
+    if (args[0] === 'worktree' && args[1] === 'list') {
+      const lines = [`worktree ${mainPath}`, 'HEAD aaaa1111', 'branch refs/heads/main'];
+      for (const p of extraPaths) {
+        lines.push('', `worktree ${p}`, 'HEAD bbbb2222', `branch refs/heads/${p.split('/').pop()}`);
+      }
+      return listOutput(lines);
+    }
+    return ok({ stdout: '', stderr: '' });
+  });
+}
+
 
 describe('GitWorktreeService.listWorktrees', () => {
   it('parses standard worktree porcelain output and derives isCurrent', async () => {
@@ -329,19 +347,6 @@ describe('GitWorktreeService.pruneWorktrees', () => {
 });
 
 describe('GitWorktreeService.resolveWorktreePath', () => {
-  function withMainWorktree(service: GitWorktreeService, mainPath: string, extraPaths: string[] = []) {
-    stubExecutor(service, (args) => {
-      if (args[0] === 'worktree' && args[1] === 'list') {
-        const lines = [`worktree ${mainPath}`, 'HEAD aaaa1111', 'branch refs/heads/main'];
-        for (const p of extraPaths) {
-          lines.push('', `worktree ${p}`, 'HEAD bbbb2222', `branch refs/heads/${p.split('/').pop()}`);
-        }
-        return listOutput(lines);
-      }
-      return ok({ stdout: '', stderr: '' });
-    });
-  }
-
   it('anchors ../${repoName}.worktrees to the MAIN worktree, sanitizes the leaf', async () => {
     // Active cwd is a linked worktree, but the path must anchor to the main repo.
     const service = new GitWorktreeService('/home/user/repo.worktrees/old', mockLog);
@@ -353,8 +358,9 @@ describe('GitWorktreeService.resolveWorktreePath', () => {
     );
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.value.path).toBe('/home/user/repo.worktrees/feature-login');
-      expect(result.value.leafName).toBe('feature-login');
+      expect(result.value.flatPath).toBe('/home/user/repo.worktrees/feature-login');
+      expect(result.value.nestedPath).toBe('/home/user/repo.worktrees/feature/login');
+      expect(result.value.hierarchical).toBe(true);
     }
   });
 
@@ -365,7 +371,11 @@ describe('GitWorktreeService.resolveWorktreePath', () => {
       { ref: 'abc1234', branchMode: 'new', newBranchName: 'hotfix' },
       '../${repoName}.worktrees'
     );
-    if (result.success) expect(result.value.leafName).toBe('hotfix');
+    if (result.success) {
+      expect(result.value.flatPath).toBe('/home/user/repo.worktrees/hotfix');
+      expect(result.value.nestedPath).toBe('/home/user/repo.worktrees/hotfix');
+      expect(result.value.hierarchical).toBe(false);
+    }
   });
 
   it('uses a 10-character short commit hash as the leaf in detached mode', async () => {
@@ -388,8 +398,10 @@ describe('GitWorktreeService.resolveWorktreePath', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.value.leafName).toBe('19eae44a9d');
-      expect(result.value.path).toBe('/home/user/repo.worktrees/19eae44a9d');
+      expect(result.value.flatPath).toBe('/home/user/repo.worktrees/19eae44a9d');
+      // A short hash has no separator, so the choice does not apply.
+      expect(result.value.hierarchical).toBe(false);
+      expect(result.value.nestedPath).toBe(result.value.flatPath);
     }
   });
 
@@ -401,8 +413,7 @@ describe('GitWorktreeService.resolveWorktreePath', () => {
       '../${repoName}.worktrees'
     );
     if (result.success) {
-      expect(result.value.leafName).toBe('feature-2');
-      expect(result.value.path).toBe('/home/user/repo.worktrees/feature-2');
+      expect(result.value.flatPath).toBe('/home/user/repo.worktrees/feature-2');
     }
   });
 
@@ -433,8 +444,7 @@ describe('GitWorktreeService.resolveWorktreePath', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.value.leafName).toBe('19eae44a9d-2');
-      expect(result.value.path).toBe('/home/user/repo.worktrees/19eae44a9d-2');
+      expect(result.value.flatPath).toBe('/home/user/repo.worktrees/19eae44a9d-2');
     }
   });
 
@@ -464,8 +474,8 @@ describe('GitWorktreeService.resolveWorktreePath', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.value.path).toBe('/repo/submodules/repo-b.worktrees/feature-submodule');
-      expect(result.value.leafName).toBe('feature-submodule');
+      expect(result.value.flatPath).toBe('/repo/submodules/repo-b.worktrees/feature-submodule');
+      expect(result.value.nestedPath).toBe('/repo/submodules/repo-b.worktrees/feature/submodule');
     }
   });
 });
@@ -615,5 +625,156 @@ describe('GitWorktreeService.copyIgnoredEnvFilesTo', () => {
 
     expect(result.success && result.value).toEqual({ copied: [], skippedNotIgnored: [] });
     expect(copyFileMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('GitWorktreeService.resolveWorktreePath — nested vs flat', () => {
+  beforeEach(() => {
+    vi.mocked(existsSync).mockReturnValue(false);
+  });
+
+  it('offers both folder shapes for a hierarchical ref', async () => {
+    const service = new GitWorktreeService('/home/user/repo', mockLog);
+    withMainWorktree(service, '/home/user/repo');
+
+    const result = await service.resolveWorktreePath(
+      { ref: 'feat/branch1', branchMode: 'existing' },
+      '../${repoName}.worktrees'
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.hierarchical).toBe(true);
+      expect(result.value.nestedPath).toBe('/home/user/repo.worktrees/feat/branch1');
+      expect(result.value.flatPath).toBe('/home/user/repo.worktrees/feat-branch1');
+    }
+  });
+
+  it('collides each candidate independently, so the two may be suffixed differently', async () => {
+    const service = new GitWorktreeService('/home/user/repo', mockLog);
+    withMainWorktree(service, '/home/user/repo', ['/home/user/repo.worktrees/feat-branch1']);
+
+    const result = await service.resolveWorktreePath(
+      { ref: 'feat/branch1', branchMode: 'existing' },
+      '../${repoName}.worktrees'
+    );
+
+    if (result.success) {
+      expect(result.value.nestedPath).toBe('/home/user/repo.worktrees/feat/branch1');
+      expect(result.value.flatPath).toBe('/home/user/repo.worktrees/feat-branch1-2');
+    }
+  });
+
+  it('suffixes the last segment, never a parent folder', async () => {
+    const service = new GitWorktreeService('/home/user/repo', mockLog);
+    withMainWorktree(service, '/home/user/repo', ['/home/user/repo.worktrees/feat/branch1']);
+
+    const result = await service.resolveWorktreePath(
+      { ref: 'feat/branch1', branchMode: 'existing' },
+      '../${repoName}.worktrees'
+    );
+
+    if (result.success) {
+      expect(result.value.nestedPath).toBe('/home/user/repo.worktrees/feat/branch1-2');
+    }
+  });
+
+  it('reports a single-segment ref as non-hierarchical with identical paths', async () => {
+    const service = new GitWorktreeService('/home/user/repo', mockLog);
+    withMainWorktree(service, '/home/user/repo');
+
+    const result = await service.resolveWorktreePath(
+      { ref: 'feature', branchMode: 'existing' },
+      '../${repoName}.worktrees'
+    );
+
+    if (result.success) {
+      expect(result.value.hierarchical).toBe(false);
+      expect(result.value.nestedPath).toBe(result.value.flatPath);
+    }
+  });
+});
+
+describe('GitWorktreeService.resolveBaseDir', () => {
+  it('expands ${repoName} against the MAIN worktree', () => {
+    const service = new GitWorktreeService('/home/user/repo.worktrees/old', mockLog);
+    const baseDir = service.resolveBaseDir(
+      [{ path: '/home/user/repo', head: 'a', branch: 'refs/heads/main', isMain: true, isDetached: false, isCurrent: false, isPrunable: false }],
+      '../${repoName}.worktrees'
+    );
+    expect(baseDir).toBe('/home/user/repo.worktrees');
+  });
+
+  it('falls back to the workspace path when there is no main worktree', () => {
+    const service = new GitWorktreeService('/home/user/repo', mockLog);
+    expect(service.resolveBaseDir([], '../${repoName}.worktrees')).toBe('/home/user/repo.worktrees');
+  });
+});
+
+describe('GitWorktreeService cleanup after remove and prune', () => {
+  const rmdirMock = vi.mocked(rmdir);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(lstat).mockResolvedValue({ isDirectory: () => true } as never);
+    rmdirMock.mockResolvedValue(undefined as never);
+    vi.mocked(readdir).mockResolvedValue([] as never);
+  });
+
+  it('prunes the parents a removal emptied when a base dir is given', async () => {
+    const service = new GitWorktreeService('/home/user/repo', mockLog);
+    stubExecutor(service, () => ok({ stdout: '', stderr: '' }));
+
+    const result = await service.removeWorktree('/home/user/repo.worktrees/feat/branch1', {
+      force: true,
+      baseDir: '/home/user/repo.worktrees',
+    });
+
+    expect(result.success).toBe(true);
+    expect(rmdirMock).toHaveBeenCalledWith('/home/user/repo.worktrees/feat');
+  });
+
+  it('prunes nothing when no base dir is given', async () => {
+    const service = new GitWorktreeService('/home/user/repo', mockLog);
+    stubExecutor(service, () => ok({ stdout: '', stderr: '' }));
+
+    await service.removeWorktree('/home/user/repo.worktrees/feat/branch1', { force: true });
+
+    expect(rmdirMock).not.toHaveBeenCalled();
+  });
+
+  it('prunes nothing when the git removal failed', async () => {
+    const service = new GitWorktreeService('/home/user/repo', mockLog);
+    stubExecutor(service, () => err(new GitError('nope', 'COMMAND_FAILED')));
+
+    const result = await service.removeWorktree('/home/user/repo.worktrees/feat/branch1', {
+      force: true,
+      baseDir: '/home/user/repo.worktrees',
+    });
+
+    expect(result.success).toBe(false);
+    expect(rmdirMock).not.toHaveBeenCalled();
+  });
+
+  it('sweeps the base dir after a successful prune', async () => {
+    const service = new GitWorktreeService('/home/user/repo', mockLog);
+    stubExecutor(service, () => ok({ stdout: '', stderr: '' }));
+    vi.mocked(readdir).mockImplementation((async (dir: string) =>
+      dir === '/home/user/repo.worktrees' ? [{ name: 'feat', isDirectory: () => true }] : []) as never);
+
+    const result = await service.pruneWorktrees({ baseDir: '/home/user/repo.worktrees' });
+
+    expect(result.success).toBe(true);
+    expect(rmdirMock).toHaveBeenCalledWith('/home/user/repo.worktrees/feat');
+  });
+
+  it('sweeps nothing when the prune command failed', async () => {
+    const service = new GitWorktreeService('/home/user/repo', mockLog);
+    stubExecutor(service, () => err(new GitError('nope', 'COMMAND_FAILED')));
+
+    const result = await service.pruneWorktrees({ baseDir: '/home/user/repo.worktrees' });
+
+    expect(result.success).toBe(false);
+    expect(rmdirMock).not.toHaveBeenCalled();
   });
 });

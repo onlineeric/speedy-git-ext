@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import type { WorktreeInfo } from '@shared/types';
 import { rpcClient } from '../rpc/rpcClient';
+import { useGraphStore } from '../stores/graphStore';
 import { trackUiInteraction } from '../utils/telemetry';
 import { WORKTREE_FOLDER_MISSING_TOOLTIP, worktreeFolderName } from '../utils/worktreeDisplay';
 import { RemoveWorktreeDialog } from './RemoveWorktreeDialog';
@@ -69,6 +70,9 @@ export function WorktreeMenuGroup({
   worktrees: WorktreeInfo[];
   onRemove: (worktree: WorktreeInfo) => void;
 }) {
+  // Read before the early return: hooks cannot sit behind one.
+  const worktreeBaseDir = useGraphStore((s) => s.worktreeBaseDir);
+
   if (worktrees.length === 1) {
     return <WorktreeMenuItems worktree={worktrees[0]} onRemove={onRemove} />;
   }
@@ -79,7 +83,7 @@ export function WorktreeMenuGroup({
         <div key={worktree.path}>
           {index > 0 && <MenuGroupSeparator />}
           <ContextMenu.Label className="px-3 py-1 text-xs text-[var(--vscode-descriptionForeground)]">
-            <span className="font-mono">{worktreeFolderName(worktree.path)}</span>
+            <span className="font-mono">{worktreeFolderName(worktree.path, worktreeBaseDir)}</span>
             <span className="block max-w-64 truncate" title={worktree.path}>{worktree.path}</span>
           </ContextMenu.Label>
           <WorktreeMenuItems worktree={worktree} onRemove={onRemove} />

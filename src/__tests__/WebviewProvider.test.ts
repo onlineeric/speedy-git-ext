@@ -101,7 +101,10 @@ function createRepoDataLoaderFixture(options: {
       untrackedCount: 0,
     } }) },
     gitRemoteService: { getRemotes: vi.fn().mockResolvedValue({ success: true, value: [] }) },
-    gitWorktreeService: { listWorktrees: vi.fn().mockResolvedValue({ success: true, value: [] }) },
+    gitWorktreeService: {
+      listWorktrees: vi.fn().mockResolvedValue({ success: true, value: [] }),
+      resolveBaseDir: vi.fn().mockReturnValue(null),
+    },
     gitStashService: { getStashes: vi.fn().mockResolvedValue({ success: true, value: [] }) },
     gitRevertService: { getRevertState: vi.fn().mockResolvedValue({ success: true, value: 'idle' }) },
     gitBranchService: { getMergeState: vi.fn().mockResolvedValue({ success: true, value: 'idle' }) },
@@ -154,7 +157,10 @@ describe('WebviewProvider initial load performance', () => {
       gitLogService,
       gitDiffService: { getUncommittedSummary: vi.fn(() => deferredUncommitted) },
       gitRemoteService: { getRemotes: vi.fn().mockResolvedValue({ success: true, value: [] }) },
-      gitWorktreeService: { listWorktrees: vi.fn().mockResolvedValue({ success: true, value: [] }) },
+      gitWorktreeService: {
+      listWorktrees: vi.fn().mockResolvedValue({ success: true, value: [] }),
+      resolveBaseDir: vi.fn().mockReturnValue(null),
+    },
       gitStashService: { getStashes: vi.fn().mockResolvedValue({ success: true, value: [] }) },
       gitRevertService: { getRevertState: vi.fn().mockResolvedValue({ success: true, value: 'idle' }) },
       gitBranchService: { getMergeState: vi.fn().mockResolvedValue({ success: true, value: 'idle' }) },

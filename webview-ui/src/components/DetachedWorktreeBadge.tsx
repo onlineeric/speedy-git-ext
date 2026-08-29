@@ -7,6 +7,7 @@ import { WorktreeIcon } from './icons';
 import { useRemoveWorktreeDialog, WorktreeMenuGroup } from './WorktreeMenuItems';
 import { LazyContextMenu } from './LazyContextMenu';
 import { MenuContent } from './MenuContent';
+import { useGraphStore } from '../stores/graphStore';
 
 interface DetachedWorktreeBadgeProps {
   worktrees: WorktreeInfo[];
@@ -14,9 +15,10 @@ interface DetachedWorktreeBadgeProps {
 }
 
 export function DetachedWorktreeBadge({ worktrees, laneColorStyle }: DetachedWorktreeBadgeProps) {
+  const worktreeBaseDir = useGraphStore((s) => s.worktreeBaseDir);
   if (worktrees.length === 0) return null;
 
-  const label = detachedWorktreeBadgeText(worktrees);
+  const label = detachedWorktreeBadgeText(worktrees, worktreeBaseDir);
   const title = worktrees.map((worktree) => worktree.path).join('\n');
   // borderColor is always set inline below, so only the text color needs a fallback.
   const fallbackColor = !laneColorStyle ? ' text-[var(--vscode-badge-foreground)]' : '';

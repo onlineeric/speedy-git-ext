@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import type { DialogId } from '@shared/telemetry';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
@@ -21,6 +22,14 @@ interface ConfirmDialogProps {
   commandPreview?: string;
   /** Dialog-outcome telemetry id (049-usage-telemetry); omit to disable tracking. */
   telemetryId?: DialogId;
+  /**
+   * Focus the confirm button on open instead of Cancel.
+   *
+   * Radix focuses `AlertDialog.Cancel` by design, which is the safer default for a
+   * destructive confirmation. Set this only where proceeding is the expected answer
+   * and Enter should carry it out.
+   */
+  focusConfirm?: boolean;
 }
 
 export function ConfirmDialog({
@@ -33,9 +42,11 @@ export function ConfirmDialog({
   variant = 'warning',
   commandPreview,
   telemetryId,
+  focusConfirm = false,
 }: ConfirmDialogProps) {
   const dialogTelemetry = useDialogTelemetry(telemetryId, open);
   const confirmButtonClass = variant === 'danger' ? buttonDangerClassName : buttonPrimaryClassName;
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
   return (
     <AlertDialog.Root
@@ -51,6 +62,14 @@ export function ConfirmDialog({
         <AlertDialog.Content
           className={dialogContentClassName}
           style={dialogContentStyle}
+          onOpenAutoFocus={
+            focusConfirm
+              ? (event) => {
+                  event.preventDefault();
+                  confirmButtonRef.current?.focus();
+                }
+              : undefined
+          }
         >
           <AlertDialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">
             {title}
@@ -71,6 +90,7 @@ export function ConfirmDialog({
               Cancel
             </AlertDialog.Cancel>
             <AlertDialog.Action
+              ref={confirmButtonRef}
               className={confirmButtonClass}
               onClick={() => {
                 dialogTelemetry.confirmed();

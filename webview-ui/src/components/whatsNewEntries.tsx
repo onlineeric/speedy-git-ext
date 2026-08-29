@@ -49,6 +49,56 @@ function ExternalLink({ url, children }: { url: string; children: ReactNode }) {
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
   {
+    version: '5.13.0',
+    headline: 'A worktree folder can now keep your branch name’s slashes, instead of always flattening them.',
+    content: (
+      <>
+        <section className="rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+          <h3 className={dialogSectionLabelClassName}>Thanks to our contributor</h3>
+          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+            This release comes from a request by{' '}
+            <ExternalLink url="https://github.com/nelson870708">@nelson870708</ExternalLink> in{' '}
+            <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/189">#189</ExternalLink>
+            , asking that a branch’s directory structure be preserved when creating a worktree.
+            Thank you!
+          </p>
+        </section>
+
+        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          Creating a worktree from <code>feat/branch1</code> used to suggest one folder,{' '}
+          <code>feat-branch1</code>, with the <code>/</code> flattened away. The Create Worktree dialog
+          now offers both shapes, each showing its own complete path:
+        </p>
+
+        <ul className="mt-3 space-y-2 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">Nested path</strong> —{' '}
+            <code>&lt;base&gt;/feat/branch1</code>, mirroring how you already organise your branches.
+          </li>
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">Flatten path</strong> —{' '}
+            <code>&lt;base&gt;/feat-branch1</code>, what previous versions always did.
+          </li>
+        </ul>
+
+        <p className="mt-3 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          The selected row’s box is editable exactly as the single box was; the other stays readable so
+          you can compare the two before choosing. A small link below them saves your pick as the
+          default. Branch names without a <code>/</code> are unchanged — one label, one box, as before.
+        </p>
+
+        <section className="mt-4 rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+          <h3 className={dialogSectionLabelClassName}>Nesting does not leave empty folders behind</h3>
+          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+            Removing a worktree now also deletes the folders that removal just emptied, stopping before
+            your configured base path, which is never touched. Pruning sweeps the base path the same
+            way. Worktrees you placed somewhere custom are left entirely alone.
+          </p>
+        </section>
+      </>
+    ),
+  },
+  {
     version: '5.12.0',
     headline: 'You can now amend the last commit without leaving the graph.',
     content: (

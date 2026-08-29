@@ -22,7 +22,7 @@ import { GitWatcherService } from './services/GitWatcherService.js';
 import type { SettingsSnapshotProperties, TelemetryService } from './services/TelemetryService.js';
 import { PersistedUIStateStore } from './webview/PersistedUIStateStore.js';
 import { GitError } from '../shared/errors.js';
-import { clampAvatarRefreshDays, clampBatchCommitSize, DEFAULT_GRAPH_COLORS, DEFAULT_USER_SETTINGS, type SubmoduleNavEntry, type UserDateFormat, type UserSettings } from '../shared/types.js';
+import { clampAvatarRefreshDays, clampBatchCommitSize, DEFAULT_GRAPH_COLORS, DEFAULT_USER_SETTINGS, normalizeWorktreeFolderNameStyle, type SubmoduleNavEntry, type UserDateFormat, type UserSettings } from '../shared/types.js';
 
 export class ExtensionController {
   private webviewProvider: WebviewProvider | undefined;
@@ -388,6 +388,7 @@ export class ExtensionController {
       'speedyGit.batchCommitSize',
       'speedyGit.overScan',
       'speedyGit.worktree.basePath',
+      'speedyGit.worktree.folderNameStyle',
       'speedyGit.toolbar.showLabels',
       'speedyGit.toolbar.showRemoteButton',
     ].some((section) => event.affectsConfiguration(section));
@@ -431,6 +432,9 @@ export class ExtensionController {
       batchCommitSize,
       overScan,
       worktreeBasePath,
+      worktreeFolderNameStyle: normalizeWorktreeFolderNameStyle(
+        config.get<string>('worktree.folderNameStyle', DEFAULT_USER_SETTINGS.worktreeFolderNameStyle)
+      ),
       toolbarShowLabels: config.get<boolean>('toolbar.showLabels', DEFAULT_USER_SETTINGS.toolbarShowLabels),
       toolbarShowRemoteButton: config.get<boolean>('toolbar.showRemoteButton', DEFAULT_USER_SETTINGS.toolbarShowRemoteButton),
     };

@@ -1,5 +1,30 @@
-import { DEFAULT_USER_SETTINGS } from '../../../shared/types.js';
+import { worktreeBasePathOf, type WorktreeInfo } from '../../../shared/types.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
+
+type WorktreeHandlerContext = Parameters<typeof worktreeHandlers.getWorktreeList>[1];
+
+/** The configured worktree base path for this context, or its default. */
+function worktreeBasePath(context: WorktreeHandlerContext): string {
+  return worktreeBasePathOf(context.getSettings());
+}
+
+/**
+ * The absolute base directory this repo's worktrees live under, or null.
+ *
+ * Takes an already-fetched list, so a caller that has one (a removal, which had to
+ * list to guard itself) pays for a single `git worktree list`; `fetchBaseDir` is for
+ * the one caller that holds none.
+ */
+function resolveBaseDir(context: WorktreeHandlerContext, worktrees: WorktreeInfo[]): string | null {
+  return context.services.current().gitWorktreeService.resolveBaseDir(worktrees, worktreeBasePath(context));
+}
+
+/** `resolveBaseDir` for a caller with no list in hand — spawns one `git worktree list`. */
+async function fetchBaseDir(context: WorktreeHandlerContext): Promise<string | null> {
+  const list = await context.services.current().gitWorktreeService.listWorktrees();
+  if (!list.success) return null;
+  return resolveBaseDir(context, list.value);
+}
 
 export const worktreeHandlers = {
   getWorktreeList: async (_message, context) => {
@@ -7,19 +32,23 @@ export const worktreeHandlers = {
   },
 
   resolveWorktreePath: async (message, context) => {
-    const basePath = context.getSettings()?.worktreeBasePath ?? DEFAULT_USER_SETTINGS.worktreeBasePath;
     const result = await context.services.current().gitWorktreeService.resolveWorktreePath(
       {
         ref: message.payload.ref,
         branchMode: message.payload.branchMode,
         newBranchName: message.payload.newBranchName,
       },
-      basePath,
+      worktreeBasePath(context),
     );
     if (result.success) {
       context.postMessage({
         type: 'worktreePathResolved',
-        payload: { path: result.value.path, requestId: message.payload.requestId },
+        payload: {
+          nestedPath: result.value.nestedPath,
+          flatPath: result.value.flatPath,
+          hierarchical: result.value.hierarchical,
+          requestId: message.payload.requestId,
+        },
       });
     } else {
       context.postMessage({ type: 'error', payload: { error: result.error } });
@@ -75,6 +104,7 @@ export const worktreeHandlers = {
     }
     const result = await context.services.current().gitWorktreeService.removeWorktree(message.payload.path, {
       force: message.payload.force,
+      baseDir: resolveBaseDir(context, guard.value),
     });
     if (result.success) {
       context.postMessage({ type: 'success', payload: { message: 'Worktree removed' } });
@@ -85,7 +115,8 @@ export const worktreeHandlers = {
   },
 
   pruneWorktree: async (_message, context) => {
-    const result = await context.services.current().gitWorktreeService.pruneWorktrees();
+    const baseDir = await fetchBaseDir(context);
+    const result = await context.services.current().gitWorktreeService.pruneWorktrees({ baseDir });
     if (result.success) {
       context.postMessage({ type: 'success', payload: { message: 'Worktrees pruned' } });
       await context.refreshCoordinator.reload();
@@ -106,10 +137,12 @@ export const worktreeHandlers = {
   'getWorktreeList' | 'resolveWorktreePath' | 'getWorktreeEnvFiles' | 'addWorktree' | 'removeWorktree' | 'pruneWorktree' | 'openWorktree' | 'revealWorktree'
 >;
 
-async function postWorktreeList(context: Parameters<typeof worktreeHandlers.getWorktreeList>[1]): Promise<void> {
-  const result = await context.services.current().gitWorktreeService.listWorktrees();
+async function postWorktreeList(context: WorktreeHandlerContext): Promise<void> {
+  const service = context.services.current().gitWorktreeService;
+  const result = await service.listWorktrees();
+  const worktrees = result.success ? result.value : [];
   context.postMessage({
     type: 'worktreeList',
-    payload: { worktrees: result.success ? result.value : [] },
+    payload: { worktrees, baseDir: service.resolveBaseDir(worktrees, worktreeBasePath(context)) },
   });
 }

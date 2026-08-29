@@ -300,7 +300,7 @@ describe('graphStore — setWorktreeList (array-valued worktreeByHead)', () => {
     useGraphStore.getState().setWorktreeList([
       makeWorktree('/wt/feature-a', head, { branch: 'refs/heads/feature-a' }),
       makeWorktree('/wt/feature-b', head, { branch: 'refs/heads/feature-b' }),
-    ]);
+    ], null);
 
     const entries = useGraphStore.getState().worktreeByHead.get(head);
     expect(entries).toHaveLength(2);
@@ -311,7 +311,7 @@ describe('graphStore — setWorktreeList (array-valued worktreeByHead)', () => {
     useGraphStore.getState().setWorktreeList([
       makeWorktree('/wt/one', 'hash1'),
       makeWorktree('/wt/two', 'hash2'),
-    ]);
+    ], null);
     const byHead = useGraphStore.getState().worktreeByHead;
     expect(byHead.get('hash1')).toHaveLength(1);
     expect(byHead.get('hash2')).toHaveLength(1);
@@ -328,7 +328,7 @@ describe('graphStore — setWorktreeList (array-valued worktreeByHead)', () => {
       isCurrent: true,
     });
 
-    useGraphStore.getState().setWorktreeList([main, linked]);
+    useGraphStore.getState().setWorktreeList([main, linked], null);
 
     const after = useGraphStore.getState();
     expect(after.worktreeByHead.get('hash1')).toEqual([main]);
@@ -351,7 +351,7 @@ describe('graphStore — setWorktreeList (array-valued worktreeByHead)', () => {
       branch: 'refs/heads/topic',
     });
 
-    useGraphStore.getState().setWorktreeList([first, second, branch]);
+    useGraphStore.getState().setWorktreeList([first, second, branch], null);
 
     const after = useGraphStore.getState();
     expect(after.detachedWorktreesByHead.get('aaaa1111')).toEqual([first, second]);
@@ -362,7 +362,7 @@ describe('graphStore — setWorktreeList (array-valued worktreeByHead)', () => {
   it('clears the explicit loading flag when a worktree list response is applied', () => {
     useGraphStore.setState({ worktreeListLoading: true });
 
-    useGraphStore.getState().setWorktreeList([makeWorktree('/wt/topic', 'hash1')]);
+    useGraphStore.getState().setWorktreeList([makeWorktree('/wt/topic', 'hash1')], null);
 
     expect(useGraphStore.getState().worktreeListLoading).toBe(false);
   });
