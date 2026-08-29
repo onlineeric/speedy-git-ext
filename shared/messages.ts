@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, MergeState, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, AvatarAuthState, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata, ToolbarBooleanSetting, WorktreeFolderNameStyle } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, MergeState, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, AvatarAuthState, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata, ToolbarBooleanSetting, WorktreeFolderNameStyle, ResolvedWorktreePaths } from './types.js';
 
 /** Payload for the batched initial data message */
 export interface InitialDataPayload {
@@ -272,16 +272,7 @@ export type ResponseMessage =
   | { type: 'avatarCacheCleared'; payload: Record<string, never> }
   | { type: 'tagMetadata'; payload: { metadata: Record<string, TagMetadata> } }
   | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[]; baseDir: string | null } }
-  | {
-      type: 'worktreePathResolved';
-      payload: {
-        nestedPath: string;
-        flatPath: string;
-        /** True when the derived folder name contains a separator, i.e. the choice applies. */
-        hierarchical: boolean;
-        requestId: number;
-      };
-    }
+  | { type: 'worktreePathResolved'; payload: ResolvedWorktreePaths & { requestId: number } }
   | { type: 'worktreeEnvFiles'; payload: { requestId: number; ignoredEnvFiles: string[]; envFilesPresent: boolean } }
   | { type: 'containingBranches'; payload: { hash: string; branches: string[]; status: 'loaded' | 'error' } }
   | { type: 'persistedUIState'; payload: { uiState: PersistedUIState } }

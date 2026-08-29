@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import type { InitialDataPayload, ResponseMessage } from '../../shared/messages.js';
 import type { AvatarUrlMap, Commit, GraphFilters, TagMetadata, UncommittedSummary, UserSettings } from '../../shared/types.js';
-import { DEFAULT_USER_SETTINGS } from '../../shared/types.js';
+import { DEFAULT_USER_SETTINGS, worktreeBasePathOf } from '../../shared/types.js';
 import { GitError, type GitErrorCode, type Result } from '../../shared/errors.js';
 import { toCommitCountBucket } from '../../shared/telemetry.js';
 import { GitHubAvatarService } from '../services/GitHubAvatarService.js';
@@ -307,7 +307,7 @@ export class RepoDataLoader {
           worktrees,
           baseDir: services.gitWorktreeService.resolveBaseDir(
             worktrees,
-            this.deps.getSettings()?.worktreeBasePath ?? DEFAULT_USER_SETTINGS.worktreeBasePath,
+            worktreeBasePathOf(this.deps.getSettings()),
           ),
         },
       });

@@ -3,7 +3,7 @@ import { readdir, copyFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
-import { buildWorktreeSegments, isInsideBaseDir } from './worktreeLeafName.js';
+import { buildWorktreeSegments, isInsideBaseDir, normalizePathForCompare } from '../utils/worktreePathSegments.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { WorktreeInfo, WorktreeBranchMode } from '../../shared/types.js';
 import { isDirtyWorkingTree } from '../utils/gitQueries.js';
@@ -23,13 +23,6 @@ export interface ResolveWorktreePathOptions {
   ref: string;
   branchMode: WorktreeBranchMode;
   newBranchName?: string;
-}
-
-/** Normalize a path for cross-worktree comparison (resolve, drop trailing separator). */
-function normalizePath(p: string): string {
-  const resolved = path.resolve(p);
-  // On case-insensitive platforms, compare case-insensitively.
-  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
 function looksLikeSubmoduleGitDir(p: string): boolean {
@@ -145,7 +138,7 @@ export class GitWorktreeService {
     const stdout = result.value.stdout.trim();
     if (!stdout) return ok([]);
 
-    const currentPath = normalizePath(this.workspacePath);
+    const currentPath = normalizePathForCompare(this.workspacePath);
     const worktrees: WorktreeInfo[] = [];
     const blocks = stdout.split('\n\n');
     let isFirst = true;
@@ -201,7 +194,7 @@ export class GitWorktreeService {
           branch,
           isMain: isFirst,
           isDetached,
-          isCurrent: normalizePath(worktreePath) === currentPath,
+          isCurrent: normalizePathForCompare(worktreePath) === currentPath,
           isPrunable,
         });
       }
@@ -263,18 +256,16 @@ export class GitWorktreeService {
     const segments = buildWorktreeSegments(desiredLeaf);
     const hierarchical = segments.length > 1;
 
-    const existingPaths = new Set(listResult.value.map((w) => normalizePath(w.path)));
+    const existingPaths = new Set(listResult.value.map((w) => normalizePathForCompare(w.path)));
     const collides = (candidate: string): boolean =>
-      existingPaths.has(normalizePath(candidate)) || existsSync(candidate);
+      existingPaths.has(normalizePathForCompare(candidate)) || existsSync(candidate);
 
     /**
      * Suffix the *last* segment on collision (`<base>/feat/branch1-2`), never a
      * parent — a suffixed parent would strand the worktree in a folder that mirrors
      * nothing in the branch name.
      */
-    const resolveCandidate = (leafSegments: string[]): string => {
-      const parents = leafSegments.slice(0, -1);
-      const leaf = leafSegments[leafSegments.length - 1];
+    const resolveCandidate = (parents: string[], leaf: string): string => {
       let candidate = path.join(baseDir, ...parents, leaf);
       let suffix = 2;
       while (collides(candidate)) {
@@ -284,7 +275,7 @@ export class GitWorktreeService {
       return candidate;
     };
 
-    const flatPath = resolveCandidate([segments.join('-')]);
+    const flatPath = resolveCandidate([], segments.join('-'));
     // Containment guard: a nested candidate that escapes the base dir falls back to
     // the flat one. Unreachable from a valid git ref, and the user has a free-text
     // box if they disagree with the result, so this stays silent.
@@ -296,7 +287,7 @@ export class GitWorktreeService {
       this.log.warn(`Nested worktree path escaped the base directory; falling back to a flat folder name.`);
       nestedPath = flatPath;
     } else {
-      nestedPath = resolveCandidate(segments);
+      nestedPath = resolveCandidate(segments.slice(0, -1), segments[segments.length - 1]);
     }
 
     return ok({ nestedPath, flatPath, hierarchical });

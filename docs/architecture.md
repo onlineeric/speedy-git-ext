@@ -31,7 +31,9 @@ src/
 │   ├── PersistedUIStateStore.ts  # Load/save/validate UI state + per-repo table layout (column-width healing)
 │   ├── RepoDataLoader.ts         # Initial + deferred data, avatar cache hydration/enqueue, submodules, initial-load perf/error telemetry
 │   ├── RefreshCoordinator.ts     # When to load: initial/manual/auto, hidden-panel deferral, loading lifecycle
-│   ├── EditorCommandService.ts   # VS Code diff/file/compare editors, worktree folder/reveal, signature help
+│   ├── EditorCommandService.ts   # VS Code diff/file/compare editors, worktree folder/reveal, signature help.
+│                                 #   findRemovableWorktree answers with the list it guarded against, so a removal
+│                                 #   resolves its base dir off that one `git worktree list`
 │   ├── OperationGuard.ts         # In-progress checks (rebase/cherry-pick/revert/merge) → GitError | null
 │   └── handlers/                 # Domain RPC handlers; fetch services from the registry at call time
 │       ├── graphDataHandlers.ts  # getCommits/loadMore/getBranches/getCommitDetails/getAuthors/refresh
@@ -73,8 +75,6 @@ src/
 │   ├── GitWorktreeService.ts     # Worktree list/add/remove; resolves BOTH candidate folders (nested + flat) in
 │                                 #   one round trip; resolveBaseDir takes an already-fetched list; prunes emptied
 │                                 #   parents after remove and sweeps the base dir after prune
-│   ├── worktreeLeafName.ts       # PURE: ref → sanitized folder segments (per-segment allowlist, `.`/`..` dropped,
-│                                 #   `/` and `\` both split), isInsideBaseDir containment guard
 │   ├── GitSignatureService.ts    # GPG/SSH signature verification
 │   ├── GitSubmoduleService.ts    # Submodule status, init, update
 │   ├── GitWatcherService.ts      # File system watcher for auto-refresh
@@ -98,7 +98,11 @@ src/
     ├── emptyDirCleanup.ts        # Delete folders a worktree removal emptied. `rmdir` IS the emptiness test (never
     │                             #   readdir-then-delete); symlinks never followed; baseDir never deleted; failures
     │                             #   logged and swallowed, so a caller's Result never changes. The sweep stops at any
-    │                             #   dir holding a `.git` entry, so it never walks or empties a worktree's own tree
+    │                             #   dir holding a `.git` entry, so it never walks or empties a worktree's own tree.
+    │                             #   `rmdir` is also the type/symlink test, so no path stats before removing
+    ├── worktreePathSegments.ts   # PURE: ref → sanitized folder segments (per-segment allowlist, `.`/`..` dropped,
+    │                             #   `/` and `\` both split); normalizePathForCompare (the one "same place?" rule,
+    │                             #   case-insensitive on win32) and the isInsideBaseDir containment guard built on it
     └── worktreeErrors.ts         # Map raw git worktree failures → friendly messages
 ```
 
@@ -282,7 +286,9 @@ utils/
 │                                 #   by its path BELOW the configured base dir, since nesting makes the last
 │                                 #   segment ambiguous; outside the base dir it stays the last segment
 ├── worktreePathChoice.ts         # PURE: the Create Worktree folder choice — dirty check vs. the computed path,
-│                                 #   switch verdict (ignore/switch/confirm), save-default link visibility
+│                                 #   switch verdict (ignore/switch/confirm), save-default link visibility. Re-exports
+│                                 #   WORKTREE_STYLE_LABELS / ResolvedWorktreePaths from shared/types (the backend's
+│                                 #   toast must name the style the dialog does)
 ├── telemetry.ts                  # Fire-and-forget webview telemetry helpers
 ├── searchFilter.ts               # Client-side search by message, hash, author
 ├── filterUtils.ts                # Author/date filter logic
@@ -307,7 +313,9 @@ utils/
 
 ```
 shared/
-├── types.ts                      # Domain types: Commit, Branch, RefInfo, GraphFilters, CommitDetails, …; cross-boundary setting clamps (batch size, avatar refresh days)
+├── types.ts                      # Domain types: Commit, Branch, RefInfo, GraphFilters, CommitDetails, …; cross-boundary setting
+│                                 #   clamps (batch size, avatar refresh days), worktreeBasePathOf (the one settings fallback),
+│                                 #   the worktree folder-style enum + its UI labels, and ResolvedWorktreePaths
 ├── messages.ts                   # RequestMessage/ResponseMessage union types for RPC
 ├── errors.ts                     # Result<T,E> monad, GitError class, GitErrorCode enum
 ├── gitRefValidation.ts           # git check-ref-format validator + tag/branch/remote wrappers — the same rules

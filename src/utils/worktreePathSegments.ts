@@ -1,7 +1,8 @@
 import path from 'node:path';
 
 /**
- * Turn a git ref into the folder name(s) a worktree is created under.
+ * Turn a git ref into the folder name(s) a worktree is created under, plus the path
+ * comparisons that answer "is this still inside the base dir".
  *
  * Extracted from `GitWorktreeService` because admitting `/` into a folder name
  * turns what used to be a one-line regex into a containment-safety rule: once a
@@ -36,12 +37,21 @@ export function buildWorktreeSegments(ref: string): string[] {
     .split(/[/\\]+/)
     .filter((segment) => segment !== '.' && segment !== '..')
     .map(sanitizeWorktreeSegment)
-    .filter((segment) => segment.length > 0 && segment !== '.' && segment !== '..');
+    // Sanitizing strips leading/trailing dots, so `.`/`..` cannot survive it — the
+    // pre-filter above is the one that matters, and it drops the component outright
+    // rather than collapsing it to `-`.
+    .filter((segment) => segment.length > 0);
   return segments.length > 0 ? segments : ['worktree'];
 }
 
-/** Normalize a path for containment comparison, case-insensitively on Windows. */
-function normalizeForCompare(p: string): string {
+/**
+ * Normalize a path for comparison — resolved, and case-insensitive on Windows.
+ *
+ * The one spelling of "are these two paths the same place", shared by the containment
+ * check below and `GitWorktreeService`'s collision check, so the two can never
+ * disagree about a pair of paths.
+ */
+export function normalizePathForCompare(p: string): string {
   const resolved = path.resolve(p);
   return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
@@ -53,8 +63,8 @@ function normalizeForCompare(p: string): string {
  * inside `<base>` because it shares its prefix.
  */
 export function isInsideBaseDir(baseDir: string, candidate: string): boolean {
-  const base = normalizeForCompare(baseDir);
-  const target = normalizeForCompare(candidate);
+  const base = normalizePathForCompare(baseDir);
+  const target = normalizePathForCompare(candidate);
   if (target === base) return false;
   return target.startsWith(base.endsWith(path.sep) ? base : base + path.sep);
 }

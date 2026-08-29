@@ -1,24 +1,29 @@
-import { DEFAULT_USER_SETTINGS } from '../../../shared/types.js';
+import { worktreeBasePathOf, type WorktreeInfo } from '../../../shared/types.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 
 type WorktreeHandlerContext = Parameters<typeof worktreeHandlers.getWorktreeList>[1];
 
-/** The configured worktree base path, or its default. */
+/** The configured worktree base path for this context, or its default. */
 function worktreeBasePath(context: WorktreeHandlerContext): string {
-  return context.getSettings()?.worktreeBasePath ?? DEFAULT_USER_SETTINGS.worktreeBasePath;
+  return worktreeBasePathOf(context.getSettings());
 }
 
 /**
  * The absolute base directory this repo's worktrees live under, or null.
  *
- * Resolved from an already-fetched worktree list so callers that need both the list
- * and the base dir do not spawn a second `git worktree list`.
+ * Takes an already-fetched list, so a caller that has one (a removal, which had to
+ * list to guard itself) pays for a single `git worktree list`; `fetchBaseDir` is for
+ * the one caller that holds none.
  */
-async function resolveBaseDir(context: WorktreeHandlerContext): Promise<string | null> {
-  const service = context.services.current().gitWorktreeService;
-  const list = await service.listWorktrees();
+function resolveBaseDir(context: WorktreeHandlerContext, worktrees: WorktreeInfo[]): string | null {
+  return context.services.current().gitWorktreeService.resolveBaseDir(worktrees, worktreeBasePath(context));
+}
+
+/** `resolveBaseDir` for a caller with no list in hand — spawns one `git worktree list`. */
+async function fetchBaseDir(context: WorktreeHandlerContext): Promise<string | null> {
+  const list = await context.services.current().gitWorktreeService.listWorktrees();
   if (!list.success) return null;
-  return service.resolveBaseDir(list.value, worktreeBasePath(context));
+  return resolveBaseDir(context, list.value);
 }
 
 export const worktreeHandlers = {
@@ -99,7 +104,7 @@ export const worktreeHandlers = {
     }
     const result = await context.services.current().gitWorktreeService.removeWorktree(message.payload.path, {
       force: message.payload.force,
-      baseDir: await resolveBaseDir(context),
+      baseDir: resolveBaseDir(context, guard.value),
     });
     if (result.success) {
       context.postMessage({ type: 'success', payload: { message: 'Worktree removed' } });
@@ -110,7 +115,7 @@ export const worktreeHandlers = {
   },
 
   pruneWorktree: async (_message, context) => {
-    const baseDir = await resolveBaseDir(context);
+    const baseDir = await fetchBaseDir(context);
     const result = await context.services.current().gitWorktreeService.pruneWorktrees({ baseDir });
     if (result.success) {
       context.postMessage({ type: 'success', payload: { message: 'Worktrees pruned' } });

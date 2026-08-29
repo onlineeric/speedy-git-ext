@@ -3,7 +3,7 @@ import {
   buildWorktreeSegments,
   isInsideBaseDir,
   sanitizeWorktreeSegment,
-} from '../services/worktreeLeafName.js';
+} from '../utils/worktreePathSegments.js';
 
 describe('sanitizeWorktreeSegment', () => {
   it('keeps the historical allowlist and collapses runs of replacements', () => {

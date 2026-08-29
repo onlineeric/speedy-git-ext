@@ -1,11 +1,8 @@
 import * as vscode from 'vscode';
 import { GitError } from '../../../shared/errors.js';
-import { normalizeWorktreeFolderNameStyle } from '../../../shared/types.js';
+import { normalizeWorktreeFolderNameStyle, WORKTREE_STYLE_LABELS } from '../../../shared/types.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 import { updateSpeedyGitSetting, updateSpeedyGitSettingInDefinedScope } from './updateSpeedyGitSetting.js';
-
-/** How each worktree folder style is named in the UI, so the toast matches the dialog. */
-const WORKTREE_STYLE_LABELS = { nested: 'Nested path', flat: 'Flatten path' } as const;
 
 export const vscodeCommandHandlers = {
   openSettings: async (message) => {

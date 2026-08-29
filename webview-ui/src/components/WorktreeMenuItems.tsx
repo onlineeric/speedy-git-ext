@@ -70,22 +70,12 @@ export function WorktreeMenuGroup({
   worktrees: WorktreeInfo[];
   onRemove: (worktree: WorktreeInfo) => void;
 }) {
+  // Read before the early return: hooks cannot sit behind one.
+  const worktreeBaseDir = useGraphStore((s) => s.worktreeBaseDir);
+
   if (worktrees.length === 1) {
     return <WorktreeMenuItems worktree={worktrees[0]} onRemove={onRemove} />;
   }
-
-  return <WorktreeMenuLabelledGroup worktrees={worktrees} onRemove={onRemove} />;
-}
-
-/** The multi-worktree form, split out so the store read is not behind an early return. */
-function WorktreeMenuLabelledGroup({
-  worktrees,
-  onRemove,
-}: {
-  worktrees: WorktreeInfo[];
-  onRemove: (worktree: WorktreeInfo) => void;
-}) {
-  const worktreeBaseDir = useGraphStore((s) => s.worktreeBaseDir);
 
   return (
     <>

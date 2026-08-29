@@ -57,6 +57,27 @@ export type WorktreeFolderNameStyle = 'nested' | 'flat';
 
 export const WORKTREE_FOLDER_NAME_STYLES = ['nested', 'flat'] as const;
 
+/**
+ * How each folder style is named in the UI. Shared because the backend's
+ * "saved as the default" toast must match the dialog's own radio labels —
+ * two copies drift the moment one is renamed.
+ */
+export const WORKTREE_STYLE_LABELS: Record<WorktreeFolderNameStyle, string> = {
+  nested: 'Nested path',
+  flat: 'Flatten path',
+};
+
+/**
+ * Both candidate folders for a new worktree, as the backend computed them.
+ * The payload of `worktreePathResolved`, named here because it crosses the boundary.
+ */
+export interface ResolvedWorktreePaths {
+  nestedPath: string;
+  flatPath: string;
+  /** True when the derived folder name contains a separator, i.e. the choice applies. */
+  hierarchical: boolean;
+}
+
 export interface SearchState {
   isOpen: boolean;
   query: string;
@@ -183,6 +204,15 @@ export function clampAvatarRefreshDays(value: number | string, fallback: number)
  * Lives beside the other cross-boundary clamps so the webview and the backend
  * cannot disagree about what an unrecognised configured value means.
  */
+/**
+ * The configured worktree base path, or its default. Stated once because settings can
+ * be absent (no repo loaded yet) and every caller of the base dir needs the same
+ * fallback — three separate `?? DEFAULT` chains is how they drift.
+ */
+export function worktreeBasePathOf(settings: Pick<UserSettings, 'worktreeBasePath'> | null | undefined): string {
+  return settings?.worktreeBasePath ?? DEFAULT_USER_SETTINGS.worktreeBasePath;
+}
+
 export function normalizeWorktreeFolderNameStyle(value: unknown): WorktreeFolderNameStyle {
   return WORKTREE_FOLDER_NAME_STYLES.includes(value as WorktreeFolderNameStyle)
     ? (value as WorktreeFolderNameStyle)

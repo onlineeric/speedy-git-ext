@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
-import type { WorktreeBranchMode, WorktreeFolderNameStyle, WorktreeInfo } from '@shared/types';
+import { WORKTREE_FOLDER_NAME_STYLES, type WorktreeBranchMode, type WorktreeFolderNameStyle, type WorktreeInfo } from '@shared/types';
 import { validateGitBranchName } from '@shared/gitRefValidation';
 import { buildAddWorktreeCommand } from '../utils/gitCommandBuilder';
 import { deriveRefNameField } from '../utils/refNameField';
@@ -59,8 +59,10 @@ function defaultNewBranchName(source: WorktreeSource): string {
   return '';
 }
 
-/** Radio order in the folder-style choice: nested first, matching the default. */
-const WORKTREE_FOLDER_STYLES: readonly WorktreeFolderNameStyle[] = ['nested', 'flat'];
+// A text-styled inline action inside the dialog body (not a dialog button, which
+// would pull the eye away from the primary action). Spelled once for both call sites.
+const linkButtonClassName =
+  'rounded px-1 py-0.5 text-xs text-[var(--vscode-textLink-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)]';
 
 const folderInputClassName =
   'w-full px-2 py-1 text-sm font-mono rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)]';
@@ -294,7 +296,7 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
                         disabled={existingWorktree.isPrunable}
                         onClick={handleOpenExistingWorktree}
                         title={existingWorktree.isPrunable ? WORKTREE_FOLDER_MISSING_TOOLTIP : existingWorktree.path}
-                        className="rounded px-1 py-0.5 text-xs text-[var(--vscode-textLink-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] disabled:cursor-not-allowed disabled:opacity-50"
+                        className={`${linkButtonClassName} disabled:cursor-not-allowed disabled:opacity-50`}
                       >
                         Open the worktree in new window
                       </button>
@@ -325,7 +327,7 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
             <label className="text-sm text-[var(--vscode-descriptionForeground)]">Worktree folder</label>
             {showStyleChoice ? (
               <>
-                {WORKTREE_FOLDER_STYLES.map((option) => {
+                {WORKTREE_FOLDER_NAME_STYLES.map((option) => {
                   const selected = style === option;
                   return (
                     <div key={option} className="mt-1 flex items-center gap-2">
@@ -358,7 +360,7 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
                   <button
                     type="button"
                     onClick={() => rpcClient.setWorktreeFolderNameStyle(style)}
-                    className="mt-1 ml-1 rounded px-1 py-0.5 text-xs text-[var(--vscode-textLink-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+                    className={`mt-1 ml-1 ${linkButtonClassName}`}
                   >
                     {link.label}
                   </button>

@@ -78,11 +78,14 @@ describe('pruneEmptyParents', () => {
   });
 
   it('does not follow a symlinked parent', async () => {
-    lstatMock.mockResolvedValue({ isDirectory: () => false } as never);
+    // `rmdir` never follows a symlink — it answers ENOTDIR — so the walk stops there
+    // with nothing deleted and nothing logged.
+    rmdirMock.mockRejectedValueOnce(fsError('ENOTDIR'));
 
     await pruneEmptyParents('/base/a/b/leaf', '/base', log);
 
-    expect(rmdirMock).not.toHaveBeenCalled();
+    expect(rmdirMock).toHaveBeenCalledTimes(1);
+    expect(log.warn).not.toHaveBeenCalled();
   });
 });
 

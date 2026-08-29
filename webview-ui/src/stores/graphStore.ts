@@ -229,7 +229,7 @@ interface GraphStore {
   compareResult: CompareResult | null;
   comparePanelUI: ComparePanelUIState;
   setHoveredCommit: (hash: string | null, anchorRect: DOMRect | null) => void;
-  setWorktreeList: (list: WorktreeInfo[], baseDir?: string | null) => void;
+  setWorktreeList: (list: WorktreeInfo[], baseDir: string | null) => void;
   setWorktreeListLoading: (loading: boolean) => void;
   setContainingBranches: (hash: string, result: ContainingBranchesResult) => void;
   clearTooltipCaches: () => void;
@@ -477,7 +477,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     set({
       worktreeList: list,
       worktreeListLoading: false,
-      ...(baseDir === undefined ? {} : { worktreeBaseDir: baseDir }),
+      worktreeBaseDir: baseDir,
       ...buildWorktreeLookups(list),
     });
   },

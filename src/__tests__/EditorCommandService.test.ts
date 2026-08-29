@@ -144,8 +144,11 @@ describe('EditorCommandService', () => {
       success: false,
       error: expect.objectContaining({ message: 'You cannot remove the worktree you are currently in.' }),
     });
-    await expect(removable.service.findRemovableWorktree('/repo-a-linked')).resolves.toEqual({
+    // A removable worktree answers with the list the guard checked, so the caller
+    // can resolve the base dir without a second `git worktree list`.
+    await expect(removable.service.findRemovableWorktree('/repo-a-linked')).resolves.toMatchObject({
       success: true,
+      value: [expect.objectContaining({ path: '/repo-a-linked' })],
     });
   });
 });

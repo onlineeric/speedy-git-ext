@@ -1,4 +1,4 @@
-import type { WorktreeFolderNameStyle } from '@shared/types';
+import { WORKTREE_STYLE_LABELS, type ResolvedWorktreePaths, type WorktreeFolderNameStyle } from '@shared/types';
 
 /**
  * The Create Worktree dialog's nested-vs-flattened folder choice, as pure decisions.
@@ -16,18 +16,10 @@ import type { WorktreeFolderNameStyle } from '@shared/types';
  *   configured style. Otherwise clicking it would appear to do nothing.
  */
 
-export interface ResolvedWorktreePaths {
-  nestedPath: string;
-  flatPath: string;
-  /** True when the derived folder name contains a separator, i.e. the choice applies. */
-  hierarchical: boolean;
-}
-
-/** How each style is named in the dialog. */
-export const WORKTREE_STYLE_LABELS: Record<WorktreeFolderNameStyle, string> = {
-  nested: 'Nested path',
-  flat: 'Flatten path',
-};
+// The resolved-paths shape and the style labels are the wire contract and are shared
+// with the backend (the toast must name the style the dialog does), so both live in
+// `shared/types`; re-exported here so call sites import the choice model from one place.
+export { WORKTREE_STYLE_LABELS, type ResolvedWorktreePaths };
 
 /** The computed default for one style; empty while nothing has been resolved yet. */
 export function computedPathFor(

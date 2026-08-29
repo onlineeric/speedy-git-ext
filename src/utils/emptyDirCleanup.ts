@@ -1,6 +1,6 @@
 import { lstat, readdir, rmdir } from 'node:fs/promises';
 import path from 'node:path';
-import { isInsideBaseDir } from '../services/worktreeLeafName.js';
+import { isInsideBaseDir } from './worktreePathSegments.js';
 
 /**
  * Delete directories that a worktree removal has just emptied.
@@ -13,8 +13,9 @@ import { isInsideBaseDir } from '../services/worktreeLeafName.js';
  *   would cheerfully delete a directory that gained a file in between. `ENOTEMPTY`
  *   is the answer, so a stray `.DS_Store` stops the walk — the intended "strictly
  *   empty" behaviour.
- * - **Symlinks are never followed or deleted.** `rmdir` refuses one anyway; the
- *   explicit `lstat` keeps the sweep from descending through one.
+ * - **Symlinks are never followed or deleted.** `rmdir` never follows one and answers
+ *   `ENOTDIR`/`EPERM`, and the sweep's own `isDirectory()` dirent filter is false for
+ *   a symlink, so neither path needs a `stat` of its own to stay safe.
  * - **`baseDir` itself is never deleted**, and nothing above it is ever touched.
  * - **A worktree's own contents are never touched.** The sweep stops at any directory
  *   holding a `.git` entry, so it only ever removes the scaffolding folders between
@@ -38,18 +39,27 @@ async function isRealDirectory(dir: string): Promise<boolean> {
 }
 
 /**
+ * The expected non-removals: not empty, gone already, or not a directory at all
+ * (a file or a symlink, which `rmdir` refuses rather than follows). None of these
+ * is a problem worth a log line. Anything else — a permission failure, say — is.
+ */
+const EXPECTED_RMDIR_FAILURES = new Set(['ENOTEMPTY', 'EEXIST', 'ENOENT', 'ENOTDIR']);
+
+/**
  * Try to remove one directory. Returns true when it was removed, false when it was
  * not empty, is not a real directory, or could not be removed for any other reason.
+ *
+ * `rmdir` is the only probe: it is already the emptiness test, and it is also the
+ * type and symlink test, so a `stat` before it would just be a second syscall
+ * reaching the same answer.
  */
 async function tryRemoveEmptyDir(dir: string, log: EmptyDirCleanupLog): Promise<boolean> {
-  if (!(await isRealDirectory(dir))) return false;
   try {
     await rmdir(dir);
     return true;
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
-    // A non-empty directory is the expected stopping condition, not a problem.
-    if (code !== 'ENOTEMPTY' && code !== 'EEXIST' && code !== 'ENOENT') {
+    if (!EXPECTED_RMDIR_FAILURES.has(code ?? '')) {
       log.warn(`Could not remove empty worktree folder: ${(error as Error).message}`);
     }
     return false;

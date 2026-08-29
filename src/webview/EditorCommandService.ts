@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { GitError, err, ok, type Result } from '../../shared/errors.js';
-import type { FileChangeStatus } from '../../shared/types.js';
+import type { FileChangeStatus, WorktreeInfo } from '../../shared/types.js';
 import { UNCOMMITTED_HASH } from '../../shared/types.js';
 import type { GitServiceRegistry } from './GitServiceRegistry.js';
 import type { WebviewRuntime } from './WebviewRuntime.js';
@@ -156,7 +156,12 @@ export class EditorCommandService {
     await vscode.commands.executeCommand('markdown.showPreview', docUri);
   }
 
-  async findRemovableWorktree(worktreePath: string): Promise<Result<void>> {
+  /**
+   * Guard a removal, answering with the worktree list the check was made against —
+   * `resolveBaseDir` needs the same list, and returning it keeps the removal to one
+   * `git worktree list` instead of two.
+   */
+  async findRemovableWorktree(worktreePath: string): Promise<Result<WorktreeInfo[]>> {
     const list = await this.services.current().gitWorktreeService.listWorktrees();
     if (!list.success) return list;
     const normalize = (value: string) => path.resolve(value);
@@ -167,7 +172,7 @@ export class EditorCommandService {
     if (match?.isCurrent) {
       return err(new GitError('You cannot remove the worktree you are currently in.', 'VALIDATION_ERROR'));
     }
-    return ok(undefined);
+    return ok(list.value);
   }
 
   getWorkspacePath(): string | undefined {
