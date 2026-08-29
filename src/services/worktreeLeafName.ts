@@ -1,5 +1,4 @@
 import path from 'node:path';
-import type { WorktreeFolderNameStyle } from '../../shared/types.js';
 
 /**
  * Turn a git ref into the folder name(s) a worktree is created under.
@@ -39,16 +38,6 @@ export function buildWorktreeSegments(ref: string): string[] {
     .map(sanitizeWorktreeSegment)
     .filter((segment) => segment.length > 0 && segment !== '.' && segment !== '..');
   return segments.length > 0 ? segments : ['worktree'];
-}
-
-/**
- * The segments a given style appends below the base directory: `nested` keeps them
- * separate, `flat` joins them with `-` into a single folder name (byte-for-byte what
- * shipped before this feature).
- */
-export function buildWorktreeLeafSegments(ref: string, style: WorktreeFolderNameStyle): string[] {
-  const segments = buildWorktreeSegments(ref);
-  return style === 'nested' ? segments : [segments.join('-')];
 }
 
 /** Normalize a path for containment comparison, case-insensitively on Windows. */

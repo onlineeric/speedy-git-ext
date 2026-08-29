@@ -16,6 +16,9 @@ import { isInsideBaseDir } from '../services/worktreeLeafName.js';
  * - **Symlinks are never followed or deleted.** `rmdir` refuses one anyway; the
  *   explicit `lstat` keeps the sweep from descending through one.
  * - **`baseDir` itself is never deleted**, and nothing above it is ever touched.
+ * - **A worktree's own contents are never touched.** The sweep stops at any directory
+ *   holding a `.git` entry, so it only ever removes the scaffolding folders between
+ *   `baseDir` and a worktree.
  * - **Failures are swallowed.** These are housekeeping; a caller's `Result` never
  *   changes because a folder could not be removed. Each failure is logged once.
  */
@@ -89,6 +92,12 @@ async function sweepChildren(dir: string, log: EmptyDirCleanupLog): Promise<void
   let entries: string[];
   try {
     const dirents = await readdir(dir, { withFileTypes: true });
+    // A `.git` entry (a file in a linked worktree, a directory in the main one) marks
+    // a checkout root. Descending past it would walk the user's whole working tree —
+    // `node_modules` and all — and would delete their genuinely-empty folders, which
+    // git does not track and so cannot restore. The sweep only owns the scaffolding
+    // *between* the base dir and a worktree, never anything inside one.
+    if (dirents.some((entry) => entry.name === '.git')) return;
     // `isDirectory()` is false for a symlink, so this filter is also the symlink guard.
     entries = dirents.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
   } catch (error) {

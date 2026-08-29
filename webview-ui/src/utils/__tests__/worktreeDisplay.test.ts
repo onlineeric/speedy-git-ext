@@ -133,6 +133,10 @@ describe('worktreeFolderName — base-dir-relative labels', () => {
     expect(worktreeFolderName('C:\\repo.worktrees\\feat\\topic', 'C:\\repo.worktrees')).toBe('feat/topic');
   });
 
+  it('matches a Windows base dir whose casing differs from the reported path', () => {
+    expect(worktreeFolderName('c:\\Repo.Worktrees\\feat\\topic', 'C:\\repo.worktrees')).toBe('feat/topic');
+  });
+
   it('threads the base dir through the detached badge text', () => {
     expect(
       detachedWorktreeBadgeText([makeWorktree({ path: '/repo.worktrees/exp/19eae44a9d' })], '/repo.worktrees'),

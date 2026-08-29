@@ -25,6 +25,11 @@ function toDisplayPath(value: string): string {
   return value.replace(/\\/g, '/').replace(/\/+$/, '');
 }
 
+/** True for a drive-letter-rooted path (`C:/…`), the only case-insensitive shape here. */
+function isWindowsPath(value: string): boolean {
+  return /^[A-Za-z]:\//.test(value);
+}
+
 /**
  * The label for a worktree folder.
  *
@@ -39,7 +44,14 @@ export function worktreeFolderName(worktreePath: string, baseDir?: string | null
 
   if (baseDir) {
     const base = toDisplayPath(baseDir);
-    if (base && normalized.length > base.length + 1 && normalized.startsWith(base + '/')) {
+    // Windows paths compare case-insensitively: git reports a worktree path as it was
+    // recorded, the base dir is resolved separately, and the two routinely disagree on
+    // drive-letter or folder casing. Comparing them literally would silently drop every
+    // nested label back to its ambiguous last segment.
+    const prefixMatches = isWindowsPath(base)
+      ? normalized.toLowerCase().startsWith(base.toLowerCase() + '/')
+      : normalized.startsWith(base + '/');
+    if (base && normalized.length > base.length + 1 && prefixMatches) {
       return normalized.slice(base.length + 1);
     }
   }

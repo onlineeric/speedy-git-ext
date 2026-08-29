@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  buildWorktreeLeafSegments,
   buildWorktreeSegments,
   isInsideBaseDir,
   sanitizeWorktreeSegment,
@@ -51,19 +50,6 @@ describe('buildWorktreeSegments', () => {
     expect(buildWorktreeSegments('...')).toEqual(['worktree']);
     expect(buildWorktreeSegments('!!!')).toEqual(['worktree']);
     expect(buildWorktreeSegments('功能')).toEqual(['worktree']);
-  });
-});
-
-describe('buildWorktreeLeafSegments', () => {
-  it('keeps segments separate under the nested style', () => {
-    expect(buildWorktreeLeafSegments('feat/branch1', 'nested')).toEqual(['feat', 'branch1']);
-  });
-
-  it('joins them with `-` under the flat style, matching the historical leaf name', () => {
-    expect(buildWorktreeLeafSegments('feat/branch1', 'flat')).toEqual(['feat-branch1']);
-    expect(buildWorktreeLeafSegments('feature/login', 'flat')).toEqual(['feature-login']);
-    expect(buildWorktreeLeafSegments('exp/20260826-test', 'flat')).toEqual(['exp-20260826-test']);
-    expect(buildWorktreeLeafSegments('feature', 'flat')).toEqual(['feature']);
   });
 });
 

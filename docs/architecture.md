@@ -74,7 +74,7 @@ src/
 │                                 #   one round trip; resolveBaseDir takes an already-fetched list; prunes emptied
 │                                 #   parents after remove and sweeps the base dir after prune
 │   ├── worktreeLeafName.ts       # PURE: ref → sanitized folder segments (per-segment allowlist, `.`/`..` dropped,
-│                                 #   `/` and `\` both split), per-style leaf, isInsideBaseDir containment guard
+│                                 #   `/` and `\` both split), isInsideBaseDir containment guard
 │   ├── GitSignatureService.ts    # GPG/SSH signature verification
 │   ├── GitSubmoduleService.ts    # Submodule status, init, update
 │   ├── GitWatcherService.ts      # File system watcher for auto-refresh
@@ -97,7 +97,8 @@ src/
     ├── gitValidation.ts          # Input validation (backend wrappers over shared/gitRefValidation)
     ├── emptyDirCleanup.ts        # Delete folders a worktree removal emptied. `rmdir` IS the emptiness test (never
     │                             #   readdir-then-delete); symlinks never followed; baseDir never deleted; failures
-    │                             #   logged and swallowed, so a caller's Result never changes
+    │                             #   logged and swallowed, so a caller's Result never changes. The sweep stops at any
+    │                             #   dir holding a `.git` entry, so it never walks or empties a worktree's own tree
     └── worktreeErrors.ts         # Map raw git worktree failures → friendly messages
 ```
 

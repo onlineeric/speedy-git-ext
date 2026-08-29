@@ -117,6 +117,23 @@ describe('sweepEmptyDirs', () => {
     expect(log.warn).not.toHaveBeenCalled();
   });
 
+  it('never descends into a worktree checkout, so its own empty folders survive', async () => {
+    // `<base>/feat/branch1` is a live worktree: it carries a `.git` file and an
+    // untracked empty `logs/` folder git could never restore.
+    readdirMock.mockImplementation((async (dir: string) => {
+      if (dir === '/base') return [dirent('feat')];
+      if (dir === '/base/feat') return [dirent('branch1')];
+      if (dir === '/base/feat/branch1') return [dirent('.git', false), dirent('logs')];
+      return [];
+    }) as never);
+    rmdirMock.mockRejectedValue(fsError('ENOTEMPTY'));
+
+    await sweepEmptyDirs('/base', log);
+
+    expect(readdirMock.mock.calls.map((call) => call[0])).not.toContain('/base/feat/branch1/logs');
+    expect(rmdirMock).not.toHaveBeenCalledWith('/base/feat/branch1/logs');
+  });
+
   it('skips symlinks and files, descending only into real directories', async () => {
     readdirMock.mockImplementation((async (dir: string) =>
       dir === '/base' ? [dirent('link', false), dirent('real')] : []) as never);
