@@ -12,6 +12,7 @@ import {
   WORKTREE_STYLE_LABELS,
   type ResolvedWorktreePaths,
 } from '../utils/worktreePathChoice';
+import type { WorktreeSource, WorktreeSourceKind } from '../utils/refWorktreeSource';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { CommandPreview } from './CommandPreview';
@@ -25,15 +26,9 @@ import {
 } from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
-export type WorktreeSourceKind = 'local-branch' | 'remote-branch' | 'commit' | 'tag';
-
-export interface WorktreeSource {
-  /** The git ref the worktree is based on: branch name, `origin/x`, tag name, or commit hash. */
-  ref: string;
-  /** Human-readable label shown in the dialog. */
-  label: string;
-  kind: WorktreeSourceKind;
-}
+// The source types live beside the pure derivation in `utils/refWorktreeSource`;
+// re-exported here so existing importers of this dialog keep working.
+export type { WorktreeSource, WorktreeSourceKind } from '../utils/refWorktreeSource';
 
 interface CreateWorktreeDialogProps {
   open: boolean;

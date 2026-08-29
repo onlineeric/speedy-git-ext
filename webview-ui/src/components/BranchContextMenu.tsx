@@ -27,7 +27,8 @@ import { MergeDialog } from './MergeDialog';
 import { getRefMergeSource } from '../utils/refMergeSource';
 import { PushDialog } from './PushDialog';
 import { CheckoutWithPullDialog } from './CheckoutWithPullDialog';
-import { CreateWorktreeDialog, type WorktreeSource } from './CreateWorktreeDialog';
+import { CreateWorktreeDialog } from './CreateWorktreeDialog';
+import { refWorktreeSource } from '../utils/refWorktreeSource';
 import { useRemoveWorktreeDialog, WorktreeMenuItems } from './WorktreeMenuItems';
 import { MenuItem } from './MenuItem';
 import { LazyContextMenu } from './LazyContextMenu';
@@ -233,20 +234,8 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
   }, [isLocalBranch, branches, refInfo.name]);
 
   // Worktree source for "Create worktree…": local branches use the branch name (existing-branch
-  // default); remote-only badges base a new tracking branch on `<remote>/<name>` (research R4).
-  const worktreeSource = useMemo<WorktreeSource | null>(() => {
-    if (isLocalBranch) {
-      return { ref: refInfo.name, label: refInfo.name, kind: 'local-branch' };
-    }
-    if (isRemoteBranch && refInfo.remote && checkoutState === 'remote-only') {
-      const full = `${refInfo.remote}/${refInfo.name}`;
-      return { ref: full, label: full, kind: 'remote-branch' };
-    }
-    if (isTag) {
-      return { ref: refInfo.name, label: refInfo.name, kind: 'tag' };
-    }
-    return null;
-  }, [isLocalBranch, isRemoteBranch, isTag, refInfo.remote, refInfo.name, checkoutState]);
+  // default); remote badges base a new tracking branch on `<remote>/<name>` (research R4).
+  const worktreeSource = useMemo(() => refWorktreeSource(refInfo), [refInfo]);
   const showWorktreeGroup = worktreeSource !== null || branchWorktree !== undefined;
   // A single "Create worktree…" item, reused across the local / remote / tag arms.
   const createWorktreeItem = worktreeSource ? (

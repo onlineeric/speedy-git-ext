@@ -272,6 +272,9 @@ utils/
 ├── mergeRefs.ts                  # Merges local/remote refs into DisplayRef[]
 ├── refMergeSource.ts             # Whether a ref badge can be merged and under what name — a remote branch
 │                                 #   must be handed to `git merge` as `<remote>/<name>`, never the bare name
+├── refWorktreeSource.ts          # The same question for "Create worktree…": which ref the badge hands to
+│                                 #   `git worktree add`, likewise `<remote>/<name>` for a remote branch. Owns the
+│                                 #   WorktreeSource types. Does NOT ask whether a local branch of that name exists
 ├── signatureGlyph.ts             # SignatureStatus → glyph/color (047); the single status→color map, reused by the details-panel labels
 ├── worktreeBadgeStyle.ts         # Worktree badge styling (046); hardcoded colors are deliberate — contrast vs. user lane colors
 ├── worktreeDisplay.ts            # Worktree list formatting/derivation (046). worktreeFolderName labels a worktree
