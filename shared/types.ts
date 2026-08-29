@@ -31,6 +31,12 @@ export interface UserSettings {
   overScan: number;
   /** Parent dir for new worktrees; default '../${repoName}.worktrees'. Ref appended as leaf. */
   worktreeBasePath: string;
+  /**
+   * Which folder shape is preselected in the Create Worktree dialog when the
+   * derived name contains `/`. Both are always offered; this only chooses the
+   * starting selection.
+   */
+  worktreeFolderNameStyle: WorktreeFolderNameStyle;
   /** Show small text labels under the toolbar icon buttons. */
   toolbarShowLabels: boolean;
   /** Show the Remote (Manage Remotes) button in the toolbar. */
@@ -42,6 +48,14 @@ export interface UserSettings {
  * (via the `setToolbarSetting` RPC, from the toolbar right-click menu).
  */
 export type ToolbarBooleanSetting = 'showLabels' | 'showRemoteButton';
+
+/**
+ * How a branch name containing `/` becomes a worktree folder:
+ * `feat/x` → `feat/x` (nested) or `feat-x` (flat).
+ */
+export type WorktreeFolderNameStyle = 'nested' | 'flat';
+
+export const WORKTREE_FOLDER_NAME_STYLES = ['nested', 'flat'] as const;
 
 export interface SearchState {
   isOpen: boolean;
@@ -101,6 +115,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   batchCommitSize: 500,
   overScan: 20,
   worktreeBasePath: '../${repoName}.worktrees',
+  worktreeFolderNameStyle: 'nested',
   toolbarShowLabels: true,
   toolbarShowRemoteButton: true,
 };
@@ -160,6 +175,18 @@ export function clampAvatarRefreshDays(value: number | string, fallback: number)
   const parsed = typeof value === 'string' ? Number.parseInt(value.trim(), 10) : value;
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(MAX_AVATAR_REFRESH_DAYS, Math.max(MIN_AVATAR_REFRESH_DAYS, Math.round(parsed)));
+}
+
+/**
+ * Coerce a configured `speedyGit.worktree.folderNameStyle` into a known style.
+ *
+ * Lives beside the other cross-boundary clamps so the webview and the backend
+ * cannot disagree about what an unrecognised configured value means.
+ */
+export function normalizeWorktreeFolderNameStyle(value: unknown): WorktreeFolderNameStyle {
+  return WORKTREE_FOLDER_NAME_STYLES.includes(value as WorktreeFolderNameStyle)
+    ? (value as WorktreeFolderNameStyle)
+    : DEFAULT_USER_SETTINGS.worktreeFolderNameStyle;
 }
 
 export interface Commit {

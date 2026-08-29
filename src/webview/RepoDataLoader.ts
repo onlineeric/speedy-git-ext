@@ -301,7 +301,16 @@ export class RepoDataLoader {
       this.deps.postMessage({ type: 'remotes', payload: { remotes } });
     }
     if (worktrees) {
-      this.deps.postMessage({ type: 'worktreeList', payload: { worktrees } });
+      this.deps.postMessage({
+        type: 'worktreeList',
+        payload: {
+          worktrees,
+          baseDir: services.gitWorktreeService.resolveBaseDir(
+            worktrees,
+            this.deps.getSettings()?.worktreeBasePath ?? DEFAULT_USER_SETTINGS.worktreeBasePath,
+          ),
+        },
+      });
     }
     if (stashes) {
       this.deps.postMessage({ type: 'stashes', payload: { stashes } });

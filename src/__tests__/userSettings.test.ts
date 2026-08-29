@@ -7,6 +7,7 @@ import {
   MAX_AVATAR_REFRESH_DAYS,
   MAX_BATCH_COMMIT_SIZE,
   MIN_AVATAR_REFRESH_DAYS,
+  normalizeWorktreeFolderNameStyle,
 } from '../../shared/types.js';
 
 describe('growBatchForTarget', () => {
@@ -94,5 +95,23 @@ describe('clampAvatarRefreshDays', () => {
     expect(clampAvatarRefreshDays('', 30)).toBe(30);
     expect(clampAvatarRefreshDays('   ', 45)).toBe(45);
     expect(clampAvatarRefreshDays('abc', 30)).toBe(30);
+  });
+});
+
+describe('normalizeWorktreeFolderNameStyle', () => {
+  it('defaults to nested', () => {
+    expect(DEFAULT_USER_SETTINGS.worktreeFolderNameStyle).toBe('nested');
+  });
+
+  it('keeps a recognised style', () => {
+    expect(normalizeWorktreeFolderNameStyle('nested')).toBe('nested');
+    expect(normalizeWorktreeFolderNameStyle('flat')).toBe('flat');
+  });
+
+  it('falls back to the default for anything else', () => {
+    expect(normalizeWorktreeFolderNameStyle('deeply-nested')).toBe('nested');
+    expect(normalizeWorktreeFolderNameStyle('')).toBe('nested');
+    expect(normalizeWorktreeFolderNameStyle(undefined)).toBe('nested');
+    expect(normalizeWorktreeFolderNameStyle(42)).toBe('nested');
   });
 });

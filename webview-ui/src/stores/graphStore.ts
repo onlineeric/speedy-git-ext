@@ -201,6 +201,12 @@ interface GraphStore {
   tooltipAnchorRect: DOMRect | null;
   worktreeList: WorktreeInfo[];
   worktreeListLoading: boolean;
+  /**
+   * Absolute base dir the repo's worktrees live under, or null when it cannot be
+   * resolved. Session state: derived from a setting plus the repo, both of which
+   * are re-sent whenever the repo changes.
+   */
+  worktreeBaseDir: string | null;
   authorList: Author[];
   authorListLoading: boolean;
   worktreeByHead: Map<string, WorktreeInfo[]>;
@@ -223,7 +229,7 @@ interface GraphStore {
   compareResult: CompareResult | null;
   comparePanelUI: ComparePanelUIState;
   setHoveredCommit: (hash: string | null, anchorRect: DOMRect | null) => void;
-  setWorktreeList: (list: WorktreeInfo[]) => void;
+  setWorktreeList: (list: WorktreeInfo[], baseDir?: string | null) => void;
   setWorktreeListLoading: (loading: boolean) => void;
   setContainingBranches: (hash: string, result: ContainingBranchesResult) => void;
   clearTooltipCaches: () => void;
@@ -447,6 +453,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   authorListLoading: false,
   worktreeList: [],
   worktreeListLoading: false,
+  worktreeBaseDir: null,
   worktreeByHead: new Map(),
   worktreeByBranch: new Map(),
   detachedWorktreesByHead: new Map(),
@@ -466,8 +473,13 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   compareResult: null,
   comparePanelUI: { ...EMPTY_COMPARE_PANEL_UI_STATE },
   setHoveredCommit: (hash, anchorRect) => set({ hoveredCommitHash: hash, tooltipAnchorRect: anchorRect }),
-  setWorktreeList: (list) => {
-    set({ worktreeList: list, worktreeListLoading: false, ...buildWorktreeLookups(list) });
+  setWorktreeList: (list, baseDir) => {
+    set({
+      worktreeList: list,
+      worktreeListLoading: false,
+      ...(baseDir === undefined ? {} : { worktreeBaseDir: baseDir }),
+      ...buildWorktreeLookups(list),
+    });
   },
   setWorktreeListLoading: (worktreeListLoading) => set({ worktreeListLoading }),
   setContainingBranches: (hash, result) => set((state) => {
@@ -843,6 +855,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
             stashes: [],
             worktreeList: [],
             worktreeListLoading: false,
+            worktreeBaseDir: null,
             worktreeByHead: new Map(),
             worktreeByBranch: new Map(),
             detachedWorktreesByHead: new Map(),
@@ -888,6 +901,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       stashes: [],
       worktreeList: [],
       worktreeListLoading: false,
+      worktreeBaseDir: null,
       worktreeByHead: new Map(),
       worktreeByBranch: new Map(),
       detachedWorktreesByHead: new Map(),
@@ -935,6 +949,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       stashes: [],
       worktreeList: [],
       worktreeListLoading: false,
+      worktreeBaseDir: null,
       worktreeByHead: new Map(),
       worktreeByBranch: new Map(),
       detachedWorktreesByHead: new Map(),

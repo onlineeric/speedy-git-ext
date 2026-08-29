@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-08-25**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-08-29**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -43,12 +43,15 @@ src/
 │       ├── commitHandlers.ts     # getCommitMessage (%B), amendCommit (guarded, HEAD-verified), cancelAmend
 │       ├── signatureHandlers.ts  # presence detection, verification, signature help
 │       ├── submoduleHandlers.ts  # submodule ops + switchRepo/displayRepo navigation
-│       ├── worktreeHandlers.ts   # list/resolve/add/remove/prune/open/reveal worktree
+│       ├── worktreeHandlers.ts   # list/resolve/add/remove/prune/open/reveal worktree; resolves the base dir once
+│                                 #   per request and threads it into the list payload, remove-prune and prune-sweep
 │       ├── workingTreeHandlers.ts# uncommitted changes, stage/unstage/discard, diff editors
 │       ├── compareHandlers.ts    # compareRefs/cancelCompare/openCompareDiff (latest-wins by request id)
 │       ├── telemetryHandlers.ts  # Validates one-way webview telemetry against closed catalogs
 │       ├── avatarHandlers.ts      # Avatar auth state, GitHub authorize/remove-token, refreshDays setting, clear cache
-│       ├── updateSpeedyGitSetting.ts # Writes one speedyGit.* setting; ExtensionController broadcasts the change
+│       ├── updateSpeedyGitSetting.ts # Writes one speedyGit.* setting; ExtensionController broadcasts the change.
+│                                 #   …InDefinedScope writes to Workspace when a workspace value already exists,
+│                                 #   so a Global write cannot be silently shadowed
 │       └── vscodeCommandHandlers.ts # settings, clipboard, openExternal, updatePersistedUIState
 ├── services/                     # All repo-bound; every method returns Result<T, GitError>
 │   ├── index.ts                  # Barrel export for all services
@@ -67,7 +70,11 @@ src/
 │   ├── GitIndexService.ts        # Stage/unstage, discard, commit (uncommitted-node operations)
 │   ├── GitCommitService.ts       # Read a commit's full message; amend HEAD (--only / -F, 60s hook ceiling,
 │                                 #   expectedHead guard, cancel outcome observed from HEAD not assumed)
-│   ├── GitWorktreeService.ts     # Worktree list/add/remove
+│   ├── GitWorktreeService.ts     # Worktree list/add/remove; resolves BOTH candidate folders (nested + flat) in
+│                                 #   one round trip; resolveBaseDir takes an already-fetched list; prunes emptied
+│                                 #   parents after remove and sweeps the base dir after prune
+│   ├── worktreeLeafName.ts       # PURE: ref → sanitized folder segments (per-segment allowlist, `.`/`..` dropped,
+│                                 #   `/` and `\` both split), per-style leaf, isInsideBaseDir containment guard
 │   ├── GitSignatureService.ts    # GPG/SSH signature verification
 │   ├── GitSubmoduleService.ts    # Submodule status, init, update
 │   ├── GitWatcherService.ts      # File system watcher for auto-refresh
@@ -88,6 +95,9 @@ src/
     ├── gitQueries.ts             # Shared read-only git queries. isDirtyWorkingTree counts untracked
     │                             #   files — for `worktree remove` only; never gate rebase/pick/revert on it
     ├── gitValidation.ts          # Input validation (backend wrappers over shared/gitRefValidation)
+    ├── emptyDirCleanup.ts        # Delete folders a worktree removal emptied. `rmdir` IS the emptiness test (never
+    │                             #   readdir-then-delete); symlinks never followed; baseDir never deleted; failures
+    │                             #   logged and swallowed, so a caller's Result never changes
     └── worktreeErrors.ts         # Map raw git worktree failures → friendly messages
 ```
 
@@ -170,7 +180,8 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ```
 ├── dialogStyles.ts               # Shared dialog width/resize, the primary/secondary/danger button variants (one shared
 │                                 #   base) and the note/warning/error message boxes (one shared base)
-├── ConfirmDialog.tsx             # Generic confirm (danger/warning variants) + CommandPreview
+├── ConfirmDialog.tsx             # Generic confirm (danger/warning variants) + CommandPreview; optional focusConfirm
+│                                 #   overrides Radix's default Cancel focus where proceeding is the expected answer
 ├── InputDialog.tsx               # Generic single-input dialog + FieldError
 ├── CommandPreview.tsx            # Live git command preview shown in dialogs
 ├── FieldError.tsx                # Validation message under inputs (pairs with aria-invalid/aria-describedby)
@@ -182,7 +193,9 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── CreateBranchDialog.tsx  DeleteBranchDialog.tsx  CheckoutWithPullDialog.tsx
 ├── TagCreationDialog.tsx  DeleteTagDialog.tsx  PushTagDialog.tsx
 ├── PushDialog.tsx  RemoteManagementDialog.tsx  StashDialog.tsx
-├── CreateWorktreeDialog.tsx  RemoveWorktreeDialog.tsx
+├── CreateWorktreeDialog.tsx      # Branch mode, env-file copy, and — for a branch name containing `/` — the
+│                                 #   Nested/Flatten folder radio pair, discard confirmation and save-default link
+├── RemoveWorktreeDialog.tsx
 ├── DiscardDialog.tsx  DiscardAllDialog.tsx  FilePickerDialog.tsx
 ├── RefBadgeLegend.tsx            # Standalone "Badge Legend" section; samples are real `RefLabel`s in lane-0 color
 │                                 #   so it can't drift from the graph. Needs no props — reused by the What's New dialog
@@ -261,7 +274,11 @@ utils/
 │                                 #   must be handed to `git merge` as `<remote>/<name>`, never the bare name
 ├── signatureGlyph.ts             # SignatureStatus → glyph/color (047); the single status→color map, reused by the details-panel labels
 ├── worktreeBadgeStyle.ts         # Worktree badge styling (046); hardcoded colors are deliberate — contrast vs. user lane colors
-├── worktreeDisplay.ts            # Worktree list formatting/derivation (046)
+├── worktreeDisplay.ts            # Worktree list formatting/derivation (046). worktreeFolderName labels a worktree
+│                                 #   by its path BELOW the configured base dir, since nesting makes the last
+│                                 #   segment ambiguous; outside the base dir it stays the last segment
+├── worktreePathChoice.ts         # PURE: the Create Worktree folder choice — dirty check vs. the computed path,
+│                                 #   switch verdict (ignore/switch/confirm), save-default link visibility
 ├── telemetry.ts                  # Fire-and-forget webview telemetry helpers
 ├── searchFilter.ts               # Client-side search by message, hash, author
 ├── filterUtils.ts                # Author/date filter logic

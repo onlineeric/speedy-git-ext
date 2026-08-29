@@ -3,11 +3,13 @@ import { readdir, copyFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
+import { buildWorktreeSegments, isInsideBaseDir } from './worktreeLeafName.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { WorktreeInfo, WorktreeBranchMode } from '../../shared/types.js';
 import { isDirtyWorkingTree } from '../utils/gitQueries.js';
 import { validateLocalBranchName, validateRefName, validateWorktreePath } from '../utils/gitValidation.js';
 import { mapWorktreeConflictError } from '../utils/worktreeErrors.js';
+import { pruneEmptyParents, sweepEmptyDirs } from '../utils/emptyDirCleanup.js';
 
 export interface AddWorktreeOptions {
   path: string;
@@ -48,19 +50,6 @@ function splitNonEmptyLines(stdout: string): string[] {
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
-}
-
-/**
- * Sanitize a ref/branch name into a filesystem-safe leaf folder name.
- * Replaces path separators and unsafe characters with '-', collapses repeats,
- * and trims leading/trailing separators.
- */
-function sanitizeLeafName(ref: string): string {
-  const cleaned = ref
-    .replace(/[^A-Za-z0-9._-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^[-.]+|[-.]+$/g, '');
-  return cleaned || 'worktree';
 }
 
 async function resolveDetachedLeafName(
@@ -224,25 +213,41 @@ export class GitWorktreeService {
   }
 
   /**
-   * Compose the absolute target path for a new worktree (research R1/R2):
-   * read the configured base path, expand `${repoName}` and resolve any leading
-   * `..` anchored to the MAIN worktree (never the current one), sanitize the ref
-   * to a leaf folder name, and append a numeric suffix on collision.
+   * The absolute base directory this repo's worktrees live under, or null when it
+   * cannot be resolved.
+   *
+   * Takes an already-fetched worktree list rather than fetching one, so the several
+   * callers that already hold a list (resolve, remove, prune, the worktree-list post)
+   * do not each spawn another `git worktree list`.
+   */
+  resolveBaseDir(worktrees: WorktreeInfo[], basePath: string): string | null {
+    const main = worktrees.find((w) => w.isMain);
+    const mainPath = main ? main.path : this.workspacePath;
+    if (!mainPath) return null;
+    const repoName = path.basename(mainPath);
+    const expandedBase = basePath.replace(/\$\{repoName\}/g, repoName);
+    // Anchor relative base paths (including a leading `..`) to the main worktree.
+    return path.resolve(mainPath, expandedBase);
+  }
+
+  /**
+   * Compose both candidate target paths for a new worktree (research R1/R2):
+   * resolve the configured base dir, derive the folder name from the ref, and offer
+   * it both nested (`<base>/feat/x`) and flattened (`<base>/feat-x`), each with its
+   * own numeric-suffix collision fallback.
+   *
+   * Both are answered in one round trip: two separate resolves would supersede each
+   * other in the webview's single pending slot, spawn `git worktree list` twice, and
+   * collision-check against two different filesystem snapshots.
    */
   async resolveWorktreePath(
     opts: ResolveWorktreePathOptions,
     basePath: string
-  ): Promise<Result<{ path: string; leafName: string }>> {
+  ): Promise<Result<{ nestedPath: string; flatPath: string; hierarchical: boolean }>> {
     const listResult = await this.listWorktrees();
     if (!listResult.success) return listResult;
 
-    const main = listResult.value.find((w) => w.isMain);
-    const mainPath = main ? main.path : this.workspacePath;
-    const repoName = path.basename(mainPath);
-
-    const expandedBase = basePath.replace(/\$\{repoName\}/g, repoName);
-    // Anchor relative base paths (including a leading `..`) to the main worktree.
-    const baseDir = path.resolve(mainPath, expandedBase);
+    const baseDir = this.resolveBaseDir(listResult.value, basePath) ?? path.resolve(this.workspacePath, basePath);
 
     let desiredLeaf: string;
     if (opts.branchMode === 'new' && opts.newBranchName) {
@@ -254,22 +259,47 @@ export class GitWorktreeService {
     } else {
       desiredLeaf = opts.ref;
     }
-    const leaf = sanitizeLeafName(desiredLeaf);
+
+    const segments = buildWorktreeSegments(desiredLeaf);
+    const hierarchical = segments.length > 1;
 
     const existingPaths = new Set(listResult.value.map((w) => normalizePath(w.path)));
     const collides = (candidate: string): boolean =>
       existingPaths.has(normalizePath(candidate)) || existsSync(candidate);
 
-    let finalLeaf = leaf;
-    let candidate = path.join(baseDir, finalLeaf);
-    let suffix = 2;
-    while (collides(candidate)) {
-      finalLeaf = `${leaf}-${suffix}`;
-      candidate = path.join(baseDir, finalLeaf);
-      suffix += 1;
+    /**
+     * Suffix the *last* segment on collision (`<base>/feat/branch1-2`), never a
+     * parent — a suffixed parent would strand the worktree in a folder that mirrors
+     * nothing in the branch name.
+     */
+    const resolveCandidate = (leafSegments: string[]): string => {
+      const parents = leafSegments.slice(0, -1);
+      const leaf = leafSegments[leafSegments.length - 1];
+      let candidate = path.join(baseDir, ...parents, leaf);
+      let suffix = 2;
+      while (collides(candidate)) {
+        candidate = path.join(baseDir, ...parents, `${leaf}-${suffix}`);
+        suffix += 1;
+      }
+      return candidate;
+    };
+
+    const flatPath = resolveCandidate([segments.join('-')]);
+    // Containment guard: a nested candidate that escapes the base dir falls back to
+    // the flat one. Unreachable from a valid git ref, and the user has a free-text
+    // box if they disagree with the result, so this stays silent.
+    const nestedCandidate = path.join(baseDir, ...segments);
+    let nestedPath: string;
+    if (!hierarchical) {
+      nestedPath = flatPath;
+    } else if (!isInsideBaseDir(baseDir, nestedCandidate)) {
+      this.log.warn(`Nested worktree path escaped the base directory; falling back to a flat folder name.`);
+      nestedPath = flatPath;
+    } else {
+      nestedPath = resolveCandidate(segments);
     }
 
-    return ok({ path: candidate, leafName: finalLeaf });
+    return ok({ nestedPath, flatPath, hierarchical });
   }
 
   async addWorktree(opts: AddWorktreeOptions): Promise<Result<void>> {
@@ -393,7 +423,15 @@ export class GitWorktreeService {
     return ok({ copied, skippedNotIgnored });
   }
 
-  async removeWorktree(worktreePath: string, opts?: { force?: boolean }): Promise<Result<void>> {
+  /**
+   * Remove a worktree and, when `baseDir` is given, delete the folders that removal
+   * just emptied. Cleanup never changes the returned `Result` — the same rule the
+   * `.env` copy already follows in `addWorktree`.
+   */
+  async removeWorktree(
+    worktreePath: string,
+    opts?: { force?: boolean; baseDir?: string | null }
+  ): Promise<Result<void>> {
     this.log.info(`Remove worktree at ${worktreePath}${opts?.force ? ' (force)' : ''}`);
 
     const pathCheck = validateWorktreePath(worktreePath);
@@ -422,16 +460,26 @@ export class GitWorktreeService {
 
     const result = await this.executor.execute({ args, cwd: this.workspacePath });
     if (!result.success) return result;
+    if (opts?.baseDir) {
+      await pruneEmptyParents(pathCheck.value, opts.baseDir, this.log);
+    }
     return ok(undefined);
   }
 
-  async pruneWorktrees(): Promise<Result<void>> {
+  /**
+   * Prune stale worktree metadata and, when `baseDir` is given, sweep the base path
+   * for empty directories left behind by folders deleted outside VS Code.
+   */
+  async pruneWorktrees(opts?: { baseDir?: string | null }): Promise<Result<void>> {
     this.log.info('Prune worktrees');
     const result = await this.executor.execute({
       args: ['worktree', 'prune'],
       cwd: this.workspacePath,
     });
     if (!result.success) return result;
+    if (opts?.baseDir) {
+      await sweepEmptyDirs(opts.baseDir, this.log);
+    }
     return ok(undefined);
   }
 }

@@ -1,12 +1,21 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
-import type { WorktreeBranchMode, WorktreeInfo } from '@shared/types';
+import type { WorktreeBranchMode, WorktreeFolderNameStyle, WorktreeInfo } from '@shared/types';
 import { validateGitBranchName } from '@shared/gitRefValidation';
 import { buildAddWorktreeCommand } from '../utils/gitCommandBuilder';
 import { deriveRefNameField } from '../utils/refNameField';
 import { WORKTREE_FOLDER_MISSING_TOOLTIP } from '../utils/worktreeDisplay';
+import {
+  computedPathFor,
+  decideStyleSwitch,
+  saveDefaultLink,
+  WORKTREE_STYLE_LABELS,
+  type ResolvedWorktreePaths,
+} from '../utils/worktreePathChoice';
 import { rpcClient } from '../rpc/rpcClient';
+import { useGraphStore } from '../stores/graphStore';
 import { CommandPreview } from './CommandPreview';
+import { ConfirmDialog } from './ConfirmDialog';
 import { FieldError } from './FieldError';
 import {
   buttonPrimaryClassName,
@@ -55,6 +64,12 @@ function defaultNewBranchName(source: WorktreeSource): string {
   return '';
 }
 
+/** Radio order in the folder-style choice: nested first, matching the default. */
+const WORKTREE_FOLDER_STYLES: readonly WorktreeFolderNameStyle[] = ['nested', 'flat'];
+
+const folderInputClassName =
+  'w-full px-2 py-1 text-sm font-mono rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)]';
+
 function initialBranchMode(defaultMode: WorktreeBranchMode, existingBranchDisabled: boolean): WorktreeBranchMode {
   if (existingBranchDisabled && defaultMode === 'existing') return 'new';
   return defaultMode;
@@ -62,11 +77,22 @@ function initialBranchMode(defaultMode: WorktreeBranchMode, existingBranchDisabl
 
 export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }: CreateWorktreeDialogProps) {
   const dialogTelemetry = useDialogTelemetry('createWorktree', open);
+  const configuredStyle = useGraphStore((s) => s.userSettings.worktreeFolderNameStyle);
   const { modes, defaultMode } = useMemo(() => modesForKind(source.kind), [source.kind]);
   const existingBranchDisabled = source.kind === 'local-branch' && existingWorktree !== undefined;
   const [branchMode, setBranchMode] = useState<WorktreeBranchMode>(() => initialBranchMode(defaultMode, existingBranchDisabled));
   const [newBranchName, setNewBranchName] = useState(() => defaultNewBranchName(source));
-  const [path, setPath] = useState('');
+  // Both candidate folders, as the backend last computed them, plus whether the
+  // choice applies at all. `null` until the first resolve answers.
+  const [resolved, setResolved] = useState<ResolvedWorktreePaths | null>(null);
+  // The text in each box. Only the selected one is editable; the other always shows
+  // its computed default (see `worktreePathChoice`).
+  const [paths, setPaths] = useState<{ nested: string; flat: string }>({ nested: '', flat: '' });
+  // Seeded once per open, so the selection resets to the configured style every time
+  // the dialog is opened and a later settings broadcast cannot move it mid-edit.
+  const [style, setStyle] = useState<WorktreeFolderNameStyle>(() => configuredStyle);
+  // The style a pending discard confirmation would switch to; null when none is open.
+  const [pendingStyle, setPendingStyle] = useState<WorktreeFolderNameStyle | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Gitignored `.env*` files that could be copied into the new worktree, plus the
@@ -85,8 +111,13 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
     let cancelled = false;
     rpcClient
       .resolveWorktreePath({ ref: source.ref, branchMode, newBranchName: newBranchName || undefined })
-      .then((resolved) => {
-        if (!cancelled) setPath(resolved.path);
+      .then((next) => {
+        if (cancelled) return;
+        // Overwriting both boxes is what silently discards a manual edit when the
+        // branch name or mode changes — the branch name is the source of truth for
+        // the suggestion, and confirming on every keystroke would be unusable.
+        setResolved(next);
+        setPaths({ nested: next.nestedPath, flat: next.flatPath });
       })
       .catch(() => {
         /* superseded / disposed — ignore */
@@ -125,15 +156,60 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
         ? ' - (no .env* file is git-ignored)'
         : ' - (no .env* file found)';
 
+  // `paths` is keyed by style name, so the selected box is a direct lookup.
+  const activePath = paths[style];
+  const showStyleChoice = resolved?.hierarchical === true;
+  const link = saveDefaultLink({
+    hierarchical: showStyleChoice,
+    selected: style,
+    configured: configuredStyle,
+  });
+
+  const setActivePath = useCallback(
+    (value: string) => {
+      setPaths((current) => ({ ...current, [style]: value }));
+    },
+    [style],
+  );
+
+  /** Move to `next`, restoring the box being left to its computed default (§5.1). */
+  const applyStyleSwitch = useCallback(
+    (next: WorktreeFolderNameStyle) => {
+      setPaths((current) => ({ ...current, [style]: computedPathFor(resolved, style) }));
+      setStyle(next);
+    },
+    [style, resolved],
+  );
+
+  const handleStyleClick = useCallback(
+    (next: WorktreeFolderNameStyle) => {
+      const verdict = decideStyleSwitch({
+        current: style,
+        next,
+        currentText: activePath,
+        computed: computedPathFor(resolved, style),
+      });
+      if (verdict === 'ignore') return;
+      if (verdict === 'switch') {
+        applyStyleSwitch(next);
+        return;
+      }
+      // 'confirm' — the radio's `checked` stays bound to `style`, so the dot does
+      // not move until the user actually confirms.
+      setPendingStyle(next);
+    },
+    [style, activePath, resolved, applyStyleSwitch],
+  );
+
   const trimmedName = newBranchName.trim();
   const branchNameField = deriveRefNameField(newBranchName, validateGitBranchName);
   const nameError = branchMode === 'new' ? branchNameField.error : undefined;
   const nameInvalid = branchMode === 'new' && !branchNameField.valid;
-  const canConfirm = path.trim().length > 0 && !nameInvalid && !busy;
+  const canConfirm = activePath.trim().length > 0 && !nameInvalid && !busy;
 
   const commandPreview = useMemo(
-    () => buildAddWorktreeCommand({ path: path || '<path>', ref: source.ref, branchMode, newBranchName: trimmedName }),
-    [path, source.ref, branchMode, trimmedName],
+    () => buildAddWorktreeCommand({ path: activePath || '<path>', ref: source.ref, branchMode, newBranchName: trimmedName }),
+    [activePath, source.ref, branchMode, trimmedName],
   );
 
   const handleConfirm = useCallback(async () => {
@@ -143,7 +219,7 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
     setError(null);
     const done = rpcClient.awaitNextDialogAction();
     rpcClient.addWorktree({
-      path: path.trim(),
+      path: activePath.trim(),
       ref: source.ref,
       branchMode,
       newBranchName: branchMode === 'new' ? trimmedName : undefined,
@@ -157,7 +233,7 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
       setError(typeof e === 'string' ? e : (e as Error).message);
       setBusy(false);
     }
-  }, [canConfirm, path, source.ref, branchMode, trimmedName, envCopyEnabled, copyEnvFiles, onClose, dialogTelemetry]);
+  }, [canConfirm, activePath, source.ref, branchMode, trimmedName, envCopyEnabled, copyEnvFiles, onClose, dialogTelemetry]);
 
   const handleCancel = useCallback(() => {
     dialogTelemetry.cancelled();
@@ -252,12 +328,55 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
 
           <div className="mt-3">
             <label className="text-sm text-[var(--vscode-descriptionForeground)]">Worktree folder</label>
-            <input
-              type="text"
-              value={path}
-              onChange={(e) => setPath(e.target.value)}
-              className="mt-1 w-full px-2 py-1 text-sm font-mono rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)]"
-            />
+            {showStyleChoice ? (
+              <>
+                {WORKTREE_FOLDER_STYLES.map((option) => {
+                  const selected = style === option;
+                  return (
+                    <div key={option} className="mt-1 flex items-center gap-2">
+                      <label className="flex w-32 shrink-0 cursor-pointer items-center gap-2 select-none">
+                        <input
+                          type="radio"
+                          name="worktree-folder-style"
+                          checked={selected}
+                          onChange={() => handleStyleClick(option)}
+                          className="accent-[var(--vscode-button-background)]"
+                        />
+                        <span className="text-sm text-[var(--vscode-foreground)]">
+                          {WORKTREE_STYLE_LABELS[option]}
+                        </span>
+                      </label>
+                      {/* The unselected box stays readable so both concrete paths can
+                          be compared, but only the selected one can be edited. */}
+                      <input
+                        type="text"
+                        value={paths[option]}
+                        disabled={!selected}
+                        onChange={(e) => setActivePath(e.target.value)}
+                        aria-label={`${WORKTREE_STYLE_LABELS[option]} worktree folder`}
+                        className={`${folderInputClassName} disabled:cursor-not-allowed disabled:opacity-60`}
+                      />
+                    </div>
+                  );
+                })}
+                {link.visible && (
+                  <button
+                    type="button"
+                    onClick={() => rpcClient.setWorktreeFolderNameStyle(style)}
+                    className="mt-1 ml-1 rounded px-1 py-0.5 text-xs text-[var(--vscode-textLink-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+                  >
+                    {link.label}
+                  </button>
+                )}
+              </>
+            ) : (
+              <input
+                type="text"
+                value={activePath}
+                onChange={(e) => setActivePath(e.target.value)}
+                className={`mt-1 ${folderInputClassName}`}
+              />
+            )}
           </div>
 
           <div className="mt-4">
@@ -311,6 +430,21 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
           </div>
         </AlertDialog.Content>
       </AlertDialog.Portal>
+      {/* Nested inside the open dialog via its own Portal, so it paints above with
+          its own overlay — the same nesting the force-delete flow already uses.
+          No telemetryId: this is a preference switch, not a tracked dialog. */}
+      <ConfirmDialog
+        open={pendingStyle !== null}
+        title="Discard changed path?"
+        description="Your edited worktree folder will be reset to the default for the option you are switching to."
+        confirmLabel="Discard"
+        focusConfirm
+        onConfirm={() => {
+          if (pendingStyle) applyStyleSwitch(pendingStyle);
+          setPendingStyle(null);
+        }}
+        onCancel={() => setPendingStyle(null)}
+      />
     </AlertDialog.Root>
   );
 }

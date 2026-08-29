@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, MergeState, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, AvatarAuthState, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata, ToolbarBooleanSetting } from './types.js';
+import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, MergeState, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, AvatarAuthState, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata, ToolbarBooleanSetting, WorktreeFolderNameStyle } from './types.js';
 
 /** Payload for the batched initial data message */
 export interface InitialDataPayload {
@@ -160,6 +160,7 @@ export type RequestMessage =
   | { type: 'getSettings'; payload: Record<string, never> }
   /** Persist a `speedyGit.toolbar.*` boolean setting from the webview (toolbar right-click menu). */
   | { type: 'setToolbarSetting'; payload: { setting: ToolbarBooleanSetting; value: boolean } }
+  | { type: 'setWorktreeFolderNameStyle'; payload: { style: WorktreeFolderNameStyle } }
   | { type: 'getSubmodules'; payload: Record<string, never> }
   /** @deprecated since 041-submodule-selector — selector navigation uses switchRepo. Handler kept for legacy compatibility; will be removed in a follow-up. */
   | { type: 'openSubmodule'; payload: { submodulePath: string } }
@@ -270,8 +271,17 @@ export type ResponseMessage =
   | { type: 'avatarAuthState'; payload: AvatarAuthState }
   | { type: 'avatarCacheCleared'; payload: Record<string, never> }
   | { type: 'tagMetadata'; payload: { metadata: Record<string, TagMetadata> } }
-  | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[] } }
-  | { type: 'worktreePathResolved'; payload: { path: string; requestId: number } }
+  | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[]; baseDir: string | null } }
+  | {
+      type: 'worktreePathResolved';
+      payload: {
+        nestedPath: string;
+        flatPath: string;
+        /** True when the derived folder name contains a separator, i.e. the choice applies. */
+        hierarchical: boolean;
+        requestId: number;
+      };
+    }
   | { type: 'worktreeEnvFiles'; payload: { requestId: number; ignoredEnvFiles: string[]; envFilesPresent: boolean } }
   | { type: 'containingBranches'; payload: { hash: string; branches: string[]; status: 'loaded' | 'error' } }
   | { type: 'persistedUIState'; payload: { uiState: PersistedUIState } }
@@ -310,7 +320,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   dropCommit: true, isCommitPushed: true, getCommitParents: true,
   getCommitMessage: true, amendCommit: true, cancelAmend: true,
   loadMoreCommits: true, locateHead: true, openSettings: true, switchRepo: true, displayRepo: true,
-  getSettings: true, setToolbarSetting: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
+  getSettings: true, setToolbarSetting: true, setWorktreeFolderNameStyle: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
   getAvatarAuthState: true, requestGitHubAuth: true, removeGitHubAuth: true, setAvatarRefreshDays: true,
   clearAvatarCache: true,
   updateSubmodule: true, initSubmodule: true,

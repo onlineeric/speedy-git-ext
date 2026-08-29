@@ -2,7 +2,7 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "5.12.0",
+  "version": "5.13.0",
   "publisher": "onlineeric",
   "license": "MIT",
   "repository": {
@@ -211,7 +211,20 @@
         "speedyGit.worktree.basePath": {
           "type": "string",
           "default": "../${repoName}.worktrees",
-          "markdownDescription": "Parent directory where new git worktrees are created. The sanitized ref name is always appended as the leaf folder (e.g. `../myrepo.worktrees/feature-foo`). Supports the `${repoName}` token. Defaults to a sibling folder so worktrees stay outside the watched working tree (protects graph performance)."
+          "markdownDescription": "Parent directory where new git worktrees are created. The sanitized ref name is appended below it as the worktree folder — either nested or flattened, per `#speedyGit.worktree.folderNameStyle#` (e.g. `../myrepo.worktrees/feat/foo` or `../myrepo.worktrees/feat-foo`). Supports the `${repoName}` token. Defaults to a sibling folder so worktrees stay outside the watched working tree (protects graph performance)."
+        },
+        "speedyGit.worktree.folderNameStyle": {
+          "type": "string",
+          "enum": [
+            "nested",
+            "flat"
+          ],
+          "default": "nested",
+          "enumDescriptions": [
+            "Keep the branch hierarchy as folders: branch `feat/x` becomes `feat/x`.",
+            "Flatten the branch hierarchy into one folder name: branch `feat/x` becomes `feat-x`."
+          ],
+          "markdownDescription": "Which worktree folder is preselected in the Create Worktree dialog for a branch name containing `/`. Both options are always offered in the dialog; this only chooses the default."
         }
       }
     }

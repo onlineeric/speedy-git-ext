@@ -1,5 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, CompareMode, GraphFilters, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting } from '@shared/types';
+import type { CherryPickOptions, CompareMode, GraphFilters, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting, WorktreeFolderNameStyle } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import {
   decideHeadContinuation,
@@ -9,6 +9,7 @@ import {
   type HeadNavigationDecision,
 } from '../utils/headNavigation';
 import { findHeadCommitHash } from '../utils/commitRefs';
+import type { ResolvedWorktreePaths } from '../utils/worktreePathChoice';
 
 /**
  * The subset of the active filters that may reach git.
@@ -54,7 +55,7 @@ class RpcClient {
    */
   private selectHeadOnNextLoad = false;
   /** One-shot slot for a `resolveWorktreePath` request awaiting its `worktreePathResolved` response. */
-  private pendingWorktreePath: { requestId: number; resolve: (value: { path: string }) => void; reject: (error: Error) => void } | null = null;
+  private pendingWorktreePath: { requestId: number; resolve: (value: ResolvedWorktreePaths) => void; reject: (error: Error) => void } | null = null;
   /** One-shot slot for a `getWorktreeEnvFiles` request awaiting its `worktreeEnvFiles` response. */
   private pendingWorktreeEnvFiles: {
     requestId: number;
@@ -320,13 +321,17 @@ class RpcClient {
         });
         break;
       case 'worktreeList':
-        store.setWorktreeList(message.payload.worktrees);
+        store.setWorktreeList(message.payload.worktrees, message.payload.baseDir);
         break;
       case 'worktreePathResolved':
         // Latest-wins: ignore stale responses whose requestId no longer matches
         // the pending request (a slower earlier response must not resolve a newer one).
         if (this.pendingWorktreePath && this.pendingWorktreePath.requestId === message.payload.requestId) {
-          this.pendingWorktreePath.resolve({ path: message.payload.path });
+          this.pendingWorktreePath.resolve({
+            nestedPath: message.payload.nestedPath,
+            flatPath: message.payload.flatPath,
+            hierarchical: message.payload.hierarchical,
+          });
           this.pendingWorktreePath = null;
         }
         break;
@@ -784,6 +789,11 @@ class RpcClient {
     this.send({ type: 'setToolbarSetting', payload: { setting, value } });
   }
 
+  /** Save the Create Worktree dialog's folder-style choice as the default. */
+  setWorktreeFolderNameStyle(style: WorktreeFolderNameStyle) {
+    this.send({ type: 'setWorktreeFolderNameStyle', payload: { style } });
+  }
+
   getSubmodules() {
     this.send({ type: 'getSubmodules', payload: {} });
   }
@@ -807,7 +817,7 @@ class RpcClient {
    * the absolute path; rejects if a previous request is superseded or the backend
    * returns an error. Non-blocking — used to seed the dialog field.
    */
-  resolveWorktreePath(payload: { ref: string; branchMode: WorktreeBranchMode; newBranchName?: string }): Promise<{ path: string }> {
+  resolveWorktreePath(payload: { ref: string; branchMode: WorktreeBranchMode; newBranchName?: string }): Promise<ResolvedWorktreePaths> {
     if (this.pendingWorktreePath) {
       this.pendingWorktreePath.reject(new Error('superseded'));
       this.pendingWorktreePath = null;

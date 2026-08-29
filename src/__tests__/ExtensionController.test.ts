@@ -168,3 +168,29 @@ describe('ExtensionController status bar text', () => {
     expect(getStatusBarItem()?.text).toBe('$(zap) Speedy Git');
   });
 });
+
+describe('ExtensionController webview settings watch', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(configValues)) delete configValues[key];
+    setConfigChangeListener(undefined);
+    setStatusBarItem(undefined);
+  });
+
+  /** Ask the controller whether one changed section should re-broadcast settings. */
+  function watches(section: string): boolean {
+    const controller = createController() as unknown as {
+      didSpeedyGitWebviewSettingsChange: (event: { affectsConfiguration: (key: string) => boolean }) => boolean;
+    };
+    return controller.didSpeedyGitWebviewSettingsChange({
+      affectsConfiguration: (key: string) => key === section,
+    });
+  }
+
+  it('watches the worktree folder-name style, so a Settings UI edit reaches an open dialog', () => {
+    expect(watches('speedyGit.worktree.folderNameStyle')).toBe(true);
+  });
+
+  it('ignores unrelated sections', () => {
+    expect(watches('speedyGit.statusBarText')).toBe(false);
+  });
+});

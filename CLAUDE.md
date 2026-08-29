@@ -124,6 +124,8 @@ These exist because the rule they encode is subtle or shared across several call
 - `utils/commitReachability.ts` — branch reachability; checkers cached by commit-list identity (WeakMap)
 - `utils/graphPaths.ts` — SVG elbow paths that cross row boundaries perfectly vertically, so per-row SVG cells join without kinks
 - `utils/compareSlot.ts` / `compareDefaults.ts` / `compareDispatch.ts` / `compareMarker.ts` — the Compare panel's slot model, seeding, dispatch and per-row B/T badges
+- `utils/worktreePathChoice.ts` — the Create Worktree folder choice's two rules, stated once: **at most one path holds manual edits — the selected one**, so leaving an option always restores its computed default and there is never a hidden edit in the row you are not looking at; and the "Use … by default" link is visible **only when saving would change something**. Edited-ness is a comparison against the computed string, not a keystroke flag, so type-then-undo leaves nothing to discard
+- `utils/worktreeDisplay.ts` — `worktreeFolderName` labels a worktree by its path **below the configured base dir**, not by its last segment: nesting makes `exp/branch1` and `feat/branch1` both read as `branch1`. Outside the base dir there is nothing to be relative to, so the last segment stands
 - `utils/branchSelection.ts` — `getBranchKey` (bare name vs `remote/name`) + additive select-all-local
 - `utils/resolveDefaultRemote.ts` — pick `origin` else first-alpha remote
 - `stores/graphSelectors.ts` — derived store reads (`useOperationInProgress`, `useCurrentLocalBranch`), one selector each so callers can't disagree on the derivation
