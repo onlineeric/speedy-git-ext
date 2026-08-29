@@ -53,7 +53,18 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
     headline: 'A worktree folder can now keep your branch name’s slashes, instead of always flattening them.',
     content: (
       <>
-        <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <section className="rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+          <h3 className={dialogSectionLabelClassName}>Thanks to our contributor</h3>
+          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+            This release comes from a request by{' '}
+            <ExternalLink url="https://github.com/nelson870708">@nelson870708</ExternalLink> in{' '}
+            <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/189">#189</ExternalLink>
+            , asking that a branch’s directory structure be preserved when creating a worktree.
+            Thank you!
+          </p>
+        </section>
+
+        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
           Creating a worktree from <code>feat/branch1</code> used to suggest one folder,{' '}
           <code>feat-branch1</code>, with the <code>/</code> flattened away. The Create Worktree dialog
           now offers both shapes, each showing its own complete path:
@@ -84,13 +95,6 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
             way. Worktrees you placed somewhere custom are left entirely alone.
           </p>
         </section>
-
-        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
-          Raised by{' '}
-          <ExternalLink url="https://github.com/nelson870708">@nelson870708</ExternalLink> in{' '}
-          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/189">#189</ExternalLink>
-          . Thank you!
-        </p>
       </>
     ),
   },
