@@ -35,6 +35,11 @@ interface HighlightedTextProps {
  * Renders `text` with each search match boxed. Returns the bare string when
  * nothing matched, so an unmatched cell keeps its single text node.
  *
+ * The segments are wrapped in **one** span rather than returned as a list: a ref
+ * badge is an `inline-flex` with a `gap`, so loose segments would each become a
+ * flex item and the gap would open a visible space on either side of every
+ * highlight — `abcdefg` searched for `cde` reading as `ab cde fg`.
+ *
  * A `<span>` rather than `<mark>`: `<mark>` carries user-agent colors that would
  * fight the theme.
  */
@@ -47,11 +52,15 @@ export function HighlightedText({ text, terms, mode = 'substring' }: Highlighted
     return segments[0].text;
   }
 
-  return segments.map((segment, index) =>
-    segment.matched ? (
-      <span key={index} style={SEARCH_MATCH_STYLE}>{segment.text}</span>
-    ) : (
-      <span key={index}>{segment.text}</span>
-    )
+  return (
+    <span>
+      {segments.map((segment, index) =>
+        segment.matched ? (
+          <span key={index} style={SEARCH_MATCH_STYLE}>{segment.text}</span>
+        ) : (
+          <span key={index}>{segment.text}</span>
+        )
+      )}
+    </span>
   );
 }

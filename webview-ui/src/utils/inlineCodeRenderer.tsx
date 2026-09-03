@@ -99,17 +99,25 @@ export function renderInlineCode(text: string, terms?: readonly SearchTerm[]): R
   });
 }
 
-/** Match boxes over one already-parsed run of text. */
+/**
+ * Match boxes over one already-parsed run of text. Wrapped in a single span for the
+ * same reason `HighlightedText` is: loose segments become separate flex items under
+ * a `gap`-bearing parent, which opens a visible space around every highlight.
+ */
 function renderHighlighted(segments: ReturnType<typeof buildHighlightSegments>, keyPrefix: string): ReactNode {
   if (segments.length === 1 && !segments[0].matched) {
     return segments[0].text;
   }
-  return segments.map((segment, index) =>
-    segment.matched ? (
-      <span key={`${keyPrefix}-${index}`} style={SEARCH_MATCH_STYLE}>{segment.text}</span>
-    ) : (
-      <span key={`${keyPrefix}-${index}`}>{segment.text}</span>
-    )
+  return (
+    <span>
+      {segments.map((segment, index) =>
+        segment.matched ? (
+          <span key={`${keyPrefix}-${index}`} style={SEARCH_MATCH_STYLE}>{segment.text}</span>
+        ) : (
+          <span key={`${keyPrefix}-${index}`}>{segment.text}</span>
+        )
+      )}
+    </span>
   );
 }
 
