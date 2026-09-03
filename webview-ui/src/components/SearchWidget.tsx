@@ -1,26 +1,48 @@
-import { useEffect } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { filterCommits } from '../utils/searchFilter';
+import { parseSearchQuery } from '../utils/searchQuery';
+
+export const SEARCH_DEBOUNCE_MS = 300;
 
 export function SearchWidget() {
   const commits = useGraphStore((state) => state.mergedCommits);
   const searchState = useGraphStore((state) => state.searchState);
+  const showTags = useGraphStore((state) => state.userSettings.showTags);
+  const showRemoteBranches = useGraphStore((state) => state.userSettings.showRemoteBranches);
   const closeSearch = useGraphStore((state) => state.closeSearch);
   const setSearchQuery = useGraphStore((state) => state.setSearchQuery);
   const setSearchMatches = useGraphStore((state) => state.setSearchMatches);
 
-  useEffect(() => {
+  const lastQueryRef = useRef(searchState.query);
+
+  // The debounce belongs to typing alone. A batch load, a filter change or a
+  // Show tags / Show remote branches toggle must recompute at once — and in a
+  // layout effect, because until it runs the existing `matchIndices` point at old
+  // row positions, and a passive effect would let one frame paint highlights on
+  // the wrong rows.
+  useLayoutEffect(() => {
     if (!searchState.isOpen) {
       return undefined;
     }
 
-    const timeout = window.setTimeout(() => {
-      setSearchMatches(filterCommits(commits, searchState.query));
-    }, 300);
+    const run = () => {
+      const terms = parseSearchQuery(useGraphStore.getState().searchState.query);
+      setSearchMatches(filterCommits(commits, terms, { showTags, showRemoteBranches }), terms);
+    };
 
+    const queryChanged = lastQueryRef.current !== searchState.query;
+    lastQueryRef.current = searchState.query;
+
+    if (!queryChanged) {
+      run();
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(run, SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timeout);
-  }, [commits, searchState.isOpen, searchState.query, setSearchMatches]);
+  }, [commits, searchState.isOpen, searchState.query, showTags, showRemoteBranches, setSearchMatches]);
 
   if (!searchState.isOpen) {
     return null;
@@ -40,8 +62,14 @@ export function SearchWidget() {
         className="min-w-[220px] rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] px-2 py-1 text-sm text-[var(--vscode-input-foreground)] outline-none"
       />
 
+      {/* Search never reaches past the loaded batches, so a bare "No results" reads
+          as a bug to a user who knows the commit exists — say what was scanned. */}
       <span className="min-w-[70px] text-xs text-[var(--vscode-descriptionForeground)]">
-        {totalMatches > 0 ? `${currentMatch} of ${totalMatches}` : searchState.query.trim() ? 'No results' : 'Type to search'}
+        {totalMatches > 0
+          ? `${currentMatch} of ${totalMatches}`
+          : searchState.query.trim()
+            ? `No results in ${commits.length} loaded commits`
+            : 'Type to search'}
       </span>
 
       <button
@@ -71,7 +99,7 @@ export function SearchWidget() {
       </button>
 
       <span className="whitespace-nowrap text-xs italic text-[var(--vscode-descriptionForeground)]">
-        Tips: You can filter message in Filter Panel
+        Searches message, author, hash, branch, tag
       </span>
     </div>
   );

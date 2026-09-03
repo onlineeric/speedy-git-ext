@@ -116,3 +116,33 @@ export function displayRefToRefInfo(displayRef: DisplayRef): RefInfo {
       return { type: 'stash', name: displayRef.stashRef };
   }
 }
+
+/**
+ * Drops the ref badges the View settings say the row must not show.
+ *
+ * **The single source of truth for "which badges does this row display".** The
+ * renderer (`CommitTableRow`) and the search matcher (`searchFilter.ts`) both call
+ * it, which is what makes "only visible badges can match" true by construction —
+ * they cannot drift without changing this one function.
+ *
+ * A merged branch is *degraded* to a local branch rather than dropped when remote
+ * branches are hidden: the local half is still there and still worth showing, but
+ * its qualified remote names go away, so `origin/main` stops matching.
+ */
+export function filterDisplayRefsBySettings(
+  displayRefs: DisplayRef[],
+  settings: { showTags: boolean; showRemoteBranches: boolean },
+): DisplayRef[] {
+  return displayRefs.flatMap((displayRef) => {
+    if (!settings.showRemoteBranches && displayRef.type === 'remote-branch') {
+      return [];
+    }
+    if (!settings.showRemoteBranches && displayRef.type === 'merged-branch') {
+      return [{ type: 'local-branch', localName: displayRef.localName } as const];
+    }
+    if (!settings.showTags && displayRef.type === 'tag') {
+      return [];
+    }
+    return [displayRef];
+  });
+}

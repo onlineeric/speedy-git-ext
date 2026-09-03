@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-08-29**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-09-02**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -117,13 +117,18 @@ src/
 ```
 components/
 ├── GraphContainer.tsx            # Virtual scrolling (@tanstack/react-virtual, ROW_HEIGHT: 28px)
-├── CommitTableRow.tsx            # Table-style commit row with resizable columns (memoized)
+├── CommitTableRow.tsx            # Table-style commit row with resizable columns (memoized); threads search terms into
+│                                 #   the message/author/hash/badge cells
 ├── CommitTableHeader.tsx         # Draggable/resizable column headers (@dnd-kit); Author gear shortcut to avatar setup
 ├── GraphCell.tsx                 # SVG graph rendering (LANE_WIDTH: 16px, 8 cycling colors)
 ├── CommitDetailsPanel.tsx        # Resizable bottom/right panel, commit metadata + file changes
 ├── CommitTooltip.tsx             # Radix popover tooltip for a row: refs, parents, external ref parsing
-├── RefLabel.tsx                  # One ref badge (branch/tag/worktree), styled per ref kind; presentation only — content decisions live in `utils/refBadgeContent.ts`
-├── OverflowRefsBadge.tsx         # "+N" popover holding refs that don't fit the row; same menus as inline badges
+├── RefLabel.tsx                  # One ref badge (branch/tag/worktree), styled per ref kind; presentation only — content decisions live in `utils/refBadgeContent.ts`.
+│                                 #   Optional `searchTerms` boxes matches in the label; `searchRing` outlines a badge that matched on text it doesn't show
+├── OverflowRefsBadge.tsx         # "+N" popover holding refs that don't fit the row; same menus as inline badges.
+│                                 #   Rings the +N trigger when a ref folded into it matched the search
+├── HighlightedText.tsx           # Renders `searchHighlight` segments as text + match boxes; owns SEARCH_MATCH_STYLE
+│                                 #   (inset box-shadow, so a box adds no width) and SEARCH_MATCH_RING_STYLE
 ├── DetachedWorktreeBadge.tsx     # Badge for a detached-HEAD worktree row (046)
 ├── SignatureColumnCell.tsx       # Grouped signature glyphs in the optional "Signature" column (047)
 ├── AuthorAvatar.tsx              # Gravatar/GitHub avatar with initials fallback + load-state cache
@@ -139,7 +144,8 @@ components/
 │                                 #   right-click menu toggles labels / Remote button, extensible via extraMenuItems
 ├── TogglePanel.tsx               # Collapsible panel for Filter/Search/Compare widgets
 ├── FilterWidget.tsx              # Author/date filter panel (react-datepicker)
-├── SearchWidget.tsx              # Text search across commits
+├── SearchWidget.tsx              # Text search across commits. Owns the one canonical parse per recompute; typing is
+│                                 #   debounced 300ms, everything else recomputes at once in a layout effect
 ├── CompareWidget.tsx             # Branch comparison
 ├── WorktreeWidget.tsx            # Worktree list + create/remove (046-git-worktrees)
 ├── ViewSettingsDialog.tsx        # Centered View settings dialog: columns left, avatars right (Radix dialog + @dnd-kit sortable); open state lives in the store
@@ -274,7 +280,8 @@ utils/
 ├── commitTableLayout.ts          # Column layout persistence & manipulation
 ├── fileTreeBuilder.ts            # Flat file list → tree structure
 ├── radioAvailability.ts          # Enable/disable logic for mutually-exclusive options
-├── mergeRefs.ts                  # Merges local/remote refs into DisplayRef[]
+├── mergeRefs.ts                  # Merges local/remote refs into DisplayRef[]. `filterDisplayRefsBySettings` is the single
+│                                 #   source of truth for which badges a row shows — the renderer and the search matcher both call it
 ├── refMergeSource.ts             # Whether a ref badge can be merged and under what name — a remote branch
 │                                 #   must be handed to `git merge` as `<remote>/<name>`, never the bare name
 ├── refWorktreeSource.ts          # The same question for "Create worktree…": which ref the badge hands to
@@ -290,7 +297,12 @@ utils/
 │                                 #   WORKTREE_STYLE_LABELS / ResolvedWorktreePaths from shared/types (the backend's
 │                                 #   toast must name the style the dialog does)
 ├── telemetry.ts                  # Fire-and-forget webview telemetry helpers
-├── searchFilter.ts               # Client-side search by message, hash, author
+├── searchQuery.ts                # PURE: query → AND-ed terms; a `"quoted run"` is one literal term, an unterminated
+│                                 #   quote is literal from the quote on. Owns EMPTY_SEARCH_TERMS. `:` is reserved
+├── searchFilter.ts               # Client-side search over subject, author name/email, hash prefix (4+ chars, per term)
+│                                 #   and every ref badge the row actually renders. Never matches the uncommitted row
+├── searchHighlight.ts            # PURE: substring/prefix highlight segments (overlapping and adjacent matches merge
+│                                 #   into one box) + `refSearchMatchKind` — label match, hidden match, or none
 ├── filterUtils.ts                # Author/date filter logic
 ├── refStyle.ts                   # Per-ref-kind badge styling
 ├── refBadgeContent.ts            # What a ref badge shows: label, lead icons (fork = local, cloud = remote;
@@ -304,7 +316,7 @@ utils/
 ├── stashMessage.ts               # Format stash entries for display
 ├── uncommittedUtils.ts           # Helpers for the uncommitted-node row
 ├── repoPath.ts                   # Repo path normalization
-└── inlineCodeRenderer.tsx        # Renders inline-code spans in commit messages
+└── inlineCodeRenderer.tsx        # Renders inline-code spans in commit messages; boxes search matches within each segment
 ```
 
 ---

@@ -77,6 +77,19 @@ export const SIGNATURE_PROBLEM_COLOR = 'var(--vscode-editorError-foreground, #F4
 export const SIGNATURE_CANNOT_VERIFY_COLOR = 'var(--vscode-editorWarning-foreground, #FFCC00)';
 
 /**
+ * The box around search-matched characters inside a row.
+ *
+ * `list.filterMatch*` rather than the `editor.findMatch*` family, because the
+ * matched **row's background** is already painted from that family — an inline box
+ * using the same tokens would be two semi-transparent overlays of one color and
+ * could read as barely-there. Falls back to the find-widget token on themes that
+ * omit the list one.
+ */
+export const SEARCH_MATCH_SURFACE_COLOR =
+  'var(--vscode-list-filterMatchBackground, var(--vscode-editor-findMatchHighlightBackground))';
+export const SEARCH_MATCH_BORDER_COLOR = 'var(--vscode-list-filterMatchBorder, transparent)';
+
+/**
  * A faint fill of `color`, for chips and badges that tint their background to
  * match their text. VS Code has no "20% of this token" tokens, and hardcoding the
  * faded shade would reintroduce exactly the problem these constants solve.

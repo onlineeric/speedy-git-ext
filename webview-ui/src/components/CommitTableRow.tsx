@@ -11,7 +11,10 @@ import { OverflowRefsBadge } from './OverflowRefsBadge';
 import { RefLabel } from './RefLabel';
 import { HeadIcon } from './icons';
 import { renderInlineCode } from '../utils/inlineCodeRenderer';
-import { mergeRefs, displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
+import { mergeRefs, displayRefToRefInfo, displayRefKey, filterDisplayRefsBySettings } from '../utils/mergeRefs';
+import { HighlightedText } from './HighlightedText';
+import { refSearchMatchKind } from '../utils/searchHighlight';
+import { EMPTY_SEARCH_TERMS, type SearchTerm } from '../utils/searchQuery';
 import { getDateFormatter, type DateFormatter } from '../utils/formatDate';
 import { AuthorAvatar } from './AuthorAvatar';
 import { AuthorContextMenu } from './AuthorContextMenu';
@@ -87,6 +90,13 @@ interface CommitTableRowProps {
   isMultiSelected?: boolean;
   isSearchMatch?: boolean;
   isCurrentSearchMatch?: boolean;
+  /**
+   * Terms to box inside the message, author, hash and ref badge cells. With eight
+   * fields able to match, the row background alone no longer says *why* the row
+   * matched. `GraphContainer` passes the frozen empty list to every non-matching
+   * row, so those stay memo-stable when the query changes.
+   */
+  searchTerms?: readonly SearchTerm[];
   /** Briefly pulses the row background after a "Go to HEAD" navigation. */
   isFlashing?: boolean;
   onClick: (event: React.MouseEvent) => void;
@@ -108,6 +118,7 @@ export const CommitTableRow = memo(function CommitTableRow({
   isMultiSelected = false,
   isSearchMatch = false,
   isCurrentSearchMatch = false,
+  searchTerms = EMPTY_SEARCH_TERMS,
   isFlashing = false,
   onClick,
   onNodeMouseEnter,
@@ -129,22 +140,13 @@ export const CommitTableRow = memo(function CommitTableRow({
   const laneColor = node ? getColor(node.colorIndex, palette) : undefined;
   const laneColorStyle = laneColor ? getLaneColorStyle(laneColor) : undefined;
 
+  // Shared with the search matcher, so "only badges the row shows can match" holds
+  // by construction rather than by two copies of the same rule agreeing.
   const { isHead, headBranchName, displayRefs } = useMemo(() => {
     const mergedRefs = mergeRefs(commit.refs);
     return {
       ...mergedRefs,
-      displayRefs: mergedRefs.displayRefs.flatMap((displayRef) => {
-        if (!showRemoteBranches && displayRef.type === 'remote-branch') {
-          return [];
-        }
-        if (!showRemoteBranches && displayRef.type === 'merged-branch') {
-          return [{ type: 'local-branch', localName: displayRef.localName } as const];
-        }
-        if (!showTags && displayRef.type === 'tag') {
-          return [];
-        }
-        return [displayRef];
-      }),
+      displayRefs: filterDisplayRefsBySettings(mergedRefs.displayRefs, { showTags, showRemoteBranches }),
     };
   }, [commit.refs, showRemoteBranches, showTags]);
 
@@ -206,6 +208,7 @@ export const CommitTableRow = memo(function CommitTableRow({
             isStash,
             isUncommitted,
             stashIndex,
+            searchTerms,
             onNodeMouseEnter,
             onNodeMouseLeave,
           })}
@@ -260,6 +263,7 @@ function renderColumn({
   isStash,
   isUncommitted,
   stashIndex,
+  searchTerms,
   onNodeMouseEnter,
   onNodeMouseLeave,
 }: {
@@ -285,6 +289,7 @@ function renderColumn({
   isStash: boolean;
   isUncommitted: boolean;
   stashIndex: number;
+  searchTerms: readonly SearchTerm[];
   onNodeMouseEnter?: (hash: string, rect: DOMRect) => void;
   onNodeMouseLeave?: () => void;
 }) {
@@ -313,7 +318,7 @@ function renderColumn({
             className="truncate font-mono text-xs text-[var(--vscode-textLink-foreground)]"
             title={commit.hash}
           >
-            {commit.abbreviatedHash}
+            <HighlightedText text={commit.abbreviatedHash} terms={searchTerms} mode="prefix" />
           </span>
           <CompareABMarker commit={commit} isUncommitted={isUncommitted} />
         </div>
@@ -332,7 +337,13 @@ function renderColumn({
               {visibleRefs.map((displayRef) =>
                 displayRef.type === 'stash' ? (
                   <StashContextMenu key={displayRefKey(displayRef)} commit={commit} stashIndex={stashIndex}>
-                    <RefLabel displayRef={displayRef} laneColorStyle={laneColorStyle} className="whitespace-nowrap" />
+                    <RefLabel
+                      displayRef={displayRef}
+                      laneColorStyle={laneColorStyle}
+                      searchTerms={searchTerms}
+                      searchRing={refSearchMatchKind(displayRef, searchTerms) === 'hidden'}
+                      className="whitespace-nowrap"
+                    />
                   </StashContextMenu>
                 ) : (
                   <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)} commit={commit}>
@@ -341,12 +352,14 @@ function renderColumn({
                       laneColorStyle={laneColorStyle}
                       worktree={worktreeForDisplayRef(displayRef, worktreeByBranch)}
                       tagMeta={displayRef.type === 'tag' ? tagMetadata[displayRef.tagName] : undefined}
+                      searchTerms={searchTerms}
+                      searchRing={refSearchMatchKind(displayRef, searchTerms) === 'hidden'}
                       className="whitespace-nowrap"
                     />
                   </BranchContextMenu>
                 )
               )}
-              <OverflowRefsBadge hiddenRefs={overflowRefs} commit={commit} laneColorStyle={laneColorStyle} worktreeByBranch={worktreeByBranch} tagMetadata={tagMetadata} />
+              <OverflowRefsBadge hiddenRefs={overflowRefs} commit={commit} laneColorStyle={laneColorStyle} worktreeByBranch={worktreeByBranch} tagMetadata={tagMetadata} searchTerms={searchTerms} />
               {showDetachedWorktrees && <DetachedWorktreeBadge worktrees={detachedWorktrees} laneColorStyle={laneColorStyle} />}
             </div>
           )}
@@ -355,7 +368,7 @@ function renderColumn({
             style={isStash ? STASH_SUBJECT_STYLE : isUncommitted ? UNCOMMITTED_SUBJECT_STYLE : undefined}
             title={commit.subject}
           >
-            {renderInlineCode(commit.subject)}
+            {renderInlineCode(commit.subject, searchTerms)}
           </span>
         </div>
       );
@@ -366,7 +379,7 @@ function renderColumn({
             <AuthorAvatar author={commit.author} email={commit.authorEmail} />
           ) : null}
           <span className="truncate text-xs text-[var(--vscode-descriptionForeground)]" title={commit.author}>
-            {commit.author}
+            <HighlightedText text={commit.author} terms={searchTerms} />
           </span>
         </div>
       );

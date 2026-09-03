@@ -49,6 +49,59 @@ function ExternalLink({ url, children }: { url: string; children: ReactNode }) {
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
   {
+    version: '5.14.0',
+    headline: 'Search now reaches branches, tags and authors — and understands more than one word at a time.',
+    content: (
+      <>
+        <section className="rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+          <h3 className={dialogSectionLabelClassName}>Thanks to our contributor</h3>
+          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+            This release comes from a request by{' '}
+            <ExternalLink url="https://github.com/nelson870708">@nelson870708</ExternalLink> in{' '}
+            <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/191">#191</ExternalLink>
+            , asking that search look beyond commit messages — you usually remember who wrote a commit,
+            or which branch or tag it belongs to. Thank you!
+          </p>
+        </section>
+
+        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          Search already covered the message, the author name and the commit hash. It now also matches:
+        </p>
+
+        <ul className="mt-3 space-y-2 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">Branch and tag names.</strong> As
+            substrings, like the message — <code>feature</code> finds <code>feature/new-ui</code>,{' '}
+            <code>v1.2</code> finds <code>v1.2.0</code>. A remote branch answers to both{' '}
+            <code>main</code> and <code>origin/main</code>.
+          </li>
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">Author email.</strong> What you
+            actually type when the display name is “John Smith” but you remember{' '}
+            <code>john.smith</code>.
+          </li>
+        </ul>
+
+        <section className="mt-4 rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+          <h3 className={dialogSectionLabelClassName}>Several words now work the way you expect</h3>
+          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+            <code>john fix</code> used to search for that exact text and find nothing. It is now two
+            terms, and a commit matches when <em>both</em> match it somewhere — so this finds a commit
+            by John about a fix. Wrap words in <code>&quot;quotes&quot;</code> to search for the phrase
+            itself. That is the whole syntax: no regex, no toggles.
+          </p>
+        </section>
+
+        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          With this many fields able to match, the row highlight alone no longer says <em>why</em> a row
+          matched — so the matching text is now boxed where it lands, inside the message, the author, the
+          hash and the ref badge. Your place in the results also survives loading another batch or
+          typing another character, instead of jumping back to the first match.
+        </p>
+      </>
+    ),
+  },
+  {
     version: '5.13.0',
     headline: 'A worktree folder can now keep your branch name’s slashes, instead of always flattening them.',
     content: (

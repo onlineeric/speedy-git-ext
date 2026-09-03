@@ -83,6 +83,13 @@ export interface SearchState {
   query: string;
   matchIndices: number[];
   currentMatchIndex: number;
+  /**
+   * Hash of the commit at `currentMatchIndex`. Lets the current match survive a
+   * recompute — a batch load, a filter change, a settings toggle or an edited
+   * query — instead of snapping back to the first result, the way a text
+   * editor's find keeps its place. `null` when there is no current match.
+   */
+  currentMatchHash: string | null;
 }
 
 export type SubmoduleStatus = 'clean' | 'dirty' | 'uninitialized';

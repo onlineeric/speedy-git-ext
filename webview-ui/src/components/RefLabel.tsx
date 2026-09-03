@@ -5,6 +5,8 @@ import { getRefBadgeContent, getRefTitle, remoteCountLabel, type RefBadgeIcon } 
 import { getRefStyle, REF_BADGE_BASE_CLASS } from '../utils/refStyle';
 import { worktreeBadgeBorderColor } from '../utils/worktreeBadgeStyle';
 import { BranchIcon, CloudIcon, TagIcon, WorktreeIcon } from './icons';
+import { HighlightedText, SEARCH_MATCH_RING_STYLE } from './HighlightedText';
+import { EMPTY_SEARCH_TERMS, type SearchTerm } from '../utils/searchQuery';
 
 interface RefLabelProps extends React.HTMLAttributes<HTMLSpanElement> {
   displayRef: DisplayRef;
@@ -12,11 +14,19 @@ interface RefLabelProps extends React.HTMLAttributes<HTMLSpanElement> {
   worktree?: WorktreeInfo;
   /** Cached annotation metadata for a tag badge; enriches the native title tooltip (048). */
   tagMeta?: TagMetadata;
+  /** Search terms to box inside the label text. */
+  searchTerms?: readonly SearchTerm[];
+  /**
+   * Outlines the whole badge, for a badge that matched on text it does not display
+   * — a merged branch hit through its qualified `origin/name`. Without it that
+   * match would be invisible.
+   */
+  searchRing?: boolean;
 }
 
 /** Renders a single ref badge with an icon and label text. */
 export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
-  function RefLabel({ displayRef, laneColorStyle, worktree, tagMeta, className, style, ...rest }, ref) {
+  function RefLabel({ displayRef, laneColorStyle, worktree, tagMeta, searchTerms = EMPTY_SEARCH_TERMS, searchRing = false, className, style, ...rest }, ref) {
     const layoutStyle = getRefStyle(displayRef.type);
     const { label, leadIcons, remoteCount } = getRefBadgeContent(displayRef);
     const title = getRefTitle(displayRef, worktree, tagMeta);
@@ -27,6 +37,9 @@ export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
     const worktreeBadgeStyle = showWorktreeIcon
       ? { ...badgeStyle, borderColor: worktreeBadgeBorderColor(badgeStyle?.borderColor) }
       : badgeStyle;
+    const finalBadgeStyle = searchRing
+      ? { ...worktreeBadgeStyle, boxShadow: SEARCH_MATCH_RING_STYLE.boxShadow }
+      : worktreeBadgeStyle;
     const borderClass = showWorktreeIcon ? 'border' : layoutStyle;
 
     return (
@@ -35,7 +48,7 @@ export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
         className={`${REF_BADGE_BASE_CLASS} ${borderClass}${fallbackColor}${className ? ` ${className}` : ''}`}
         title={title}
         {...rest}
-        style={worktreeBadgeStyle}
+        style={finalBadgeStyle}
       >
         {leadIcons.length > 0 && (
           // Tighter than the badge's own gap so a fork+cloud pair reads as one sigil, not two icons.
@@ -47,7 +60,7 @@ export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
             {remoteCount > 1 && <span className="text-[10px] leading-none">{remoteCount}</span>}
           </span>
         )}
-        {label}
+        <HighlightedText text={label} terms={searchTerms} />
         {remoteCount > 0 && <span className="sr-only">{remoteCountLabel(remoteCount)}</span>}
         {showWorktreeIcon && <WorktreeIcon className="ml-0.5 h-3 w-3 shrink-0" />}
       </span>
