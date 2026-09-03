@@ -52,54 +52,66 @@ export function SearchWidget() {
   const currentMatch = totalMatches > 0 ? searchState.currentMatchIndex + 1 : 0;
 
   return (
-    <div className="flex items-center gap-2 rounded-md border border-[var(--vscode-panel-border)] bg-[var(--vscode-editorWidget-background)] px-3 py-2 shadow-sm">
-      <input
-        autoFocus
-        type="text"
-        value={searchState.query}
-        onChange={(event) => setSearchQuery(event.target.value)}
-        placeholder="Search commits (Ctrl+F)"
-        className="min-w-[220px] rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] px-2 py-1 text-sm text-[var(--vscode-input-foreground)] outline-none"
-      />
-
-      {/* Search never reaches past the loaded batches, so a bare "No results" reads
-          as a bug to a user who knows the commit exists — say what was scanned. */}
-      <span className="min-w-[70px] text-xs text-[var(--vscode-descriptionForeground)]">
-        {totalMatches > 0
-          ? `${currentMatch} of ${totalMatches}`
-          : searchState.query.trim()
-            ? `No results in ${commits.length} loaded commits`
-            : 'Type to search'}
+    <div className="flex flex-col gap-2 rounded-md border border-[var(--vscode-panel-border)] bg-[var(--vscode-editorWidget-background)] px-3 py-2 shadow-sm">
+      {/* The heading carries what search reaches, so the widened scope is stated
+          before the box rather than trailing after the buttons. */}
+      <span className="text-sm font-semibold text-[var(--vscode-foreground)]">
+        Searches message, author, hash, branch and tag
       </span>
 
-      <button
-        type="button"
-        onClick={() => rpcClient.navigateMatch('prev')}
-        disabled={totalMatches === 0}
-        className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] disabled:opacity-50"
-      >
-        Prev (Shift+F3)
-      </button>
+      <div className="flex items-center gap-3">
+        <input
+          autoFocus
+          type="text"
+          value={searchState.query}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Search commits (Ctrl+F)"
+          className="min-w-0 flex-1 max-w-[640px] rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] px-2 py-1 text-sm text-[var(--vscode-input-foreground)] outline-none"
+        />
 
-      <button
-        type="button"
-        onClick={() => rpcClient.navigateMatch('next')}
-        disabled={totalMatches === 0}
-        className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] disabled:opacity-50"
-      >
-        Next (F3)
-      </button>
+        {/* Search never reaches past the loaded batches, so a bare "No results" reads
+            as a bug to a user who knows the commit exists — say what was scanned. */}
+        <span className="min-w-[70px] shrink-0 text-xs text-[var(--vscode-descriptionForeground)]">
+          {totalMatches > 0
+            ? `${currentMatch} of ${totalMatches}`
+            : searchState.query.trim()
+              ? `No results in ${commits.length} loaded commits`
+              : 'Type to search'}
+        </span>
+      </div>
 
-      <button
-        type="button"
-        onClick={closeSearch}
-        className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)]"
-      >
-        Close (Esc)
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => rpcClient.navigateMatch('prev')}
+          disabled={totalMatches === 0}
+          className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] disabled:opacity-50"
+        >
+          Prev (Shift+F3)
+        </button>
 
-      <span className="whitespace-nowrap text-xs italic text-[var(--vscode-descriptionForeground)]">
-        Searches message, author, hash, branch, tag
+        <button
+          type="button"
+          onClick={() => rpcClient.navigateMatch('next')}
+          disabled={totalMatches === 0}
+          className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] disabled:opacity-50"
+        >
+          Next (F3)
+        </button>
+
+        <button
+          type="button"
+          onClick={closeSearch}
+          className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)]"
+        >
+          Close (Esc)
+        </button>
+      </div>
+
+      {/* How the words in a query combine — the half that changes what a user types,
+          since a space is AND rather than a literal. */}
+      <span className="text-xs italic text-[var(--vscode-descriptionForeground)]">
+        Each word must match separately — quote words with spaces, like &quot;fix login&quot;
       </span>
     </div>
   );
