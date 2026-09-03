@@ -80,6 +80,14 @@ export function SearchWidget() {
         </span>
       </div>
 
+      {/* How the words in a query combine — the half that changes what a user types,
+          since a space is AND rather than a literal. "Somewhere on the commit" is the
+          load-bearing part: two words may land on two different fields. */}
+      <span className="text-xs italic text-[var(--vscode-descriptionForeground)]">
+        Every word must appear somewhere on the commit; quote words to search them as one
+        phrase: &quot;fix login&quot;
+      </span>
+
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -107,12 +115,6 @@ export function SearchWidget() {
           Close (Esc)
         </button>
       </div>
-
-      {/* How the words in a query combine — the half that changes what a user types,
-          since a space is AND rather than a literal. */}
-      <span className="text-xs italic text-[var(--vscode-descriptionForeground)]">
-        Each word must match separately — quote words with spaces, like &quot;fix login&quot;
-      </span>
     </div>
   );
 }
