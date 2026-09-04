@@ -13,7 +13,6 @@ import { HeadIcon } from './icons';
 import { renderInlineCode } from '../utils/inlineCodeRenderer';
 import { mergeRefs, displayRefToRefInfo, displayRefKey, filterDisplayRefsBySettings } from '../utils/mergeRefs';
 import { HighlightedText } from './HighlightedText';
-import { refSearchMatchKind } from '../utils/searchHighlight';
 import { EMPTY_SEARCH_TERMS, type SearchTerm } from '../utils/searchQuery';
 import { getDateFormatter, type DateFormatter } from '../utils/formatDate';
 import { AuthorAvatar } from './AuthorAvatar';
@@ -341,7 +340,6 @@ function renderColumn({
                       displayRef={displayRef}
                       laneColorStyle={laneColorStyle}
                       searchTerms={searchTerms}
-                      searchRing={refSearchMatchKind(displayRef, searchTerms) === 'hidden'}
                       className="whitespace-nowrap"
                     />
                   </StashContextMenu>
@@ -353,7 +351,6 @@ function renderColumn({
                       worktree={worktreeForDisplayRef(displayRef, worktreeByBranch)}
                       tagMeta={displayRef.type === 'tag' ? tagMetadata[displayRef.tagName] : undefined}
                       searchTerms={searchTerms}
-                      searchRing={refSearchMatchKind(displayRef, searchTerms) === 'hidden'}
                       className="whitespace-nowrap"
                     />
                   </BranchContextMenu>

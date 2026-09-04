@@ -1,6 +1,7 @@
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { parseCommitLine, parseBranchLine, parseBranchRefName, parseStashBaseHash } from '../utils/gitParsers.js';
+import { readHeadHash } from '../utils/gitQueries.js';
 import { type Result, ok } from '../../shared/errors.js';
 import type { Author, Commit, Branch, GraphFilters } from '../../shared/types.js';
 
@@ -220,16 +221,7 @@ export class GitLogService {
 
   /** Full hash of the commit HEAD points at. Fails on an unborn branch (fresh repo). */
   async getHeadCommitHash(): Promise<Result<string>> {
-    const result = await this.executor.execute({
-      args: ['rev-parse', 'HEAD'],
-      cwd: this.workspacePath,
-    });
-
-    if (!result.success) {
-      return result;
-    }
-
-    return ok(result.value.stdout.trim());
+    return readHeadHash(this.executor, this.workspacePath);
   }
 
   /**

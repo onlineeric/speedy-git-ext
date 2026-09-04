@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
-import { SEARCH_MATCH_STYLE } from '../components/HighlightedText';
-import { buildHighlightSegments } from './searchHighlight';
+import { HighlightedText } from '../components/HighlightedText';
 import type { SearchTerm } from './searchQuery';
 
 const INLINE_CODE_CLASSES = 'font-mono rounded px-1 bg-[var(--vscode-textCodeBlock-background)]';
@@ -69,15 +68,8 @@ export function parseInlineCode(text: string): InlineCodeSegment[] {
 export function renderInlineCode(text: string, terms?: readonly SearchTerm[]): ReactNode {
   const hasTerms = !!terms && terms.length > 0;
   if (!text.includes('`')) {
-    if (!hasTerms) {
-      return text;
-    }
-    const segments = buildHighlightSegments(text, terms);
-    // Fast path preserved: no match means the cell keeps its single text node.
-    if (segments.length === 1 && !segments[0].matched) {
-      return text;
-    }
-    return renderHighlighted(segments, 'h');
+    // No backticks and no query: the cell keeps its single text node.
+    return hasTerms ? <HighlightedText text={text} terms={terms} /> : text;
   }
 
   const segments = parseInlineCode(text);
@@ -88,7 +80,7 @@ export function renderInlineCode(text: string, terms?: readonly SearchTerm[]): R
   }
 
   return segments.map((segment, index) => {
-    const body = hasTerms ? renderHighlighted(buildHighlightSegments(segment.text, terms), `h${index}`) : segment.text;
+    const body = hasTerms ? <HighlightedText text={segment.text} terms={terms} /> : segment.text;
     return segment.isCode ? (
       <code key={index} className={INLINE_CODE_CLASSES}>
         {body}
@@ -97,28 +89,6 @@ export function renderInlineCode(text: string, terms?: readonly SearchTerm[]): R
       <span key={index}>{body}</span>
     );
   });
-}
-
-/**
- * Match boxes over one already-parsed run of text. Wrapped in a single span for the
- * same reason `HighlightedText` is: loose segments become separate flex items under
- * a `gap`-bearing parent, which opens a visible space around every highlight.
- */
-function renderHighlighted(segments: ReturnType<typeof buildHighlightSegments>, keyPrefix: string): ReactNode {
-  if (segments.length === 1 && !segments[0].matched) {
-    return segments[0].text;
-  }
-  return (
-    <span>
-      {segments.map((segment, index) =>
-        segment.matched ? (
-          <span key={`${keyPrefix}-${index}`} style={SEARCH_MATCH_STYLE}>{segment.text}</span>
-        ) : (
-          <span key={`${keyPrefix}-${index}`}>{segment.text}</span>
-        )
-      )}
-    </span>
-  );
 }
 
 /**

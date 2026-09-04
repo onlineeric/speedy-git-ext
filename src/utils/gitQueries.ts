@@ -20,3 +20,19 @@ export async function isDirtyWorkingTree(executor: GitExecutor, workspacePath: s
   if (!result.success) return result;
   return ok(result.value.stdout.trim().length > 0);
 }
+
+/**
+ * Full hash of the commit HEAD points at. Fails on an unborn branch (fresh repo).
+ *
+ * Shared rather than re-spelled per service because it is the identity check the
+ * amend guard and Go-to-HEAD both rest on: they must resolve HEAD the same way,
+ * or the guard clears a commit the navigation then cannot find.
+ */
+export async function readHeadHash(executor: GitExecutor, workspacePath: string): Promise<Result<string>> {
+  const result = await executor.execute({
+    args: ['rev-parse', 'HEAD'],
+    cwd: workspacePath,
+  });
+  if (!result.success) return result;
+  return ok(result.value.stdout.trim());
+}

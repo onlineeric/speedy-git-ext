@@ -3,6 +3,7 @@ import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { filterCommits } from '../utils/searchFilter';
 import { parseSearchQuery } from '../utils/searchQuery';
+import { buttonPrimaryClassName, buttonSecondaryClassName } from './dialogStyles';
 
 export const SEARCH_DEBOUNCE_MS = 300;
 
@@ -93,7 +94,7 @@ export function SearchWidget() {
           type="button"
           onClick={() => rpcClient.navigateMatch('prev')}
           disabled={totalMatches === 0}
-          className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] disabled:opacity-50"
+          className={`${buttonSecondaryClassName} text-xs`}
         >
           Prev (Shift+F3)
         </button>
@@ -102,7 +103,7 @@ export function SearchWidget() {
           type="button"
           onClick={() => rpcClient.navigateMatch('next')}
           disabled={totalMatches === 0}
-          className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] disabled:opacity-50"
+          className={`${buttonPrimaryClassName} text-xs`}
         >
           Next (F3)
         </button>
@@ -110,7 +111,7 @@ export function SearchWidget() {
         <button
           type="button"
           onClick={closeSearch}
-          className="rounded px-2 py-1 text-xs bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)]"
+          className={`${buttonSecondaryClassName} text-xs`}
         >
           Close (Esc)
         </button>

@@ -1,5 +1,5 @@
 import type { DisplayRef } from '../types/displayRefs';
-import { getRefBadgeContent } from './refBadgeContent';
+import { getRefBadgeContent, type RefBadgeContent } from './refBadgeContent';
 import { MIN_HASH_TERM_LENGTH } from './searchFilter';
 import type { SearchTerm } from './searchQuery';
 
@@ -110,14 +110,24 @@ export type RefSearchMatchKind = 'none' | 'label' | 'hidden';
  * badge instead of an inline box, so the match is still visible.
  */
 export function refSearchMatchKind(displayRef: DisplayRef, terms: readonly SearchTerm[]): RefSearchMatchKind {
+  return refContentSearchMatchKind(getRefBadgeContent(displayRef), terms);
+}
+
+/**
+ * The same answer for a caller that has already built the badge's content —
+ * `RefLabel` renders from it, so making it re-derive the `DisplayRef` would cost
+ * a second `getRefBadgeContent` per badge on every row of a virtualized scroll.
+ */
+export function refContentSearchMatchKind(content: RefBadgeContent, terms: readonly SearchTerm[]): RefSearchMatchKind {
   if (terms.length === 0) return 'none';
 
-  const label = getRefBadgeContent(displayRef).label.toLowerCase();
+  const label = content.label.toLowerCase();
   if (terms.some(({ text }) => label.includes(text))) return 'label';
 
-  if (displayRef.type === 'merged-branch') {
-    const remoteNames = displayRef.remoteNames.map((name) => name.toLowerCase());
-    if (terms.some(({ text }) => remoteNames.some((name) => name.includes(text)))) return 'hidden';
+  const hidden = content.hiddenSearchTexts;
+  if (hidden.length > 0) {
+    const lowered = hidden.map((name) => name.toLowerCase());
+    if (terms.some(({ text }) => lowered.some((name) => name.includes(text)))) return 'hidden';
   }
 
   return 'none';

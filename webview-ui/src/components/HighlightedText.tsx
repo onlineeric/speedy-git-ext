@@ -44,6 +44,14 @@ interface HighlightedTextProps {
  * fight the theme.
  */
 export function HighlightedText({ text, terms, mode = 'substring' }: HighlightedTextProps): ReactNode {
+  // Search closed is the overwhelmingly common case, and it reaches here once per
+  // hash, author and ref badge of every row a virtualized scroll mounts. Answering
+  // it before the segment builders allocate their single-segment array keeps the
+  // no-search render free.
+  if (terms.length === 0) {
+    return text;
+  }
+
   const segments = mode === 'prefix'
     ? buildPrefixHighlightSegments(text, terms)
     : buildHighlightSegments(text, terms);
@@ -54,13 +62,9 @@ export function HighlightedText({ text, terms, mode = 'substring' }: Highlighted
 
   return (
     <span>
-      {segments.map((segment, index) =>
-        segment.matched ? (
-          <span key={index} style={SEARCH_MATCH_STYLE}>{segment.text}</span>
-        ) : (
-          <span key={index}>{segment.text}</span>
-        )
-      )}
+      {segments.map((segment, index) => (
+        <span key={index} style={segment.matched ? SEARCH_MATCH_STYLE : undefined}>{segment.text}</span>
+      ))}
     </span>
   );
 }

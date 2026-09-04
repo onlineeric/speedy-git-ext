@@ -8,6 +8,15 @@ import { RefBadgeLegend } from './RefBadgeLegend';
 import { dialogSectionLabelClassName } from './dialogStyles';
 import { ADDED_COLOR, DELETED_COLOR } from '../utils/themeColors';
 
+/**
+ * The bordered panel each release note groups a topic into, and the body text
+ * inside it. Spelled once because a single entry uses each of them many times over
+ * — 9 callouts and 22 paragraphs across the current notes — and a release reads as
+ * one page only while every block is the same block.
+ */
+const calloutClassName = 'rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2';
+const bodyTextClassName = 'text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]';
+
 const ADDED_LINE_STYLE = { color: ADDED_COLOR };
 const DELETED_LINE_STYLE = { color: DELETED_COLOR };
 
@@ -53,9 +62,9 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
     headline: 'Search now reaches branches, tags and authors — and understands more than one word at a time.',
     content: (
       <>
-        <section className="rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+        <section className={calloutClassName}>
           <h3 className={dialogSectionLabelClassName}>Thanks to our contributor</h3>
-          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          <p className={bodyTextClassName}>
             This release comes from a request by{' '}
             <ExternalLink url="https://github.com/nelson870708">@nelson870708</ExternalLink> in{' '}
             <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/191">#191</ExternalLink>
@@ -64,11 +73,11 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           </p>
         </section>
 
-        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <p className={`${bodyTextClassName} mt-4`}>
           Search already covered the message, the author name and the commit hash. It now also matches:
         </p>
 
-        <ul className="mt-3 space-y-2 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <ul className={`${bodyTextClassName} mt-3 space-y-2`}>
           <li>
             <strong className="text-[var(--vscode-foreground)]">Branch and tag names.</strong> As
             substrings, like the message — <code>feature</code> finds <code>feature/new-ui</code>,{' '}
@@ -82,9 +91,9 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           </li>
         </ul>
 
-        <section className="mt-4 rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+        <section className={`${calloutClassName} mt-4`}>
           <h3 className={dialogSectionLabelClassName}>Several words now work the way you expect</h3>
-          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          <p className={bodyTextClassName}>
             <code>john fix</code> used to search for that exact text and find nothing. It is now two
             terms, and a commit matches when <em>both</em> match it somewhere — so this finds a commit
             by John about a fix. Wrap words in <code>&quot;quotes&quot;</code> to search for the phrase
@@ -92,7 +101,7 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           </p>
         </section>
 
-        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <p className={`${bodyTextClassName} mt-4`}>
           With this many fields able to match, the row highlight alone no longer says <em>why</em> a row
           matched — so the matching text is now boxed where it lands, inside the message, the author, the
           hash and the ref badge. Your place in the results also survives loading another batch or
@@ -106,9 +115,9 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
     headline: 'A worktree folder can now keep your branch name’s slashes, instead of always flattening them.',
     content: (
       <>
-        <section className="rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+        <section className={calloutClassName}>
           <h3 className={dialogSectionLabelClassName}>Thanks to our contributor</h3>
-          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          <p className={bodyTextClassName}>
             This release comes from a request by{' '}
             <ExternalLink url="https://github.com/nelson870708">@nelson870708</ExternalLink> in{' '}
             <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/189">#189</ExternalLink>
@@ -117,13 +126,13 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           </p>
         </section>
 
-        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <p className={`${bodyTextClassName} mt-4`}>
           Creating a worktree from <code>feat/branch1</code> used to suggest one folder,{' '}
           <code>feat-branch1</code>, with the <code>/</code> flattened away. The Create Worktree dialog
           now offers both shapes, each showing its own complete path:
         </p>
 
-        <ul className="mt-3 space-y-2 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <ul className={`${bodyTextClassName} mt-3 space-y-2`}>
           <li>
             <strong className="text-[var(--vscode-foreground)]">Nested path</strong> —{' '}
             <code>&lt;base&gt;/feat/branch1</code>, mirroring how you already organise your branches.
@@ -134,15 +143,15 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           </li>
         </ul>
 
-        <p className="mt-3 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <p className={`${bodyTextClassName} mt-3`}>
           The selected row’s box is editable exactly as the single box was; the other stays readable so
           you can compare the two before choosing. A small link below them saves your pick as the
           default. Branch names without a <code>/</code> are unchanged — one label, one box, as before.
         </p>
 
-        <section className="mt-4 rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+        <section className={`${calloutClassName} mt-4`}>
           <h3 className={dialogSectionLabelClassName}>Nesting does not leave empty folders behind</h3>
-          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          <p className={bodyTextClassName}>
             Removing a worktree now also deletes the folders that removal just emptied, stopping before
             your configured base path, which is never touched. Pruning sweeps the base path the same
             way. Worktrees you placed somewhere custom are left entirely alone.
@@ -156,13 +165,13 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
     headline: 'You can now amend the last commit without leaving the graph.',
     content: (
       <>
-        <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <p className={bodyTextClassName}>
           Right-click the commit you have checked out and pick{' '}
           <em>Amend Last Commit…</em>. The dialog opens with that commit’s existing message already in
           it — the whole message, body and trailers included, not just the first line.
         </p>
 
-        <ul className="mt-3 space-y-2 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <ul className={`${bodyTextClassName} mt-3 space-y-2`}>
           <li>
             <strong className="text-[var(--vscode-foreground)]">Fix the message.</strong> The most
             common reason to amend, and on its own it changes nothing else.
@@ -181,9 +190,9 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           </li>
         </ul>
 
-        <section className="mt-4 rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+        <section className={`${calloutClassName} mt-4`}>
           <h3 className={dialogSectionLabelClassName}>Amending a commit you have pushed</h3>
-          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          <p className={bodyTextClassName}>
             Amending replaces the commit rather than adding to it, so a commit that is already on a
             remote will need a force push before the two agree again. The dialog says so before you
             confirm, and names the branch that will move — worth reading if more than one branch sits
@@ -191,7 +200,7 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           </p>
         </section>
 
-        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <p className={`${bodyTextClassName} mt-4`}>
           Amending runs your <code>pre-commit</code> and <code>commit-msg</code> hooks, even when only
           the message changed. If they take a while the dialog says it is waiting on them and lets you
           stop waiting, rather than looking frozen.
@@ -204,12 +213,12 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
     headline: 'You can now merge from a commit, a remote branch or a tag — not just a local branch.',
     content: (
       <>
-        <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <p className={bodyTextClassName}>
           Merging used to be offered only when you right-clicked a local branch badge. It is now on
           three more places, each running the merge you would type yourself:
         </p>
 
-        <ul className="mt-3 space-y-2 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <ul className={`${bodyTextClassName} mt-3 space-y-2`}>
           <li>
             <strong className="text-[var(--vscode-foreground)]">Any commit row.</strong> Right-click a
             commit and pick <em>Merge into Current Branch</em>. Useful when the point you want is not
@@ -225,9 +234,9 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           </li>
         </ul>
 
-        <section className="mt-4 rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+        <section className={`${calloutClassName} mt-4`}>
           <h3 className={dialogSectionLabelClassName}>If a merge hits a conflict</h3>
-          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          <p className={bodyTextClassName}>
             <em>Continue Merge</em> and <em>Abort Merge</em> now appear in the right-click menus for as
             long as the merge is paused, so you can finish it or back out without leaving the graph.
             They are still there if you close the window and come back.
@@ -241,9 +250,9 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
     headline: 'Submodule changes now show which commit the submodule moved to.',
     content: (
       <>
-        <section className="rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
+        <section className={calloutClassName}>
           <h3 className={dialogSectionLabelClassName}>Thanks to our contributor</h3>
-          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+          <p className={bodyTextClassName}>
             This release comes from a report by{' '}
             <ExternalLink url="https://github.com/jinho9265">@jinho9265</ExternalLink> in{' '}
             <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/184">#184</ExternalLink>
@@ -252,7 +261,7 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           </p>
         </section>
 
-        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <p className={`${bodyTextClassName} mt-4`}>
           Opening a commit that moves a submodule to a new commit used to show a diff that was blank
           on both sides. A submodule is not a file: this repository stores only a pointer to a commit
           that lives in the submodule’s own repository, so there was never any content here to show.
@@ -260,13 +269,13 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           which commit the submodule moved from and to.
         </p>
 
-        <pre className="mt-3 overflow-x-auto rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2 text-xs leading-relaxed">
+        <pre className={`${calloutClassName} mt-3 overflow-x-auto text-xs leading-relaxed`}>
           <span style={DELETED_LINE_STYLE}>- Subproject commit f4b7306bdab79fb7fc3fad64c2cf98667147d892</span>
           {'\n'}
           <span style={ADDED_LINE_STYLE}>+ Subproject commit ec5f862988547fabd5c10efa49c288469314e41a</span>
         </pre>
 
-        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <p className={`${bodyTextClassName} mt-4`}>
           Submodule rows are marked with a <SubmoduleBadge /> badge, since a two-line diff is
           otherwise hard to tell from a broken one. Uncommitted submodule changes, which previously
           could not be opened at all, now work the same way.
@@ -279,8 +288,8 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
     headline: 'Branch badges now say where a branch lives with icons instead of words.',
     content: (
       <>
-        <section className="rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2">
-          <p className="text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <section className={calloutClassName}>
+          <p className={bodyTextClassName}>
             This release started with a contribution from{' '}
             <ExternalLink url="https://github.com/jayll1303">@jayll1303</ExternalLink>, who noticed
             that spelling out <code>main ⇄ origin/main</code> ate a lot of row width on a small
@@ -290,7 +299,7 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           </p>
         </section>
 
-        <p className="mt-4 text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]">
+        <p className={`${bodyTextClassName} mt-4`}>
           The fork glyph <InlineRefBadge><BranchIcon /></InlineRefBadge> now means “exists locally”
           and the cloud <InlineRefBadge><CloudIcon /></InlineRefBadge> means “exists on a remote”, so
           a branch that is both reads as the two combined. Remote names moved into the badge’s

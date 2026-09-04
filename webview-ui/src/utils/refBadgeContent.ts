@@ -15,6 +15,16 @@ export interface RefBadgeContent {
    * the cloud. 0 for every badge that isn't a merged branch.
    */
   remoteCount: number;
+  /**
+   * Text a search may match on that the badge does **not** render — a merged
+   * branch's qualified `origin/name`, which the badge shows as bare `name`.
+   *
+   * It lives here beside `label` because the matcher and the highlighter must
+   * answer "what can this badge match, and is it visible?" from one place: a
+   * match found here gets a ring around the whole badge rather than an inline
+   * box, and a second switch over `DisplayRef` is how the two fall out of step.
+   */
+  hiddenSearchTexts: readonly string[];
 }
 
 /**
@@ -30,6 +40,9 @@ const CLOUD_ICONS: readonly RefBadgeIcon[] = Object.freeze(['cloud']);
 const BRANCH_CLOUD_ICONS: readonly RefBadgeIcon[] = Object.freeze(['branch', 'cloud']);
 const TAG_ICONS: readonly RefBadgeIcon[] = Object.freeze(['tag']);
 const NO_ICONS: readonly RefBadgeIcon[] = Object.freeze([]);
+
+/** Shared by every badge whose whole matchable text is its label. Frozen for the same reason the icon lists are. */
+const NO_HIDDEN_TEXTS: readonly string[] = Object.freeze([]);
 
 /**
  * Decides what a ref badge shows.
@@ -55,15 +68,20 @@ const NO_ICONS: readonly RefBadgeIcon[] = Object.freeze([]);
 export function getRefBadgeContent(displayRef: DisplayRef): RefBadgeContent {
   switch (displayRef.type) {
     case 'local-branch':
-      return { label: displayRef.localName, leadIcons: BRANCH_ICONS, remoteCount: 0 };
+      return { label: displayRef.localName, leadIcons: BRANCH_ICONS, remoteCount: 0, hiddenSearchTexts: NO_HIDDEN_TEXTS };
     case 'remote-branch':
-      return { label: displayRef.remoteName, leadIcons: CLOUD_ICONS, remoteCount: 0 };
+      return { label: displayRef.remoteName, leadIcons: CLOUD_ICONS, remoteCount: 0, hiddenSearchTexts: NO_HIDDEN_TEXTS };
     case 'merged-branch':
-      return { label: displayRef.localName, leadIcons: BRANCH_CLOUD_ICONS, remoteCount: displayRef.remoteNames.length };
+      return {
+        label: displayRef.localName,
+        leadIcons: BRANCH_CLOUD_ICONS,
+        remoteCount: displayRef.remoteNames.length,
+        hiddenSearchTexts: displayRef.remoteNames,
+      };
     case 'tag':
-      return { label: displayRef.tagName, leadIcons: TAG_ICONS, remoteCount: 0 };
+      return { label: displayRef.tagName, leadIcons: TAG_ICONS, remoteCount: 0, hiddenSearchTexts: NO_HIDDEN_TEXTS };
     case 'stash':
-      return { label: displayRef.stashRef, leadIcons: NO_ICONS, remoteCount: 0 };
+      return { label: displayRef.stashRef, leadIcons: NO_ICONS, remoteCount: 0, hiddenSearchTexts: NO_HIDDEN_TEXTS };
   }
 }
 

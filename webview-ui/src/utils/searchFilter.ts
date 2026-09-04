@@ -2,6 +2,7 @@ import type { Commit } from '@shared/types';
 import { UNCOMMITTED_HASH } from '@shared/types';
 import type { DisplayRef } from '../types/displayRefs';
 import { filterDisplayRefsBySettings, mergeRefs } from './mergeRefs';
+import { getRefBadgeContent } from './refBadgeContent';
 import type { SearchTerm } from './searchQuery';
 
 /**
@@ -53,18 +54,41 @@ function mergedDisplayRefs(commit: Commit): DisplayRef[] {
   return displayRefs;
 }
 
-/** Every text a rendered badge contributes. A remote badge's label is already `origin/main`, so the bare form is free via substring matching. */
+/**
+ * Every text a rendered badge contributes, read from the badge's own content so
+ * the matcher cannot disagree with what `RefLabel` draws. A remote badge's label
+ * is already `origin/main`, so the bare form is free via substring matching, and
+ * `hiddenSearchTexts` carries the one accepted "matched with nothing visible"
+ * case — a merged branch's qualified remote names, marked in the UI by a ring on
+ * the badge rather than an inline highlight.
+ */
 function refTextsFor(displayRef: DisplayRef): string[] {
-  switch (displayRef.type) {
-    case 'local-branch':  return [displayRef.localName];
-    case 'remote-branch': return [displayRef.remoteName];
-    // The badge shows only the local name, but the qualified remote names are what
-    // a user types — the one accepted "matched with nothing visible" case, marked
-    // in the UI by a ring on the badge rather than an inline highlight.
-    case 'merged-branch': return [displayRef.localName, ...displayRef.remoteNames];
-    case 'tag':           return [displayRef.tagName];
-    case 'stash':         return [displayRef.stashRef];
-  }
+  const { label, hiddenSearchTexts } = getRefBadgeContent(displayRef);
+  return hiddenSearchTexts.length > 0 ? [label, ...hiddenSearchTexts] : [label];
+}
+
+/**
+ * The five settings-independent haystacks, cached by commit identity for the same
+ * reason `mergedRefsCache` is: a `Commit` is immutable and replaced wholesale.
+ *
+ * Without it every debounced keystroke re-lowercases every loaded commit's five
+ * fields — tens of thousands of byte-identical strings per recompute once a few
+ * batches are loaded, when only `commitMatchesTerms` actually depends on the query.
+ */
+const commitTextCache = new WeakMap<Commit, Omit<CommitSearchFields, 'refTexts'>>();
+
+function commitTextFields(commit: Commit): Omit<CommitSearchFields, 'refTexts'> {
+  const cached = commitTextCache.get(commit);
+  if (cached) return cached;
+  const fields = {
+    subject: (commit.subject ?? '').toLowerCase(),
+    author: (commit.author ?? '').toLowerCase(),
+    authorEmail: (commit.authorEmail ?? '').toLowerCase(),
+    hash: (commit.hash ?? '').toLowerCase(),
+    abbreviatedHash: (commit.abbreviatedHash ?? '').toLowerCase(),
+  };
+  commitTextCache.set(commit, fields);
+  return fields;
 }
 
 /**
@@ -72,6 +96,9 @@ function refTextsFor(displayRef: DisplayRef): string[] {
  * match — the uncommitted row alone, whose subject is generated text like
  * "3 staged, 2 unstaged" that a search for `staged` should not surface. Stash
  * pseudo-commits are ordinary participants.
+ *
+ * Only `refTexts` is rebuilt per call: it is the one field the View settings can
+ * change, so caching it would have to be invalidated on a Show tags toggle.
  */
 export function buildCommitSearchFields(commit: Commit, settings: SearchSettings): CommitSearchFields | null {
   if (commit.hash === UNCOMMITTED_HASH) return null;
@@ -79,11 +106,7 @@ export function buildCommitSearchFields(commit: Commit, settings: SearchSettings
   const displayRefs = filterDisplayRefsBySettings(mergedDisplayRefs(commit), settings);
 
   return {
-    subject: (commit.subject ?? '').toLowerCase(),
-    author: (commit.author ?? '').toLowerCase(),
-    authorEmail: (commit.authorEmail ?? '').toLowerCase(),
-    hash: (commit.hash ?? '').toLowerCase(),
-    abbreviatedHash: (commit.abbreviatedHash ?? '').toLowerCase(),
+    ...commitTextFields(commit),
     refTexts: displayRefs.flatMap(refTextsFor).map((text) => text.toLowerCase()),
   };
 }

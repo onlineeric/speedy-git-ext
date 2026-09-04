@@ -62,7 +62,6 @@ export function worktreeFolderName(worktreePath: string, baseDir?: string | null
 export function localBranchNameForDisplayRef(displayRef: DisplayRef): string | null {
   switch (displayRef.type) {
     case 'local-branch':
-      return displayRef.localName;
     case 'merged-branch':
       return displayRef.localName;
     case 'remote-branch':

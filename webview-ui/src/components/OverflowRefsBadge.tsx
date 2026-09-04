@@ -74,7 +74,6 @@ export function OverflowRefsBadge({ hiddenRefs, commit, laneColorStyle, worktree
                 worktree={worktreeByBranch ? worktreeForDisplayRef(displayRef, worktreeByBranch) : undefined}
                 tagMeta={displayRef.type === 'tag' ? tagMetadata?.[displayRef.tagName] : undefined}
                 searchTerms={searchTerms}
-                searchRing={refSearchMatchKind(displayRef, searchTerms) === 'hidden'}
               />
             </BranchContextMenu>
           ))}
