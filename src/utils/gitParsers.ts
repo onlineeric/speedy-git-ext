@@ -30,14 +30,6 @@ export function gitErrorDetail(error: { stderr?: string; message?: string }): st
 }
 
 /**
- * The commit a stash was taken on top of, from a `%P` (parent hashes) field.
- *
- * A stash commit has two or three parents: the base commit, the index snapshot
- * and — with `-u` — the untracked snapshot. Only the first is real history; the
- * other two are stash internals that must never reach the graph. Both readers of
- * `git stash list` need this rule, so it lives here rather than twice inline.
- */
-/**
  * A raw `%B` message as we store it: only trailing newlines go, because internal
  * blank lines separate paragraphs and trailers and are content.
  *
@@ -48,6 +40,14 @@ export function trimCommitMessage(rawMessage: string): string {
   return rawMessage.replace(/\n+$/, '');
 }
 
+/**
+ * The commit a stash was taken on top of, from a `%P` (parent hashes) field.
+ *
+ * A stash commit has two or three parents: the base commit, the index snapshot
+ * and — with `-u` — the untracked snapshot. Only the first is real history; the
+ * other two are stash internals that must never reach the graph. Both readers of
+ * `git stash list` need this rule, so it lives here rather than twice inline.
+ */
 export function parseStashBaseHash(parentField: string): string {
   return parentField.trim().split(' ')[0];
 }

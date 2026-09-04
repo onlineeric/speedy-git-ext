@@ -7,6 +7,9 @@ import { displayRefToRefInfo, displayRefKey } from '../utils/mergeRefs';
 import { worktreeForDisplayRef } from '../utils/worktreeDisplay';
 import { ACCENT_COLOR, tint } from '../utils/themeColors';
 import { REF_BADGE_BASE_CLASS } from '../utils/refStyle';
+import { refSearchMatchKind } from '../utils/searchHighlight';
+import { EMPTY_SEARCH_TERMS, type SearchTerm } from '../utils/searchQuery';
+import { SEARCH_MATCH_RING_STYLE } from './HighlightedText';
 
 /** Used when the row has no lane color to borrow — see `laneColorStyle`. */
 const OVERFLOW_BADGE_FALLBACK_STYLE: React.CSSProperties = {
@@ -22,17 +25,24 @@ interface OverflowRefsBadgeProps {
   laneColorStyle?: React.CSSProperties;
   worktreeByBranch?: Map<string, WorktreeInfo>;
   tagMetadata?: Record<string, TagMetadata>;
+  /** Search terms; the +N trigger rings when a badge folded into it matched. */
+  searchTerms?: readonly SearchTerm[];
 }
 
-export function OverflowRefsBadge({ hiddenRefs, commit, laneColorStyle, worktreeByBranch, tagMetadata }: OverflowRefsBadgeProps) {
+export function OverflowRefsBadge({ hiddenRefs, commit, laneColorStyle, worktreeByBranch, tagMetadata, searchTerms = EMPTY_SEARCH_TERMS }: OverflowRefsBadgeProps) {
   if (hiddenRefs.length === 0) return null;
+
+  // A match hidden behind the +N would otherwise be a row highlighted for no
+  // visible reason — this is the badge's share of saying why.
+  const hasSearchMatch = hiddenRefs.some((displayRef) => refSearchMatchKind(displayRef, searchTerms) !== 'none');
+  const triggerStyle = laneColorStyle ?? OVERFLOW_BADGE_FALLBACK_STYLE;
 
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
         <span
           className={`${REF_BADGE_BASE_CLASS} border cursor-pointer font-medium hover:opacity-80`}
-          style={laneColorStyle ?? OVERFLOW_BADGE_FALLBACK_STYLE}
+          style={hasSearchMatch ? { ...triggerStyle, boxShadow: SEARCH_MATCH_RING_STYLE.boxShadow } : triggerStyle}
           onClick={(e) => e.stopPropagation()}
         >
           +{hiddenRefs.length}
@@ -63,6 +73,7 @@ export function OverflowRefsBadge({ hiddenRefs, commit, laneColorStyle, worktree
                 laneColorStyle={laneColorStyle}
                 worktree={worktreeByBranch ? worktreeForDisplayRef(displayRef, worktreeByBranch) : undefined}
                 tagMeta={displayRef.type === 'tag' ? tagMetadata?.[displayRef.tagName] : undefined}
+                searchTerms={searchTerms}
               />
             </BranchContextMenu>
           ))}

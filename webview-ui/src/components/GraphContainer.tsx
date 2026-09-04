@@ -16,6 +16,7 @@ import {
   setCommitTableColumnPreferredWidth,
 } from '../utils/commitTableLayout';
 import { computeScrollTopForRow } from '../utils/rowVisibility';
+import { EMPTY_SEARCH_TERMS } from '../utils/searchQuery';
 
 const ROW_HEIGHT = 28;
 
@@ -50,6 +51,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
   const selectCommit = useGraphStore((state) => state.selectCommit);
   const selectedCommitIndex = useGraphStore((state) => state.selectedCommitIndex);
   const searchState = useGraphStore((state) => state.searchState);
+  const searchTerms = useGraphStore((state) => state.searchTerms);
   const hoveredCommitHash = useGraphStore((state) => state.hoveredCommitHash);
   const userSettings = useGraphStore((state) => state.userSettings);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -222,12 +224,16 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
     return () => clearTimeout(timer);
   }, [flashCommitHash, flashToken, virtualizer]);
 
+  // Keyed on the *hash* of the current match, not on `matchIndices`: every
+  // recompute hands back a fresh array, so depending on it would re-scroll the
+  // user back on every batch load — defeating the match preservation it pairs with.
   useEffect(() => {
-    const currentMatch = searchState.matchIndices[searchState.currentMatchIndex];
+    const { matchIndices, currentMatchIndex } = useGraphStore.getState().searchState;
+    const currentMatch = matchIndices[currentMatchIndex];
     if (currentMatch !== undefined) {
       virtualizer.scrollToIndex(currentMatch, { align: 'auto' });
     }
-  }, [searchState.currentMatchIndex, searchState.matchIndices, virtualizer]);
+  }, [searchState.currentMatchHash, virtualizer]);
 
   // Auto-fit the date column when the user switches date format. Skips the
   // initial mount so a previously persisted width is preserved on load.
@@ -379,6 +385,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
                     isMultiSelected={isMultiSelected}
                     isSearchMatch={isSearchMatch}
                     isCurrentSearchMatch={isCurrentSearchMatch}
+                    searchTerms={isSearchMatch ? searchTerms : EMPTY_SEARCH_TERMS}
                     isFlashing={flashCommitHash === commit.hash}
                     onClick={(event) => handleCommitClick(commit.hash, virtualItem.index, event)}
                     onNodeMouseEnter={stableOnNodeMouseEnter}

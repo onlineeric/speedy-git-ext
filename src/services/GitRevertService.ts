@@ -121,24 +121,8 @@ export class GitRevertService {
     }
 
     // Step 1: stage the inverse changes without committing.
-    const step1Args = ['revert'];
-    if (mainlineParent !== undefined) {
-      step1Args.push('-m', String(mainlineParent));
-    }
-    step1Args.push('--no-commit', hash);
-
-    this.log.info(`Revert commit (edit message): ${hash}`);
-    const step1 = await this.executor.execute({ args: step1Args, cwd: this.workspacePath });
-    if (!step1.success) {
-      const errorDetail = gitErrorDetail(step1.error);
-      if (isNothingToApplyStderr(errorDetail)) {
-        return err(new GitError(ALREADY_REVERTED_MESSAGE, 'COMMAND_FAILED'));
-      }
-      if (isConflictStderr(errorDetail)) {
-        return err(new GitError(NO_COMMIT_CONFLICT_MESSAGE, 'REVERT_CONFLICT_NO_RECOVERY'));
-      }
-      return step1;
-    }
+    const step1 = await this.stageRevert(hash, mainlineParent, 'Revert commit (edit message)');
+    if (!step1.success) return step1;
 
     // Between steps: the index was clean before step 1, so anything staged now is the
     // inverse patch. Nothing staged means there was no net change to revert — stop
@@ -164,13 +148,28 @@ export class GitRevertService {
   }
 
   private async revertNoCommit(hash: string, mainlineParent?: number): Promise<Result<string>> {
+    const staged = await this.stageRevert(hash, mainlineParent, 'Revert commit (stage only)');
+    if (!staged.success) return staged;
+
+    return ok(`Reverted ${hash.slice(0, 7)} — changes staged. Commit when ready.`);
+  }
+
+  /**
+   * `git revert --no-commit`, with the error taxonomy both modes built on it share.
+   *
+   * Stated once because the two modes must classify a failure identically: a
+   * conflict here leaves the user outside git's revert state machine either way, so
+   * a message that appeared in only one of them would describe the same repository
+   * state two different ways.
+   */
+  private async stageRevert(hash: string, mainlineParent: number | undefined, logLabel: string): Promise<Result<void>> {
     const args = ['revert'];
     if (mainlineParent !== undefined) {
       args.push('-m', String(mainlineParent));
     }
     args.push('--no-commit', hash);
 
-    this.log.info(`Revert commit (stage only): ${hash}`);
+    this.log.info(`${logLabel}: ${hash}`);
     const result = await this.executor.execute({ args, cwd: this.workspacePath });
     if (!result.success) {
       const errorDetail = gitErrorDetail(result.error);
@@ -183,7 +182,7 @@ export class GitRevertService {
       return result;
     }
 
-    return ok(`Reverted ${hash.slice(0, 7)} — changes staged. Commit when ready.`);
+    return ok(undefined);
   }
 
   private async revertWithCommit(hash: string, mainlineParent?: number): Promise<Result<string>> {

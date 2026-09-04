@@ -57,6 +57,7 @@ import { toCommitCountBucket } from '@shared/telemetry';
 import { trackUi } from '../utils/telemetry';
 import { joinRepoPath } from '../utils/repoPath';
 import { stripLocalBranchPrefix } from '../utils/worktreeDisplay';
+import { EMPTY_SEARCH_TERMS, type SearchTerm } from '../utils/searchQuery';
 
 interface WorktreeLookups {
   worktreeByHead: Map<string, WorktreeInfo[]>;
@@ -179,6 +180,15 @@ interface GraphStore {
   userSettings: UserSettings;
   pendingUserSettings: UserSettings | undefined;
   searchState: SearchState;
+  /**
+   * The parsed terms behind `searchState.matchIndices`, for the rows to highlight with.
+   *
+   * Held at the root rather than inside `SearchState` so `shared/types.ts` stays
+   * free of a webview-only type, and written in the **same `set` call** as
+   * `matchIndices` — which is what guarantees the panel's "N of M" and the rows'
+   * highlights always describe the same query.
+   */
+  searchTerms: readonly SearchTerm[];
   activeToggleWidget: ActiveToggleWidget;
   gitHubAvatarUrls: Record<string, string>;
   /** GitHub authorization state for avatar lookups, shown in the Avatars section. */
@@ -310,7 +320,7 @@ interface GraphStore {
   closeSearch: () => void;
   setActiveToggleWidget: (widget: ActiveToggleWidget) => void;
   setSearchQuery: (query: string) => void;
-  setSearchMatches: (matchIndices: number[]) => void;
+  setSearchMatches: (matchIndices: number[], terms: readonly SearchTerm[]) => void;
   nextMatch: () => void;
   prevMatch: () => void;
   setAuthorList: (authors: Author[]) => void;
@@ -352,6 +362,7 @@ const defaultSearchState: SearchState = {
   query: '',
   matchIndices: [],
   currentMatchIndex: -1,
+  currentMatchHash: null,
 };
 
 function getUncommittedContext(state: GraphStore): UncommittedContext {
@@ -436,6 +447,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   userSettings: { ...DEFAULT_USER_SETTINGS },
   pendingUserSettings: undefined,
   searchState: defaultSearchState,
+  searchTerms: EMPTY_SEARCH_TERMS,
   activeToggleWidget: null,
   gitHubAvatarUrls: {},
   avatarAuthState: { authorized: false, accountLabel: null, rateLimitResetAt: null },
@@ -987,6 +999,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         ...defaultSearchState,
         isOpen: state.searchState.isOpen,
       },
+      searchTerms: EMPTY_SEARCH_TERMS,
     }));
   },
   setIsLoadingRepo: (isLoadingRepo) => set({ isLoadingRepo }),
@@ -1001,6 +1014,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   })),
   closeSearch: () => set((state) => ({
     searchState: defaultSearchState,
+    searchTerms: EMPTY_SEARCH_TERMS,
     activeToggleWidget: state.activeToggleWidget === 'search' ? null : state.activeToggleWidget,
   })),
   setActiveToggleWidget: (widget) => set((state) => {
@@ -1014,6 +1028,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         : closingSearch
           ? defaultSearchState
           : state.searchState,
+      searchTerms: closingSearch ? EMPTY_SEARCH_TERMS : state.searchTerms,
     };
   }),
   setSearchQuery: (query) => set((state) => ({
@@ -1022,13 +1037,28 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       query,
     },
   })),
-  setSearchMatches: (matchIndices) => set((state) => ({
-    searchState: {
-      ...state.searchState,
-      matchIndices,
-      currentMatchIndex: matchIndices.length > 0 ? 0 : -1,
-    },
-  })),
+  setSearchMatches: (matchIndices, terms) => set((state) => {
+    // Stay on the row the user is sitting on whenever it still matches — this runs
+    // on every recompute, an edited query included, the way a text editor's find does.
+    const previousHash = state.searchState.currentMatchHash;
+    let currentMatchIndex = matchIndices.length > 0 ? 0 : -1;
+    if (previousHash && matchIndices.length > 0) {
+      const position = matchIndices.findIndex((index) => state.mergedCommits[index]?.hash === previousHash);
+      if (position >= 0) currentMatchIndex = position;
+    }
+    const currentMatchHash = currentMatchIndex >= 0
+      ? state.mergedCommits[matchIndices[currentMatchIndex]]?.hash ?? null
+      : null;
+    return {
+      searchState: {
+        ...state.searchState,
+        matchIndices,
+        currentMatchIndex,
+        currentMatchHash,
+      },
+      searchTerms: terms,
+    };
+  }),
   nextMatch: () => set((state) => {
     const { matchIndices, currentMatchIndex } = state.searchState;
     if (matchIndices.length === 0) return {};
@@ -1039,6 +1069,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       searchState: {
         ...state.searchState,
         currentMatchIndex: newMatchIndex,
+        currentMatchHash: commit?.hash ?? null,
       },
       selectedCommit: commit?.hash,
       selectedCommitIndex: commitIndex,
@@ -1056,6 +1087,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       searchState: {
         ...state.searchState,
         currentMatchIndex: newMatchIndex,
+        currentMatchHash: commit?.hash ?? null,
       },
       selectedCommit: commit?.hash,
       selectedCommitIndex: commitIndex,

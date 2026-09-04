@@ -9,6 +9,7 @@ describe('getRefBadgeContent', () => {
         label: 'main',
         leadIcons: ['branch'],
         remoteCount: 0,
+        hiddenSearchTexts: [],
       });
     });
 
@@ -17,6 +18,7 @@ describe('getRefBadgeContent', () => {
         label: 'origin/main',
         leadIcons: ['cloud'],
         remoteCount: 0,
+        hiddenSearchTexts: [],
       });
     });
 
@@ -25,6 +27,7 @@ describe('getRefBadgeContent', () => {
         label: 'main',
         leadIcons: ['branch', 'cloud'],
         remoteCount: 1,
+        hiddenSearchTexts: ['origin/main'],
       });
     });
 
@@ -61,7 +64,12 @@ describe('getRefBadgeContent', () => {
         localName: 'main',
         remoteNames: ['origin/main', 'upstream/main', 'fork/main'],
       };
-      expect(getRefBadgeContent(displayRef)).toEqual({ label: 'main', leadIcons: ['branch', 'cloud'], remoteCount: 3 });
+      expect(getRefBadgeContent(displayRef)).toEqual({
+        label: 'main',
+        leadIcons: ['branch', 'cloud'],
+        remoteCount: 3,
+        hiddenSearchTexts: ['origin/main', 'upstream/main', 'fork/main'],
+      });
     });
   });
 
@@ -71,6 +79,7 @@ describe('getRefBadgeContent', () => {
         label: 'v1.0.0',
         leadIcons: ['tag'],
         remoteCount: 0,
+        hiddenSearchTexts: [],
       });
     });
 
@@ -79,6 +88,7 @@ describe('getRefBadgeContent', () => {
         label: 'stash@{0}',
         leadIcons: [],
         remoteCount: 0,
+        hiddenSearchTexts: [],
       });
     });
   });

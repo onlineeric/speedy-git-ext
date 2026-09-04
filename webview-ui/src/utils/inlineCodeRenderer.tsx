@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { HighlightedText } from '../components/HighlightedText';
+import type { SearchTerm } from './searchQuery';
 
 const INLINE_CODE_CLASSES = 'font-mono rounded px-1 bg-[var(--vscode-textCodeBlock-background)]';
 
@@ -54,30 +56,39 @@ export function parseInlineCode(text: string): InlineCodeSegment[] {
 }
 
 /**
- * Renders a text string with backtick-delimited inline code styled as `<code>` elements.
- * Returns the original string unchanged if no backtick pairs are found.
+ * Renders a text string with backtick-delimited inline code styled as `<code>` elements,
+ * and — when `terms` are given — a box around each search match inside it.
+ * Returns the original string unchanged when there is neither a backtick pair nor a match.
+ *
+ * Note that matching runs against the raw subject (backticks included) while
+ * highlighting runs against the parsed segments (backticks stripped), so a term
+ * spanning a backtick boundary matches the row but highlights nothing. Rare, and
+ * the row highlight stays authoritative.
  */
-export function renderInlineCode(text: string): ReactNode {
+export function renderInlineCode(text: string, terms?: readonly SearchTerm[]): ReactNode {
+  const hasTerms = !!terms && terms.length > 0;
   if (!text.includes('`')) {
-    return text;
+    // No backticks and no query: the cell keeps its single text node.
+    return hasTerms ? <HighlightedText text={text} terms={terms} /> : text;
   }
 
   const segments = parseInlineCode(text);
 
   // If parsing produced a single non-code segment, return plain string
-  if (segments.length === 1 && !segments[0].isCode) {
+  if (segments.length === 1 && !segments[0].isCode && !hasTerms) {
     return segments[0].text;
   }
 
-  return segments.map((segment, index) =>
-    segment.isCode ? (
+  return segments.map((segment, index) => {
+    const body = hasTerms ? <HighlightedText text={segment.text} terms={terms} /> : segment.text;
+    return segment.isCode ? (
       <code key={index} className={INLINE_CODE_CLASSES}>
-        {segment.text}
+        {body}
       </code>
     ) : (
-      <span key={index}>{segment.text}</span>
-    )
-  );
+      <span key={index}>{body}</span>
+    );
+  });
 }
 
 /**

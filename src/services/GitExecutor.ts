@@ -30,6 +30,14 @@ export interface GitExecRawResult {
   stderr: string;
 }
 
+/**
+ * The environment every git spawn inherits, built once per extension host rather
+ * than per command — `process.env` is host-backed, and copying its ~60 entries on
+ * each of the ten-odd spawns a repo load makes is pure waste. A caller's own `env`
+ * is layered on top at spawn time, so an override still wins.
+ */
+const BASE_GIT_ENV: NodeJS.ProcessEnv = { ...process.env, GIT_EDITOR: 'true' };
+
 export class GitExecutor {
   constructor(private readonly log: LogOutputChannel) {}
 
@@ -65,7 +73,7 @@ export class GitExecutor {
     // no-op editor is the default for every spawn. Caller `env` is spread after it,
     // so a command that genuinely needs an editor — the interactive rebase's
     // sequence and message scripts — still overrides it.
-    const spawnEnv = { ...process.env, GIT_EDITOR: 'true', ...env };
+    const spawnEnv = env ? { ...BASE_GIT_ENV, ...env } : BASE_GIT_ENV;
 
     return new Promise((resolve) => {
       const gitProcess = spawn('git', args, {

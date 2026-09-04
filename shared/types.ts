@@ -83,6 +83,13 @@ export interface SearchState {
   query: string;
   matchIndices: number[];
   currentMatchIndex: number;
+  /**
+   * Hash of the commit at `currentMatchIndex`. Lets the current match survive a
+   * recompute — a batch load, a filter change, a settings toggle or an edited
+   * query — instead of snapping back to the first result, the way a text
+   * editor's find keeps its place. `null` when there is no current match.
+   */
+  currentMatchHash: string | null;
 }
 
 export type SubmoduleStatus = 'clean' | 'dirty' | 'uninitialized';
@@ -199,12 +206,6 @@ export function clampAvatarRefreshDays(value: number | string, fallback: number)
 }
 
 /**
- * Coerce a configured `speedyGit.worktree.folderNameStyle` into a known style.
- *
- * Lives beside the other cross-boundary clamps so the webview and the backend
- * cannot disagree about what an unrecognised configured value means.
- */
-/**
  * The configured worktree base path, or its default. Stated once because settings can
  * be absent (no repo loaded yet) and every caller of the base dir needs the same
  * fallback — three separate `?? DEFAULT` chains is how they drift.
@@ -213,6 +214,12 @@ export function worktreeBasePathOf(settings: Pick<UserSettings, 'worktreeBasePat
   return settings?.worktreeBasePath ?? DEFAULT_USER_SETTINGS.worktreeBasePath;
 }
 
+/**
+ * Coerce a configured `speedyGit.worktree.folderNameStyle` into a known style.
+ *
+ * Lives beside the other cross-boundary clamps so the webview and the backend
+ * cannot disagree about what an unrecognised configured value means.
+ */
 export function normalizeWorktreeFolderNameStyle(value: unknown): WorktreeFolderNameStyle {
   return WORKTREE_FOLDER_NAME_STYLES.includes(value as WorktreeFolderNameStyle)
     ? (value as WorktreeFolderNameStyle)

@@ -115,9 +115,17 @@ export class AvatarRefreshQueue {
     // a full backlog is AVATAR_CACHE_MAX_ENTRIES long and every load re-sorts it,
     // so the comparator runs tens of thousands of times per sort.
     const keyed = this.queue.map((task) => ({ task, record: cache.get(task.email) }));
-    keyed.sort((a, b) =>
-      a.record && b.record ? compareAvatarRefreshPriority(a.record, b.record) : 0,
-    );
+    // A record can be missing — eviction past AVATAR_CACHE_MAX_ENTRIES can drop one
+    // while its task is still queued. Answering 0 for those pairs makes the
+    // comparator inconsistent (a < b and b < c but a == c), which `Array#sort` is
+    // free to turn into an arbitrary order for the whole queue, not just the odd
+    // entry. Sort them last instead: `processOne` drops a task whose record is gone,
+    // so they are the ones worth reaching after everything that can still resolve.
+    keyed.sort((a, b) => {
+      if (!a.record) return b.record ? 1 : 0;
+      if (!b.record) return -1;
+      return compareAvatarRefreshPriority(a.record, b.record);
+    });
     this.queue = keyed.map((entry) => entry.task);
   }
 

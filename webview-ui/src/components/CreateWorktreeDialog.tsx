@@ -64,6 +64,9 @@ function defaultNewBranchName(source: WorktreeSource): string {
 const linkButtonClassName =
   'rounded px-1 py-0.5 text-xs text-[var(--vscode-textLink-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)]';
 
+/** Wider than the shared dialog: the folder rows show two full absolute paths side by side. */
+const wideDialogContentStyle: React.CSSProperties = { ...dialogContentStyle, width: '68rem' };
+
 const folderInputClassName =
   'w-full px-2 py-1 text-sm font-mono rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)]';
 
@@ -250,7 +253,6 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
     detached: `Detached HEAD at ${source.label}`,
   };
 
-  const customDialogContentStyle = { ...dialogContentStyle, width: '68rem' };
 
   return (
     <AlertDialog.Root open={open} onOpenChange={(isOpen) => !isOpen && handleCancel()}>
@@ -258,7 +260,7 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
         <AlertDialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <AlertDialog.Content
           className={dialogContentClassName}
-          style={customDialogContentStyle}
+          style={wideDialogContentStyle}
         >
           <AlertDialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">
             Create Worktree

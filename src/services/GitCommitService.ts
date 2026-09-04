@@ -3,6 +3,7 @@ import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import { trimCommitMessage } from '../utils/gitParsers.js';
 import { validateHash } from '../utils/gitValidation.js';
+import { readHeadHash } from '../utils/gitQueries.js';
 
 /**
  * Committing runs `pre-commit` and `commit-msg` hooks, and git runs them even
@@ -83,7 +84,7 @@ export class GitCommitService {
     const hashCheck = validateHash(expectedHead);
     if (!hashCheck.success) return hashCheck;
 
-    const headCheck = await this.readHead();
+    const headCheck = await readHeadHash(this.executor, this.workspacePath);
     if (!headCheck.success) return headCheck;
     if (headCheck.value !== expectedHead) {
       return err(
@@ -145,7 +146,7 @@ export class GitCommitService {
     cause: GitError,
     expectedHead: string
   ): Promise<Result<string>> {
-    const head = await this.readHead();
+    const head = await readHeadHash(this.executor, this.workspacePath);
     const stoppedWaiting =
       cause.code === 'TIMEOUT'
         ? `The amend did not finish within ${AMEND_TIMEOUT_MS / 1000} seconds, so waiting stopped.`
@@ -179,12 +180,4 @@ export class GitCommitService {
     );
   }
 
-  private async readHead(): Promise<Result<string>> {
-    const result = await this.executor.execute({
-      args: ['rev-parse', 'HEAD'],
-      cwd: this.workspacePath,
-    });
-    if (!result.success) return result;
-    return ok(result.value.stdout.trim());
-  }
 }

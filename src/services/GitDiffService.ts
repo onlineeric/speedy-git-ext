@@ -221,7 +221,8 @@ export class GitDiffService {
     });
 
     if (!result.success) return null;
-    return parseLsTreeGitlink(result.value.stdout);
+    // `ls-tree`: `160000 commit <sha>`
+    return parseGitlinkHash(result.value.stdout, 2);
   }
 
   /** The commit a submodule points at in the index, or `null` if that path is not a gitlink there. */
@@ -232,7 +233,8 @@ export class GitDiffService {
     });
 
     if (!result.success) return null;
-    return parseLsFilesGitlink(result.value.stdout);
+    // `ls-files -s`: `160000 <sha> 0`
+    return parseGitlinkHash(result.value.stdout, 1);
   }
 
   async openExternalDirDiff(hash: string, parentHash?: string): Promise<Result<string>> {
@@ -577,19 +579,22 @@ function formatSubmodulePointer(commitHash: string): string {
   return `Subproject commit ${commitHash}\n`;
 }
 
-/** Reads the gitlink hash out of a `git ls-tree` line (`160000 commit <sha>\t<path>`). */
-function parseLsTreeGitlink(output: string): string | null {
+/**
+ * Reads the gitlink hash out of the first line of an index/tree listing, which is
+ * `<mode> …\t<path>` in both forms we ask for. The two differ only in which
+ * space-separated field carries the hash:
+ *
+ * - `git ls-tree`   → `160000 commit <sha>\t<path>`  (field 2)
+ * - `git ls-files -s` → `160000 <sha> 0\t<path>`     (field 1)
+ *
+ * The mode is the check that matters either way — it is the only thing that says
+ * this path is a submodule rather than a file.
+ */
+function parseGitlinkHash(output: string, hashField: number): string | null {
   const [meta] = (output.split('\n')[0] ?? '').split('\t');
-  const [mode, type, hash] = (meta ?? '').trim().split(/ +/);
-  if (mode !== SUBMODULE_MODE || type !== 'commit' || !hash) return null;
-  return hash;
-}
-
-/** Reads the gitlink hash out of a `git ls-files -s` line (`160000 <sha> 0\t<path>`). */
-function parseLsFilesGitlink(output: string): string | null {
-  const [meta] = (output.split('\n')[0] ?? '').split('\t');
-  const [mode, hash] = (meta ?? '').trim().split(/ +/);
-  if (mode !== SUBMODULE_MODE || !hash) return null;
+  const fields = (meta ?? '').trim().split(/ +/);
+  const hash = fields[hashField];
+  if (fields[0] !== SUBMODULE_MODE || !hash) return null;
   return hash;
 }
 
@@ -638,17 +643,13 @@ function buildFileChange(
   path: string,
   status: FileChangeStatus,
   isSubmodule: boolean,
-  oldPath?: string
+  oldPath?: string,
+  stageState?: FileStageState
 ): FileChange {
   const file: FileChange = { path, status };
   if (oldPath !== undefined) file.oldPath = oldPath;
   if (isSubmodule) file.isSubmodule = true;
-  return file;
-}
-
-/** Attaches a stage state to a `FileChange` built by {@link buildFileChange}. */
-function withStageState(file: FileChange, stageState: FileStageState): FileChange {
-  file.stageState = stageState;
+  if (stageState !== undefined) file.stageState = stageState;
   return file;
 }
 
@@ -940,10 +941,10 @@ function parseStatusPorcelainV2(output: string): {
       const path = token.substring(afterNthSpace(token, 8));
       const isSubmodule = isSubmoduleStatusEntry(token);
       if (xy[0] !== '.') {
-        stagedFiles.push(withStageState(buildFileChange(path, statusLetterToFileStatus(xy[0]), isSubmodule), 'staged'));
+        stagedFiles.push(buildFileChange(path, statusLetterToFileStatus(xy[0]), isSubmodule, undefined, 'staged'));
       }
       if (xy[1] !== '.') {
-        unstagedFiles.push(withStageState(buildFileChange(path, statusLetterToFileStatus(xy[1]), isSubmodule), 'unstaged'));
+        unstagedFiles.push(buildFileChange(path, statusLetterToFileStatus(xy[1]), isSubmodule, undefined, 'unstaged'));
       }
     } else if (token.startsWith('2 ')) {
       // Rename/copy entry — 9 header fields before path, next token is origPath
@@ -953,10 +954,10 @@ function parseStatusPorcelainV2(output: string): {
       const isSubmodule = isSubmoduleStatusEntry(token);
       i++; // consume origPath token
       if (xy[0] !== '.') {
-        stagedFiles.push(withStageState(buildFileChange(path, xy[0] === 'R' ? 'renamed' : 'copied', isSubmodule, origPath), 'staged'));
+        stagedFiles.push(buildFileChange(path, xy[0] === 'R' ? 'renamed' : 'copied', isSubmodule, origPath, 'staged'));
       }
       if (xy[1] !== '.') {
-        unstagedFiles.push(withStageState(buildFileChange(path, statusLetterToFileStatus(xy[1]), isSubmodule, origPath), 'unstaged'));
+        unstagedFiles.push(buildFileChange(path, statusLetterToFileStatus(xy[1]), isSubmodule, origPath, 'unstaged'));
       }
     } else if (token.startsWith('u ')) {
       // Unmerged entries are handled separately via detectConflictState — skip here
