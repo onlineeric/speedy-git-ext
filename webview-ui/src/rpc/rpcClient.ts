@@ -1,5 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { CherryPickOptions, CompareMode, GraphFilters, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting, WorktreeFolderNameStyle } from '@shared/types';
+import type { BranchCheckoutTarget, CherryPickOptions, CompareMode, GraphFilters, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting, WorktreeFolderNameStyle } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import {
   decideHeadContinuation,
@@ -358,7 +358,15 @@ class RpcClient {
         break;
       }
       case 'checkoutNeedsStash':
-        store.setPendingCheckout({ name: message.payload.name, pull: message.payload.pull });
+        if (store.activeBranchCheckout?.requestId === message.payload.requestId
+          && store.displayedRepoPath === message.payload.repoPath && !store.isLoadingRepo) {
+          store.setPendingCheckout(message.payload);
+        }
+        break;
+      case 'branchCheckoutFinished':
+        if (store.activeBranchCheckout?.requestId === message.payload.requestId) {
+          useGraphStore.setState({ activeBranchCheckout: null });
+        }
         break;
       case 'checkoutCommitNeedsStash':
         store.setPendingCommitCheckout({ hash: message.payload.hash });
@@ -449,8 +457,12 @@ class RpcClient {
     if (hash) this.getCommitDetails(hash);
   }
 
-  checkoutBranch(name: string, remote?: string) {
-    this.send({ type: 'checkoutBranch', payload: { name, remote } });
+  checkoutBranch(target: BranchCheckoutTarget, stash = false) {
+    const store = useGraphStore.getState();
+    if (store.activeBranchCheckout || store.isLoadingRepo || target.repoPath !== store.displayedRepoPath) return;
+    const request = { ...target, requestId: this.nextRequestId++ };
+    useGraphStore.setState({ activeBranchCheckout: request });
+    this.send({ type: stash ? 'stashAndCheckout' : 'checkoutBranch', payload: request });
   }
 
   checkoutCommit(hash: string) {
@@ -529,14 +541,6 @@ class RpcClient {
         squash: options?.squash,
       },
     });
-  }
-
-  checkoutBranchWithPull(name: string, pull: boolean) {
-    this.send({ type: 'checkoutBranch', payload: { name, pull } });
-  }
-
-  stashAndCheckout(name: string, pull?: boolean) {
-    this.send({ type: 'stashAndCheckout', payload: { name, pull } });
   }
 
   stashAndCheckoutCommit(hash: string) {

@@ -1,4 +1,4 @@
-import type { Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, MergeState, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, AvatarAuthState, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata, ToolbarBooleanSetting, WorktreeFolderNameStyle, ResolvedWorktreePaths } from './types.js';
+import type { BranchCheckoutRequest, Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, MergeState, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, AvatarAuthState, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata, ToolbarBooleanSetting, WorktreeFolderNameStyle, ResolvedWorktreePaths } from './types.js';
 
 /** Payload for the batched initial data message */
 export interface InitialDataPayload {
@@ -36,7 +36,7 @@ export type RequestMessage =
   | { type: 'getCommits'; payload: { filters?: Partial<GraphFilters> } }
   | { type: 'getBranches'; payload: Record<string, never> }
   | { type: 'getCommitDetails'; payload: { hash: string } }
-  | { type: 'checkoutBranch'; payload: { name: string; remote?: string; pull?: boolean } }
+  | { type: 'checkoutBranch'; payload: BranchCheckoutRequest }
   | { type: 'checkoutCommit'; payload: { hash: string } }
   | { type: 'fetch'; payload: { remote?: string; prune?: boolean; filters?: Partial<GraphFilters> } }
   | { type: 'copyToClipboard'; payload: { text: string } }
@@ -169,7 +169,7 @@ export type RequestMessage =
   | { type: 'updateSubmodule'; payload: { submodulePath: string } }
   | { type: 'initSubmodule'; payload: { submodulePath: string } }
   // Stash-and-checkout flow
-  | { type: 'stashAndCheckout'; payload: { name: string; remote?: string; pull?: boolean } }
+  | { type: 'stashAndCheckout'; payload: BranchCheckoutRequest }
   | { type: 'stashAndCheckoutCommit'; payload: { hash: string } }
   // Worktree ops
   | { type: 'getWorktreeList'; payload: Record<string, never> }
@@ -254,7 +254,8 @@ export type ResponseMessage =
    */
   | { type: 'headLocationFailed'; payload: { error: GitError | { message: string } } }
   | { type: 'repoList'; payload: { repos: RepoInfo[]; activeRepoPath: string } }
-  | { type: 'checkoutNeedsStash'; payload: { name: string; pull?: boolean } }
+  | { type: 'checkoutNeedsStash'; payload: BranchCheckoutRequest }
+  | { type: 'branchCheckoutFinished'; payload: { requestId: number } }
   | { type: 'checkoutCommitNeedsStash'; payload: { hash: string } }
   | { type: 'deleteBranchNeedsForce'; payload: { name: string; deleteRemote?: { remote: string; name: string } } }
   | { type: 'checkoutPullFailed'; payload: { branch: string; error: { message: string; code: GitErrorCode } } }
@@ -336,7 +337,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   signaturePresence: true, signaturePresenceFailed: true, signaturesVerified: true,
   commitPushedResult: true, commitParents: true, commitMessage: true,
   commitsAppended: true, prefetchError: true, headLocation: true, headLocationFailed: true, repoList: true,
-  checkoutNeedsStash: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
+  checkoutNeedsStash: true, branchCheckoutFinished: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, submodulesData: true, submoduleOperationResult: true,
   pushResult: true, avatarUrls: true, avatarAuthState: true, avatarCacheCleared: true, tagMetadata: true, worktreeList: true, worktreePathResolved: true, worktreeEnvFiles: true, containingBranches: true,
   persistedUIState: true, authorList: true, uncommittedChanges: true, conflictState: true,

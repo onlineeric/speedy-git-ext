@@ -15,6 +15,8 @@ export class WebviewRuntime {
   initialLoadSent = false;
   lastCommitFingerprint = '';
   activeCompareController: { requestId: string; controller: AbortController } | null = null;
+  /** Held across checkout, optional stash/pull, and the resulting refresh. */
+  branchCheckoutInProgress = false;
   /**
    * The controller for the amend currently in flight, if any.
    *

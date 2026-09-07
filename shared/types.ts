@@ -279,8 +279,23 @@ export function buildUncommittedSubject(
   return `Uncommitted Changes (${parts.join(', ')})`;
 }
 
+/** A branch checkout stays tied to the repository where the user requested it. */
+export interface BranchCheckoutTarget {
+  name: string;
+  /** Set only when creating a local tracking branch from this exact remote. */
+  remote?: string;
+  pull?: boolean;
+  repoPath: string;
+}
+
+export interface BranchCheckoutRequest extends BranchCheckoutTarget {
+  requestId: number;
+}
+
 export interface Branch {
   name: string;
+  /** Configured upstream, for explaining what checkout-with-pull will update from. */
+  upstream?: string;
   remote?: string;
   current: boolean;
   hash: string;

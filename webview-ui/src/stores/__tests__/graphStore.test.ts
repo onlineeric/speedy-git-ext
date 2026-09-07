@@ -419,3 +419,28 @@ describe('graphStore — toggleSelectedCommit', () => {
     expect(useGraphStore.getState().selectedCommits).toEqual(['A', 'C']);
   });
 });
+
+
+describe('graphStore — branch checkout dialog lifetime', () => {
+  it('keeps checkout choices and stash recovery across commit refreshes', () => {
+    const target = { name: 'feature', repoPath: '/repo' };
+    const pending = { ...target, remote: 'upstream', requestId: 1 };
+    useGraphStore.setState({ checkoutDialog: target, pendingCheckout: pending });
+    useGraphStore.getState().setCommits([makeCommit('new-commit')]);
+    expect(useGraphStore.getState().checkoutDialog).toEqual(target);
+    expect(useGraphStore.getState().pendingCheckout).toEqual(pending);
+    useGraphStore.getState().setInitialData(makeInitialDataPayload([makeCommit('refreshed')]));
+    expect(useGraphStore.getState().checkoutDialog).toEqual(target);
+    expect(useGraphStore.getState().pendingCheckout).toEqual(pending);
+  });
+
+  it('clears dialogs when the backend announces a different parent repository', () => {
+    const target = { name: 'feature', repoPath: '/repo' };
+    useGraphStore.setState({ activeParentRepoPath: '/repo', checkoutDialog: target,
+      pendingCheckout: { ...target, requestId: 1 }, checkoutWorktree: makeWorktree('/worktree', 'abc') });
+    useGraphStore.getState().setRepos([], '/other');
+    expect(useGraphStore.getState().checkoutDialog).toBeNull();
+    expect(useGraphStore.getState().pendingCheckout).toBeNull();
+    expect(useGraphStore.getState().checkoutWorktree).toBeNull();
+  });
+});

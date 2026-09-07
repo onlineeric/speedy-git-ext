@@ -6,6 +6,7 @@ import { GraphContainer } from './components/GraphContainer';
 import { CommitDetailsPanel } from './components/CommitDetailsPanel';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { ToastContainer } from './components/ToastContainer';
+import { BranchCheckoutDialogs } from './components/BranchCheckoutDialogs';
 import { WhatsNewDialog } from './components/WhatsNewDialog';
 
 export function App() {
@@ -177,6 +178,7 @@ export function App() {
         confirmLabel="Stash & Checkout"
         variant="warning"
       />
+      <BranchCheckoutDialogs />
       <ToastContainer />
     </div>
   );

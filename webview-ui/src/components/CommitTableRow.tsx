@@ -337,6 +337,7 @@ function renderColumn({
                 displayRef.type === 'stash' ? (
                   <StashContextMenu key={displayRefKey(displayRef)} commit={commit} stashIndex={stashIndex}>
                     <RefLabel
+                      checkoutHint
                       displayRef={displayRef}
                       laneColorStyle={laneColorStyle}
                       searchTerms={searchTerms}
@@ -346,6 +347,7 @@ function renderColumn({
                 ) : (
                   <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)} commit={commit}>
                     <RefLabel
+                      checkoutHint
                       displayRef={displayRef}
                       laneColorStyle={laneColorStyle}
                       worktree={worktreeForDisplayRef(displayRef, worktreeByBranch)}

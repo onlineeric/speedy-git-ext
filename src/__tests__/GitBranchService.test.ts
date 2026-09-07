@@ -1,5 +1,6 @@
 import type { LogOutputChannel } from 'vscode';
 import { describe, it, expect, vi } from 'vitest';
+import { err, GitError, ok } from '../../shared/errors.js';
 import { GitBranchService } from '../services/GitBranchService.js';
 
 const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as LogOutputChannel;
@@ -323,5 +324,54 @@ describe('GitBranchService.merge', () => {
 
     execute.mockResolvedValue({ success: false, error: new GitError('x', 'COMMAND_FAILED') });
     expect(await service.getMergeState()).toEqual({ success: true, value: 'idle' });
+  });
+});
+
+
+describe('GitBranchService.checkout', () => {
+  function setup() {
+    const service = new GitBranchService('/repo', mockLog);
+    const execute = vi.spyOn(service['executor'], 'execute').mockResolvedValue(ok({ stdout: '', stderr: '' }));
+    return { service, execute };
+  }
+
+  it('verifies the local branch before an unambiguous checkout', async () => {
+    const { service, execute } = setup();
+    await service.checkout('feature/login');
+    expect(execute).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      args: ['show-ref', '--verify', '--quiet', 'refs/heads/feature/login'],
+    }));
+    expect(execute).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      args: ['checkout', '--no-guess', 'feature/login', '--'],
+    }));
+  });
+
+  it('never treats a deleted branch as a tag or restores a file with its name', async () => {
+    const { service, execute } = setup();
+    execute.mockResolvedValue(err(new GitError('Missing branch', 'COMMAND_FAILED')));
+    expect((await service.checkout('feature')).success).toBe(false);
+    expect(execute).toHaveBeenCalledOnce();
+  });
+
+  it('uses the clicked remote directly, even with multiple remotes and checkout.defaultRemote', async () => {
+    const { service, execute } = setup();
+    await service.checkout('feature/login', 'upstream');
+    expect(execute).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      args: ['checkout', '-b', 'feature/login', '--track', 'refs/remotes/upstream/feature/login', '--'],
+    }));
+  });
+
+  it('does not fall back to a different target when tracking creation fails', async () => {
+    const { service, execute } = setup();
+    const error = new GitError('Branch already exists', 'COMMAND_FAILED');
+    execute.mockResolvedValue(err(error));
+    expect(await service.checkout('feature', 'upstream')).toEqual(err(error));
+    expect(execute).toHaveBeenCalledOnce();
+  });
+
+  it.each(['HEAD', '-f', 'feature..bad'])('rejects invalid branch target %s before running git', async (name) => {
+    const { service, execute } = setup();
+    expect((await service.checkout(name)).success).toBe(false);
+    expect(execute).not.toHaveBeenCalled();
   });
 });

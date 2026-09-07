@@ -57,6 +57,11 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
           {/* Only the body scrolls, so the version and Close stay reachable however long it grows. */}
           <div className="mt-4 flex-1 overflow-y-auto">
             <RefBadgeLegend />
+            <p className="mt-3 text-xs text-[var(--vscode-descriptionForeground)]">
+              Double-click a local branch badge to switch without pulling. A remote badge with a local
+              counterpart opens the Pull/No pull checkout dialog; otherwise it creates a tracking branch.
+              Right-click a badge for more actions.
+            </p>
 
             <h3 className={`${dialogSectionLabelClassName} mt-6`}>Help &amp; Feedback</h3>
             <Dialog.Description className="text-sm text-[var(--vscode-descriptionForeground)]">

@@ -22,6 +22,8 @@ export function useOperationInProgress(): boolean {
   return useGraphStore(
     (s) =>
       s.loading ||
+      s.isLoadingRepo ||
+      s.activeBranchCheckout !== null ||
       s.rebaseInProgress ||
       s.cherryPickInProgress ||
       s.revertInProgress ||

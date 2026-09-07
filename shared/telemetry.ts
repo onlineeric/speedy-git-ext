@@ -79,6 +79,7 @@ export function toCommitCountBucket(n: number): CommitCountBucket {
 export const UI_SURFACES = [
   'commitMenu',
   'branchMenu',
+  'branchBadge',
   'tagMenu',
   'stashMenu',
   'authorMenu',
@@ -124,7 +125,7 @@ export const UI_ACTIONS = [
   'amendCommit', 'amendIncludeStaged', 'amendForcePush',
   'resetSoft', 'resetMixed', 'resetHard',
   // Branch / remote-branch / tag badge menus
-  'checkout', 'merge', 'renameBranch', 'push', 'pull', 'fastForward',
+  'checkout', 'checkoutDoubleClick', 'merge', 'renameBranch', 'push', 'pull', 'fastForward',
   'deleteBranch', 'deleteRemoteBranch', 'pushTag', 'deleteTag',
   'copyName', 'toggleBranchFilter',
   // Worktree menu items (rendered inside branch-badge menus)
@@ -149,7 +150,7 @@ export const UI_ACTIONS = [
 export type UiAction = (typeof UI_ACTIONS)[number];
 
 export const DIALOG_IDS = [
-  'checkoutCommit', 'checkoutWithPull', 'stashAndCheckout',
+  'checkoutCommit', 'checkoutWithPull', 'stashAndCheckout', 'checkoutWorktree',
   'createBranch', 'renameBranch', 'deleteBranch', 'deleteRemoteBranch',
   'merge', 'push', 'fastForward',
   'createTag', 'deleteTag', 'pushTag',

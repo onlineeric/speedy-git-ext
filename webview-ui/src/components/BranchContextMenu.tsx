@@ -12,9 +12,8 @@ import {
   buildFastForwardLocalBranchCommand,
   buildPullCommand,
   buildRenameBranchCommand,
-  buildStashAndCheckoutCommand,
 } from '../utils/gitCommandBuilder';
-import { hasRemoteCounterpart } from '../utils/commitMenuAvailability';
+import { getBranchCheckoutState, requestBranchCheckout } from '../utils/branchCheckout';
 import { resolveDefaultRemote, resolveDefaultRemoteName } from '../utils/resolveDefaultRemote';
 import { CompareMenuItems } from './CompareMenuItems';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -26,7 +25,6 @@ import { RebaseConfirmDialog } from './RebaseConfirmDialog';
 import { MergeDialog } from './MergeDialog';
 import { getRefMergeSource } from '../utils/refMergeSource';
 import { PushDialog } from './PushDialog';
-import { CheckoutWithPullDialog } from './CheckoutWithPullDialog';
 import { CreateWorktreeDialog } from './CreateWorktreeDialog';
 import { refWorktreeSource } from '../utils/refWorktreeSource';
 import { useRemoveWorktreeDialog, WorktreeMenuItems } from './WorktreeMenuItems';
@@ -49,28 +47,19 @@ interface BranchContextMenuProps {
   children: React.ReactNode;
 }
 
-/** Determines whether a branch has local, remote, or both counterparts */
-type BranchCheckoutState = 'local-only' | 'remote-only' | 'dual';
-
-function getBranchCheckoutState(refInfo: RefInfo, branches: ReturnType<typeof useGraphStore.getState>['branches']): BranchCheckoutState {
-  if (refInfo.type === 'branch') {
-    // Local branch — check if there's a matching remote counterpart
-    return hasRemoteCounterpart(branches, refInfo.name) ? 'dual' : 'local-only';
-  }
-  if (refInfo.type === 'remote' && refInfo.remote) {
-    // Remote branch — check if there's a local branch with the same name
-    const localName = refInfo.name;
-    const hasLocal = branches.some((b) => !b.remote && b.name === localName);
-    return hasLocal ? 'dual' : 'remote-only';
-  }
-  return 'local-only';
-}
-
 export function BranchContextMenu({ refInfo, commit, children }: BranchContextMenuProps) {
   return (
-    <LazyContextMenu stopPropagation body={<BranchContextMenuBody refInfo={refInfo} commit={commit} />}>
-      {children}
-    </LazyContextMenu>
+    <span onDoubleClick={(event) => {
+      // Portal dialogs bubble through React too; only the actual badge is a target.
+      if (!event.currentTarget.contains(event.target as Node)) return;
+      event.stopPropagation();
+      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      requestBranchCheckout(refInfo, 'doubleClick');
+    }}>
+      <LazyContextMenu stopPropagation body={<BranchContextMenuBody refInfo={refInfo} commit={commit} />}>
+        {children}
+      </LazyContextMenu>
+    </span>
   );
 }
 
@@ -79,7 +68,6 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
   const [renameOpen, setRenameOpen] = useState(false);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [pushDialogOpen, setPushDialogOpen] = useState(false);
-  const [checkoutWithPullOpen, setCheckoutWithPullOpen] = useState(false);
   const [rebaseConfirmOpen, setRebaseConfirmOpen] = useState(false);
   const [fastForwardOpen, setFastForwardOpen] = useState(false);
   const [createWorktreeOpen, setCreateWorktreeOpen] = useState(false);
@@ -91,7 +79,6 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
   const { openRemoveWorktreeDialog, removeWorktreeDialog } = useRemoveWorktreeDialog();
 
   const rebaseInProgress = useGraphStore((s) => s.rebaseInProgress);
-  const pendingCheckout = useGraphStore((s) => s.pendingCheckout);
   const pendingForceDeleteBranch = useGraphStore((s) => s.pendingForceDeleteBranch);
   const isOperationInProgress = useOperationInProgress();
 
@@ -151,20 +138,6 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
     return false;
   }, [refInfo, branches]);
 
-  const handleCheckout = () => {
-    track('checkout');
-    if (checkoutState === 'dual') {
-      // Local branch with remote counterpart (or remote badge with local counterpart): show pull dialog
-      setCheckoutWithPullOpen(true);
-    } else if (isRemoteBranch) {
-      // Remote-only (no local counterpart): create local tracking branch directly — no dialog
-      rpcClient.checkoutBranch(refInfo.name, refInfo.remote);
-    } else {
-      // Local-only (no remote counterpart): checkout directly — no dialog
-      rpcClient.checkoutBranch(refInfo.name);
-    }
-  };
-
   const handleCopyName = () => {
     track('copyName');
     rpcClient.copyToClipboard(displayName);
@@ -193,11 +166,6 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
     (newName: string) => buildRenameBranchCommand({ oldName: refInfo.name, newName: newName || '<new-name>' }),
     [refInfo.name],
   );
-
-  const stashAndCheckoutPreview = useMemo(() => {
-    if (!pendingCheckout) return '';
-    return buildStashAndCheckoutCommand({ branch: pendingCheckout.name, pull: pendingCheckout.pull ?? false });
-  }, [pendingCheckout]);
 
   // For remote-only badges, use the badge's own remote; otherwise auto-pick the default remote.
   const fastForwardRemote = useMemo(
@@ -258,8 +226,6 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
     </MenuItem>
   );
 
-  // pendingCheckout is for this branch (from checkoutNeedsStash response)
-  const stashConfirmOpen = pendingCheckout !== null && pendingCheckout.name === refInfo.name;
   const forceDeleteConfirmOpen = pendingForceDeleteBranch !== null && pendingForceDeleteBranch.name === refInfo.name;
 
   // Groups are organised by the object each item acts on, so a menu that mixes
@@ -279,7 +245,7 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
                 <MenuGroupSeparator label={isTag ? 'Tag' : 'Branch'} name={displayName} />
 
                 {isBranch && !isCurrentBranch && (
-                  <MenuItem onSelect={handleCheckout}>Checkout {refInfo.name}</MenuItem>
+                  <MenuItem disabled={isOperationInProgress} onSelect={() => requestBranchCheckout(refInfo, 'menu')}>Checkout {refInfo.name}</MenuItem>
                 )}
 
                 {mergeSource && (
@@ -534,17 +500,6 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
         />
       )}
 
-      {/* Checkout with pull dialog (dual-branch case) */}
-      <CheckoutWithPullDialog
-        open={checkoutWithPullOpen}
-        branchName={refInfo.name}
-        onConfirm={(pull) => {
-          setCheckoutWithPullOpen(false);
-          rpcClient.checkoutBranchWithPull(refInfo.name, pull);
-        }}
-        onCancel={() => setCheckoutWithPullOpen(false)}
-      />
-
       {/* Fast-forward local branch from remote (no checkout).
          Shared between three entry points: from a local/dual branch badge (local exists, fast-forward it),
          from a remote-only branch badge (local does not yet exist, create it from remote tip), and from
@@ -572,25 +527,6 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
         confirmLabel={fastForwardTargetIsCurrent ? 'Pull' : 'Fast-forward'}
         variant="warning"
         commandPreview={fastForwardPreview}
-      />
-
-      {/* Stash-and-checkout dialog (triggered by checkoutNeedsStash response) */}
-      <ConfirmDialog
-        open={stashConfirmOpen}
-        onConfirm={() => {
-          const checkout = pendingCheckout;
-          useGraphStore.getState().setPendingCheckout(null);
-          if (checkout) {
-            rpcClient.stashAndCheckout(checkout.name, checkout.pull);
-          }
-        }}
-        onCancel={() => useGraphStore.getState().setPendingCheckout(null)}
-        title="Stash Changes"
-        description="You have uncommitted changes. Stash them and checkout the branch?"
-        telemetryId="stashAndCheckout"
-        confirmLabel="Stash & Checkout"
-        variant="warning"
-        commandPreview={stashAndCheckoutPreview}
       />
 
       {/* Rebase confirmation */}

@@ -69,6 +69,7 @@ export function OverflowRefsBadge({ hiddenRefs, commit, laneColorStyle, worktree
           {hiddenRefs.map((displayRef) => (
             <BranchContextMenu key={displayRefKey(displayRef)} refInfo={displayRefToRefInfo(displayRef)} commit={commit}>
               <RefLabel
+                checkoutHint
                 displayRef={displayRef}
                 laneColorStyle={laneColorStyle}
                 worktree={worktreeByBranch ? worktreeForDisplayRef(displayRef, worktreeByBranch) : undefined}

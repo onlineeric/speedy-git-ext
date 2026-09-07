@@ -44,6 +44,7 @@ export interface DropCommitCommandOptions {
 
 export interface CheckoutCommandOptions {
   branch: string;
+  remote?: string;
   pull: boolean;
 }
 
@@ -172,9 +173,10 @@ export function buildAmendCommand(options: AmendCommandOptions): string {
 }
 
 export function buildCheckoutCommand(options: CheckoutCommandOptions): string {
-  const parts = ['git checkout', options.branch];
-  if (options.pull) parts.push('&& git pull');
-  return parts.join(' ');
+  const command = options.remote
+    ? `git checkout -b ${options.branch} --track refs/remotes/${options.remote}/${options.branch} --`
+    : `git checkout --no-guess ${options.branch} --`;
+  return options.pull ? `${command} && git pull` : command;
 }
 
 export interface DeleteBranchCommandOptions {
@@ -195,10 +197,7 @@ export interface DropStashCommandOptions {
   stashIndex: number;
 }
 
-export interface StashAndCheckoutCommandOptions {
-  branch: string;
-  pull: boolean;
-}
+export type StashAndCheckoutCommandOptions = CheckoutCommandOptions;
 
 export interface RenameBranchCommandOptions {
   oldName: string;
@@ -249,9 +248,7 @@ export function buildDropStashCommand(options: DropStashCommandOptions): string 
 }
 
 export function buildStashAndCheckoutCommand(options: StashAndCheckoutCommandOptions): string {
-  const parts = ['git stash && git checkout', options.branch];
-  if (options.pull) parts.push('&& git pull');
-  return parts.join(' ');
+  return `git stash && ${buildCheckoutCommand(options)}`;
 }
 
 export function buildRenameBranchCommand(options: RenameBranchCommandOptions): string {

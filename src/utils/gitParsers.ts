@@ -239,13 +239,13 @@ export function parseTagMetadata(stdout: string): TagMetadata[] {
 }
 
 export function parseBranchLine(line: string): Branch | null {
-  // Format: refname\x00HEAD_marker\x00hash
+  // Format: refname\x00HEAD_marker\x00hash\x00upstream (optional in older callers)
   const parts = line.split(NULL_CHAR);
-  if (parts.length !== 3) {
+  if (parts.length !== 3 && parts.length !== 4) {
     return null;
   }
 
-  const [rawName, headMarker, hash] = parts;
+  const [rawName, headMarker, hash, upstream] = parts;
   const trimmedName = rawName.trim();
   const isCurrent = headMarker === '*';
 
@@ -262,6 +262,7 @@ export function parseBranchLine(line: string): Branch | null {
 
     return {
       name: ref.name,
+      ...(ref.type === 'branch' && upstream ? { upstream: upstream.trim() } : {}),
       remote: ref.type === 'remote' ? ref.remote : undefined,
       current: isCurrent,
       hash: hash.trim(),

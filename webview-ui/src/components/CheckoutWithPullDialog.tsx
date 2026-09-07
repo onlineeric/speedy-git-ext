@@ -7,19 +7,21 @@ import {
   buttonSecondaryClassName,
   dialogContentClassName,
   dialogContentStyle,
+  dialogOverlayClassName,
 } from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
 interface CheckoutWithPullDialogProps {
   open: boolean;
   branchName: string;
+  upstream?: string;
   onConfirm: (pull: boolean) => void;
   onCancel: () => void;
 }
 
 const customDialogContentStyle = { ...dialogContentStyle, width: '38rem' };
 
-export function CheckoutWithPullDialog({ open, branchName, onConfirm, onCancel }: CheckoutWithPullDialogProps) {
+export function CheckoutWithPullDialog({ open, branchName, upstream, onConfirm, onCancel }: CheckoutWithPullDialogProps) {
   const dialogTelemetry = useDialogTelemetry('checkoutWithPull', open);
   const [pull, setPull] = useState(true);
 
@@ -38,7 +40,7 @@ export function CheckoutWithPullDialog({ open, branchName, onConfirm, onCancel }
   return (
     <AlertDialog.Root open={open} onOpenChange={(isOpen) => !isOpen && handleCancel()}>
       <AlertDialog.Portal>
-        <AlertDialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
+        <AlertDialog.Overlay className={dialogOverlayClassName} />
         <AlertDialog.Content
           className={dialogContentClassName}
           style={customDialogContentStyle}
@@ -47,7 +49,10 @@ export function CheckoutWithPullDialog({ open, branchName, onConfirm, onCancel }
             Checkout Branch
           </AlertDialog.Title>
           <AlertDialog.Description className="mt-2 text-sm text-[var(--vscode-descriptionForeground)]">
-            Checkout branch &apos;{branchName}&apos;
+            Checkout local branch &apos;{branchName}&apos;.{' '}
+            {upstream
+              ? `Pull updates it from its configured upstream (${upstream}), which may differ from the remote badge you clicked.`
+              : 'No upstream is configured. Pull uses your Git configuration and may require an upstream; No pull only switches branches.'}
           </AlertDialog.Description>
 
           <div className="mt-4 flex gap-4">

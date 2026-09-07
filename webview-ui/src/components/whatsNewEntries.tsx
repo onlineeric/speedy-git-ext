@@ -58,6 +58,39 @@ function ExternalLink({ url, children }: { url: string; children: ReactNode }) {
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
   {
+    version: '5.15.0',
+    headline: 'Double-click a branch badge to switch branches.',
+    content: (
+      <>
+        <section className={calloutClassName}>
+          <h3 className={dialogSectionLabelClassName}>Thanks to our contributor</h3>
+          <p className={bodyTextClassName}>
+            Thanks to <ExternalLink url="https://github.com/brainz80">@brainz80</ExternalLink> for requesting
+            faster branch switching in{' '}
+            <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/193">#193</ExternalLink>!
+          </p>
+        </section>
+        <ul className={`${bodyTextClassName} mt-4 space-y-3`}>
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">Local branches:</strong>{' '}
+            double-click a branch badge to switch without pulling. This also works on combined
+            local/cloud badges and branch badges inside the +N popover.
+          </li>
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">Remote branches:</strong>{' '}
+            if a local branch of that name already exists, choose Pull or No pull in the familiar
+            Checkout dialog. Pull is selected by default and uses the local branch&apos;s configured
+            upstream. If there is no local counterpart, a tracking branch is created from the remote you clicked.
+          </li>
+          <li>
+            If changes block checkout, you can choose to stash tracked changes first. A branch already
+            checked out in another worktree offers to open that worktree. Right-click menus remain available.
+          </li>
+        </ul>
+      </>
+    ),
+  },
+  {
     version: '5.14.0',
     headline: 'Search now reaches branches, tags and authors — and understands more than one word at a time.',
     content: (
