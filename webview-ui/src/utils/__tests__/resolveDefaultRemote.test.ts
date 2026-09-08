@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Branch } from '@shared/types';
-import { resolveDefaultRemote } from '../resolveDefaultRemote';
+import { resolveDefaultRemote, resolvePublishedBranchRemote } from '../resolveDefaultRemote';
 
 function b(name: string, remote?: string): Branch {
   return { name, remote, current: false, hash: '0'.repeat(40) };
@@ -46,5 +46,31 @@ describe('resolveDefaultRemote', () => {
       b('feature-x', 'fork'),
       b('release', 'fork'),
     ])).toBe('fork');
+  });
+});
+
+
+describe('resolvePublishedBranchRemote', () => {
+  it('uses fork when origin only has unrelated branches', () => {
+    expect(resolvePublishedBranchRemote([b('main', 'origin'), b('feature', 'fork')], b('feature'))).toBe('fork');
+  });
+
+  it('prefers a matching upstream when the branch exists on multiple remotes', () => {
+    expect(resolvePublishedBranchRemote([b('feature', 'origin'), b('feature', 'fork')],
+      { ...b('feature'), upstream: 'fork/feature' })).toBe('fork');
+  });
+
+  it('does not guess when multiple counterparts exist without an upstream', () => {
+    expect(resolvePublishedBranchRemote([b('feature', 'origin'), b('feature', 'fork')], b('feature'))).toBeUndefined();
+  });
+
+  it('does not substitute a same-named branch for a differently named upstream', () => {
+    expect(resolvePublishedBranchRemote([b('feature', 'origin')],
+      { ...b('feature'), upstream: 'fork/different' })).toBeUndefined();
+  });
+
+  it('does not publish a private branch or push from detached HEAD', () => {
+    expect(resolvePublishedBranchRemote([b('main', 'origin')], b('private'))).toBeUndefined();
+    expect(resolvePublishedBranchRemote([b('main', 'origin')], null)).toBeUndefined();
   });
 });

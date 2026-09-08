@@ -33,3 +33,17 @@ export function resolveDefaultRemote(branches: Branch[]): string {
 export function resolveDefaultRemoteName(remotes: { name: string }[]): string {
   return pickDefaultRemote(remotes.map((r) => r.name));
 }
+
+
+/** Resolve an existing same-named remote branch without guessing a push destination. */
+export function resolvePublishedBranchRemote(branches: readonly Branch[], local: Branch | null): string | undefined {
+  if (!local || local.remote) return undefined;
+  const counterparts = branches.filter((branch) => branch.remote && branch.name === local.name);
+  const upstream = counterparts.find((branch) => `${branch.remote}/${branch.name}` === local.upstream);
+  if (upstream) return upstream.remote;
+  // A configured upstream pointing elsewhere is also a reason to ask the user
+  // to choose explicitly, even when only one same-named counterpart exists.
+  if (local.upstream) return undefined;
+  const remotes = [...new Set(counterparts.map((branch) => branch.remote!))];
+  return remotes.length === 1 ? remotes[0] : undefined;
+}

@@ -11,7 +11,7 @@ function isBranchNotFullyMerged(stderr: string | undefined): boolean {
 }
 
 export function isCheckoutConflict(error: GitError): boolean {
-  return error.message.includes('would be overwritten by checkout');
+  return gitErrorDetail(error).includes('would be overwritten by checkout');
 }
 
 /**
@@ -39,40 +39,32 @@ export class GitBranchService {
 
   async checkout(name: string, remote?: string): Promise<Result<string>> {
     this.log.info(`Checkout branch: ${name}${remote ? ` (remote: ${remote})` : ''}`);
-    const nameCheck = validateRefName(name);
+    const nameCheck = validateLocalBranchName(name);
     if (!nameCheck.success) return nameCheck;
     if (remote) {
       const remoteCheck = validateRefName(remote);
       if (!remoteCheck.success) return remoteCheck;
-    }
-
-    // Always use `git checkout <name>` first.
-    // Git automatically creates a local tracking branch if only one remote matches.
-    const result = await this.executor.execute({
-      args: ['checkout', name],
-      cwd: this.workspacePath,
-    });
-
-    if (result.success) {
-      return ok(`Checked out '${name}'`);
-    }
-
-    // If a simple checkout failed and a remote was specified,
-    // try explicitly creating a tracking branch (e.g. when multiple remotes have the same branch name)
-    if (remote) {
-      const trackResult = await this.executor.execute({
-        args: ['checkout', '-b', name, `${remote}/${name}`],
+    } else {
+      // A stale badge must never resolve to a tag or restore a same-named file.
+      const exists = await this.executor.execute({
+        args: ['show-ref', '--verify', '--quiet', `refs/heads/${name}`],
         cwd: this.workspacePath,
       });
-
-      if (trackResult.success) {
-        return ok(`Checked out '${name}' tracking ${remote}/${name}`);
+      if (!exists.success) {
+        return err(new GitError(`Could not resolve local branch '${name}'. ${exists.error.message}`,
+          exists.error.code, exists.error.command, exists.error.stderr));
       }
-
-      return err(mapWorktreeCheckoutError(trackResult.error));
     }
 
-    return err(mapWorktreeCheckoutError(result.error));
+    // Explicit tracking creation cannot let checkout.defaultRemote choose a
+    // different remote, or overwrite a local branch created since the last load.
+    const args = remote
+      ? ['checkout', '-b', name, '--track', `refs/remotes/${remote}/${name}`, '--']
+      : ['checkout', '--no-guess', name, '--'];
+    const result = await this.executor.execute({ args, cwd: this.workspacePath });
+    return result.success
+      ? ok(`Checked out '${name}'${remote ? ` tracking ${remote}/${name}` : ''}`)
+      : err(mapWorktreeCheckoutError(result.error));
   }
 
   async checkoutCommit(hash: string): Promise<Result<string, GitError>> {

@@ -53,19 +53,19 @@
       "surface": {
         "classification": "SystemMetaData",
         "purpose": "FeatureInsight",
-        "comment": "UI surface id from the closed catalog (e.g. commitMenu, toolbar)."
+        "comment": "UI surface id from the closed catalog (e.g. commitMenu, toolbar, branchBadge)."
       },
       "action": {
         "classification": "SystemMetaData",
         "purpose": "FeatureInsight",
-        "comment": "Action id from the closed catalog (e.g. cherryPick, copyHash)."
+        "comment": "Action id from the closed catalog (e.g. cherryPick, copyHash, checkoutDoubleClick)."
       }
     },
     "dialogOutcome": {
       "dialog": {
         "classification": "SystemMetaData",
         "purpose": "FeatureInsight",
-        "comment": "Dialog id from the closed catalog (e.g. merge, createTag)."
+        "comment": "Dialog id from the closed catalog (e.g. merge, createTag, checkoutWorktree)."
       },
       "outcome": {
         "classification": "SystemMetaData",

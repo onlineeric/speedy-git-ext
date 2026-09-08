@@ -218,12 +218,12 @@ describe('buildAmendCommand', () => {
 describe('buildCheckoutCommand', () => {
   it('builds checkout without pull', () => {
     expect(buildCheckoutCommand({ branch: 'feature', pull: false }))
-      .toBe('git checkout feature');
+      .toBe('git checkout --no-guess feature --');
   });
 
   it('builds checkout with pull', () => {
     expect(buildCheckoutCommand({ branch: 'feature', pull: true }))
-      .toBe('git checkout feature && git pull');
+      .toBe('git checkout --no-guess feature -- && git pull');
   });
 });
 
@@ -314,12 +314,12 @@ describe('buildDropStashCommand', () => {
 describe('buildStashAndCheckoutCommand', () => {
   it('builds stash and checkout without pull', () => {
     expect(buildStashAndCheckoutCommand({ branch: 'feature', pull: false }))
-      .toBe('git stash && git checkout feature');
+      .toBe('git stash && git checkout --no-guess feature --');
   });
 
   it('builds stash and checkout with pull', () => {
     expect(buildStashAndCheckoutCommand({ branch: 'feature', pull: true }))
-      .toBe('git stash && git checkout feature && git pull');
+      .toBe('git stash && git checkout --no-guess feature -- && git pull');
   });
 });
 

@@ -30,7 +30,8 @@ function createTrackedTestSetup(serviceOverrides: Record<string, unknown>) {
     services,
     postMessage,
     log: {},
-    runtime: { activeCompareController: null },
+    runtime: { activeCompareController: null, currentRepoPath: '/repo', fetchGeneration: 0 },
+    operationGuard: { getOperationInProgressError: vi.fn().mockResolvedValue(null) },
     refreshCoordinator: { reload: vi.fn().mockResolvedValue(undefined) },
     telemetry: { sendOperation },
   } as never;
@@ -132,7 +133,7 @@ describe('WebviewMessageRouter operation telemetry middleware', () => {
 
     await router.dispatch({
       type: 'checkoutBranch',
-      payload: { name: 'main', pull: true },
+      payload: { name: 'main', pull: true, repoPath: '/repo', requestId: 1 },
     });
 
     expect(sendOperation).toHaveBeenCalledWith('checkoutBranch', 'error', expect.any(Number), 'COMMAND_FAILED');

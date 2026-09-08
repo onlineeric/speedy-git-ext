@@ -212,6 +212,15 @@ describe('parseRefs', () => {
 });
 
 describe('parseBranchLine', () => {
+  it('preserves the configured upstream for checkout confirmation', () => {
+    const parsed = parseBranchLine(['refs/heads/feature', ' ', 'abc123', 'upstream/other-name'].join('\0'));
+    expect(parsed?.upstream).toBe('upstream/other-name');
+  });
+
+  it('does not invent an upstream for an untracked branch', () => {
+    expect(parseBranchLine(['refs/heads/feature', ' ', 'abc123', ''].join('\0'))?.upstream).toBeUndefined();
+  });
+
   function branchLine(name: string, headMarker: string, hash: string): string {
     return [name, headMarker, hash].join(NUL);
   }

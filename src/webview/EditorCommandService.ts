@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { randomUUID } from 'node:crypto';
 import * as vscode from 'vscode';
 import { GitError, err, ok, type Result } from '../../shared/errors.js';
 import type { FileChangeStatus, WorktreeInfo } from '../../shared/types.js';
@@ -252,5 +253,8 @@ function buildWorktreeSubmoduleUri(filePath: string, fileName: string): vscode.U
     authority: 'worktree',
     path: `/Working Tree: ${fileName}`,
     query: filePath,
+    // VS Code caches virtual documents by URI. Reopening must read the current
+    // pointer and dirty suffix, even when the submodule path is unchanged.
+    fragment: randomUUID(),
   });
 }

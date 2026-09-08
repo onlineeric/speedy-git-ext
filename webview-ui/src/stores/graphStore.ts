@@ -3,6 +3,8 @@ import type {
   ActiveToggleWidget,
   Author,
   Branch,
+  BranchCheckoutTarget,
+  BranchCheckoutRequest,
   CherryPickOptions,
   RevertOptions,
   Commit,
@@ -154,7 +156,10 @@ interface GraphStore {
    */
   flashToken: number;
   totalLoadedWithoutFilter: number | null;
-  pendingCheckout: { name: string; pull?: boolean } | null;
+  pendingCheckout: BranchCheckoutRequest | null;
+  checkoutDialog: (BranchCheckoutTarget & { differingRemoteBranch?: string }) | null;
+  checkoutWorktree: WorktreeInfo | null;
+  activeBranchCheckout: BranchCheckoutRequest | null;
   pendingCommitCheckout: { hash: string } | null;
   pendingForceDeleteBranch: { name: string; deleteRemote?: { remote: string; name: string } } | null;
   repos: RepoInfo[];
@@ -307,7 +312,7 @@ interface GraphStore {
   setHasMore: (has: boolean) => void;
   setPrefetching: (v: boolean) => void;
   setTotalLoadedWithoutFilter: (n: number | null) => void;
-  setPendingCheckout: (checkout: { name: string; pull?: boolean } | null) => void;
+  setPendingCheckout: (checkout: BranchCheckoutRequest | null) => void;
   setPendingCommitCheckout: (checkout: { hash: string } | null) => void;
   setPendingForceDeleteBranch: (pending: { name: string; deleteRemote?: { remote: string; name: string } } | null) => void;
   setRepos: (repos: RepoInfo[], activeRepoPath: string) => void;
@@ -437,6 +442,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   flashToken: 0,
   totalLoadedWithoutFilter: null,
   pendingCheckout: null,
+  checkoutDialog: null,
+  checkoutWorktree: null,
+  activeBranchCheckout: null,
   pendingCommitCheckout: null,
   pendingForceDeleteBranch: null,
   repos: [],
@@ -878,7 +886,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
             conflictType: undefined,
             uncommittedCounts: { stagedCount: 0, unstagedCount: 0, untrackedCount: 0 },
             hasUncommittedChanges: false,
-            ...(parentChanged ? { pendingCommitCheckout: null } : {}),
+            ...(parentChanged ? { pendingCommitCheckout: null, pendingCheckout: null, checkoutDialog: null, checkoutWorktree: null } : {}),
           }
         : {}),
     });
@@ -900,6 +908,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       submodules: [],
       isLoadingRepo: true,
       pendingCommitCheckout: null,
+      pendingCheckout: null,
+      checkoutDialog: null,
+      checkoutWorktree: null,
       selectedCommit: undefined,
       selectedCommitIndex: -1,
       ...GO_TO_HEAD_RESET,
@@ -948,6 +959,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       displayedRepoPath,
       isLoadingRepo: true,
       pendingCommitCheckout: null,
+      pendingCheckout: null,
+      checkoutDialog: null,
+      checkoutWorktree: null,
       selectedCommit: undefined,
       selectedCommitIndex: -1,
       ...GO_TO_HEAD_RESET,

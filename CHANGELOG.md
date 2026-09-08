@@ -4,6 +4,15 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.15.0] - 2026-09-08
+
+### Added
+- **Double-click a branch badge to switch branches.** Local and combined local/cloud badges switch immediately without pulling. A remote badge with no local counterpart creates and checks out a tracking branch from that exact remote. When a remote badge has a same-named local branch, the existing Checkout dialog offers Pull (selected by default) or No pull; pulling uses the local branch's configured upstream, which the dialog now displays. The shortcut also works on branch badges inside the `+N` overflow popover. Current local branches, tags and stashes do not trigger checkout, and modifier clicks retain their selection behavior.
+- **Shared checkout recovery for double-click and context-menu actions.** Checkout dialogs survive scrolling and do not require opening a menu first. Conflicting tracked changes offer Stash & Checkout; untracked-file collisions explain how to resolve them. Branches already in another worktree offer to open that worktree. Checkout is guarded during active Git operations and repeated requests, and recovery stays tied to the originating repository.
+
+### Credits
+- Thanks to [@brainz80](https://github.com/brainz80) for requesting double-click branch switching in [#193](https://github.com/onlineeric/speedy-git-ext/issues/193)!
+
 ## [5.14.0] - 2026-09-02
 
 ### Added

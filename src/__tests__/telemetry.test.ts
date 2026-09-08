@@ -51,6 +51,14 @@ describe('TRACKED_OPERATIONS', () => {
 });
 
 describe('isValidUiTelemetryEvent', () => {
+  it('accepts badge checkout telemetry without allowing branch or repository details', () => {
+    const event = { kind: 'uiInteraction', surface: 'branchBadge', action: 'checkoutDoubleClick' };
+    expect(isValidUiTelemetryEvent(event)).toBe(true);
+    expect(isValidUiTelemetryEvent({ ...event, branch: 'private-feature' })).toBe(false);
+    expect(isValidUiTelemetryEvent({ ...event, repoPath: '/private/repo' })).toBe(false);
+    expect(isValidUiTelemetryEvent({ kind: 'dialogOutcome', dialog: 'checkoutWorktree', outcome: 'confirmed' })).toBe(true);
+  });
+
   it('accepts every uiInteraction surface/action combination in the catalog', () => {
     for (const surface of UI_SURFACES) {
       for (const action of UI_ACTIONS) {

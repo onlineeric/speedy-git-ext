@@ -2,37 +2,11 @@ import * as vscode from 'vscode';
 import { isCheckoutConflict } from '../../services/GitBranchService.js';
 import type { Result } from '../../../shared/errors.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
+import { branchCheckoutHandlers } from './branchCheckoutHandlers.js';
 import type { WebviewRequestContext } from '../WebviewRequestContext.js';
 
 export const branchHandlers = {
-  checkoutBranch: async (message, context) => {
-    const services = context.services.current();
-    const checkoutResult = await services.gitBranchService.checkout(message.payload.name, message.payload.remote);
-    if (!checkoutResult.success) {
-      if (isCheckoutConflict(checkoutResult.error)) {
-        context.postMessage({ type: 'checkoutNeedsStash', payload: { name: message.payload.name, pull: message.payload.pull } });
-        return;
-      }
-      context.postMessage({ type: 'error', payload: { error: checkoutResult.error } });
-      return;
-    }
-    if (message.payload.pull) {
-      const pullResult = await context.services.current().gitRemoteService.pull();
-      if (!pullResult.success) {
-        context.postMessage({
-          type: 'checkoutPullFailed',
-          payload: {
-            branch: message.payload.name,
-            error: { message: pullResult.error.message, code: pullResult.error.code },
-          },
-        });
-        await context.refreshCoordinator.reload();
-        return;
-      }
-    }
-    context.postMessage({ type: 'success', payload: { message: checkoutResult.value } });
-    await context.refreshCoordinator.reload();
-  },
+  ...branchCheckoutHandlers,
 
   checkoutCommit: async (message, context) => {
     const checkoutResult = await context.services.current().gitBranchService.checkoutCommit(message.payload.hash);
@@ -46,35 +20,6 @@ export const branchHandlers = {
       return;
     }
     context.postMessage({ type: 'success', payload: { message: checkoutResult.value } });
-    await context.refreshCoordinator.reload();
-  },
-
-  stashAndCheckout: async (message, context) => {
-    const stashResult = await context.services.current().gitStashService.stash();
-    if (!stashResult.success) {
-      context.postMessage({ type: 'error', payload: { error: stashResult.error } });
-      return;
-    }
-    const checkoutAfterStash = await context.services.current().gitBranchService.checkout(message.payload.name, message.payload.remote);
-    if (!checkoutAfterStash.success) {
-      context.postMessage({ type: 'error', payload: { error: checkoutAfterStash.error } });
-      return;
-    }
-    if (message.payload.pull) {
-      const pullAfterStash = await context.services.current().gitRemoteService.pull();
-      if (!pullAfterStash.success) {
-        context.postMessage({
-          type: 'checkoutPullFailed',
-          payload: {
-            branch: message.payload.name,
-            error: { message: pullAfterStash.error.message, code: pullAfterStash.error.code },
-          },
-        });
-        await context.refreshCoordinator.reload();
-        return;
-      }
-    }
-    context.postMessage({ type: 'success', payload: { message: checkoutAfterStash.value } });
     await context.refreshCoordinator.reload();
   },
 

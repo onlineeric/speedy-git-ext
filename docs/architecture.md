@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-09-02**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-09-08**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -37,7 +37,9 @@ src/
 │   ├── OperationGuard.ts         # In-progress checks (rebase/cherry-pick/revert/merge) → GitError | null
 │   └── handlers/                 # Domain RPC handlers; fetch services from the registry at call time
 │       ├── graphDataHandlers.ts  # getCommits/loadMore/getBranches/getCommitDetails/getAuthors/refresh
-│       ├── branchHandlers.ts     # checkout/create/rename/delete/fast-forward branch; merge + continue/abort merge (guarded, conflict-aware)
+│       ├── branchHandlers.ts     # create/rename/delete/fast-forward branch; commit checkout; merge + continue/abort merge
+│       ├── branchCheckoutHandlers.ts # Shared branch checkout/stash/pull execution; operation guard, busy lock,
+│                                     #   repository-bound recovery and request-correlated completion
 │       ├── remoteHandlers.ts     # fetch/push/pull, add/edit/remove remote
 │       ├── tagHandlers.ts        # create/delete/push tag (optional chained push, remote delete, force — 048)
 │       ├── stashHandlers.ts      # get/apply/pop/drop/create stash
@@ -161,7 +163,9 @@ components/
 
 ```
 ├── CommitContextMenu.tsx         # Commit row menu
-├── BranchContextMenu.tsx         # Branch/tag ref badge menu
+├── BranchContextMenu.tsx         # Branch/tag ref badge menu + lightweight double-click trigger
+├── BranchCheckoutDialogs.tsx     # App-level checkout/pull, stash recovery, and worktree navigation dialogs;
+│                                 #   survives row virtualization and works before any menu is opened
 ├── StashContextMenu.tsx          # Stash pseudo-commit menu
 ├── AuthorContextMenu.tsx         # Author cell menu
 ├── DateContextMenu.tsx           # Date cell menu
@@ -269,9 +273,11 @@ utils/
 ├── compareDispatch.ts            # Resolve compare request → backend RPC
 ├── compareMarker.ts              # Per-row "B"ase / "T"arget badge derivation
 ├── externalRefParser.ts          # Parse typed commit-ish expressions (HEAD~3, origin/main^2, …)
-├── resolveDefaultRemote.ts       # Pick `origin` else first-alpha remote
+├── resolveDefaultRemote.ts       # Default remote selection; resolvePublishedBranchRemote requires an existing, unambiguous branch destination
 ├── amendMessages.ts              # Post-amend force-push wording; translates git's `stale info` lease rejection
 ├── rebaseSquashMessages.ts       # Combined message per squash group — full messages, never subjects
+├── branchCheckout.ts             # Shared checkout decisions and interaction dispatch; menu vs double-click
+│                                 #   pull policy, busy/worktree checks, telemetry; reads store only on interaction
 ├── branchSelection.ts            # getBranchKey (bare name vs remote/name) + additive select-all-local
 ├── mergedCommits.ts              # Detect merged-branch commit grouping for badges
 ├── refNameField.ts               # Live ref-name validation state (error suppressed while pristine)
@@ -341,4 +347,9 @@ telemetry.json                    # Machine-readable event manifest for VS Code 
 esbuild.config.mjs                # Production-only telemetry destination injection; empty in dev/test builds
 ```
 
-Tests live in `__tests__/` directories beside the code they cover (~115 files, Vitest).
+Tests live in `__tests__/` directories beside the code they cover (Vitest).
+Branch checkout coverage includes `src/__tests__/branchCheckoutHandlers.test.ts` (execution, guards,
+recovery and navigation races), `webview-ui/src/utils/__tests__/branchCheckout.test.ts` (gesture policy
+and RPC lifecycle), and `webview-ui/src/components/__tests__/BranchContextMenu.test.ts` (badge events).
+
+`webview-ui/src/rpc/__tests__/amendSelection.test.ts` covers post-amend selection and open-details refresh.

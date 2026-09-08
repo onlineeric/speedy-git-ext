@@ -297,7 +297,7 @@ export class GitLogService {
     const result = await this.executor.execute({
       // `%(refname)` (not `:short`) so local branches with slashes are never
       // mistaken for `<remote>/<branch>` — see parseBranchLine.
-      args: ['branch', '-a', '--format=%(refname)%00%(HEAD)%00%(objectname)'],
+      args: ['branch', '-a', '--format=%(refname)%00%(HEAD)%00%(objectname)%00%(upstream:short)'],
       cwd: this.workspacePath,
     });
 

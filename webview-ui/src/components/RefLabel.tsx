@@ -11,6 +11,8 @@ import { EMPTY_SEARCH_TERMS, type SearchTerm } from '../utils/searchQuery';
 
 interface RefLabelProps extends React.HTMLAttributes<HTMLSpanElement> {
   displayRef: DisplayRef;
+  /** Only interactive graph badges advertise checkout; legend samples do not. */
+  checkoutHint?: boolean;
   laneColorStyle?: React.CSSProperties;
   worktree?: WorktreeInfo;
   /** Cached annotation metadata for a tag badge; enriches the native title tooltip (048). */
@@ -21,7 +23,7 @@ interface RefLabelProps extends React.HTMLAttributes<HTMLSpanElement> {
 
 /** Renders a single ref badge with an icon and label text. */
 export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
-  function RefLabel({ displayRef, laneColorStyle, worktree, tagMeta, searchTerms = EMPTY_SEARCH_TERMS, className, style, ...rest }, ref) {
+  function RefLabel({ displayRef, checkoutHint, laneColorStyle, worktree, tagMeta, searchTerms = EMPTY_SEARCH_TERMS, className, style, ...rest }, ref) {
     const layoutStyle = getRefStyle(displayRef.type);
     const content = getRefBadgeContent(displayRef);
     const { label, leadIcons, remoteCount } = content;
@@ -47,7 +49,8 @@ export const RefLabel = forwardRef<HTMLSpanElement, RefLabelProps>(
       <span
         ref={ref}
         className={`${REF_BADGE_BASE_CLASS} ${borderClass}${fallbackColor}${className ? ` ${className}` : ''}`}
-        title={title}
+        title={checkoutHint && (displayRef.type === 'local-branch' || displayRef.type === 'merged-branch' || displayRef.type === 'remote-branch')
+          ? `${title}\nDouble-click to checkout; right-click for more actions.` : title}
         {...rest}
         style={badgeStyle}
       >
