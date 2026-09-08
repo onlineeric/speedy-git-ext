@@ -273,7 +273,7 @@ utils/
 ├── compareDispatch.ts            # Resolve compare request → backend RPC
 ├── compareMarker.ts              # Per-row "B"ase / "T"arget badge derivation
 ├── externalRefParser.ts          # Parse typed commit-ish expressions (HEAD~3, origin/main^2, …)
-├── resolveDefaultRemote.ts       # Pick `origin` else first-alpha remote
+├── resolveDefaultRemote.ts       # Default remote selection; resolvePublishedBranchRemote requires an existing, unambiguous branch destination
 ├── amendMessages.ts              # Post-amend force-push wording; translates git's `stale info` lease rejection
 ├── rebaseSquashMessages.ts       # Combined message per squash group — full messages, never subjects
 ├── branchCheckout.ts             # Shared checkout decisions and interaction dispatch; menu vs double-click
@@ -351,3 +351,5 @@ Tests live in `__tests__/` directories beside the code they cover (Vitest).
 Branch checkout coverage includes `src/__tests__/branchCheckoutHandlers.test.ts` (execution, guards,
 recovery and navigation races), `webview-ui/src/utils/__tests__/branchCheckout.test.ts` (gesture policy
 and RPC lifecycle), and `webview-ui/src/components/__tests__/BranchContextMenu.test.ts` (badge events).
+
+`webview-ui/src/rpc/__tests__/amendSelection.test.ts` covers post-amend selection and open-details refresh.

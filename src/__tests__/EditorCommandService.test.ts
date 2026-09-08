@@ -84,6 +84,20 @@ describe('EditorCommandService', () => {
     );
   });
 
+  it('uses a fresh virtual document when reopening a working-tree submodule diff', async () => {
+    const { service } = makeEditorCommandService();
+    const commands = vi.mocked(vscode.commands.executeCommand);
+    commands.mockClear();
+    await service.openDiffEditor(UNCOMMITTED_HASH, 'submodules/repo-a', undefined, 'modified', true);
+    await service.openDiffEditor(UNCOMMITTED_HASH, 'submodules/repo-a', undefined, 'modified', true);
+    const first = commands.mock.calls[0][2] as vscode.Uri;
+    const second = commands.mock.calls[1][2] as vscode.Uri;
+    expect(first.fragment).toBeTruthy();
+    expect(second.fragment).not.toBe(first.fragment);
+    expect(second.query).toBe(first.query);
+    expect(second.authority).toBe('worktree');
+  });
+
   it('still uses a plain file URI for an ordinary uncommitted file', async () => {
     const { service } = makeEditorCommandService({ repoPath: '/repo-a' });
 

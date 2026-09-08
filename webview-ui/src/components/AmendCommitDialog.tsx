@@ -9,7 +9,7 @@ import { trackUiInteraction } from '../utils/telemetry';
 import { describeForcePushFailure } from '../utils/amendMessages';
 import { hasRemoteCounterpart } from '../utils/commitMenuAvailability';
 import { buildAmendCommand, buildPushCommand } from '../utils/gitCommandBuilder';
-import { resolveDefaultRemote } from '../utils/resolveDefaultRemote';
+import { resolvePublishedBranchRemote } from '../utils/resolveDefaultRemote';
 import { CommandPreview } from './CommandPreview';
 import {
   buttonPrimaryClassName,
@@ -114,15 +114,17 @@ export function AmendCommitDialog({ commit, surface, onClose }: AmendCommitDialo
   // current branch for the first time — under a label that says force push, on a
   // branch whose absence of a remote is precisely what makes it private. So the
   // affordance needs both: the commit is out there, and this branch is too.
-  const canForcePush = isPublished && hasRemoteCounterpart(branches, currentLocalBranch?.name);
+  const hasPublishedBranch = isPublished && hasRemoteCounterpart(branches, currentLocalBranch?.name);
+  const publishedRemote = resolvePublishedBranchRemote(branches, currentLocalBranch);
+  const canForcePush = hasPublishedBranch && publishedRemote !== undefined;
   const confirmDisabled = message === null || message.trim().length === 0 || isAmending;
 
   // One description of the push, so the previewed command and the push that runs
   // cannot describe different things.
   const pushTarget =
-    canForcePush && forcePush && currentLocalBranch
+    canForcePush && forcePush && currentLocalBranch && publishedRemote
       ? {
-          remote: resolveDefaultRemote(branches),
+          remote: publishedRemote,
           branch: currentLocalBranch.name,
           setUpstream: false,
           forceMode: 'force-with-lease' as const,
@@ -237,6 +239,13 @@ export function AmendCommitDialog({ commit, surface, onClose }: AmendCommitDialo
               <p className={dialogWarningClassName}>
                 This commit already exists on a remote. Amending rewrites it, so the remote and your
                 branch will disagree until you force push.
+              </p>
+            )}
+
+            {hasPublishedBranch && !publishedRemote && (
+              <p className={dialogNoteClassName}>
+                The force-push destination is unclear from this branch&apos;s remotes and upstream.
+                After amending, use Push to choose the remote explicitly.
               </p>
             )}
 

@@ -725,7 +725,13 @@ class RpcClient {
     this.selectHeadOnNextLoad = false;
     const store = useGraphStore.getState();
     const headHash = findHeadCommitHash(store.mergedCommits);
-    if (headHash) store.setSelectedCommit(headHash);
+    if (headHash) {
+      store.setSelectedCommit(headHash);
+      if (store.detailsPanelOpen) {
+        store.setCommitDetails(undefined);
+        this.getCommitDetails(headHash);
+      }
+    }
   }
 
   isCommitPushed(hash: string): Promise<boolean> {
