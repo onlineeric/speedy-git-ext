@@ -67,8 +67,24 @@ describe('branch checkout interaction and RPC lifecycle', () => {
 
   it('owns the pull choice in global state, without sending checkout yet', () => {
     requestBranchCheckout(remote, 'doubleClick');
-    expect(useGraphStore.getState().checkoutDialog).toEqual({ name: 'feature', repoPath: '/repo' });
+    expect(useGraphStore.getState().checkoutDialog).toEqual({ name: 'feature', repoPath: '/repo', differingRemoteBranch: 'upstream/feature' });
     expect(send.mock.calls.some(([request]) => request.type === 'checkoutBranch')).toBe(false);
+  });
+
+  it.each(['menu', 'doubleClick'] as const)('explains different remote/local commits for %s checkout', (gesture) => {
+    requestBranchCheckout(remote, gesture);
+    expect(useGraphStore.getState().checkoutDialog?.differingRemoteBranch).toBe('upstream/feature');
+  });
+
+  it('omits the note when the remote and local point at the same commit', () => {
+    useGraphStore.setState({ branches: branches.map((branch) => ({ ...branch, hash: 'same' })) });
+    requestBranchCheckout(remote, 'menu');
+    expect(useGraphStore.getState().checkoutDialog?.differingRemoteBranch).toBeUndefined();
+  });
+
+  it('omits the remote note for local badge menu checkout', () => {
+    requestBranchCheckout(local, 'menu');
+    expect(useGraphStore.getState().checkoutDialog?.differingRemoteBranch).toBeUndefined();
   });
 
   it('offers worktree navigation even for a branch held by the main worktree', () => {

@@ -50,7 +50,13 @@ export function requestBranchCheckout(ref: RefInfo, gesture: CheckoutGesture): v
     ...(decision === 'tracking' ? { remote: ref.remote } : {}),
   };
   if (decision === 'dialog') {
-    useGraphStore.setState({ checkoutDialog: target });
+    const local = store.branches.find((branch) => !branch.remote && branch.name === ref.name);
+    const remote = ref.type === 'remote'
+      ? store.branches.find((branch) => branch.remote === ref.remote && branch.name === ref.name)
+      : undefined;
+    const differingRemoteBranch = local && remote && local.hash !== remote.hash
+      ? `${ref.remote}/${ref.name}` : undefined;
+    useGraphStore.setState({ checkoutDialog: { ...target, differingRemoteBranch } });
   } else {
     rpcClient.checkoutBranch(target);
   }

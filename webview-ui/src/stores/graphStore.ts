@@ -157,7 +157,7 @@ interface GraphStore {
   flashToken: number;
   totalLoadedWithoutFilter: number | null;
   pendingCheckout: BranchCheckoutRequest | null;
-  checkoutDialog: BranchCheckoutTarget | null;
+  checkoutDialog: (BranchCheckoutTarget & { differingRemoteBranch?: string }) | null;
   checkoutWorktree: WorktreeInfo | null;
   activeBranchCheckout: BranchCheckoutRequest | null;
   pendingCommitCheckout: { hash: string } | null;

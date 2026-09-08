@@ -54,6 +54,14 @@ export function BranchContextMenu({ refInfo, commit, children }: BranchContextMe
       if (!event.currentTarget.contains(event.target as Node)) return;
       event.stopPropagation();
       if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      if (refInfo.type === 'branch' || refInfo.type === 'remote') {
+        // Clear the browser's word selection after double-click, without
+        // preventing the mousedown events needed for normal drag-to-select.
+        const selection = event.currentTarget.ownerDocument.getSelection();
+        if (selection?.anchorNode && event.currentTarget.contains(selection.anchorNode)) {
+          selection.removeAllRanges();
+        }
+      }
       requestBranchCheckout(refInfo, 'doubleClick');
     }}>
       <LazyContextMenu stopPropagation body={<BranchContextMenuBody refInfo={refInfo} commit={commit} />}>

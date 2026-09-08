@@ -21,9 +21,10 @@ export function BranchCheckoutDialogs() {
           open
           branchName={target.name}
           upstream={upstream}
+          differingRemoteBranch={target.differingRemoteBranch}
           onConfirm={(pull) => {
             useGraphStore.setState({ checkoutDialog: null });
-            rpcClient.checkoutBranch({ ...target, pull });
+            rpcClient.checkoutBranch({ name: target.name, repoPath: target.repoPath, pull });
           }}
           onCancel={() => useGraphStore.setState({ checkoutDialog: null })}
         />

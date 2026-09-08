@@ -8,6 +8,7 @@ import {
   dialogContentClassName,
   dialogContentStyle,
   dialogOverlayClassName,
+  dialogNoteClassName,
 } from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
@@ -15,13 +16,14 @@ interface CheckoutWithPullDialogProps {
   open: boolean;
   branchName: string;
   upstream?: string;
+  differingRemoteBranch?: string;
   onConfirm: (pull: boolean) => void;
   onCancel: () => void;
 }
 
 const customDialogContentStyle = { ...dialogContentStyle, width: '38rem' };
 
-export function CheckoutWithPullDialog({ open, branchName, upstream, onConfirm, onCancel }: CheckoutWithPullDialogProps) {
+export function CheckoutWithPullDialog({ open, branchName, upstream, differingRemoteBranch, onConfirm, onCancel }: CheckoutWithPullDialogProps) {
   const dialogTelemetry = useDialogTelemetry('checkoutWithPull', open);
   const [pull, setPull] = useState(true);
 
@@ -48,11 +50,23 @@ export function CheckoutWithPullDialog({ open, branchName, upstream, onConfirm, 
           <AlertDialog.Title className="text-base font-semibold text-[var(--vscode-foreground)]">
             Checkout Branch
           </AlertDialog.Title>
-          <AlertDialog.Description className="mt-2 text-sm text-[var(--vscode-descriptionForeground)]">
-            Checkout local branch &apos;{branchName}&apos;.{' '}
-            {upstream
-              ? `Pull updates it from its configured upstream (${upstream}), which may differ from the remote badge you clicked.`
-              : 'No upstream is configured. Pull uses your Git configuration and may require an upstream; No pull only switches branches.'}
+          <AlertDialog.Description asChild>
+            <div>
+              {differingRemoteBranch && (
+                <p className={`${dialogNoteClassName} mt-3`}>
+                  You selected &apos;{differingRemoteBranch}&apos;, but a local branch named{' '}
+                  &apos;{branchName}&apos; already exists at a different commit. Checkout switches to
+                  that local branch, so you need to choose whether to update it. Choose <strong>No pull</strong>
+                  {' '}to keep its current commit, or <strong>Pull</strong> to update it from its configured upstream.
+                </p>
+              )}
+              <p className="mt-2 text-sm text-[var(--vscode-descriptionForeground)]">
+                Checkout local branch &apos;{branchName}&apos;.{' '}
+                {upstream
+                  ? `Pull updates it from its configured upstream (${upstream}), which may differ from the remote badge you clicked.`
+                  : 'No upstream is configured. Pull uses your Git configuration and may require an upstream; No pull only switches branches.'}
+              </p>
+            </div>
           </AlertDialog.Description>
 
           <div className="mt-4 flex gap-4">

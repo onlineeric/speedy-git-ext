@@ -12,10 +12,11 @@ vi.mock('../../utils/branchCheckout', () => ({
 // mounting the heavy lazy menu, exactly as on the very first badge interaction.
 describe('branch badge double-click event', () => {
   const refInfo = { type: 'branch' as const, name: 'feature' };
-  const wrapper = () => BranchContextMenu({ refInfo, commit: {} as Commit, children: 'feature' });
+  const wrapper = (type: 'branch' | 'tag' = 'branch') => BranchContextMenu({ refInfo: { ...refInfo, type }, commit: {} as Commit, children: 'feature' });
+  const removeAllRanges = vi.fn();
   function event(overrides = {}) {
     return {
-      currentTarget: { contains: () => true }, target: {}, stopPropagation: vi.fn(),
+      currentTarget: { contains: () => true, ownerDocument: { getSelection: () => ({ anchorNode: {}, removeAllRanges }) } }, target: {}, stopPropagation: vi.fn(),
       button: 0, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false,
       ...overrides,
     } as unknown as MouseEvent<HTMLSpanElement>;
@@ -27,17 +28,34 @@ describe('branch badge double-click event', () => {
     wrapper().props.onDoubleClick(click);
     expect(requestBranchCheckout).toHaveBeenCalledExactlyOnceWith(refInfo, 'doubleClick');
     expect(click.stopPropagation).toHaveBeenCalledOnce();
+    expect(removeAllRanges).toHaveBeenCalledOnce();
   });
 
   it.each(['ctrlKey', 'metaKey', 'shiftKey', 'altKey'])('ignores %s double-clicks used for selection', (modifier) => {
     wrapper().props.onDoubleClick(event({ [modifier]: true }));
     expect(requestBranchCheckout).not.toHaveBeenCalled();
+    expect(removeAllRanges).not.toHaveBeenCalled();
   });
 
   it('ignores non-primary buttons and events from portal dialogs', () => {
     wrapper().props.onDoubleClick(event({ button: 2 }));
     wrapper().props.onDoubleClick(event({ currentTarget: { contains: () => false } }));
     expect(requestBranchCheckout).not.toHaveBeenCalled();
+    expect(removeAllRanges).not.toHaveBeenCalled();
+  });
+
+  it('keeps text selection on tags', () => {
+    wrapper('tag').props.onDoubleClick(event());
+    expect(removeAllRanges).not.toHaveBeenCalled();
+  });
+
+  it('preserves a selection outside the badge', () => {
+    const target = {};
+    wrapper().props.onDoubleClick(event({ target, currentTarget: {
+      contains: (node: unknown) => node === target,
+      ownerDocument: { getSelection: () => ({ anchorNode: {}, removeAllRanges }) },
+    } }));
+    expect(removeAllRanges).not.toHaveBeenCalled();
   });
 
   it('does not intercept the existing single-click row selection', () => {
