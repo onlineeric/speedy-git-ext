@@ -264,6 +264,7 @@ Menu/dialog composition:
 
 ## Key Design Decisions
 
+- **Native Git behavior across all features** — by default match the corresponding Git command and selected options. Do not add product restrictions merely because a valid Git operation is unusual (for example detached HEAD or merge targets). Preserve Git’s hooks, signing, configuration and errors. Explain consequences where useful; do not silently add flags or extra mutations. If an existing rule or proposed workflow differs from Git, surface the discrepancy and resolve it with the maintainer rather than inventing an exception. This governs product behavior, not permission for agents to mutate repository history. If the git behavior may not works well on our UI, conflict with common UI workflow or experience, may causing bad user experience, than clarify without assume.
 - **Performance first** — fast, responsive UX is the top priority
 - Extension backend uses **esbuild** (fast CJS for Node); webview uses **Vite** (ESM, React)
 - Graph topology computed in webview, not backend
