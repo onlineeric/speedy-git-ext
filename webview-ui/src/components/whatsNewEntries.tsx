@@ -58,6 +58,62 @@ function ExternalLink({ url, children }: { url: string; children: ReactNode }) {
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
   {
+    version: '5.16.0',
+    headline: 'Create fixup and squash commits from the graph, then autosquash them when you rebase.',
+    content: (
+      <>
+        <section className={calloutClassName}>
+          <h3 className={dialogSectionLabelClassName}>Thanks to our contributor</h3>
+          <p className={bodyTextClassName}>
+            This release comes from a request by{' '}
+            <ExternalLink url="https://github.com/nelson870708">@nelson870708</ExternalLink> in{' '}
+            <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/194">#194</ExternalLink>
+            , asking for fixup and squash commits without dropping to the command line. Thank you!
+          </p>
+        </section>
+
+        <p className={`${bodyTextClassName} mt-4`}>
+          Right-click any commit and pick <em>Create Fixup Commit…</em>. It creates a new commit on HEAD
+          that targets the one you clicked, in any of git&apos;s four kinds:
+        </p>
+
+        <ul className={`${bodyTextClassName} mt-3 space-y-2`}>
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">Fixup</strong> — add your changes; the
+            target keeps its message.
+          </li>
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">Squash</strong> — add your changes and
+            combine the messages, with an optional note of your own.
+          </li>
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">Amend</strong> — add your changes and give
+            the target a new message.
+          </li>
+          <li>
+            <strong className="text-[var(--vscode-foreground)]">Reword</strong> — just give the target a
+            new message.
+          </li>
+        </ul>
+
+        <p className={`${bodyTextClassName} mt-3`}>
+          Choose staged changes only or all tracked changes (<code>-a</code>), and the command preview
+          shows exactly what runs.
+        </p>
+
+        <section className={`${calloutClassName} mt-4`}>
+          <h3 className={dialogSectionLabelClassName}>Apply them with autosquash</h3>
+          <p className={bodyTextClassName}>
+            <em>Rebase Current Branch onto This Commit</em> has a new <em>Autosquash</em> checkbox that
+            folds these commits into their targets and tells you how many will be applied. The
+            interactive rebase does it for you: when it finds them, it moves each one under its target
+            before you start, and you can still adjust the plan or uncheck it.
+          </p>
+        </section>
+      </>
+    ),
+  },
+  {
     version: '5.15.0',
     headline: 'Double-click a branch badge to switch branches.',
     content: (
