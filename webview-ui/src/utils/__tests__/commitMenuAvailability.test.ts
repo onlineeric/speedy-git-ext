@@ -186,3 +186,19 @@ describe('hasRemoteCounterpart', () => {
     expect(hasRemoteCounterpart(branches, 'nope')).toBe(false);
   });
 });
+
+describe('canCreateFixup', () => {
+  it('offers a fixup against any real commit: HEAD, merges, roots, off-branch commits', () => {
+    expect(getCommitMenuAvailability({ commit: makeCommit('head', ['parent'], HEAD_REF), ...ON_BRANCH }).canCreateFixup).toBe(true);
+    expect(getCommitMenuAvailability({ commit: makeCommit('abc', ['p1', 'p2']), ...ON_BRANCH }).canCreateFixup).toBe(true);
+    expect(getCommitMenuAvailability({ commit: makeCommit('abc', []), ...ON_BRANCH }).canCreateFixup).toBe(true);
+    expect(
+      getCommitMenuAvailability({ commit: makeCommit('abc'), currentBranchHash: null, isOnFirstParentChain: false }).canCreateFixup,
+    ).toBe(true);
+  });
+
+  it('withholds it from a stash entry', () => {
+    const stash = makeCommit('abc', ['parent'], [{ name: 'stash@{0}', type: 'stash' }]);
+    expect(getCommitMenuAvailability({ commit: stash, ...ON_BRANCH }).canCreateFixup).toBe(false);
+  });
+});

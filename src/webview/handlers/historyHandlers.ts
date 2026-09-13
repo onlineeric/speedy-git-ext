@@ -1,5 +1,8 @@
+import { GitError } from '../../../shared/errors.js';
 import type { RebaseAction } from '../../../shared/types.js';
+import { REBASE_STOPPED_ON_EMPTY_COMMIT_MESSAGE } from '../../services/GitRebaseService.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
+import type { WebviewRequestContext } from '../WebviewRequestContext.js';
 
 // None of the handlers below pre-check the working tree. Git enforces its own
 // preconditions and its error names what is in the way, so a check here could only be
@@ -115,7 +118,14 @@ export const historyHandlers = {
 
   rebase: async (message, context) => {
     if (await postOperationInProgress(context)) return;
-    const rebaseResult = await context.services.current().gitRebaseService.rebase(message.payload.targetRef, message.payload.ignoreDate);
+    const { targetRef, ignoreDate, autosquash } = message.payload;
+    // The version is read only when it can change the command.
+    const gitVersion = autosquash ? (await context.getGitVersion()).version : null;
+    const rebaseResult = await context.services.current().gitRebaseService.rebase(targetRef, {
+      ignoreDate,
+      autosquash,
+      gitVersion,
+    });
     await postRebaseResult(context, rebaseResult);
   },
 
@@ -133,6 +143,17 @@ export const historyHandlers = {
       context.postMessage({ type: 'rebaseCommits', payload: { entries: commitsResult.value } });
     } else {
       context.postMessage({ type: 'error', payload: { error: commitsResult.error } });
+    }
+  },
+
+  getRebaseRangeCommits: async (message, context) => {
+    // Unguarded for the same reason as getRebaseCommits: a read that starts nothing.
+    const { upstream } = message.payload;
+    const result = await context.services.current().gitRebaseService.getRebaseRangeCommits(upstream);
+    if (result.success) {
+      context.postMessage({ type: 'rebaseRangeCommits', payload: { upstream, entries: result.value } });
+    } else {
+      context.postMessage({ type: 'error', payload: { error: result.error } });
     }
   },
 
@@ -154,9 +175,7 @@ export const historyHandlers = {
       await context.refreshCoordinator.reload();
       context.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
     } else if (continueResult.error.code === 'REBASE_CONFLICT') {
-      context.postMessage({ type: 'error', payload: { error: continueResult.error } });
-      const conflictInfo = await context.services.current().gitRebaseService.getConflictInfo();
-      context.postMessage({ type: 'rebaseState', payload: { state: 'in-progress', conflictInfo: conflictInfo.success ? conflictInfo.value : undefined } });
+      await postRebasePaused(context, continueResult.error);
     } else {
       context.postMessage({ type: 'error', payload: { error: continueResult.error } });
     }
@@ -199,9 +218,7 @@ export const historyHandlers = {
       await context.refreshCoordinator.reload();
       context.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
     } else if (result.error.code === 'REBASE_CONFLICT') {
-      context.postMessage({ type: 'error', payload: { error: result.error } });
-      const conflictInfo = await context.services.current().gitRebaseService.getConflictInfo();
-      context.postMessage({ type: 'rebaseState', payload: { state: 'in-progress', conflictInfo: conflictInfo.success ? conflictInfo.value : undefined } });
+      await postRebasePaused(context, result.error);
     } else {
       context.postMessage({ type: 'error', payload: { error: result.error } });
     }
@@ -219,6 +236,7 @@ export const historyHandlers = {
   | 'rebase'
   | 'interactiveRebase'
   | 'getRebaseCommits'
+  | 'getRebaseRangeCommits'
   | 'abortRebase'
   | 'continueRebase'
   | 'isCommitPushed'
@@ -254,6 +272,22 @@ async function postOperationInProgress(
   return true;
 }
 
+/**
+ * Report a paused rebase: the error toast, then the state that drives the banner.
+ *
+ * A pause with nothing to resolve is git stopping on a commit that became empty,
+ * so the toast says that instead of sending the user looking for conflicts.
+ */
+async function postRebasePaused(context: WebviewRequestContext, error: GitError): Promise<void> {
+  const conflictInfo = await context.services.current().gitRebaseService.getConflictInfo();
+  const info = conflictInfo.success ? conflictInfo.value : undefined;
+  const reported = info?.stoppedOnEmptyCommit
+    ? new GitError(REBASE_STOPPED_ON_EMPTY_COMMIT_MESSAGE, error.code, error.command, error.stderr)
+    : error;
+  context.postMessage({ type: 'error', payload: { error: reported } });
+  context.postMessage({ type: 'rebaseState', payload: { state: 'in-progress', conflictInfo: info } });
+}
+
 async function postRebaseResult(
   context: Parameters<typeof historyHandlers.rebase>[1],
   result: Awaited<ReturnType<ReturnType<typeof context.services.current>['gitRebaseService']['rebase']>>,
@@ -263,9 +297,7 @@ async function postRebaseResult(
     await context.refreshCoordinator.reload();
     context.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });
   } else if (result.error.code === 'REBASE_CONFLICT') {
-    context.postMessage({ type: 'error', payload: { error: result.error } });
-    const conflictInfo = await context.services.current().gitRebaseService.getConflictInfo();
-    context.postMessage({ type: 'rebaseState', payload: { state: 'in-progress', conflictInfo: conflictInfo.success ? conflictInfo.value : undefined } });
+    await postRebasePaused(context, result.error);
   } else {
     context.postMessage({ type: 'error', payload: { error: result.error } });
     context.postMessage({ type: 'rebaseState', payload: { state: 'idle' } });

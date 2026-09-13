@@ -51,6 +51,7 @@ import {
 } from '@shared/types';
 import { slotsEqual } from '../utils/compareSlot';
 import type { InitialDataPayload } from '@shared/messages';
+import type { GitVersionInfo } from '@shared/gitVersion';
 import { type GraphTopology } from '../utils/graphTopology';
 import { computeHiddenCommitHashes } from '../utils/commitVisibility';
 import { computeMergedTopology, type UncommittedContext } from '../utils/mergedCommits';
@@ -136,6 +137,12 @@ interface GraphStore {
   /** Presence lookups that failed in the current visible column session (047). */
   signaturePresenceFailed: Record<string, boolean>;
   pendingRebaseEntries: RebaseEntry[] | undefined;
+  /**
+   * The installed git's version, fetched lazily by the dialogs that need it and
+   * kept for the session (the git binary does not change per repo). `undefined`
+   * until it arrives; `version: null` inside means unknown, which fails open.
+   */
+  gitVersion: GitVersionInfo | undefined;
   selectedCommits: string[];
   lastClickedHash: string | undefined;
   hasMore: boolean;
@@ -304,6 +311,7 @@ interface GraphStore {
   /** Merge a batch of verification verdicts into the cache and clear their loading flags (047). */
   mergeVerifiedSignatures: (results: Record<string, CommitSignatureInfo | null>) => void;
   setPendingRebaseEntries: (entries: RebaseEntry[] | undefined) => void;
+  setGitVersion: (gitVersion: GitVersionInfo) => void;
   setSelectedCommits: (hashes: string[]) => void;
   setSelectionAnchor: (hash: string | undefined) => void;
   toggleSelectedCommit: (hash: string) => void;
@@ -430,6 +438,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   signaturePresenceLoading: {},
   signaturePresenceFailed: {},
   pendingRebaseEntries: undefined,
+  gitVersion: undefined,
   selectedCommits: [],
   lastClickedHash: undefined,
   hasMore: true,
@@ -802,6 +811,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     };
   }),
   setPendingRebaseEntries: (pendingRebaseEntries) => set({ pendingRebaseEntries }),
+  setGitVersion: (gitVersion) => set({ gitVersion }),
   setSelectedCommits: (selectedCommits) => set({ selectedCommits }),
   setSelectionAnchor: (lastClickedHash) => set({ lastClickedHash }),
   toggleSelectedCommit: (hash) => set((state) => {

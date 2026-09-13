@@ -196,10 +196,10 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
     [fastForwardTargetIsCurrent, fastForwardRemote, refInfo.name, fastForwardSetUpstream],
   );
 
-  const handleRebaseConfirm = (ignoreDate: boolean) => {
+  const handleRebaseConfirm = (options: { ignoreDate: boolean; autosquash: boolean }) => {
     setRebaseConfirmOpen(false);
     useGraphStore.getState().setLoading(true);
-    rpcClient.rebase(displayName, ignoreDate);
+    rpcClient.rebase(displayName, options);
   };
 
   // Find remote counterpart for local branch (used in delete dialog)
@@ -545,6 +545,7 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
         title="Rebase Current Branch"
         description={`Rebase the current branch onto '${displayName}'? This will rewrite commit history. Pushed commits will require a force-push.`}
         targetRef={displayName}
+        surface={menuSurface}
       />
 
       {/* Create worktree dialog (local branch, remote-only badge, or tag) */}

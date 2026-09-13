@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { Commit } from '@shared/types';
 import type { UiSurface } from '@shared/telemetry';
@@ -11,9 +11,9 @@ import { hasRemoteCounterpart } from '../utils/commitMenuAvailability';
 import { buildAmendCommand, buildPushCommand } from '../utils/gitCommandBuilder';
 import { resolvePublishedBranchRemote } from '../utils/resolveDefaultRemote';
 import { CommandPreview } from './CommandPreview';
+import { CommitCancelButton, CommitHookWaitNotice } from './CommitHookWait';
 import {
   buttonPrimaryClassName,
-  buttonSecondaryClassName,
   dialogContentClassName,
   dialogContentStyle,
   dialogErrorClassName,
@@ -22,6 +22,7 @@ import {
   dialogWarningClassName,
 } from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
+import { useCommitHookWait } from '../hooks/useCommitHookWait';
 
 interface AmendCommitDialogProps {
   commit: Commit;
@@ -29,24 +30,6 @@ interface AmendCommitDialogProps {
   surface: UiSurface;
   onClose: () => void;
 }
-
-/**
- * How long an amend may run before the dialog stops looking merely slow.
- *
- * Committing runs `pre-commit` and `commit-msg` hooks — git runs them even for a
- * message-only amend — and hook output is invisible from here. In a husky /
- * lint-staged repo that is tens of seconds of apparent nothing, so past this
- * point the wait is named as the repo's own tooling and given a way out. Fast
- * repos finish long before and never see it.
- */
-const HOOK_WAIT_NOTICE_MS = 3_000;
-
-/**
- * Idle, running, and running long enough to name the hooks. One value rather
- * than two booleans: the fourth combination they could spell (waiting on hooks
- * while not amending) does not exist, and every exit has to clear both.
- */
-type AmendPhase = 'idle' | 'amending' | 'waitingOnHooks';
 
 /**
  * The dialog is mounted only while it is open (the menu renders it
@@ -61,9 +44,8 @@ export function AmendCommitDialog({ commit, surface, onClose }: AmendCommitDialo
   const [isPublished, setIsPublished] = useState(false);
   const [includeStaged, setIncludeStaged] = useState(false);
   const [forcePush, setForcePush] = useState(false);
-  const [phase, setPhase] = useState<AmendPhase>('idle');
   const [error, setError] = useState<string | null>(null);
-  const hookNoticeTimer = useRef<ReturnType<typeof setTimeout>>();
+  const hookWait = useCommitHookWait();
 
   const stagedCount = useGraphStore((s) => s.uncommittedCounts.stagedCount);
   // Presence, not verification: the note only needs to know the commit *is*
@@ -104,9 +86,7 @@ export function AmendCommitDialog({ commit, surface, onClose }: AmendCommitDialo
     };
   }, [commit.hash, commit.subject]);
 
-  useEffect(() => () => clearTimeout(hookNoticeTimer.current), []);
-
-  const isAmending = phase !== 'idle';
+  const isAmending = hookWait.isRunning;
 
   // Two separate questions, and they come apart: `isPublished` says the *commit*
   // is on a remote, which stays true when an unpublished branch merely shares a
@@ -137,8 +117,7 @@ export function AmendCommitDialog({ commit, surface, onClose }: AmendCommitDialo
     if (pushTarget) trackUiInteraction(surface, 'amendForcePush');
 
     setError(null);
-    setPhase('amending');
-    hookNoticeTimer.current = setTimeout(() => setPhase('waitingOnHooks'), HOOK_WAIT_NOTICE_MS);
+    hookWait.start();
 
     try {
       await rpcClient.amendCommit(message ?? '', includeStaged, commit.hash);
@@ -147,11 +126,10 @@ export function AmendCommitDialog({ commit, surface, onClose }: AmendCommitDialo
       // `commit-msg` hook that rejects at second 40 must not take the message
       // with it. Only success and the user's own cancel close it.
       setError(String(amendError));
-      setPhase('idle');
-      clearTimeout(hookNoticeTimer.current);
+      hookWait.finish();
       return;
     }
-    clearTimeout(hookNoticeTimer.current);
+    hookWait.finish();
 
     // The amend rewrote the tip, so its hash changed and the selection would
     // otherwise be dropped by the reload that follows.
@@ -272,31 +250,17 @@ export function AmendCommitDialog({ commit, surface, onClose }: AmendCommitDialo
             <CommandPreview command={buildAmendCommand({ includeStaged })} />
             {pushTarget && <CommandPreview command={buildPushCommand(pushTarget)} showLabel={false} />}
 
-            {phase === 'waitingOnHooks' && (
-              <p className={dialogNoteClassName}>
-                Waiting on this repository&apos;s commit hooks. They can take a while; cancelling
-                stops the wait, not the hooks themselves.
-              </p>
-            )}
+            <CommitHookWaitNotice phase={hookWait.phase} />
 
             {error && <p className={dialogErrorClassName}>{error}</p>}
           </div>
 
           <div className="mt-6 flex justify-end gap-2">
-            {phase === 'waitingOnHooks' ? (
-              <button type="button" onClick={() => rpcClient.cancelAmend()} className={buttonSecondaryClassName}>
-                Cancel wait
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => handleOpenChange(false)}
-                disabled={isAmending}
-                className={buttonSecondaryClassName}
-              >
-                Cancel
-              </button>
-            )}
+            <CommitCancelButton
+              phase={hookWait.phase}
+              onCancelWait={() => rpcClient.cancelAmend()}
+              onCancel={() => handleOpenChange(false)}
+            />
             <button
               type="button"
               onClick={() => void handleConfirm()}

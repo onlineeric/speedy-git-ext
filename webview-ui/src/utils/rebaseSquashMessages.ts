@@ -13,14 +13,33 @@ import type { RebaseEntry, SquashGroupMessage } from '@shared/types';
  * message, so joining subjects would silently discard every body and trailer in
  * the group.
  */
+/**
+ * What a `squash` entry adds to its group's message.
+ *
+ * Git comments out the title paragraph of a squashed `squash!` / `fixup!` /
+ * `amend!` commit, because that line only told autosquash where to go; the
+ * blank lines after it then fall away in cleanup. Keeping it would put
+ * `squash! <subject>` into the final message.
+ */
+function squashContribution(message: string): string {
+  if (!/^(squash|fixup|amend)!/.test(message)) return message;
+  const bodyStart = message.search(/\n[ \t]*\n/);
+  return bodyStart < 0 ? '' : message.slice(bodyStart).replace(/^(?:[ \t]*\n)+/, '');
+}
+
 export function buildSquashMessages(entries: RebaseEntry[]): SquashGroupMessage[] {
   const groups: SquashGroupMessage[] = [];
   let currentLeadHash: string | null = null;
   let currentMessages: string[] = [];
+  let currentHasSquash = false;
 
-  /** Close the group being built, if it actually combines more than one message. */
+  /**
+   * Close the group being built, if it has a squash. Keyed on the squash rather
+   * than on how many messages survived: git opens its editor for every such
+   * group, even when a `squash!` contributes nothing but its title.
+   */
   const flush = () => {
-    if (currentLeadHash && currentMessages.length > 1) {
+    if (currentLeadHash && currentHasSquash) {
       groups.push({ groupLeadHash: currentLeadHash, combinedMessage: currentMessages.join('\n\n') });
     }
   };
@@ -32,8 +51,11 @@ export function buildSquashMessages(entries: RebaseEntry[]): SquashGroupMessage[
       flush();
       currentLeadHash = entry.hash;
       currentMessages = [entry.action === 'reword' && entry.rewordMessage ? entry.rewordMessage : entry.message];
+      currentHasSquash = false;
     } else if (entry.action === 'squash') {
-      currentMessages.push(entry.message);
+      currentHasSquash = true;
+      const contribution = squashContribution(entry.message);
+      if (contribution) currentMessages.push(contribution);
     }
     // fixup: silently discard
   }

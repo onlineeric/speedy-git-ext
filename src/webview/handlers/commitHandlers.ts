@@ -27,7 +27,7 @@ export const commitHandlers = {
     }
 
     const controller = new AbortController();
-    context.runtime.activeAmendController = controller;
+    context.runtime.activeCommitController = controller;
     try {
       const result = await context.services.current().gitCommitService.amendCommit({
         message: message.payload.message,
@@ -43,8 +43,8 @@ export const commitHandlers = {
         context.postMessage({ type: 'error', payload: { error: result.error } });
       }
     } finally {
-      if (context.runtime.activeAmendController === controller) {
-        context.runtime.activeAmendController = null;
+      if (context.runtime.activeCommitController === controller) {
+        context.runtime.activeCommitController = null;
       }
     }
   },
@@ -52,6 +52,49 @@ export const commitHandlers = {
   cancelAmend: async (_message, context) => {
     // Ends our wait only. The hook process git spawned keeps running, which is
     // why the reported outcome is observed from HEAD rather than assumed.
-    context.runtime.activeAmendController?.abort();
+    context.runtime.activeCommitController?.abort();
   },
-} satisfies Pick<RequestHandlerMap, 'getCommitMessage' | 'amendCommit' | 'cancelAmend'>;
+
+  createFixupCommit: async (message, context) => {
+    // Same guard as amend: the webview's in-progress flags are only as fresh as
+    // the last refresh, and committing into a paused sequencer operation
+    // silently changes what that operation continues from.
+    const operationError = await context.operationGuard.getOperationInProgressError();
+    if (operationError) {
+      context.postMessage({ type: 'error', payload: { error: operationError } });
+      return;
+    }
+
+    const controller = new AbortController();
+    context.runtime.activeCommitController = controller;
+    try {
+      const result = await context.services.current().gitCommitService.createFixupCommit({
+        ...message.payload,
+        abortSignal: controller.signal,
+      });
+
+      if (result.success) {
+        context.postMessage({ type: 'success', payload: { message: result.value } });
+        await context.refreshCoordinator.reload();
+      } else {
+        context.postMessage({ type: 'error', payload: { error: result.error } });
+      }
+    } finally {
+      if (context.runtime.activeCommitController === controller) {
+        context.runtime.activeCommitController = null;
+      }
+    }
+  },
+
+  cancelFixupCommit: async (_message, context) => {
+    context.runtime.activeCommitController?.abort();
+  },
+
+  getGitVersion: async (_message, context) => {
+    const { raw } = await context.getGitVersion();
+    context.postMessage({ type: 'gitVersion', payload: { raw } });
+  },
+} satisfies Pick<
+  RequestHandlerMap,
+  'getCommitMessage' | 'amendCommit' | 'cancelAmend' | 'createFixupCommit' | 'cancelFixupCommit' | 'getGitVersion'
+>;

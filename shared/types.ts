@@ -788,4 +788,10 @@ export interface RebaseConflictInfo {
   conflictedFiles: string[];
   conflictCommitHash: string;
   conflictCommitMessage: string;
+  /**
+   * The rebase paused with no conflicted files and a clean index and worktree:
+   * `git rebase -i` stopped on a commit that became empty, and there is nothing
+   * to resolve — only continue or abort.
+   */
+  stoppedOnEmptyCommit: boolean;
 }

@@ -1,5 +1,7 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
-import type { BranchCheckoutTarget, CherryPickOptions, CompareMode, GraphFilters, InteractiveRebaseConfig, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting, WorktreeFolderNameStyle } from '@shared/types';
+import type { FixupCommitKind } from '@shared/fixupCommit';
+import { parseGitVersion } from '@shared/gitVersion';
+import type { BranchCheckoutTarget, CherryPickOptions, CompareMode, GraphFilters, InteractiveRebaseConfig, RebaseEntry, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting, WorktreeFolderNameStyle } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import {
   decideHeadContinuation,
@@ -45,6 +47,9 @@ class RpcClient {
   private parentRequestIdByHash = new Map<string, number>();
   private pendingPush: { resolve: (message: string) => void; reject: (error: Error) => void } | null = null;
   private pendingCommitMessages = new Map<string, { resolve: (message: string) => void; reject: (error: Error) => void }>();
+  private pendingRebaseRanges = new Map<string, { resolve: (entries: RebaseEntry[]) => void; reject: (error: Error) => void }>();
+  /** A `getGitVersion` request is in flight; the answer is kept in the store for the session. */
+  private gitVersionRequested = false;
   /**
    * One-shot: re-select the head row once the next reloaded commit list lands.
    *
@@ -291,6 +296,19 @@ class RpcClient {
         store.setRebaseInProgress(message.payload.state === 'in-progress');
         store.setRebaseConflictInfo(message.payload.conflictInfo);
         break;
+      case 'rebaseRangeCommits': {
+        const pending = this.pendingRebaseRanges.get(message.payload.upstream);
+        if (pending) {
+          this.pendingRebaseRanges.delete(message.payload.upstream);
+          pending.resolve(message.payload.entries);
+        }
+        break;
+      }
+      case 'gitVersion': {
+        const { raw } = message.payload;
+        store.setGitVersion({ raw, version: raw === null ? null : parseGitVersion(raw) });
+        break;
+      }
       case 'rebaseCommits':
         store.setPendingRebaseEntries(message.payload.entries);
         break;
@@ -644,8 +662,23 @@ class RpcClient {
   }
 
   // Rebase ops
-  rebase(targetRef: string, ignoreDate?: boolean) {
-    this.send({ type: 'rebase', payload: { targetRef, ignoreDate } });
+  rebase(targetRef: string, options: { ignoreDate: boolean; autosquash: boolean }) {
+    this.send({ type: 'rebase', payload: { targetRef, ignoreDate: options.ignoreDate, autosquash: options.autosquash } });
+  }
+
+  /** The commits a rebase onto `upstream` would replay, oldest first. */
+  getRebaseRangeCommits(upstream: string): Promise<RebaseEntry[]> {
+    return new Promise((resolve, reject) => {
+      this.pendingRebaseRanges.set(upstream, { resolve, reject });
+      this.send({ type: 'getRebaseRangeCommits', payload: { upstream } });
+    });
+  }
+
+  /** Ask for the installed git's version once per session; the answer lands in the store. */
+  requestGitVersion() {
+    if (this.gitVersionRequested || useGraphStore.getState().gitVersion !== undefined) return;
+    this.gitVersionRequested = true;
+    this.send({ type: 'getGitVersion', payload: {} });
   }
 
   getRebaseCommits(baseHash: string) {
@@ -715,6 +748,21 @@ class RpcClient {
     this.send({ type: 'cancelAmend', payload: {} });
   }
 
+  /**
+   * Create a fixup/squash/amend! commit, resolving when the backend answers.
+   * Rejects with the backend's own message, so the dialog can stay open.
+   */
+  createFixupCommit(payload: { kind: FixupCommitKind; targetHash: string; includeAllTracked: boolean; message?: string }): Promise<void> {
+    const done = this.awaitNextDialogAction();
+    this.send({ type: 'createFixupCommit', payload });
+    return done;
+  }
+
+  /** Stop waiting on a slow fixup commit. Ends our wait; the hooks git spawned keep running. */
+  cancelFixupCommit() {
+    this.send({ type: 'cancelFixupCommit', payload: {} });
+  }
+
   /** Follow the selection to the head row once the next reloaded commit list lands. */
   selectHeadAfterNextLoad() {
     this.selectHeadOnNextLoad = true;
@@ -757,6 +805,7 @@ class RpcClient {
 
     rejectAll(this.pendingPushedChecks, error);
     rejectAll(this.pendingCommitMessages, error);
+    rejectAll(this.pendingRebaseRanges, error);
     rejectAll(this.pendingParentLookups, error);
     this.parentRequestIdByHash.clear();
   }

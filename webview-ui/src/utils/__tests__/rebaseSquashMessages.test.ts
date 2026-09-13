@@ -60,3 +60,29 @@ describe('buildSquashMessages', () => {
     expect(groups.map((g) => g.groupLeadHash)).toEqual(['aaa1111', 'ccc3333']);
   });
 });
+
+describe('buildSquashMessages — autosquash title lines', () => {
+  it("drops a squash! commit's title line, as git does", () => {
+    const groups = buildSquashMessages([
+      entry('aaa1111', 'Add the widget', 'Why.'),
+      entry('bbb2222', 'squash! Add the widget', 'Extra note.', 'squash'),
+    ]);
+    expect(groups[0].combinedMessage).toBe('Add the widget\n\nWhy.\n\nExtra note.');
+  });
+
+  it('keeps the group when a squash! adds nothing but its title — git still asks for the message', () => {
+    const groups = buildSquashMessages([
+      entry('aaa1111', 'Add the widget', ''),
+      entry('bbb2222', 'squash! Add the widget', '', 'squash'),
+    ]);
+    expect(groups).toEqual([{ groupLeadHash: 'aaa1111', combinedMessage: 'Add the widget' }]);
+  });
+
+  it('leaves an ordinary squash message whole', () => {
+    const groups = buildSquashMessages([
+      entry('aaa1111', 'A', ''),
+      entry('bbb2222', 'Squash! is not a prefix', '', 'squash'),
+    ]);
+    expect(groups[0].combinedMessage).toBe('A\n\nSquash! is not a prefix');
+  });
+});

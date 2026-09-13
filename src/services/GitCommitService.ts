@@ -4,6 +4,8 @@ import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import { trimCommitMessage } from '../utils/gitParsers.js';
 import { validateHash } from '../utils/gitValidation.js';
 import { readHeadHash } from '../utils/gitQueries.js';
+import { buildFixupCommitArgs, fixupKindUsesEditorMessage, type FixupCommitKind } from '../../shared/fixupCommit.js';
+import { createEditorScriptDir, prepareMessageReplacingEditor, removeEditorScriptDir } from './gitEditorScripts.js';
 
 /**
  * Committing runs `pre-commit` and `commit-msg` hooks, and git runs them even
@@ -31,6 +33,36 @@ export interface AmendOptions {
   expectedHead: string;
   abortSignal?: AbortSignal;
 }
+
+export interface FixupCommitOptions {
+  kind: FixupCommitKind;
+  /** Full hash of the commit the new one targets. */
+  targetHash: string;
+  /** `-a`; ignored for `reword`, which git refuses to combine with it. */
+  includeAllTracked: boolean;
+  /** Squash: the optional `-m` text. Amend/reword: the required replacement message. */
+  message?: string;
+  abortSignal?: AbortSignal;
+}
+
+/** How an interrupted commit is named in what we tell the user. */
+interface InterruptedCommitWording {
+  /** "the amend" */
+  operation: string;
+  /** "Commit amended." */
+  done: string;
+  /** "The commit was not amended." */
+  notDone: string;
+  /** "Whether the commit was amended" */
+  unknown: string;
+}
+
+const FIXUP_KIND_PREFIX: Record<FixupCommitKind, string> = {
+  fixup: 'fixup!',
+  squash: 'squash!',
+  amend: 'amend!',
+  reword: 'amend!',
+};
 
 /**
  * Creating and rewriting commits.
@@ -125,59 +157,150 @@ export class GitCommitService {
 
     if (result.success) return ok('Commit amended.');
     if (result.error.code === 'CANCELLED' || result.error.code === 'TIMEOUT') {
-      return this.describeInterruptedAmend(result.error, expectedHead);
+      return this.describeInterruptedCommit(result.error, AMEND_WORDING, async (head) => head !== expectedHead);
     }
     return err(result.error);
   }
 
   /**
-   * Report what an interrupted amend actually did, by looking rather than
+   * `git commit --fixup` / `--squash` on HEAD, targeting another commit.
+   *
+   * Nothing is pre-validated that git validates itself — "nothing to commit",
+   * `-a` with `reword:`, a git too old for `amend:` — so its own error reaches
+   * the user. amend/reword refuse `-m` and `-F`, so their message goes through a
+   * scripted editor that keeps git's `amend! <subject>` title line.
+   */
+  async createFixupCommit(options: FixupCommitOptions): Promise<Result<string>> {
+    const { kind, targetHash, includeAllTracked, message, abortSignal } = options;
+
+    const hashCheck = validateHash(targetHash);
+    if (!hashCheck.success) return hashCheck;
+
+    const usesEditorMessage = fixupKindUsesEditorMessage(kind);
+    if (usesEditorMessage && !message?.trim()) {
+      return err(new GitError('A message is required for an amend! commit.', 'VALIDATION_ERROR'));
+    }
+
+    // Read before running, so an interrupted wait can be judged by looking.
+    const headBefore = await readHeadHash(this.executor, this.workspacePath);
+    if (!headBefore.success) return headBefore;
+
+    const args = buildFixupCommitArgs({
+      kind,
+      targetHash,
+      includeAllTracked,
+      message: kind === 'squash' ? message : undefined,
+    });
+    this.log.info(`Create ${FIXUP_KIND_PREFIX[kind]} commit (${kind}${includeAllTracked ? ', -a' : ''})`);
+
+    const scriptDir = usesEditorMessage ? createEditorScriptDir('speedy-fixup') : null;
+    try {
+      const result = await this.executor.execute({
+        args,
+        cwd: this.workspacePath,
+        // fixup/squash need no editor: GitExecutor's no-op one accepts git's
+        // prepared `fixup! <subject>` / `squash! <subject>` unchanged.
+        env: scriptDir ? prepareMessageReplacingEditor(scriptDir, message ?? '') : undefined,
+        timeout: AMEND_TIMEOUT_MS,
+        abortSignal,
+      });
+
+      const wording = fixupWording(kind);
+      if (result.success) return ok(wording.done);
+      if (result.error.code === 'CANCELLED' || result.error.code === 'TIMEOUT') {
+        return this.describeInterruptedCommit(result.error, wording, (head) =>
+          this.isNewCommitOn(head, headBefore.value),
+        );
+      }
+      return err(result.error);
+    } finally {
+      if (scriptDir) removeEditorScriptDir(scriptDir);
+    }
+  }
+
+  /** A new commit was made iff HEAD moved and its parent is the HEAD we started from. */
+  private async isNewCommitOn(head: string, previousHead: string): Promise<boolean | undefined> {
+    if (head === previousHead) return false;
+    const parent = await this.executor.execute({
+      args: ['rev-parse', '--verify', '--quiet', `${head}^`],
+      cwd: this.workspacePath,
+    });
+    if (!parent.success) return undefined;
+    return parent.value.stdout.trim() === previousHead ? true : undefined;
+  }
+
+  /**
+   * Report what an interrupted commit actually did, by looking rather than
    * assuming.
    *
    * Cancelling and timing out both end our *wait*; neither states the outcome.
    * Hooks run before the commit object is written, so almost always nothing was
    * created — but killing git in the window between the object being written and
-   * the process exiting leaves the amend done. "Did my history get rewritten or
-   * not?" is the worst question to leave a user holding, and an assumption that
-   * is wrong one time in a hundred is exactly how they end up holding it. So HEAD
-   * is re-read and compared with the commit the dialog was opened against.
+   * the process exiting leaves the commit done. "Did my history change or not?"
+   * is the worst question to leave a user holding, and an assumption that is
+   * wrong one time in a hundred is exactly how they end up holding it. So HEAD
+   * is re-read and `wasCompleted` judges it; `undefined` means it cannot tell.
    */
-  private async describeInterruptedAmend(
+  private async describeInterruptedCommit(
     cause: GitError,
-    expectedHead: string
+    wording: InterruptedCommitWording,
+    wasCompleted: (head: string) => Promise<boolean | undefined>,
   ): Promise<Result<string>> {
     const head = await readHeadHash(this.executor, this.workspacePath);
     const stoppedWaiting =
       cause.code === 'TIMEOUT'
-        ? `The amend did not finish within ${AMEND_TIMEOUT_MS / 1000} seconds, so waiting stopped.`
-        : 'Waiting for the amend was cancelled.';
+        ? `${capitalize(wording.operation)} did not finish within ${AMEND_TIMEOUT_MS / 1000} seconds, so waiting stopped.`
+        : `Waiting for ${wording.operation} was cancelled.`;
 
-    if (!head.success) {
+    const completed = head.success ? await wasCompleted(head.value) : undefined;
+
+    if (completed === undefined) {
       // We could not look, so we do not claim. Naming the uncertainty beats
       // guessing in either direction.
       return err(
         new GitError(
-          `${stoppedWaiting} Whether the commit was amended could not be determined — check the graph after refreshing. ${HOOKS_STILL_RUNNING}`,
+          `${stoppedWaiting} ${wording.unknown} could not be determined — check the graph after refreshing. ${HOOKS_STILL_RUNNING}`,
           cause.code,
           cause.command
         )
       );
     }
 
-    if (head.value !== expectedHead) {
+    if (completed) {
       // Observed: the commit object was written before git went away. This is a
-      // completed amend, so it is reported as one — the graph must reload and
+      // completed commit, so it is reported as one — the graph must reload and
       // the dialog must close, exactly as on the ordinary success path.
-      return ok(`Commit amended. ${stoppedWaiting} The amend had already completed. ${HOOKS_STILL_RUNNING}`);
+      return ok(`${wording.done} ${stoppedWaiting} ${capitalize(wording.operation)} had already completed. ${HOOKS_STILL_RUNNING}`);
     }
 
     return err(
       new GitError(
-        `${stoppedWaiting} The commit was not amended. ${HOOKS_STILL_RUNNING}`,
+        `${stoppedWaiting} ${wording.notDone} ${HOOKS_STILL_RUNNING}`,
         cause.code,
         cause.command
       )
     );
   }
 
+}
+
+const AMEND_WORDING: InterruptedCommitWording = {
+  operation: 'the amend',
+  done: 'Commit amended.',
+  notDone: 'The commit was not amended.',
+  unknown: 'Whether the commit was amended',
+};
+
+function fixupWording(kind: FixupCommitKind): InterruptedCommitWording {
+  const prefix = FIXUP_KIND_PREFIX[kind];
+  return {
+    operation: `the ${prefix} commit`,
+    done: `Created ${prefix} commit.`,
+    notDone: `No ${prefix} commit was created.`,
+    unknown: `Whether the ${prefix} commit was created`,
+  };
+}
+
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }

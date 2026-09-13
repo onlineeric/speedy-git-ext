@@ -1,17 +1,62 @@
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
-import * as crypto from 'crypto';
 import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
+import type { GitVersion } from '../../shared/gitVersion.js';
+import { buildRebaseArgs } from '../../shared/rebaseCommand.js';
+import { buildRebaseEditorMessages, buildRebaseTodoLines } from '../../shared/rebaseTodo.js';
 import type { InteractiveRebaseConfig, RebaseConflictInfo, RebaseEntry, RebaseState } from '../../shared/types.js';
 import { validateHash, validateRefName } from '../utils/gitValidation.js';
 import { isConflictStderr, trimCommitMessage } from '../utils/gitParsers.js';
+import {
+  createEditorScriptDir,
+  removeEditorScriptDir,
+  toShellPath,
+  writeEditorFile,
+  writeEditorScript,
+} from './gitEditorScripts.js';
 
-/** Convert Windows backslash paths to forward slashes for Git shell compatibility */
-function toShellPath(p: string): string {
-  return p.replace(/\\/g, '/');
+const REBASE_CONFLICT_MESSAGE =
+  'Rebase paused due to conflict. Resolve conflicts in the Source Control panel, then continue.';
+
+/**
+ * What to say when a paused rebase has nothing to resolve: `git rebase -i`
+ * stops on a commit whose changes are already in the new base.
+ */
+export const REBASE_STOPPED_ON_EMPTY_COMMIT_MESSAGE =
+  'Rebase paused — git stopped at a commit that became empty. Continue or abort.';
+
+/**
+ * `%H\x1f%h\x1f%s\x1f%B` records, NUL-terminated by `-z`.
+ *
+ * `-z` is what makes `%B` readable at all: the raw message is multi-line, so a
+ * newline-delimited stream cannot say where one commit ends and the next
+ * begins. Fields inside a record stay unit-separated.
+ */
+const REBASE_ENTRY_FORMAT = '--format=%H\x1f%h\x1f%s\x1f%B';
+
+function parseRebaseEntryRecords(stdout: string): RebaseEntry[] {
+  const records = stdout.split('\0').filter((record) => record.length > 0);
+  return records.map((record) => {
+    // The message is last, so any `\x1f` it happens to contain rejoins into it
+    // rather than shifting the fields before it.
+    const [hash, abbreviatedHash, subject, ...messageParts] = record.split('\x1f');
+    return {
+      hash: hash.trim(),
+      abbreviatedHash: abbreviatedHash.trim(),
+      subject: subject.trim(),
+      message: trimCommitMessage(messageParts.join('\x1f')),
+      action: 'pick',
+    };
+  });
+}
+
+export interface RebaseOptions {
+  ignoreDate?: boolean;
+  /** Apply `fixup!`/`squash!`/`amend!` commits; the command form is chosen by `gitVersion`. */
+  autosquash?: boolean;
+  gitVersion?: GitVersion | null;
 }
 
 export class GitRebaseService {
@@ -50,7 +95,7 @@ export class GitRebaseService {
     const stoppedShaPath = path.join(this.rebaseMergeDir, 'stopped-sha');
     try {
       const conflictCommitHash = fs.readFileSync(stoppedShaPath, 'utf-8').trim();
-      return ok({ conflictedFiles: [], conflictCommitHash, conflictCommitMessage: '' });
+      return ok({ conflictedFiles: [], conflictCommitHash, conflictCommitMessage: '', stoppedOnEmptyCommit: false });
     } catch {
       return err(new GitError('No stopped-sha file found', 'COMMAND_FAILED'));
     }
@@ -60,52 +105,60 @@ export class GitRebaseService {
     const hashCheck = validateHash(baseHash);
     if (!hashCheck.success) return hashCheck;
 
-    // `-z` terminates each commit record with NUL instead of a newline, which is
-    // what makes `%B` readable at all: the raw message is multi-line, so a
-    // newline-delimited stream cannot say where one commit ends and the next
-    // begins. Fields inside a record stay unit-separated.
     const result = await this.executor.execute({
-      args: ['log', '--reverse', '--ancestry-path', '-z', '--format=%H\x1f%h\x1f%s\x1f%B', `${baseHash}..HEAD`, '--'],
+      args: ['log', '--reverse', '--ancestry-path', '-z', REBASE_ENTRY_FORMAT, `${baseHash}..HEAD`, '--'],
       cwd: this.workspacePath,
     });
     if (!result.success) return result;
 
-    const records = result.value.stdout.split('\0').filter((record) => record.length > 0);
-    const entries: RebaseEntry[] = records.map((record) => {
-      // The message is last, so any `\x1f` it happens to contain rejoins into it
-      // rather than shifting the fields before it.
-      const [hash, abbreviatedHash, subject, ...messageParts] = record.split('\x1f');
-      return {
-        hash: hash.trim(),
-        abbreviatedHash: abbreviatedHash.trim(),
-        subject: subject.trim(),
-        message: trimCommitMessage(messageParts.join('\x1f')),
-        action: 'pick',
-      };
-    });
-
-    return ok(entries);
+    return ok(parseRebaseEntryRecords(result.value.stdout));
   }
 
-  async rebase(targetRef: string, ignoreDate = false): Promise<Result<string>> {
+  /**
+   * The commits `git rebase <upstream>` would replay, oldest first.
+   *
+   * Separate from `getRebaseCommits`, whose `--ancestry-path` returns nothing
+   * when the upstream is on another branch, and which accepts only a hash while
+   * the badge menu rebases onto a ref name. Merges are left out because a plain
+   * rebase drops them.
+   */
+  async getRebaseRangeCommits(upstream: string): Promise<Result<RebaseEntry[]>> {
+    const refCheck = validateRefName(upstream);
+    if (!refCheck.success) return refCheck;
+
+    const result = await this.executor.execute({
+      args: ['log', '--reverse', '--no-merges', '-z', REBASE_ENTRY_FORMAT, `${upstream}..HEAD`, '--'],
+      cwd: this.workspacePath,
+    });
+    if (!result.success) return result;
+
+    return ok(parseRebaseEntryRecords(result.value.stdout));
+  }
+
+  async rebase(targetRef: string, options: RebaseOptions = {}): Promise<Result<string>> {
     const refCheck = validateRefName(targetRef);
     if (!refCheck.success) return refCheck;
 
-    this.log.info(`Rebase onto: ${targetRef}${ignoreDate ? ' (--ignore-date)' : ''}`);
-    const args = ['rebase', targetRef];
-    if (ignoreDate) args.push('--ignore-date');
+    const { args, needsNoOpSequenceEditor } = buildRebaseArgs({
+      targetRef,
+      ignoreDate: options.ignoreDate ?? false,
+      autosquash: options.autosquash ?? false,
+      gitVersion: options.gitVersion ?? null,
+    });
+
+    this.log.info(`Rebase: git ${args.join(' ')}`);
     const result = await this.executor.execute({
       args,
       cwd: this.workspacePath,
+      // `true` exits 0 without touching the file, so git's own autosquashed
+      // todo list runs as prepared.
+      env: needsNoOpSequenceEditor ? { GIT_SEQUENCE_EDITOR: 'true' } : undefined,
     });
 
     if (!result.success) {
       const stderr = result.error.stderr ?? '';
       if (this.isRebaseConflict(stderr)) {
-        return err(new GitError(
-          'Rebase paused due to conflict. Resolve conflicts in the Source Control panel, then continue.',
-          'REBASE_CONFLICT'
-        ));
+        return err(new GitError(REBASE_CONFLICT_MESSAGE, 'REBASE_CONFLICT'));
       }
       return result;
     }
@@ -117,43 +170,27 @@ export class GitRebaseService {
     const hashCheck = validateHash(config.baseHash);
     if (!hashCheck.success) return hashCheck;
 
-    const tmpDir = path.join(os.tmpdir(), `speedy-rebase-${crypto.randomUUID()}`);
-    fs.mkdirSync(tmpDir, { recursive: true });
-
-    this.writeTempScripts(tmpDir, config);
-
-    const sequenceEditor = toShellPath(path.join(tmpDir, 'sequence-editor.sh'));
-    const messageEditor = toShellPath(path.join(tmpDir, 'editor.sh'));
-    const todoPath = toShellPath(path.join(tmpDir, 'todo.txt'));
-    const counterPath = toShellPath(path.join(tmpDir, 'counter.txt'));
+    const tmpDir = createEditorScriptDir('speedy-rebase');
+    const env = this.writeTempScripts(tmpDir, config);
 
     this.log.info(`Interactive rebase from: ${config.baseHash}`);
     const result = await this.executor.execute({
       args: ['rebase', '-i', config.baseHash],
       cwd: this.workspacePath,
-      env: {
-        GIT_SEQUENCE_EDITOR: sequenceEditor,
-        GIT_EDITOR: messageEditor,
-        SPEEDY_TODO_FILE: todoPath,
-        SPEEDY_REBASE_DIR: toShellPath(tmpDir),
-        SPEEDY_COUNTER_FILE: counterPath,
-      },
+      env,
     });
 
     if (!result.success) {
       const stderr = result.error.stderr ?? '';
       if (this.isRebaseConflict(stderr)) {
         this.activeTmpDir = tmpDir;
-        return err(new GitError(
-          'Rebase paused due to conflict. Resolve conflicts in the Source Control panel, then continue.',
-          'REBASE_CONFLICT'
-        ));
+        return err(new GitError(REBASE_CONFLICT_MESSAGE, 'REBASE_CONFLICT'));
       }
-      this.deleteTmpDir(tmpDir);
+      removeEditorScriptDir(tmpDir);
       return result;
     }
 
-    this.deleteTmpDir(tmpDir);
+    removeEditorScriptDir(tmpDir);
     return ok('Interactive rebase completed successfully.');
   }
 
@@ -214,73 +251,64 @@ export class GitRebaseService {
     ]);
 
     const conflictedFiles: string[] = [];
+    let hasTrackedChanges = false;
     if (statusResult.success) {
       for (const line of statusResult.value.stdout.split('\n')) {
+        if (line.length === 0) continue;
         const code = line.substring(0, 2);
         if (/^(UU|AA|DD|AU|UA|DU|UD)/.test(code)) {
           conflictedFiles.push(line.substring(3).trim());
         }
+        if (code !== '??' && code !== '!!') hasTrackedChanges = true;
       }
     }
 
     const conflictCommitMessage = logResult?.success ? logResult.value.stdout.trim() : '';
+    // Nothing conflicted and nothing left in the index or worktree: git stopped
+    // because the commit became empty, not because anything needs resolving.
+    // Only claimed when status was actually read.
+    const stoppedOnEmptyCommit = statusResult.success && !hasTrackedChanges;
 
-    return ok({ conflictedFiles, conflictCommitHash, conflictCommitMessage });
+    return ok({ conflictedFiles, conflictCommitHash, conflictCommitMessage, stoppedOnEmptyCommit });
   }
 
-  private writeTempScripts(tmpDir: string, config: InteractiveRebaseConfig): void {
-    // Build todo sequence
-    const todoLines = config.entries.map((entry) => `${entry.action} ${entry.hash} ${entry.subject}`);
-    const todoPath = path.join(tmpDir, 'todo.txt');
-    fs.writeFileSync(todoPath, todoLines.join('\n') + '\n', 'utf-8');
+  /** Write the todo list, editor messages and both editor scripts; returns the environment to run git with. */
+  private writeTempScripts(tmpDir: string, config: InteractiveRebaseConfig): Record<string, string> {
+    const todoPath = writeEditorFile(tmpDir, 'todo.txt', buildRebaseTodoLines(config.entries).join('\n') + '\n');
 
-    // Sequence editor: copy our todo.txt to the file git passes — uses env var to avoid path injection
-    const seqEditor = '#!/bin/sh\ncp "$SPEEDY_TODO_FILE" "$1"\n';
-    const seqEditorPath = path.join(tmpDir, 'sequence-editor.sh');
-    fs.writeFileSync(seqEditorPath, seqEditor, { mode: 0o755 });
+    // Sequence editor: copy our todo.txt over the file git passes.
+    const sequenceEditor = writeEditorScript(tmpDir, 'sequence-editor.sh', ['cp "$SPEEDY_TODO_FILE" "$1"']);
 
-    // Write message files (reword entries + squash group messages)
-    let msgIndex = 0;
-    for (const entry of config.entries) {
-      if (entry.action === 'reword' && entry.rewordMessage) {
-        const msgPath = path.join(tmpDir, `message-${msgIndex}.txt`);
-        fs.writeFileSync(msgPath, entry.rewordMessage, 'utf-8');
-        msgIndex++;
-      }
-    }
-    for (const sqMsg of config.squashMessages) {
-      const msgPath = path.join(tmpDir, `message-${msgIndex}.txt`);
-      fs.writeFileSync(msgPath, sqMsg.combinedMessage, 'utf-8');
-      msgIndex++;
-    }
+    // One message file per editor call, numbered in the order git makes the calls.
+    buildRebaseEditorMessages(config.entries, config.squashMessages).forEach((message, index) => {
+      writeEditorFile(tmpDir, `message-${index}.txt`, message);
+    });
+    const counterPath = writeEditorFile(tmpDir, 'counter.txt', '0');
 
-    // Counter file for editor
-    const counterPath = path.join(tmpDir, 'counter.txt');
-    fs.writeFileSync(counterPath, '0', 'utf-8');
-
-    // Editor script: reads message-N.txt → $1, increments counter — uses env vars to avoid path injection
-    const editorScript = [
-      '#!/bin/sh',
+    // Editor: copy message-N.txt over $1, then advance the counter.
+    const messageEditor = writeEditorScript(tmpDir, 'editor.sh', [
       'COUNTER=$(cat "$SPEEDY_COUNTER_FILE")',
       'MSG_FILE="${SPEEDY_REBASE_DIR}/message-${COUNTER}.txt"',
       'if [ -f "$MSG_FILE" ]; then',
       '  cp "$MSG_FILE" "$1"',
       'fi',
       'echo $((COUNTER + 1)) > "$SPEEDY_COUNTER_FILE"',
-    ].join('\n') + '\n';
-    const editorPath = path.join(tmpDir, 'editor.sh');
-    fs.writeFileSync(editorPath, editorScript, { mode: 0o755 });
+    ]);
+
+    return {
+      GIT_SEQUENCE_EDITOR: sequenceEditor,
+      GIT_EDITOR: messageEditor,
+      SPEEDY_TODO_FILE: todoPath,
+      SPEEDY_REBASE_DIR: toShellPath(tmpDir),
+      SPEEDY_COUNTER_FILE: counterPath,
+    };
   }
 
   private cleanupActiveTmpDir(): void {
     if (this.activeTmpDir) {
-      this.deleteTmpDir(this.activeTmpDir);
+      removeEditorScriptDir(this.activeTmpDir);
       this.activeTmpDir = null;
     }
-  }
-
-  private deleteTmpDir(dir: string): void {
-    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
   }
 
   private isRebaseConflict(stderr: string): boolean {

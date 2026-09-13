@@ -168,3 +168,83 @@ describe('GitCommitService.amendCommit', () => {
     });
   });
 });
+
+describe('GitCommitService.createFixupCommit', () => {
+  const TARGET = 'cccccccccccccccccccccccccccccccccccccccc';
+
+  it('rejects an invalid target hash before running anything', async () => {
+    const service = new GitCommitService('/repo', mockLog);
+    const spy = vi.spyOn(service['executor'], 'execute');
+    const result = await service.createFixupCommit({ kind: 'fixup', targetHash: 'nope', includeAllTracked: false });
+    expect(result.success).toBe(false);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('runs the shared args with the default no-op editor for fixup and squash', async () => {
+    const service = new GitCommitService('/repo', mockLog);
+    const spy = stubExecutor(service, [HEAD]);
+
+    const result = await service.createFixupCommit({ kind: 'squash', targetHash: TARGET, includeAllTracked: true, message: 'note' });
+
+    expect(result.success).toBe(true);
+    expect(argsOfCommit(spy)).toEqual(['commit', '-a', `--squash=${TARGET}`, '-m', 'note']);
+    expect(commitCall(spy)?.env).toBeUndefined();
+  });
+
+  it('supplies the amend/reword message through a scripted GIT_EDITOR, never -m', async () => {
+    const service = new GitCommitService('/repo', mockLog);
+    const spy = stubExecutor(service, [HEAD]);
+
+    await service.createFixupCommit({ kind: 'reword', targetHash: TARGET, includeAllTracked: true, message: 'New message' });
+
+    expect(argsOfCommit(spy)).toEqual(['commit', `--fixup=reword:${TARGET}`]);
+    expect(commitCall(spy)?.env?.GIT_EDITOR).toMatch(/replace-message-editor\.sh$/);
+  });
+
+  it('refuses amend/reword without a message', async () => {
+    const service = new GitCommitService('/repo', mockLog);
+    const spy = stubExecutor(service, [HEAD]);
+    const result = await service.createFixupCommit({ kind: 'amend', targetHash: TARGET, includeAllTracked: false, message: '  ' });
+    expect(result.success).toBe(false);
+    expect(argsOfCommit(spy)).toBeUndefined();
+  });
+
+  it("passes git's own refusal through", async () => {
+    const service = new GitCommitService('/repo', mockLog);
+    stubExecutor(service, [HEAD], () => err(new GitError('nothing to commit', 'COMMAND_FAILED')));
+    const result = await service.createFixupCommit({ kind: 'fixup', targetHash: TARGET, includeAllTracked: false });
+    expect(!result.success && result.error.message).toBe('nothing to commit');
+  });
+
+  describe('after the wait is cut short', () => {
+    function stubInterrupted(service: GitCommitService, headAfter: string, parentOfHeadAfter: string) {
+      const heads = [HEAD, headAfter];
+      vi.spyOn(service['executor'], 'execute').mockImplementation(async (options) => {
+        if (options.args[0] === 'rev-parse' && options.args[1] === 'HEAD') return stdout(`${heads.shift()}\n`);
+        if (options.args[0] === 'rev-parse') return stdout(`${parentOfHeadAfter}\n`);
+        return err(new GitError('Cancelled', 'CANCELLED'));
+      });
+    }
+
+    it('reports nothing created when HEAD is unchanged', async () => {
+      const service = new GitCommitService('/repo', mockLog);
+      stubInterrupted(service, HEAD, 'unused');
+      const result = await service.createFixupCommit({ kind: 'fixup', targetHash: TARGET, includeAllTracked: false });
+      expect(!result.success && result.error.message).toContain('No fixup! commit was created');
+    });
+
+    it('reports success when the new HEAD sits on the old one', async () => {
+      const service = new GitCommitService('/repo', mockLog);
+      stubInterrupted(service, MOVED_HEAD, HEAD);
+      const result = await service.createFixupCommit({ kind: 'fixup', targetHash: TARGET, includeAllTracked: false });
+      expect(result.success && result.value).toContain('Created fixup! commit.');
+    });
+
+    it('names the uncertainty when HEAD moved somewhere else', async () => {
+      const service = new GitCommitService('/repo', mockLog);
+      stubInterrupted(service, MOVED_HEAD, TARGET);
+      const result = await service.createFixupCommit({ kind: 'squash', targetHash: TARGET, includeAllTracked: false });
+      expect(!result.success && result.error.message).toContain('could not be determined');
+    });
+  });
+});
