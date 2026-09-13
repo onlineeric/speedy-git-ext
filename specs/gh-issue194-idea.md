@@ -8,145 +8,160 @@
 
 ## Problem and intent
 
-The issue requests graph context-menu actions for creating fixup and squash commits without copying a hash into a terminal. It asks that the target be reachable from the current branch's HEAD and that detached HEAD be excluded.
+The current Git workflow in the extension does not provide a straightforward way to create fixup or squash commits directly from the UI. Users must manually perform these actions via the command line, which interrupts the seamless experience the extension aims to provide.
 
-The proposed UX combines these actions into one dialog in the existing Create group, adds explanations, and optionally includes unstaged tracked changes and untracked files. The purpose is to prepare a correction for later history cleanup while keeping normal graph browsing fast.
+## Eric's idea for start brainstorming
 
-## Git semantics that shape the design
+This is my idea, but I want to discuss, improve it. 
+I want to provide a simple, direct, easy to use and easy to understand way for users to create fixup and squash commits from the UI, and then use our existing rebase function to automatically apply them.
 
-| Choice | Git option | Effect when autosquashed later |
-| --- | --- | --- |
-| Fixup | `--fixup=<hash>` | Fold in changes; retain the target message. |
-| Squash | `--squash=<hash>` | Fold in changes; combine messages for review. |
-| Fixup and replace message | `--fixup=amend:<hash>` | Fold in changes; replace the target message. |
+### Phase 1
+Create new menu on the right click menu in the "Create" group.
+The menu name should be something like "Create Fixup/Squash Commit with this commit hash".
+then popup a dialog to confirm the action and provide options, such as choosing between fixup or squash, allow `-a` for stage all tracked files.
+If there are untracked files on local, provide a warning message to user, suggest user to verify, because they will be ignored by this commit, or user need to manually Add them first (`git add -A`).
+We do not provide add untracked files from this dialog, since git command will ignore them unless they are explicitly added.
+I prefer always use commit hash instead of commit message or other identifiers, so the command should be something like `git commit --fixup <commit-hash>` or `git commit --squash <commit-hash>`.
 
-These create new commits at HEAD. Plain `--amend` takes no target hash and immediately replaces HEAD; it belongs in the existing Amend Last Commit workflow. A possible later message-only choice is `--fixup=reword:<hash>`, which ignores staged changes. `-a` includes modified/deleted tracked files, including unstaged portions of partially staged files, but excludes untracked files. [Git commit documentation](https://git-scm.com/docs/git-commit)
+### Phase 2
+Use our existing Rebase function to automatically apply the fixup or squash commits by `--autosquash`. 
+We currently have 2 rebase functions in the extension:
+- Rebase current branch onto this (commit)
+- Start interactive rebase from here
 
-Autosquash reorders marked commits and changes their rebase actions. Its selected range must include the target; a root target needs `--root`. Standard markers use subjects, so duplicate subjects can make target matching ambiguous even when creation used a hash. Users should review the resulting todo list. [Git rebase documentation](https://git-scm.com/docs/git-rebase#Documentation/git-rebase.txt---autosquash)
+we need to evaluate how to make autosquash as a option, such as a checkbox in UI, or on the menu.
 
-## Proposed entry point
+## Phase 1 — Design
 
-- Add **Create Fixup / Squash Commit…** to the Create group, after Create Branch Here and Create Tag Here.
-- Offer the same action from the commit row and ref-badge Create menus. The selected commit is the target regardless of which badge opened the menu.
-- Use one dialog, initially selecting Fixup. Do not persist the mode or inclusion checkboxes between openings in the initial design.
-- Keep the existing Amend Last Commit action separate.
+Confirmed with Eric on 2026-09-13 unless marked **Proposal**.
 
-This name exposes the terms the requester will look for and avoids suggesting that a new commit is inserted directly at the clicked row. The third mode is explained inside the dialog.
+### Verified git behaviour (git 2.43, scratch repo)
 
-## Proposed dialog
+These facts drive the dialog; they were tested, not assumed.
 
-Title: **Create Fixup / Squash Commit**.
+| Command | Needs something to commit? | `-a` allowed? | `-m` / `-F` allowed? | Message when no editor edits it |
+| --- | --- | --- | --- | --- |
+| `--fixup=<hash>` | Yes ("nothing to commit") | Yes | n/a (not offered) | `fixup! <subject>` |
+| `--squash=<hash>` | Yes | Yes | `-m` yes → `squash! <subject>` + blank line + text | `squash! <subject>` |
+| `--fixup=amend:<hash>` | **No** — succeeds with an empty index | Yes | **No** — `-m` and `-F` are both refused | `amend! <subject>` + target's full message |
+| `--fixup=reword:<hash>` | **No** — staged changes are ignored and stay staged | **No** — refused | **No** | `amend! <subject>` + target's full message |
 
-Show the target's abbreviated hash and subject, plus the current branch receiving the new commit. Keep these visible while choosing options.
+- `amend:` and `reword:` take their message **only through the editor**: git opens it prefilled with
+  `amend! <subject>`, a blank line, then the target's full message. At autosquash the text below the
+  title line replaces the target's message.
+- `amend:` / `reword:` need git 2.32+. See "Git version gate" below.
 
-Always show this short explanation:
+### Menu
 
-> Creates a new commit on your current branch. The selected commit stays unchanged until you run an autosquash rebase.
+- **"Create Fixup Commit..."** in the commit group, directly below "Amend Last Commit...". Not in
+  the Create group: branch and tag are created *at* the commit, but a fixup commit is created on
+  HEAD and only *targets* the commit.
+- Shown on every real commit row and on badge menus (which share `useCommitMenuItems`). Hidden on
+  stash rows and the uncommitted row.
+- Disabled (not hidden) while another operation is in progress, like Amend.
+- Single-commit only; no multi-select variant.
 
-Use radio choices with plain descriptions:
+### Dialog
 
-- **Fixup — keep target message** (default): “Add these changes to the target during autosquash.”
-- **Squash — combine messages**: “Add these changes and review the combined commit message during autosquash.”
-- **Fixup — replace target message**: “Add these changes and use the replacement message during autosquash.”
+One dialog for all four kinds. Layout, top to bottom:
 
-### Message fields
+1. **Target** — short hash and subject of the commit.
+2. **Not-an-ancestor warning** (yellow, `dialogWarningClassName`) — shown when the target is not an
+   ancestor of HEAD: autosquash on the current branch will never apply this commit. A warning only;
+   the commit can still be created, because git allows it. Merge-commit targets are allowed with no
+   extra warning in Phase 1.
+3. **Kind** (radio):
+   - Fixup — add changes; the target keeps its message
+   - Squash — add changes; messages are combined
+   - Amend — add changes and replace the target's message
+   - Reword — replace the target's message only
+4. **Include** (radio, disabled for Reword because git refuses `-a` there and ignores the index):
+   - Staged changes only (N files)
+   - All tracked changes, `-a` (N staged + M modified)
+5. **Message**:
+   - Fixup: no message input. A fixup's message is discarded at autosquash.
+   - Squash: an "Add a message" checkbox (`-m`), which enables a textarea. Unchecked commits with
+     plain `squash! <subject>`, which is what git's editor template gives when accepted unchanged.
+   - Amend / Reword: a required textarea prefilled with the target's full message (existing
+     `getCommitMessage` RPC). Confirm is disabled while it is empty, matching git's "an empty
+     message aborts the commit".
+6. **Untracked-files warning** — shown when `untrackedCount > 0` and the kind can include content
+   (not Reword): untracked files are not included, not even by `-a`, so add them first
+   (`git add`). The dialog never adds files itself.
+7. **Nothing-to-commit note** — see below.
+8. **Command preview** — the exact `git commit ...` command.
+9. **Hook wait / cancel** — same behaviour as the Amend dialog.
 
-- Fixup needs no editable message field for the initial feature. Show the generated title as a read-only preview.
-- Squash offers an **Additional message** multiline field. Recommend allowing it to be empty rather than inventing a message requirement beyond Git's generated title.
-- Replacement-message mode offers a required **Replacement commit message** multiline field, prefilled with the target's complete message, including body and trailers. Preserve user edits when switching modes within the same dialog.
-- Keep the generated marker separate from editable text so users cannot accidentally remove it. Show the final message preview with its actual prefix (`fixup!`, `squash!`, or `amend!`).
-- Do not open an external editor or silently accept an unedited message because the extension's Git editor is a no-op. The technical spec must establish a supported message-input path for each mode; amend-fixup cannot simply inherit every ordinary commit message flag.
+**Keeping the dialog height stable:** the conditional sections (warnings, message area) use the
+always-rendered-but-hidden pattern where they would otherwise make the dialog jump as the kind
+changes.
 
-### Included changes
+### Nothing to commit
 
-Always show **Staged changes: N files — included**, including zero. Creating a new commit normally consumes staged work; an extra opt-in for staged changes would make the common path cumbersome.
+Follows git exactly: only Fixup and Squash need content.
 
-Optional checkboxes, both initially off:
+- If the selected include option covers 0 files, Fixup and Squash are disabled with a note that
+  there is nothing to commit, and Amend / Reword remain available.
+- When there are no staged or modified files at all, the dialog opens with **Reword** preselected,
+  so the only action git would accept is the one already chosen. If Reword is unavailable (git older
+  than 2.32), nothing is preselected and Confirm stays disabled.
+- Counts come from the store and may be slightly stale; the backend command is the real check,
+  and a git refusal is shown as an error.
 
-- **Also include unstaged changes to tracked files (`-a`)**. Show the applicable file count and explain that this includes all unstaged portions of partially staged files.
-- **Also include untracked files**. Show only when eligible files exist, with a count. Include non-ignored untracked files only; never force-add ignored files or silently add a nested repository as a gitlink.
+### How the message reaches git (backend)
 
-The options are independent: selecting untracked files must not implicitly include unstaged changes to existing tracked files. Do not implement that combination using an indiscriminate “stage everything” operation.
+"Match the git workflow" here means: where git would open an editor, we collect that text in the
+dialog first. The interactive rebase already works this way: it collects reword/squash messages up
+front, and `GitRebaseService` supplies them through a scripted `GIT_EDITOR` (`editor.sh` + message
+files in a temp dir, `toShellPath` for Windows).
 
-Provide a compact, expandable read-only list of the affected paths, with links to the existing change-review workflow where practical. Keep file/hunk selection in the existing staging UI. Counts for staged and unstaged categories may overlap; a combined file total must deduplicate paths.
+- Fixup: `git commit [-a] --fixup=<fullHash>`, default no-op editor.
+- Squash: `git commit [-a] --squash=<fullHash> [-m <message>]`, default no-op editor.
+- Amend / Reword: `git commit [-a] --fixup=amend:<fullHash>` or `--fixup=reword:<fullHash>` with a
+  scripted `GIT_EDITOR` that **keeps git's own first line** (`amend! <subject>`, which autosquash
+  matches on) and replaces everything below it with the dialog's message. Extract the temp-dir
+  editor-script helper out of `GitRebaseService` so both features share it, rather than duplicating
+  it.
+- Always the full hash, never a subject or other identifier.
+- New RPC(s) in `shared/messages.ts`; `OperationGuard` check before running, as for Amend.
 
-If there are no included content changes, explain what to stage or select and disable creation for the initial three-mode design. A dedicated message-only mode remains an open scope decision.
+### Git version gate
 
-Show a live command preview, including any explicit staging step needed for untracked files. Use the existing dialog styling and a mode-specific primary button: **Create Fixup Commit**, **Create Squash Commit**, or **Create Message-Replacing Fixup**. Cancel closes without staging or committing anything.
+Amend and Reword are **disabled when git is older than 2.32**. This shows git's own limit up front;
+it adds no rule on top of git.
 
-## Availability and correctness
+- The Amend and Reword radios stay visible but disabled, with a note naming the requirement and the
+  detected version (e.g. "Requires git 2.32+ — you have 2.30.1").
+- The version comes from the existing, currently unused `GitConfigService.getGitVersion()`. It is
+  read once and cached on the backend (the git binary does not change per repo), then fetched
+  lazily when the dialog opens. It is never read on the commit-load path.
+- Parsing is a pure util with Vitest tests, e.g. `supportsFixupAmend(version)`. It must handle
+  vendor suffixes such as `2.39.3 (Apple Git-145)` and `2.45.1.windows.1`.
+- **Fail open:** if the version is unknown (lookup failed, or the string can't be parsed), Amend
+  and Reword stay enabled and git's own error is shown if it refuses. A parsing gap must never lock
+  users out of a working feature.
 
-- Require a checked-out local branch, a real target commit reachable from HEAD, no unresolved conflicts, and no merge/rebase/cherry-pick/revert in progress. HEAD itself is a valid target.
-- Membership means ancestry, not a branch decoration or a first-parent-only test. A commit can belong to several branches.
-- Exclude stash pseudo-commits and the uncommitted node.
-- Recommend excluding merge commits as targets in the first version: replaying and autosquashing into a merge requires a separate product design. This is a proposed restriction beyond the issue, requiring maintainer agreement. Ordinary commits behind merges remain eligible for creation, with no promise that a later rebase preserves topology automatically.
-- A root commit may be targeted; explain the later root-inclusive rebase requirement.
-- Keep temporarily unavailable actions disabled consistently with surrounding menu items. Empty staging does not disable opening the dialog: the inclusion options may supply changes.
-- Filtered or partially loaded history must not falsely establish that a commit is outside the branch. Resolve uncertain ancestry on demand through Git without loading all history into the graph.
-- Validate repository identity, branch identity, expected HEAD, target existence/reachability and operation state again before mutation. Switching to a different branch on the same hash also invalidates the dialog's destination.
-- Refresh inclusion information at confirmation. Material differences require renewed review rather than silently widening the approved set. Do not claim this eliminates every race with external tools; the technical spec must define the snapshot and locking strategy.
-- Never retarget to a new repository or branch after navigation. Late responses must stay associated with their original request.
+### Reuse from the Amend dialog
 
-## Running, success and failure
+`AmendCommitDialog` already has the staged-count checkbox, `CommandPreview`, the "waiting on commit
+hooks" phase with cancel, and dialog telemetry. Extract the shared pieces instead of copying them.
 
-- Disable duplicate submission and conflicting extension operations while work runs.
-- Follow the existing amend workflow's longer hook wait, progress and cancellation UX. Preserve normal hooks and signing configuration; no new bypass switches.
-- On success, refresh graph and working-tree status and select the new commit where visible. Do not alter filters just to reveal it; explain when the active filters hide it.
-- On failure, retain the dialog, entered message and choices. Refresh actual status before retrying.
-- Including untracked files may stage them before the commit runs. If the commit fails, report any files that remain staged; do not blindly reset the index, which may also contain prior or external staging changes. Opening or cancelling before execution must never stage files.
-- After timeout/cancellation, inspect actual repository state and report completion or uncertainty. A moved HEAD alone is insufficient proof that this particular request succeeded when external commits are possible. Avoid duplicate commits on retry.
-- No automatic push, force push, amend or rebase follows creation. A published target does not itself make this new commit a history rewrite.
+### Telemetry
 
-## Completing the autosquash workflow
+- Menu item: `createFixupCommit`.
+- Dialog outcome via `useDialogTelemetry`.
+- Enum `kind`: `fixup | squash | amend | reword`; booleans `includeAllTracked` and (squash)
+  `hasMessage`.
+- Never the hash, subject or message text.
 
-Investigation of the current implementation found that `GitRebaseService.interactiveRebase` supplies a custom todo list; the dialog currently handles manually selected squash/fixup actions. Adding `--autosquash` to the command alone would not establish a correct integrated workflow because the custom sequence editor supplies the final list.
+### Known limitation carried into Phase 2
 
-**Confirmed scope:** complete commit creation and clearly explain the separate autosquash step. Autosquash integration in Speedy Git's interactive-rebase dialog is a separate follow-up, outside this feature. Do not claim that the current interactive-rebase UI automatically recognizes the new markers.
+Git writes the target's **subject**, not its hash, into the title (`fixup! <subject>`), and
+autosquash matches on it. If two commits in the rebase range share a subject, the fixup can attach
+to the wrong one. Phase 2 should detect duplicate subjects in the range.
 
-A contextual help example can show `git rebase -i --autosquash <target>^`, with `--root` for a root target. Label it as an example that requires reviewing the range and topology; do not execute it from this dialog. Later rebasing can conflict and rewriting already-published history may require coordination and a force push.
 
-**Separate follow-up:** an Autosquash option in the interactive-rebase dialog that previews the reordered entries, supports replacement-message fixups, resolves targets within the chosen range, preserves message bodies, and fits existing conflict continuation. Its design and implementation belong in a separate spec; this commit-creation feature does not depend on it shipping.
 
-## Performance requirements
 
-- No extra Git commands, message reads or status scans during row rendering, scrolling or initial graph loading.
-- Preserve lazy context-menu construction and memoized rows. Use the existing cached reachability infrastructure where it can give a reliable answer; perform uncertain checks only for the opened menu/dialog.
-- Fetch full message data only when replacement-message mode needs it. Reuse that result within the dialog.
-- Fetch status on demand; keep expensive path lists collapsed and virtualize large lists if necessary. Do not read diffs or file contents merely to compute counts.
-- No full-history fetch or topology recompute for checkbox changes. Command/message previews are local dialog state.
-- Scope asynchronous results and cancellation to the originating repository/request. Coalesce the normal refresh after completion.
 
-## Telemetry review
 
-Review and instrument the menu action, dialog confirmed/cancelled outcome, and commit operation result/duration through existing closed catalogs and helpers. Represent mode and selected inclusion options only through approved fixed enums/booleans or catalog actions supported by the existing schema. Update `telemetry.json` and focused tests during implementation.
-
-Never transmit target hashes, subjects/messages, paths, branch/repository identity, hook output or user input. Do not track typing, preview changes, status refreshes or ancestry checks.
-
-## Product acceptance examples
-
-1. Staged hunks only, default Fixup: creates one correction commit and leaves unstaged hunks untouched.
-2. Tracked checkbox on: includes unstaged tracked modifications/deletions, with the partial-staging consequence visible before confirmation.
-3. Untracked checkbox alone: includes eligible new files and staged changes while preserving unrelated unstaged tracked changes.
-4. Squash: preserves entered additional message and the generated marker.
-5. Replacement-message fixup: preserves the full edited message and leaves the original target unchanged until later autosquash.
-6. Filtered/incomplete graph: on-demand ancestry validation reaches the correct eligibility result without a full-history load.
-7. Branch/repository/HEAD changes, conflicts, hook failure and cancellation: no silent retargeting, lost message or automatic duplicate retry.
-8. Large histories and many changed files: opening the feature does not add per-row work or degrade scrolling.
-9. A later Git autosquash, in a suitable range, produces the expected content and message for each supported mode. Include duplicate-subject and root-target cases in validation.
-
-## Confirmed decisions
-
-- **Third mode: fixup with replacement message** — confirmed by the maintainer on 2026-09-12. Use `--fixup=amend:<hash>` to create a new commit whose replacement message is applied during later autosquash. Immediate Amend Last Commit remains a separate workflow.
-- **Commit creation only; autosquash integration is a separate follow-up** — confirmed by the maintainer on 2026-09-12. Include guidance about the later autosquash step, without enhancing or invoking the interactive-rebase workflow in this feature.
-
-## Decisions to resolve together
-
-1. Confirm **Create Fixup / Squash Commit…** and the proposed default Fixup selection.
-2. Keep three modes initially, or add **Reword only** (`--fixup=reword:<hash>`) for message-only corrections with all content controls disabled?
-3. Agree on the merge-target restriction, detached-HEAD exclusion from the issue, and both inclusion options defaulting off.
-
-No release version or What's New content is decided here. The contributor credit and release dialog belong to the maintainer's release pass.
-
-## Handoff
-
-After product decisions are settled, a technical spec should define message construction/editor handling, supported Git capability checks, staging and snapshot semantics, request correlation, lifecycle ownership, timeout verification, and focused validation. This document does not authorize implementation or changes to repository history.
