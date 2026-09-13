@@ -20,17 +20,17 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-  arrayMove,
 } from '@dnd-kit/sortable';
 import type { RebaseEntry, SquashGroupMessage, InteractiveRebaseConfig } from '@shared/types';
 import type { UiSurface } from '@shared/telemetry';
 import { buildRebaseTodoLines } from '@shared/rebaseTodo';
 import { InteractiveRebaseRow } from './InteractiveRebaseRow';
+import { InteractiveRebaseDragBlock } from './InteractiveRebaseDragBlock';
 import { AutosquashWarnings } from './AutosquashWarnings';
 import { CommandPreview } from './CommandPreview';
 import { buildSquashMessages } from '../utils/rebaseSquashMessages';
 import { applyAutosquash, findAutosquashLinks, isAutosquashDefaultChecked, revertAutosquash } from '../utils/autosquash';
-import { getRebaseGroupPositions } from '../utils/rebaseGroups';
+import { getRebaseDragBlocks, getRebaseGroupPositions, moveRebaseDragBlock } from '../utils/rebaseGroups';
 import { buildInteractiveRebaseCommand } from '../utils/gitCommandBuilder';
 import { trackUiInteraction } from '../utils/telemetry';
 import { rpcClient } from '../rpc/rpcClient';
@@ -91,11 +91,7 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, surfac
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      setEntries((prev) => {
-        const oldIndex = prev.findIndex((e) => e.hash === active.id);
-        const newIndex = prev.findIndex((e) => e.hash === over.id);
-        return arrayMove(prev, oldIndex, newIndex);
-      });
+      setEntries((prev) => moveRebaseDragBlock(prev, String(active.id), String(over.id)));
     }
   }, []);
 
@@ -115,6 +111,7 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, surfac
   };
 
   const groupPositions = useMemo(() => getRebaseGroupPositions(entries), [entries]);
+  const dragBlocks = useMemo(() => getRebaseDragBlocks(entries), [entries]);
 
   const handleNext = () => {
     const error = validateStep1(entries);
@@ -193,7 +190,7 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, surfac
             {step === 1 && (
               <div>
                 <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
-                  Drag to reorder commits. Assign actions for each entry.
+                  Drag to reorder commits; a squash group moves as one. Assign actions for each entry.
                 </p>
                 <label
                   className={`flex items-center gap-2 mb-2 select-none ${hasAutosquashLinks ? 'cursor-pointer' : 'opacity-60'}`}
@@ -216,15 +213,25 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, surfac
                   </div>
                 )}
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <SortableContext items={entries.map((e) => e.hash)} strategy={verticalListSortingStrategy}>
-                    {entries.map((entry, idx) => (
-                      <InteractiveRebaseRow
-                        key={entry.hash}
-                        entry={entry}
-                        isFirst={idx === 0}
-                        groupPosition={groupPositions[idx]}
-                        onChange={handleEntryChange}
-                      />
+                  <SortableContext items={dragBlocks.map((block) => block.id)} strategy={verticalListSortingStrategy}>
+                    {dragBlocks.map((block) => (
+                      <InteractiveRebaseDragBlock key={block.id} id={block.id}>
+                        {(dragHandle) =>
+                          block.entries.map((entry, offset) => {
+                            const idx = block.startIndex + offset;
+                            return (
+                              <InteractiveRebaseRow
+                                key={entry.hash}
+                                entry={entry}
+                                isFirst={idx === 0}
+                                groupPosition={groupPositions[idx]}
+                                dragHandle={dragHandle}
+                                onChange={handleEntryChange}
+                              />
+                            );
+                          })
+                        }
+                      </InteractiveRebaseDragBlock>
                     ))}
                   </SortableContext>
                 </DndContext>

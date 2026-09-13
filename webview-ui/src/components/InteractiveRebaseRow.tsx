@@ -1,8 +1,7 @@
 import { memo } from 'react';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import type { RebaseEntry, RebaseAction } from '@shared/types';
 import type { RebaseGroupPosition } from '../utils/rebaseGroups';
+import type { RebaseDragHandleProps } from './InteractiveRebaseDragBlock';
 import { ACCENT_COLOR } from '../utils/themeColors';
 
 interface InteractiveRebaseRowProps {
@@ -10,6 +9,8 @@ interface InteractiveRebaseRowProps {
   isFirst: boolean;
   /** Where this row sits in a squash group's bracket. */
   groupPosition: RebaseGroupPosition;
+  /** Handle of the drag block this row belongs to — the whole group for a grouped row. */
+  dragHandle: RebaseDragHandleProps;
   onChange: (hash: string, updates: Partial<RebaseEntry>) => void;
 }
 
@@ -46,18 +47,9 @@ export const InteractiveRebaseRow = memo(function InteractiveRebaseRow({
   entry,
   isFirst,
   groupPosition,
+  dragHandle,
   onChange,
 }: InteractiveRebaseRowProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: entry.hash,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
   const handleActionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const action = e.target.value as RebaseAction;
     onChange(entry.hash, {
@@ -77,8 +69,6 @@ export const InteractiveRebaseRow = memo(function InteractiveRebaseRow({
 
   return (
     <div
-      ref={setNodeRef}
-      style={style}
       className={`flex gap-2 p-2 mb-1 rounded border ${
         isDropped
           ? 'border-[var(--vscode-inputValidation-errorBorder)] opacity-60'
@@ -90,10 +80,10 @@ export const InteractiveRebaseRow = memo(function InteractiveRebaseRow({
         <div className="flex items-center gap-2">
           {/* Drag handle */}
           <span
-            {...attributes}
-            {...listeners}
+            {...dragHandle.attributes}
+            {...dragHandle.listeners}
             className="cursor-grab text-[var(--vscode-descriptionForeground)] select-none px-1 text-base leading-none"
-            title="Drag to reorder"
+            title={groupPosition === 'none' ? 'Drag to reorder' : 'Drag to reorder this squash group together'}
           >
             ⠿
           </span>

@@ -212,8 +212,9 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── MergeDialog.tsx  RebaseConfirmDialog.tsx  CherryPickDialog.tsx  RevertDialog.tsx
 │                                 #   MergeDialog takes any commit-ish (branch / remote branch / tag / commit) + a kind for wording
 │                                 #   RebaseConfirmDialog: Ignore date + Autosquash (range read on open; ticked iff a commit applies)
-├── DropCommitDialog.tsx  InteractiveRebaseDialog.tsx + InteractiveRebaseRow.tsx (@dnd-kit sortable)
+├── DropCommitDialog.tsx  InteractiveRebaseDialog.tsx + InteractiveRebaseRow.tsx + InteractiveRebaseDragBlock.tsx (@dnd-kit sortable)
 │                                 #   Autosquash checkbox (pre-checked when anything matches), squash-group bracket per row,
+│                                 #   each squash group is one sortable block, so its rows only ever move together,
 │                                 #   command preview on every step and the exact todo list on Confirm
 ├── AmendCommitDialog.tsx         # Amend Last Commit: full-message box, include-staged / force-push options,
 │                                 #   published + signature notes, hook-wait state; stays open on every failure
@@ -302,7 +303,7 @@ utils/
 │                                 #   squash!/fixup!/amend! commit's title paragraph is dropped, as git does
 ├── autosquash.ts                 # PURE: git's autosquash matching ported from sequencer.c (subject, hash prefix,
 │                                 #   subject prefix; nested prefixes) + apply/revert on the todo list. Both rebase dialogs
-├── rebaseGroups.ts               # PURE: lead/member/last position of each interactive-rebase row, from shared groupRebaseEntries
+├── rebaseGroups.ts               # PURE: lead/member/last position of each interactive-rebase row, from shared groupRebaseEntries; drag blocks + block move
 ├── fixupCommitOptions.ts         # PURE: Create Fixup Commit availability, preselection and confirm rules
 ├── branchCheckout.ts             # Shared checkout decisions and interaction dispatch; menu vs double-click
 │                                 #   pull policy, busy/worktree checks, telemetry; reads store only on interaction
