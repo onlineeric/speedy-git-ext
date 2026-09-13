@@ -123,9 +123,9 @@ describe('buildFixupCommitCommand', () => {
     expect(buildFixupCommitCommand({ kind: 'squash', targetHash: 'abc', includeAllTracked: false, hasMessage: true }))
       .toBe('git commit --squash=abc -m <message>');
     expect(buildFixupCommitCommand({ kind: 'amend', targetHash: 'abc', includeAllTracked: false, hasMessage: true }))
-      .toBe('git commit --fixup=amend:abc');
+      .toBe('git commit --cleanup=whitespace --fixup=amend:abc');
     expect(buildFixupCommitCommand({ kind: 'reword', targetHash: 'abc', includeAllTracked: true, hasMessage: true }))
-      .toBe('git commit --fixup=reword:abc');
+      .toBe('git commit --cleanup=whitespace --fixup=reword:abc');
   });
 });
 

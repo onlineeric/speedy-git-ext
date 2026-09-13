@@ -1,19 +1,6 @@
 import type { RebaseEntry, SquashGroupMessage } from '@shared/types';
 
 /**
- * The combined message git will write for each squash group in a rebase plan.
- *
- * A group is a lead entry (`pick` or `reword`) plus every `squash` that follows
- * it; `fixup` contributes nothing by definition, and `drop` is not there at all.
- * Only groups with more than one message are returned — a lone commit keeps the
- * message it already has, so there is nothing to combine.
- *
- * Every contribution is the commit's **complete** message, not its subject.
- * Whatever comes out of here is written verbatim as the resulting commit's whole
- * message, so joining subjects would silently discard every body and trailer in
- * the group.
- */
-/**
  * What a `squash` entry adds to its group's message.
  *
  * Git comments out the title paragraph of a squashed `squash!` / `fixup!` /
@@ -27,6 +14,19 @@ function squashContribution(message: string): string {
   return bodyStart < 0 ? '' : message.slice(bodyStart).replace(/^(?:[ \t]*\n)+/, '');
 }
 
+/**
+ * The combined message git will write for each squash group in a rebase plan.
+ *
+ * A group is a lead entry (`pick` or `reword`) plus every `squash` that follows
+ * it; `fixup` contributes nothing by definition, and `drop` is not there at all.
+ * Every group containing a `squash` is returned — git opens its editor for each
+ * one — while a group of only a lead and fixups keeps its message unasked.
+ *
+ * Every contribution is the commit's **complete** message, not its subject.
+ * Whatever comes out of here is written verbatim as the resulting commit's whole
+ * message, so joining subjects would silently discard every body and trailer in
+ * the group.
+ */
 export function buildSquashMessages(entries: RebaseEntry[]): SquashGroupMessage[] {
   const groups: SquashGroupMessage[] = [];
   let currentLeadHash: string | null = null;

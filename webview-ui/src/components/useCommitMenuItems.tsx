@@ -27,7 +27,7 @@ import { TagCreationDialog } from './TagCreationDialog';
 import { CherryPickDialog } from './CherryPickDialog';
 import { MergeDialog } from './MergeDialog';
 import { InteractiveRebaseDialog } from './InteractiveRebaseDialog';
-import { RebaseConfirmDialog } from './RebaseConfirmDialog';
+import { RebaseConfirmDialog, type RebaseConfirmOptions } from './RebaseConfirmDialog';
 import { RevertDialog } from './RevertDialog';
 import { DropCommitDialog } from './DropCommitDialog';
 import { AmendCommitDialog } from './AmendCommitDialog';
@@ -284,7 +284,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
     [isMultiSelectActive, selectedCommits]
   );
 
-  const handleRebaseOntoCommitConfirm = (options: { ignoreDate: boolean; autosquash: boolean }) => {
+  const handleRebaseOntoCommitConfirm = (options: RebaseConfirmOptions) => {
     setRebaseOntoConfirmOpen(false);
     useGraphStore.getState().setLoading(true);
     rpcClient.rebase(commit.hash, options);

@@ -33,7 +33,7 @@ interface RebaseConfirmDialogProps {
   surface: UiSurface;
 }
 
-/** The commits in `<targetRef>..HEAD`, once per dialog open; `null` while loading or after a failed read. */
+/** The commits a rebase onto `targetRef` would replay, once per dialog open; `null` while loading. */
 type RangeState = { upstream: string; entries: RebaseEntry[] | null } | undefined;
 
 export function RebaseConfirmDialog({
@@ -68,7 +68,10 @@ export function RebaseConfirmDialog({
     rpcClient.getRebaseRangeCommits(targetRef).then(
       (entries) => setRange((current) => (current?.upstream === targetRef ? { upstream: targetRef, entries } : current)),
       () => {
-        // The summary is advisory; the rebase itself still runs. Leave it empty.
+        // The summary is advisory; the rebase itself still runs. Forget the
+        // request, so re-ticking the box (or an unrelated error having
+        // rejected it) asks again instead of leaving the summary blank.
+        setRange((current) => (current?.upstream === targetRef ? undefined : current));
       },
     );
   };

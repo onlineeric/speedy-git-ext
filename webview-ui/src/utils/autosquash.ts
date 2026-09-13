@@ -1,4 +1,5 @@
 import type { RebaseEntry } from '@shared/types';
+import { MIN_HASH_TERM_LENGTH } from './searchFilter';
 
 /**
  * Git's autosquash rules, stated once for both rebase dialogs.
@@ -10,9 +11,9 @@ import type { RebaseEntry } from '@shared/types';
  *   `squash! ` or `amend! `. Repeated prefixes (`fixup! squash! X`) are skipped
  *   to reach the target text; the **outermost** prefix decides the kind.
  * - The target is looked up among **earlier** commits only: an exact subject
- *   match (first occurrence wins); else, when the text has no space, a commit
- *   whose hash starts with it; else the first commit whose subject starts with
- *   the text.
+ *   match (first occurrence wins); else, when the text is 4+ hex digits, a
+ *   commit whose hash starts with it; else the first commit whose subject
+ *   starts with the text.
  * - A matched autosquash commit is no longer a subject target itself, but it can
  *   still be reached by hash or subject prefix, which is how chains attach.
  */
@@ -50,6 +51,16 @@ function skipPrefix(text: string): { kind: AutosquashKind; rest: string } | null
   return null;
 }
 
+/**
+ * The target text as a hash prefix git would resolve, lowercased, or null.
+ * Git reads a commit name from 4 hex digits up (its minimum abbreviation) in
+ * either case; below that, `fixup! add` or `fixup! 1` is not a hash to git and
+ * falls through to the subject-prefix match.
+ */
+function asHashPrefix(text: string): string | null {
+  return text.length >= MIN_HASH_TERM_LENGTH && /^[0-9a-f]+$/i.test(text) ? text.toLowerCase() : null;
+}
+
 /** The kind and target text of an autosquashable subject, or null for an ordinary commit. */
 export function parseAutosquashSubject(subject: string): { kind: AutosquashKind; targetText: string } | null {
   const outer = skipPrefix(subject);
@@ -80,11 +91,14 @@ export function findAutosquashLinks(entries: readonly RebaseEntry[]): Autosquash
       const earlier = entries.slice(0, i);
       const bySubject = indexBySubject.get(targetText);
 
+      const hashPrefix = asHashPrefix(targetText);
+      const byHash = hashPrefix === null ? -1 : earlier.findIndex((other) => other.hash.startsWith(hashPrefix));
+
       if (bySubject !== undefined) {
         targetIndex = bySubject;
         if (earlier.filter((other) => other.subject === targetText).length > 1) ambiguous.add(targetText);
-      } else if (!targetText.includes(' ') && targetText.length > 0 && earlier.some((other) => other.hash.startsWith(targetText))) {
-        targetIndex = earlier.findIndex((other) => other.hash.startsWith(targetText));
+      } else if (byHash >= 0) {
+        targetIndex = byHash;
       } else if (targetText.length > 0) {
         targetIndex = earlier.findIndex((other) => other.subject.startsWith(targetText));
         if (targetIndex >= 0 && earlier.filter((other) => other.subject.startsWith(targetText)).length > 1) {

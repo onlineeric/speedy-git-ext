@@ -21,11 +21,16 @@ describe('buildFixupCommitArgs', () => {
 
   it('amend: --fixup=amend:<hash>, -a allowed, message never on the command line', () => {
     expect(buildFixupCommitArgs({ kind: 'amend', targetHash: HASH, includeAllTracked: true, message: 'new' }))
-      .toEqual(['commit', '-a', `--fixup=amend:${HASH}`]);
+      .toEqual(['commit', '-a', '--cleanup=whitespace', `--fixup=amend:${HASH}`]);
   });
 
   it('reword: never -a, because git refuses it', () => {
     expect(buildFixupCommitArgs({ kind: 'reword', targetHash: HASH, includeAllTracked: true, message: 'new' }))
-      .toEqual(['commit', `--fixup=reword:${HASH}`]);
+      .toEqual(['commit', '--cleanup=whitespace', `--fixup=reword:${HASH}`]);
+  });
+
+  it('amend/reword keep lines starting with # — the editor-supplied message has no comments to strip', () => {
+    expect(buildFixupCommitArgs({ kind: 'amend', targetHash: HASH, includeAllTracked: false })).toContain('--cleanup=whitespace');
+    expect(buildFixupCommitArgs({ kind: 'fixup', targetHash: HASH, includeAllTracked: false })).not.toContain('--cleanup=whitespace');
   });
 });

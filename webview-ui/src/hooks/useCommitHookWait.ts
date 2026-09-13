@@ -26,6 +26,9 @@ export function useCommitHookWait() {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   const start = useCallback(() => {
+    // A second start must not orphan the first timer: it would fire after
+    // `finish` and leave an idle dialog showing "Cancel wait".
+    clearTimeout(timer.current);
     setPhase('running');
     timer.current = setTimeout(() => setPhase('waitingOnHooks'), HOOK_WAIT_NOTICE_MS);
   }, []);

@@ -21,7 +21,7 @@ import { DeleteBranchDialog } from './DeleteBranchDialog';
 import { DeleteTagDialog } from './DeleteTagDialog';
 import { PushTagDialog } from './PushTagDialog';
 import { InputDialog } from './InputDialog';
-import { RebaseConfirmDialog } from './RebaseConfirmDialog';
+import { RebaseConfirmDialog, type RebaseConfirmOptions } from './RebaseConfirmDialog';
 import { MergeDialog } from './MergeDialog';
 import { getRefMergeSource } from '../utils/refMergeSource';
 import { PushDialog } from './PushDialog';
@@ -196,7 +196,7 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
     [fastForwardTargetIsCurrent, fastForwardRemote, refInfo.name, fastForwardSetUpstream],
   );
 
-  const handleRebaseConfirm = (options: { ignoreDate: boolean; autosquash: boolean }) => {
+  const handleRebaseConfirm = (options: RebaseConfirmOptions) => {
     setRebaseConfirmOpen(false);
     useGraphStore.getState().setLoading(true);
     rpcClient.rebase(displayName, options);

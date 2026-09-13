@@ -234,7 +234,7 @@ describe('GitRebaseService.getRebaseRangeCommits', () => {
     expect(result.success).toBe(false);
   });
 
-  it('reads <upstream>..HEAD oldest first, without merges', async () => {
+  it('reads the commits git would replay, in its todo order', async () => {
     const service = new GitRebaseService('/repo', mockLog);
     const spy = vi.spyOn(service['executor'], 'execute').mockResolvedValue({
       success: true,
@@ -243,7 +243,8 @@ describe('GitRebaseService.getRebaseRangeCommits', () => {
 
     const result = await service.getRebaseRangeCommits('origin/main');
     expect(spy.mock.calls[0][0].args).toEqual([
-      'log', '--reverse', '--no-merges', '-z', '--format=%H\x1f%h\x1f%s\x1f%B', 'origin/main..HEAD', '--',
+      'log', '--reverse', '--topo-order', '--no-merges', '--right-only', '--cherry-pick', '-z',
+      '--format=%H\x1f%h\x1f%s\x1f%B', 'origin/main...HEAD', '--',
     ]);
     expect(result.success && result.value).toEqual([
       { hash: 'a'.repeat(40), abbreviatedHash: 'aaaaaaa', subject: 'fixup! X', message: 'fixup! X', action: 'pick' },
@@ -252,8 +253,10 @@ describe('GitRebaseService.getRebaseRangeCommits', () => {
 });
 
 describe('GitRebaseService.getConflictInfo', () => {
-  function stubStatus(service: GitRebaseService, status: string) {
+  /** `hasAmendFile`: git left `rebase-merge/amend`, as it does at an `edit` stop or a rejected reword. */
+  function stubStatus(service: GitRebaseService, status: string, hasAmendFile = false) {
     vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+    vi.mocked(fs.existsSync).mockImplementation((p) => (String(p).endsWith('amend') ? hasAmendFile : true));
     vi.spyOn(service['executor'], 'execute').mockResolvedValue({ success: true, value: { stdout: status, stderr: '' } });
   }
 
@@ -262,6 +265,13 @@ describe('GitRebaseService.getConflictInfo', () => {
     stubStatus(service, '?? untracked.txt\n');
     const result = await service.getConflictInfo();
     expect(result.success && result.value.stoppedOnEmptyCommit).toBe(true);
+  });
+
+  it('does not flag a clean pause at an edit stop or a rejected reword', async () => {
+    const service = new GitRebaseService('/repo', mockLog);
+    stubStatus(service, '', true);
+    const result = await service.getConflictInfo();
+    expect(result.success && result.value.stoppedOnEmptyCommit).toBe(false);
   });
 
   it('does not flag a pause with conflicted files', async () => {

@@ -197,7 +197,7 @@ describe('GitCommitService.createFixupCommit', () => {
 
     await service.createFixupCommit({ kind: 'reword', targetHash: TARGET, includeAllTracked: true, message: 'New message' });
 
-    expect(argsOfCommit(spy)).toEqual(['commit', `--fixup=reword:${TARGET}`]);
+    expect(argsOfCommit(spy)).toEqual(['commit', '--cleanup=whitespace', `--fixup=reword:${TARGET}`]);
     expect(commitCall(spy)?.env?.GIT_EDITOR).toMatch(/replace-message-editor\.sh$/);
   });
 

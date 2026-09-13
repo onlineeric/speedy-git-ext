@@ -33,6 +33,11 @@ export function buildFixupCommitArgs(options: FixupCommitArgsOptions): string[] 
   const { kind, targetHash, includeAllTracked, message } = options;
   const args = ['commit'];
   if (includeAllTracked && fixupKindAcceptsAllTracked(kind)) args.push('-a');
+  // A message that reaches git through the editor is cleaned with `strip` by
+  // default, which deletes every line starting with `#` — an issue reference
+  // like `#123 Fix login` would vanish. The scripted editor leaves no comment
+  // lines of git's in the file, so whitespace cleanup is what `-m` / `-F` get.
+  if (fixupKindUsesEditorMessage(kind)) args.push('--cleanup=whitespace');
 
   switch (kind) {
     case 'fixup':

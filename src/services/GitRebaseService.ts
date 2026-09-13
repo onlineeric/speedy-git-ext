@@ -119,15 +119,22 @@ export class GitRebaseService {
    *
    * Separate from `getRebaseCommits`, whose `--ancestry-path` returns nothing
    * when the upstream is on another branch, and which accepts only a hash while
-   * the badge menu rebases onto a ref name. Merges are left out because a plain
-   * rebase drops them.
+   * the badge menu rebases onto a ref name. The walk mirrors how git builds its
+   * todo list: merges are left out because a plain rebase drops them,
+   * `--cherry-pick --right-only` over the symmetric range drops commits whose
+   * patch is already upstream (so a `fixup!` whose target git skips is not
+   * counted as applied), and `--topo-order` gives git's order, which autosquash
+   * matching ("earlier commits only") depends on.
    */
   async getRebaseRangeCommits(upstream: string): Promise<Result<RebaseEntry[]>> {
     const refCheck = validateRefName(upstream);
     if (!refCheck.success) return refCheck;
 
     const result = await this.executor.execute({
-      args: ['log', '--reverse', '--no-merges', '-z', REBASE_ENTRY_FORMAT, `${upstream}..HEAD`, '--'],
+      args: [
+        'log', '--reverse', '--topo-order', '--no-merges', '--right-only', '--cherry-pick', '-z', REBASE_ENTRY_FORMAT,
+        `${upstream}...HEAD`, '--',
+      ],
       cwd: this.workspacePath,
     });
     if (!result.success) return result;
@@ -138,6 +145,10 @@ export class GitRebaseService {
   async rebase(targetRef: string, options: RebaseOptions = {}): Promise<Result<string>> {
     const refCheck = validateRefName(targetRef);
     if (!refCheck.success) return refCheck;
+    // A new rebase must never continue with an earlier interactive rebase's
+    // message editor: the `-i --autosquash` form opens the editor for squash
+    // groups, and leftover message files would be written into them.
+    this.cleanupActiveTmpDir();
 
     const { args, needsNoOpSequenceEditor } = buildRebaseArgs({
       targetRef,
@@ -169,6 +180,7 @@ export class GitRebaseService {
   async interactiveRebase(config: InteractiveRebaseConfig): Promise<Result<string>> {
     const hashCheck = validateHash(config.baseHash);
     if (!hashCheck.success) return hashCheck;
+    this.cleanupActiveTmpDir();
 
     const tmpDir = createEditorScriptDir('speedy-rebase');
     const env = this.writeTempScripts(tmpDir, config);
@@ -266,8 +278,15 @@ export class GitRebaseService {
     const conflictCommitMessage = logResult?.success ? logResult.value.stdout.trim() : '';
     // Nothing conflicted and nothing left in the index or worktree: git stopped
     // because the commit became empty, not because anything needs resolving.
-    // Only claimed when status was actually read.
-    const stoppedOnEmptyCommit = statusResult.success && !hasTrackedChanges;
+    // Only claimed when status was actually read. A clean tree alone is not
+    // enough: git also pauses cleanly at an `edit` line or when a reword's
+    // `commit-msg` hook rejects, and both leave `rebase-merge/amend` behind,
+    // which an empty-commit stop never writes.
+    const stoppedOnEmptyCommit =
+      statusResult.success &&
+      !hasTrackedChanges &&
+      fs.existsSync(this.rebaseMergeDir) &&
+      !fs.existsSync(path.join(this.rebaseMergeDir, 'amend'));
 
     return ok({ conflictedFiles, conflictCommitHash, conflictCommitMessage, stoppedOnEmptyCommit });
   }

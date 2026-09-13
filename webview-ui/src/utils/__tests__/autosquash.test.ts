@@ -80,6 +80,21 @@ describe('findAutosquashLinks + applyAutosquash — git parity', () => {
     expect(links.map((l) => [l.kind, l.targetHash.slice(0, 7)])).toEqual([['squash', 'abc1234'], ['fixup', 'abc1234']]);
   });
 
+  it('reads a hash only from 4 hex digits up, in either case, as git does', () => {
+    const entries = [
+      entry('add1234', 'Initial'),
+      entry('bbbbbbb', 'add button'),
+      entry('ccccccc', 'fixup! add'),
+      entry('ddddddd', 'fixup! ADD12'),
+    ];
+    const { links } = findAutosquashLinks(entries);
+    // `add` is below git's abbreviation floor, so it matches the subject prefix, not the hash.
+    expect(links.map((l) => [l.hash.slice(0, 7), l.targetHash.slice(0, 7)])).toEqual([
+      ['ccccccc', 'bbbbbbb'],
+      ['ddddddd', 'add1234'],
+    ]);
+  });
+
   it('only looks earlier in the list', () => {
     const entries = [entry('aaaaaaa', 'fixup! Later'), entry('bbbbbbb', 'Later')];
     expect(findAutosquashLinks(entries)).toMatchObject({ links: [], unmatched: ['aaaaaaa'.padEnd(40, '0')] });
