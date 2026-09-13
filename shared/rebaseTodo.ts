@@ -10,6 +10,30 @@ export function buildRebaseTodoLines(entries: readonly RebaseEntry[]): string[] 
   return entries.map((entry) => `${entry.action} ${entry.hash} ${entry.subject}`);
 }
 
+/** A `pick`/`reword` and the `squash`/`fixup` rows that merge into it, as list indices. */
+export interface RebaseEntryGroup {
+  leadIndex: number;
+  memberIndices: number[];
+}
+
+/**
+ * Git's grouping rule, stated once: a `pick`/`reword` opens a group, and each
+ * `squash`/`fixup` joins the nearest group above it. A `drop` belongs to no
+ * group and does not break one; a `squash`/`fixup` with no lead above it
+ * joins nothing. Every lead yields a group, members or not.
+ */
+export function groupRebaseEntries(entries: readonly RebaseEntry[]): RebaseEntryGroup[] {
+  const groups: RebaseEntryGroup[] = [];
+  entries.forEach((entry, index) => {
+    if (entry.action === 'pick' || entry.action === 'reword') {
+      groups.push({ leadIndex: index, memberIndices: [] });
+    } else if (entry.action === 'squash' || entry.action === 'fixup') {
+      groups[groups.length - 1]?.memberIndices.push(index);
+    }
+  });
+  return groups;
+}
+
 /**
  * The messages git will ask the editor for, in the order it asks.
  *
@@ -26,29 +50,17 @@ export function buildRebaseEditorMessages(
 ): string[] {
   const squashMessageByLead = new Map(squashMessages.map((group) => [group.groupLeadHash, group.combinedMessage]));
   const messages: string[] = [];
-  let groupLeadHash: string | null = null;
-  let groupHasSquash = false;
 
-  const closeGroup = () => {
-    const combined = groupLeadHash !== null && groupHasSquash ? squashMessageByLead.get(groupLeadHash) : undefined;
+  for (const { leadIndex, memberIndices } of groupRebaseEntries(entries)) {
+    const lead = entries[leadIndex];
+    // Every reword occupies a slot, message or not: skipping one would shift
+    // each later message onto the wrong editor call.
+    if (lead.action === 'reword') messages.push(lead.rewordMessage || lead.message);
+
+    const hasSquash = memberIndices.some((index) => entries[index].action === 'squash');
+    const combined = hasSquash ? squashMessageByLead.get(lead.hash) : undefined;
     if (combined !== undefined) messages.push(combined);
-  };
-
-  for (const entry of entries) {
-    if (entry.action === 'drop') continue;
-
-    if (entry.action === 'pick' || entry.action === 'reword') {
-      closeGroup();
-      groupLeadHash = entry.hash;
-      groupHasSquash = false;
-      // Every reword occupies a slot, message or not: skipping one would shift
-      // each later message onto the wrong editor call.
-      if (entry.action === 'reword') messages.push(entry.rewordMessage || entry.message);
-    } else if (entry.action === 'squash') {
-      groupHasSquash = true;
-    }
   }
-  closeGroup();
 
   return messages;
 }

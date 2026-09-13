@@ -14,12 +14,6 @@
 /** `[major, minor, patch]`. */
 export type GitVersion = readonly [number, number, number];
 
-/** What the backend read, and what it parses to. `raw` is null when the lookup failed. */
-export interface GitVersionInfo {
-  raw: string | null;
-  version: GitVersion | null;
-}
-
 /** The first git version that has each feature this extension depends on. */
 export const GIT_FEATURE_VERSIONS = {
   /** `--fixup=amend:` / `--fixup=reword:` (and `fixup -C` in the todo list). */

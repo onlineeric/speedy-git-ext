@@ -34,10 +34,8 @@ const TRACKED_OPERATION_LIST = [
   'resetBranch', 'cherryPick', 'abortCherryPick', 'continueCherryPick',
   'revert', 'continueRevert', 'abortRevert',
   'rebase', 'interactiveRebase', 'abortRebase', 'continueRebase', 'dropCommit',
-  // `getCommitMessage` is a read and `cancelAmend` is a control message; neither is an operation.
-  'amendCommit',
-  // Likewise `cancelFixupCommit` is a control message.
-  'createFixupCommit',
+  // `getCommitMessage` is a read and `cancelCommitWait` is a control message; neither is an operation.
+  'amendCommit', 'createFixupCommit',
   'updateSubmodule', 'initSubmodule',
   'addWorktree', 'removeWorktree', 'pruneWorktree', 'openWorktree',
   'stageFiles', 'unstageFiles', 'stageAll', 'unstageAll', 'discardFiles', 'discardAllUnstaged',

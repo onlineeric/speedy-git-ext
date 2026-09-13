@@ -1,5 +1,5 @@
 import type { CompareMode, GraphFilters, SlotValue } from '../../shared/types.js';
-import type { GitVersionInfo } from '../../shared/gitVersion.js';
+import type { GitVersion } from '../../shared/gitVersion.js';
 
 export interface CompareRequestPayload {
   a: SlotValue;
@@ -22,9 +22,9 @@ export class WebviewRuntime {
    * The controller for the commit currently in flight — an amend or a fixup
    * commit — if any.
    *
-   * Here for the same reason the compare controller is: `cancelAmend` /
-   * `cancelFixupCommit` arrive as their own messages, so the thing they cancel
-   * has to outlive the dispatch that started it. One field serves both flows:
+   * Here for the same reason the compare controller is: `cancelCommitWait`
+   * arrives as its own message, so the thing it cancels has to outlive the
+   * dispatch that started it. One field serves both flows:
    * their dialogs are modal and only one commit can be written at a time.
    */
   activeCommitController: AbortController | null = null;
@@ -34,7 +34,7 @@ export class WebviewRuntime {
    * per repo, so repo switches keep it. `undefined` means not read yet; the
    * promise is cached so concurrent askers share one read.
    */
-  gitVersion: Promise<GitVersionInfo> | undefined = undefined;
+  gitVersion: Promise<GitVersion | null> | undefined = undefined;
 
   constructor(public currentRepoPath: string) {}
 

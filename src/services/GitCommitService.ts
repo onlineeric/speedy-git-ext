@@ -4,7 +4,12 @@ import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import { trimCommitMessage } from '../utils/gitParsers.js';
 import { validateHash } from '../utils/gitValidation.js';
 import { readHeadHash } from '../utils/gitQueries.js';
-import { buildFixupCommitArgs, fixupKindUsesEditorMessage, type FixupCommitKind } from '../../shared/fixupCommit.js';
+import {
+  buildFixupCommitArgs,
+  fixupKindUsesEditorMessage,
+  type FixupCommitArgsOptions,
+  type FixupCommitKind,
+} from '../../shared/fixupCommit.js';
 import { createEditorScriptDir, prepareMessageReplacingEditor, removeEditorScriptDir } from './gitEditorScripts.js';
 
 /**
@@ -34,16 +39,8 @@ export interface AmendOptions {
   abortSignal?: AbortSignal;
 }
 
-export interface FixupCommitOptions {
-  kind: FixupCommitKind;
-  /** Full hash of the commit the new one targets. */
-  targetHash: string;
-  /** `-a`; ignored for `reword`, which git refuses to combine with it. */
-  includeAllTracked: boolean;
-  /** Squash: the optional `-m` text. Amend/reword: the required replacement message. */
-  message?: string;
-  abortSignal?: AbortSignal;
-}
+/** Amend/reword require `message`; the builder decides where each kind's message goes. */
+export type FixupCommitOptions = FixupCommitArgsOptions & { abortSignal?: AbortSignal };
 
 /** How an interrupted commit is named in what we tell the user. */
 interface InterruptedCommitWording {
@@ -185,12 +182,7 @@ export class GitCommitService {
     const headBefore = await readHeadHash(this.executor, this.workspacePath);
     if (!headBefore.success) return headBefore;
 
-    const args = buildFixupCommitArgs({
-      kind,
-      targetHash,
-      includeAllTracked,
-      message: kind === 'squash' ? message : undefined,
-    });
+    const args = buildFixupCommitArgs({ kind, targetHash, includeAllTracked, message });
     this.log.info(`Create ${FIXUP_KIND_PREFIX[kind]} commit (${kind}${includeAllTracked ? ', -a' : ''})`);
 
     const scriptDir = usesEditorMessage ? createEditorScriptDir('speedy-fixup') : null;

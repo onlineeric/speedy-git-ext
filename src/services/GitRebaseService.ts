@@ -6,7 +6,7 @@ import { GitError, type Result, ok, err } from '../../shared/errors.js';
 import type { GitVersion } from '../../shared/gitVersion.js';
 import { buildRebaseArgs } from '../../shared/rebaseCommand.js';
 import { buildRebaseEditorMessages, buildRebaseTodoLines } from '../../shared/rebaseTodo.js';
-import type { InteractiveRebaseConfig, RebaseConflictInfo, RebaseEntry, RebaseState } from '../../shared/types.js';
+import type { InteractiveRebaseConfig, RebaseConflictInfo, RebaseEntry, RebaseRangeCommit, RebaseState } from '../../shared/types.js';
 import { validateHash, validateRefName } from '../utils/gitValidation.js';
 import { isConflictStderr, trimCommitMessage } from '../utils/gitParsers.js';
 import {
@@ -126,20 +126,26 @@ export class GitRebaseService {
    * counted as applied), and `--topo-order` gives git's order, which autosquash
    * matching ("earlier commits only") depends on.
    */
-  async getRebaseRangeCommits(upstream: string): Promise<Result<RebaseEntry[]>> {
+  async getRebaseRangeCommits(upstream: string): Promise<Result<RebaseRangeCommit[]>> {
     const refCheck = validateRefName(upstream);
     if (!refCheck.success) return refCheck;
 
+    // Hash and subject only: autosquash matching reads nothing else, and a range
+    // onto a far-away upstream can hold thousands of full messages.
     const result = await this.executor.execute({
       args: [
-        'log', '--reverse', '--topo-order', '--no-merges', '--right-only', '--cherry-pick', '-z', REBASE_ENTRY_FORMAT,
+        'log', '--reverse', '--topo-order', '--no-merges', '--right-only', '--cherry-pick', '-z', '--format=%H\x1f%s',
         `${upstream}...HEAD`, '--',
       ],
       cwd: this.workspacePath,
     });
     if (!result.success) return result;
 
-    return ok(parseRebaseEntryRecords(result.value.stdout));
+    const records = result.value.stdout.split('\0').filter((record) => record.length > 0);
+    return ok(records.map((record) => {
+      const [hash, subject] = record.split('\x1f');
+      return { hash: hash.trim(), subject: subject.trim() };
+    }));
   }
 
   async rebase(targetRef: string, options: RebaseOptions = {}): Promise<Result<string>> {

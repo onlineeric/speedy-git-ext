@@ -146,7 +146,7 @@ export function buildFixupCommitCommand(options: FixupCommitCommandOptions): str
     kind: options.kind,
     targetHash: options.targetHash,
     includeAllTracked: options.includeAllTracked,
-    message: options.kind === 'squash' && options.hasMessage ? '<message>' : undefined,
+    message: options.hasMessage ? '<message>' : undefined,
   });
   return ['git', ...args].join(' ');
 }

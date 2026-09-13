@@ -51,7 +51,7 @@ import {
 } from '@shared/types';
 import { slotsEqual } from '../utils/compareSlot';
 import type { InitialDataPayload } from '@shared/messages';
-import type { GitVersionInfo } from '@shared/gitVersion';
+import type { GitVersion } from '@shared/gitVersion';
 import { type GraphTopology } from '../utils/graphTopology';
 import { computeHiddenCommitHashes } from '../utils/commitVisibility';
 import { computeMergedTopology, type UncommittedContext } from '../utils/mergedCommits';
@@ -140,9 +140,9 @@ interface GraphStore {
   /**
    * The installed git's version, fetched lazily by the dialogs that need it and
    * kept for the session (the git binary does not change per repo). `undefined`
-   * until it arrives; `version: null` inside means unknown, which fails open.
+   * until it arrives; `null` means unknown, which fails open.
    */
-  gitVersion: GitVersionInfo | undefined;
+  gitVersion: GitVersion | null | undefined;
   selectedCommits: string[];
   lastClickedHash: string | undefined;
   hasMore: boolean;
@@ -311,7 +311,7 @@ interface GraphStore {
   /** Merge a batch of verification verdicts into the cache and clear their loading flags (047). */
   mergeVerifiedSignatures: (results: Record<string, CommitSignatureInfo | null>) => void;
   setPendingRebaseEntries: (entries: RebaseEntry[] | undefined) => void;
-  setGitVersion: (gitVersion: GitVersionInfo) => void;
+  setGitVersion: (gitVersion: GitVersion | null) => void;
   setSelectedCommits: (hashes: string[]) => void;
   setSelectionAnchor: (hash: string | undefined) => void;
   toggleSelectedCommit: (hash: string) => void;

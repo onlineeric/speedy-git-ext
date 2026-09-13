@@ -21,11 +21,6 @@ export type FixupKindBlock = 'nothingToCommit' | 'gitTooOld';
 /** Why each kind cannot be chosen right now, or null when it can. */
 export type FixupKindAvailability = Record<FixupCommitKind, FixupKindBlock | null>;
 
-/** Whether this kind puts working-tree content into the commit (reword never does). */
-export function fixupKindIncludesContent(kind: FixupCommitKind): boolean {
-  return kind !== 'reword';
-}
-
 export function includedFileCount(counts: WorkingTreeCounts, includeAllTracked: boolean): number {
   return includeAllTracked ? counts.stagedCount + counts.unstagedCount : counts.stagedCount;
 }

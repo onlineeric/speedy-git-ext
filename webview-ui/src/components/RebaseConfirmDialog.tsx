@@ -1,19 +1,19 @@
 import { useMemo, useState } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
-import type { RebaseEntry } from '@shared/types';
+import type { RebaseRangeCommit } from '@shared/types';
 import type { UiSurface } from '@shared/telemetry';
 import { buildRebaseCommand } from '../utils/gitCommandBuilder';
 import { findAutosquashLinks } from '../utils/autosquash';
 import { trackUiInteraction } from '../utils/telemetry';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
+import { AutosquashWarnings } from './AutosquashWarnings';
 import { CommandPreview } from './CommandPreview';
 import {
   buttonPrimaryClassName,
   buttonSecondaryClassName,
   dialogContentClassName,
   dialogContentStyle,
-  dialogWarningClassName,
 } from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 
@@ -34,7 +34,7 @@ interface RebaseConfirmDialogProps {
 }
 
 /** The commits a rebase onto `targetRef` would replay, once per dialog open; `null` while loading. */
-type RangeState = { upstream: string; entries: RebaseEntry[] | null } | undefined;
+type RangeState = { upstream: string; commits: RebaseRangeCommit[] | null } | undefined;
 
 export function RebaseConfirmDialog({
   open,
@@ -64,9 +64,9 @@ export function RebaseConfirmDialog({
     // the range only to summarise what autosquash will do.
     rpcClient.requestGitVersion();
     if (range?.upstream === targetRef) return;
-    setRange({ upstream: targetRef, entries: null });
+    setRange({ upstream: targetRef, commits: null });
     rpcClient.getRebaseRangeCommits(targetRef).then(
-      (entries) => setRange((current) => (current?.upstream === targetRef ? { upstream: targetRef, entries } : current)),
+      (commits) => setRange((current) => (current?.upstream === targetRef ? { upstream: targetRef, commits } : current)),
       () => {
         // The summary is advisory; the rebase itself still runs. Forget the
         // request, so re-ticking the box (or an unrelated error having
@@ -76,17 +76,9 @@ export function RebaseConfirmDialog({
     );
   };
 
-  const analysis = useMemo(() => {
-    const entries = range?.entries;
-    if (!entries) return null;
-    const { links, unmatched, ambiguousSubjects } = findAutosquashLinks(entries);
-    const subjectByHash = new Map(entries.map((entry) => [entry.hash, entry.subject]));
-    return {
-      appliedCount: links.length,
-      unmatchedSubjects: unmatched.map((hash) => subjectByHash.get(hash) ?? hash),
-      ambiguousSubjects,
-    };
-  }, [range]);
+  const rangeCommits = range?.commits;
+  const analysis = useMemo(() => (rangeCommits ? findAutosquashLinks(rangeCommits) : null), [rangeCommits]);
+  const appliedCount = analysis?.links.length ?? 0;
 
   const handleConfirm = () => {
     dialogTelemetry.confirmed();
@@ -155,26 +147,15 @@ export function RebaseConfirmDialog({
                 className={`text-sm text-[var(--vscode-foreground)] ${analysis ? '' : 'invisible'}`}
                 aria-hidden={!analysis}
               >
-                {analysis?.appliedCount ?? 0} fixup/squash commit{analysis?.appliedCount === 1 ? '' : 's'} will be applied.
+                {appliedCount} fixup/squash commit{appliedCount === 1 ? '' : 's'} will be applied.
               </p>
-              {analysis?.unmatchedSubjects.map((subject) => (
-                <p key={`unmatched:${subject}`} className={dialogWarningClassName}>
-                  <span className="font-mono">{subject}</span> won&apos;t be applied: its target is not among the
-                  rebased commits. Rebase from an earlier commit to include it.
-                </p>
-              ))}
-              {analysis?.ambiguousSubjects.map((subject) => (
-                <p key={`ambiguous:${subject}`} className={dialogWarningClassName}>
-                  More than one commit matches <span className="font-mono">{subject}</span>. Autosquash matches by
-                  subject and may pick the wrong one.
-                </p>
-              ))}
+              {rangeCommits && analysis && <AutosquashWarnings entries={rangeCommits} analysis={analysis} />}
             </div>
           )}
           {targetRef && (
             <div className="mt-4">
               <CommandPreview
-                command={buildRebaseCommand({ targetRef, ignoreDate, autosquash, gitVersion: gitVersion?.version ?? null })}
+                command={buildRebaseCommand({ targetRef, ignoreDate, autosquash, gitVersion: gitVersion ?? null })}
               />
             </div>
           )}

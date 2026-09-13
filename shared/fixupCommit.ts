@@ -12,7 +12,10 @@ export interface FixupCommitArgsOptions {
   targetHash: string;
   /** `-a`. Ignored for `reword`, which git refuses to combine with `-a`. */
   includeAllTracked: boolean;
-  /** Squash only: the `-m` text. amend/reword take their message through git's editor instead. */
+  /**
+   * Squash: the optional `-m` text. Amend/reword: the replacement message, which
+   * git takes only through its editor, so it never becomes an argument.
+   */
   message?: string;
 }
 
@@ -24,7 +27,10 @@ export function fixupKindUsesEditorMessage(kind: FixupCommitKind): boolean {
   return kind === 'amend' || kind === 'reword';
 }
 
-/** Whether git accepts `-a` for this kind. `--fixup=reword:` refuses it and ignores the index. */
+/**
+ * Whether git accepts `-a` for this kind — equivalently, whether the commit
+ * takes working-tree content at all. `--fixup=reword:` refuses `-a` and ignores the index.
+ */
 export function fixupKindAcceptsAllTracked(kind: FixupCommitKind): boolean {
   return kind !== 'reword';
 }

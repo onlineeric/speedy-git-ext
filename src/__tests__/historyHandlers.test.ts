@@ -169,7 +169,7 @@ describe('historyHandlers — a rebase paused on an empty commit', () => {
   it('reads the git version only for an autosquash rebase', async () => {
     const gitRebaseService = { rebase: vi.fn().mockResolvedValue(ok('done')) };
     const { context } = makeContext(gitRebaseService);
-    const getGitVersion = vi.fn().mockResolvedValue({ raw: '2.44.0', version: [2, 44, 0] });
+    const getGitVersion = vi.fn().mockResolvedValue([2, 44, 0]);
     (context as unknown as { getGitVersion: typeof getGitVersion }).getGitVersion = getGitVersion;
 
     await historyHandlers.rebase({ type: 'rebase', payload: { targetRef: 'main' } }, context);

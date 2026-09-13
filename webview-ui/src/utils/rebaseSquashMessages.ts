@@ -1,4 +1,5 @@
 import type { RebaseEntry, SquashGroupMessage } from '@shared/types';
+import { groupRebaseEntries } from '@shared/rebaseTodo';
 
 /**
  * What a `squash` entry adds to its group's message.
@@ -29,38 +30,19 @@ function squashContribution(message: string): string {
  */
 export function buildSquashMessages(entries: RebaseEntry[]): SquashGroupMessage[] {
   const groups: SquashGroupMessage[] = [];
-  let currentLeadHash: string | null = null;
-  let currentMessages: string[] = [];
-  let currentHasSquash = false;
 
-  /**
-   * Close the group being built, if it has a squash. Keyed on the squash rather
-   * than on how many messages survived: git opens its editor for every such
-   * group, even when a `squash!` contributes nothing but its title.
-   */
-  const flush = () => {
-    if (currentLeadHash && currentHasSquash) {
-      groups.push({ groupLeadHash: currentLeadHash, combinedMessage: currentMessages.join('\n\n') });
-    }
-  };
+  for (const { leadIndex, memberIndices } of groupRebaseEntries(entries)) {
+    const squashes = memberIndices.map((index) => entries[index]).filter((entry) => entry.action === 'squash');
+    // Keyed on the squash rather than on how many messages survive: git opens
+    // its editor for every such group, even when a `squash!` contributes
+    // nothing but its title. fixup members contribute nothing.
+    if (squashes.length === 0) continue;
 
-  for (const entry of entries) {
-    if (entry.action === 'drop') continue;
-
-    if (entry.action === 'pick' || entry.action === 'reword') {
-      flush();
-      currentLeadHash = entry.hash;
-      currentMessages = [entry.action === 'reword' && entry.rewordMessage ? entry.rewordMessage : entry.message];
-      currentHasSquash = false;
-    } else if (entry.action === 'squash') {
-      currentHasSquash = true;
-      const contribution = squashContribution(entry.message);
-      if (contribution) currentMessages.push(contribution);
-    }
-    // fixup: silently discard
+    const lead = entries[leadIndex];
+    const leadMessage = lead.action === 'reword' && lead.rewordMessage ? lead.rewordMessage : lead.message;
+    const contributions = squashes.map((entry) => squashContribution(entry.message)).filter(Boolean);
+    groups.push({ groupLeadHash: lead.hash, combinedMessage: [leadMessage, ...contributions].join('\n\n') });
   }
-
-  flush();
 
   return groups;
 }

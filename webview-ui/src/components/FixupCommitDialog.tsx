@@ -18,7 +18,6 @@ import {
   canConfirmFixup,
   effectiveFixupKind,
   FIXUP_KINDS,
-  fixupKindIncludesContent,
   getFixupKindAvailability,
   getInitialFixupSelection,
   squashMessageToSend,
@@ -33,6 +32,7 @@ import {
   dialogContentClassName,
   dialogContentStyle,
   dialogErrorClassName,
+  dialogMessageTextareaClassName,
   dialogNoteClassName,
   dialogOverlayClassName,
   dialogSectionLabelClassName,
@@ -60,9 +60,6 @@ const KIND_TELEMETRY: Record<FixupCommitKind, UiAction> = {
   amend: 'fixupKindAmend',
   reword: 'fixupKindReword',
 };
-
-const textareaClassName =
-  'w-full resize-y rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] p-2 font-mono text-sm text-[var(--vscode-input-foreground)] disabled:opacity-60';
 
 /**
  * Stacks alternatives in one grid cell and shows only the active one, so the
@@ -92,8 +89,7 @@ export function FixupCommitDialog({ commit, surface, onClose }: FixupCommitDialo
 
   const counts = useGraphStore((s) => s.uncommittedCounts);
   const commits = useGraphStore((s) => s.commits);
-  const gitVersion = useGitVersion();
-  const knownVersion = gitVersion?.version ?? null;
+  const knownVersion = useGitVersion() ?? null;
   const supportsAmendReword = supportsGitFeature(knownVersion, 'fixupAmendReword');
 
   const [initial] = useState(() => getInitialFixupSelection({ counts, supportsAmendReword }));
@@ -159,17 +155,17 @@ export function FixupCommitDialog({ commit, surface, onClose }: FixupCommitDialo
         kind,
         targetHash: commit.hash,
         includeAllTracked: sendsAllTracked,
-        message: fixupKindUsesEditorMessage(kind) ? (replacementMessage ?? '') : kind === 'squash' ? squashMessage : undefined,
+        // The builder places each kind's message; fixup ignores it.
+        message: fixupKindUsesEditorMessage(kind) ? (replacementMessage ?? '') : squashMessage,
       });
+      onClose();
     } catch (createError) {
       // Every failure keeps the dialog open with what was typed — a `commit-msg`
       // hook that rejects at second 40 must not take the message with it.
       setError(String(createError));
+    } finally {
       hookWait.finish();
-      return;
     }
-    hookWait.finish();
-    onClose();
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -183,7 +179,7 @@ export function FixupCommitDialog({ commit, surface, onClose }: FixupCommitDialo
   // is reserved exactly when toggling could make it appear.
   const nothingToCommitPossible = counts.stagedCount === 0;
   const nothingToCommitShown = kind !== null && availability[kind] === 'nothingToCommit';
-  const untrackedShown = counts.untrackedCount > 0 && (kind === null || fixupKindIncludesContent(kind));
+  const untrackedShown = counts.untrackedCount > 0 && (kind === null || fixupKindAcceptsAllTracked(kind));
 
   return (
     <Dialog.Root open onOpenChange={handleOpenChange}>
@@ -299,7 +295,7 @@ export function FixupCommitDialog({ commit, surface, onClose }: FixupCommitDialo
                         rows={5}
                         placeholder="Added below the combined message…"
                         aria-label="Squash message"
-                        className={textareaClassName}
+                        className={dialogMessageTextareaClassName}
                       />
                     </div>
                   ),
@@ -318,7 +314,7 @@ export function FixupCommitDialog({ commit, surface, onClose }: FixupCommitDialo
                         disabled={isRunning || replacementMessage === null || kind === null || !fixupKindUsesEditorMessage(kind)}
                         rows={5}
                         placeholder={replacementMessage === null ? 'Loading commit message…' : 'Commit message…'}
-                        className={textareaClassName}
+                        className={dialogMessageTextareaClassName}
                       />
                     </div>
                   ),
@@ -364,7 +360,6 @@ export function FixupCommitDialog({ commit, surface, onClose }: FixupCommitDialo
           <div className="mt-6 flex justify-end gap-2">
             <CommitCancelButton
               phase={hookWait.phase}
-              onCancelWait={() => rpcClient.cancelFixupCommit()}
               onCancel={() => handleOpenChange(false)}
             />
             <button

@@ -24,7 +24,7 @@ import { GitHubAuthService, type AvatarAuthChange } from '../services/GitHubAuth
 import { GitHubAvatarService } from '../services/GitHubAvatarService.js';
 import { WhatsNewStore } from '../services/WhatsNewStore.js';
 import { GitConfigService } from '../services/GitConfigService.js';
-import { parseGitVersion, type GitVersionInfo } from '../../shared/gitVersion.js';
+import { parseGitVersion, type GitVersion } from '../../shared/gitVersion.js';
 import { clampBatchCommitSize, DEFAULT_USER_SETTINGS } from '../../shared/types.js';
 import { EditorCommandService } from './EditorCommandService.js';
 import { GitServiceRegistry, type GitServiceSet } from './GitServiceRegistry.js';
@@ -380,10 +380,9 @@ export class WebviewProvider {
     return folders?.[0]?.uri.fsPath;
   }
 
-  private async readGitVersion(): Promise<GitVersionInfo> {
+  private async readGitVersion(): Promise<GitVersion | null> {
     const result = await new GitConfigService(this.runtime.currentRepoPath, this.log).getGitVersion();
-    const raw = result.success ? result.value : null;
-    return { raw, version: raw === null ? null : parseGitVersion(raw) };
+    return result.success ? parseGitVersion(result.value) : null;
   }
 
   private getBatchSize(): number {

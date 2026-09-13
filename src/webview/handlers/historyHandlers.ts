@@ -120,7 +120,7 @@ export const historyHandlers = {
     if (await postOperationInProgress(context)) return;
     const { targetRef, ignoreDate, autosquash } = message.payload;
     // The version is read only when it can change the command.
-    const gitVersion = autosquash ? (await context.getGitVersion()).version : null;
+    const gitVersion = autosquash ? await context.getGitVersion() : null;
     const rebaseResult = await context.services.current().gitRebaseService.rebase(targetRef, {
       ignoreDate,
       autosquash,
@@ -151,7 +151,7 @@ export const historyHandlers = {
     const { upstream } = message.payload;
     const result = await context.services.current().gitRebaseService.getRebaseRangeCommits(upstream);
     if (result.success) {
-      context.postMessage({ type: 'rebaseRangeCommits', payload: { upstream, entries: result.value } });
+      context.postMessage({ type: 'rebaseRangeCommits', payload: { upstream, commits: result.value } });
     } else {
       context.postMessage({ type: 'error', payload: { error: result.error } });
     }

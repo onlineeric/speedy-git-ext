@@ -6,7 +6,6 @@ import {
   dialogContentClassName,
   dialogContentStyle,
   dialogNoteClassName,
-  dialogWarningClassName,
 } from './dialogStyles';
 import {
   DndContext,
@@ -27,6 +26,7 @@ import type { RebaseEntry, SquashGroupMessage, InteractiveRebaseConfig } from '@
 import type { UiSurface } from '@shared/telemetry';
 import { buildRebaseTodoLines } from '@shared/rebaseTodo';
 import { InteractiveRebaseRow } from './InteractiveRebaseRow';
+import { AutosquashWarnings } from './AutosquashWarnings';
 import { CommandPreview } from './CommandPreview';
 import { buildSquashMessages } from '../utils/rebaseSquashMessages';
 import { applyAutosquash, findAutosquashLinks, revertAutosquash } from '../utils/autosquash';
@@ -115,7 +115,6 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, surfac
   };
 
   const groupPositions = useMemo(() => getRebaseGroupPositions(entries), [entries]);
-  const subjectByHash = useMemo(() => new Map(initialEntries.map((e) => [e.hash, e.subject])), [initialEntries]);
 
   const handleNext = () => {
     const error = validateStep1(entries);
@@ -213,18 +212,7 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, surfac
                 </label>
                 {(autosquashAnalysis.unmatched.length > 0 || autosquashAnalysis.ambiguousSubjects.length > 0) && (
                   <div className="space-y-1 mb-3">
-                    {autosquashAnalysis.unmatched.map((hash) => (
-                      <p key={`unmatched:${hash}`} className={dialogWarningClassName}>
-                        <span className="font-mono">{subjectByHash.get(hash)}</span> stays pick and won&apos;t be
-                        applied: its target is not in this list. Rebase from an earlier commit to include it.
-                      </p>
-                    ))}
-                    {autosquashAnalysis.ambiguousSubjects.map((subject) => (
-                      <p key={`ambiguous:${subject}`} className={dialogWarningClassName}>
-                        More than one commit matches <span className="font-mono">{subject}</span>. Autosquash matches by
-                        subject and may pick the wrong one.
-                      </p>
-                    ))}
+                    <AutosquashWarnings entries={initialEntries} analysis={autosquashAnalysis} />
                   </div>
                 )}
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

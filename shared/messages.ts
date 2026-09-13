@@ -1,4 +1,4 @@
-import type { BranchCheckoutRequest, Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, MergeState, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, AvatarAuthState, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata, ToolbarBooleanSetting, WorktreeFolderNameStyle, ResolvedWorktreePaths } from './types.js';
+import type { BranchCheckoutRequest, Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, MergeState, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RebaseRangeCommit, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, AvatarAuthState, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata, ToolbarBooleanSetting, WorktreeFolderNameStyle, ResolvedWorktreePaths } from './types.js';
 
 /** Payload for the batched initial data message */
 export interface InitialDataPayload {
@@ -30,7 +30,8 @@ export interface InitialDataPayload {
   errors: string[];
 }
 import type { GitError, GitErrorCode } from './errors.js';
-import type { FixupCommitKind } from './fixupCommit.js';
+import type { FixupCommitArgsOptions } from './fixupCommit.js';
+import type { GitVersion } from './gitVersion.js';
 import type { UiTelemetryEvent } from './telemetry.js';
 
 export type RequestMessage =
@@ -101,16 +102,14 @@ export type RequestMessage =
    * because `git commit --amend` rewrites whatever HEAD is when it runs.
    */
   | { type: 'amendCommit'; payload: { message: string; includeStaged: boolean; expectedHead: string } }
-  /** Stop waiting on a running amend (its hooks may be slow). Ends the wait, not the hooks. */
-  | { type: 'cancelAmend'; payload: Record<string, never> }
   /**
    * `git commit --fixup` / `--squash` targeting `targetHash` (always the full
    * hash). `message` is the squash `-m` text, or the amend/reword replacement
    * message supplied through git's editor.
    */
-  | { type: 'createFixupCommit'; payload: { kind: FixupCommitKind; targetHash: string; includeAllTracked: boolean; message?: string } }
-  /** Stop waiting on a running fixup commit (its hooks may be slow). Ends the wait, not the hooks. */
-  | { type: 'cancelFixupCommit'; payload: Record<string, never> }
+  | { type: 'createFixupCommit'; payload: FixupCommitArgsOptions }
+  /** Stop waiting on the running amend or fixup commit (its hooks may be slow). Ends the wait, not the hooks. */
+  | { type: 'cancelCommitWait'; payload: Record<string, never> }
   /** The installed git's version, read once per panel. Answered with `gitVersion`. */
   | { type: 'getGitVersion'; payload: Record<string, never> }
   | { type: 'isCommitPushed'; payload: { hash: string } }
@@ -243,9 +242,9 @@ export type ResponseMessage =
   | { type: 'rebaseState'; payload: { state: RebaseState; conflictInfo?: RebaseConflictInfo } }
   | { type: 'rebaseCommits'; payload: { entries: RebaseEntry[] } }
   /** Echoes `upstream` so a dialog can ignore a reply to a request it no longer cares about. */
-  | { type: 'rebaseRangeCommits'; payload: { upstream: string; entries: RebaseEntry[] } }
-  /** `raw` is `git --version` without its lead-in, or null when the lookup failed. */
-  | { type: 'gitVersion'; payload: { raw: string | null } }
+  | { type: 'rebaseRangeCommits'; payload: { upstream: string; commits: RebaseRangeCommit[] } }
+  /** `version` is null when the lookup failed or its output could not be parsed. */
+  | { type: 'gitVersion'; payload: { version: GitVersion | null } }
   | { type: 'signatureInfo'; payload: { hash: string; signature: CommitSignatureInfo | null } }
   // Signature history column (047-signing-verification)
   | { type: 'signaturePresence'; payload: { presence: Record<string, SignaturePresence> } }
@@ -327,8 +326,8 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   abortRebase: true, continueRebase: true,
   getSignatureInfo: true, detectSignaturePresence: true, verifySignatures: true, openSignatureHelp: true,
   dropCommit: true, isCommitPushed: true, getCommitParents: true,
-  getCommitMessage: true, amendCommit: true, cancelAmend: true,
-  createFixupCommit: true, cancelFixupCommit: true, getGitVersion: true,
+  getCommitMessage: true, amendCommit: true,
+  createFixupCommit: true, cancelCommitWait: true, getGitVersion: true,
   loadMoreCommits: true, locateHead: true, openSettings: true, switchRepo: true, displayRepo: true,
   getSettings: true, setToolbarSetting: true, setWorktreeFolderNameStyle: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
   getAvatarAuthState: true, requestGitHubAuth: true, removeGitHubAuth: true, setAvatarRefreshDays: true,

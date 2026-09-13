@@ -599,6 +599,12 @@ export interface RebaseEntry {
   rewordMessage?: string;
 }
 
+/**
+ * A commit a plain `git rebase <upstream>` would replay: only what autosquash
+ * matching reads, so the lookup never carries every full message in the range.
+ */
+export type RebaseRangeCommit = Pick<RebaseEntry, 'hash' | 'subject'>;
+
 export interface SquashGroupMessage {
   groupLeadHash: string;
   combinedMessage: string;

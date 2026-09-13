@@ -47,8 +47,8 @@ src/
 │       ├── historyHandlers.ts    # reset/cherry-pick/revert/rebase (+ autosquash, version-chosen) + continue/abort,
 │                                 #   getRebaseRangeCommits, dropCommit; a pause with nothing to resolve is reported
 │                                 #   as "stopped at a commit that became empty"
-│       ├── commitHandlers.ts     # getCommitMessage (%B), amendCommit (guarded, HEAD-verified), cancelAmend,
-│                                 #   createFixupCommit (guarded) / cancelFixupCommit, getGitVersion
+│       ├── commitHandlers.ts     # getCommitMessage (%B), amendCommit (HEAD-verified) + createFixupCommit through one
+│                                 #   guarded, cancellable runner; cancelCommitWait; getGitVersion
 │       ├── signatureHandlers.ts  # presence detection, verification, signature help
 │       ├── submoduleHandlers.ts  # submodule ops + switchRepo/displayRepo navigation
 │       ├── worktreeHandlers.ts   # list/resolve/add/remove/prune/open/reveal worktree; resolves the base dir once
@@ -203,7 +203,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 
 ```
 ├── dialogStyles.ts               # Shared dialog width/resize, the primary/secondary/danger button variants (one shared
-│                                 #   base) and the note/warning/error message boxes (one shared base)
+│                                 #   base), the note/warning/error message boxes (one shared base) and the commit-message textarea
 ├── ConfirmDialog.tsx             # Generic confirm (danger/warning variants) + CommandPreview; optional focusConfirm
 │                                 #   overrides Radix's default Cancel focus where proceeding is the expected answer
 ├── InputDialog.tsx               # Generic single-input dialog + FieldError
@@ -221,6 +221,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 │                                 #   include staged / -a, message per kind in a height-stable slot, not-an-ancestor and
 │                                 #   untracked warnings, nothing-to-commit note, hook-wait; decisions in fixupCommitOptions
 ├── CommitHookWait.tsx            # Hook-wait notice + Cancel / "Cancel wait" button shared by the amend and fixup dialogs
+├── AutosquashWarnings.tsx        # Unmatched / ambiguous autosquash warnings shared by both rebase dialogs
 ├── CreateBranchDialog.tsx  DeleteBranchDialog.tsx  CheckoutWithPullDialog.tsx
 ├── TagCreationDialog.tsx  DeleteTagDialog.tsx  PushTagDialog.tsx
 ├── PushDialog.tsx  RemoteManagementDialog.tsx  StashDialog.tsx
@@ -297,7 +298,7 @@ utils/
 │                                 #   squash!/fixup!/amend! commit's title paragraph is dropped, as git does
 ├── autosquash.ts                 # PURE: git's autosquash matching ported from sequencer.c (subject, hash prefix,
 │                                 #   subject prefix; nested prefixes) + apply/revert on the todo list. Both rebase dialogs
-├── rebaseGroups.ts               # PURE: lead/member/last position of each interactive-rebase row in its squash group
+├── rebaseGroups.ts               # PURE: lead/member/last position of each interactive-rebase row, from shared groupRebaseEntries
 ├── fixupCommitOptions.ts         # PURE: Create Fixup Commit availability, preselection and confirm rules
 ├── branchCheckout.ts             # Shared checkout decisions and interaction dispatch; menu vs double-click
 │                                 #   pull policy, busy/worktree checks, telemetry; reads store only on interaction
@@ -367,7 +368,8 @@ shared/
 │                                 #   (usesNonInteractiveAutosquash)
 ├── fixupCommit.ts                # PURE: `git commit --fixup/--squash` args — the backend runs and the dialog previews them
 ├── rebaseCommand.ts              # PURE: `git rebase` args incl. version-chosen autosquash form (+ no-op sequence editor)
-├── rebaseTodo.ts                 # PURE: interactive rebase todo lines + editor messages in the order git asks for them
+├── rebaseTodo.ts                 # PURE: interactive rebase todo lines, git's squash-group rule (groupRebaseEntries) +
+│                                 #   editor messages in the order git asks for them
 ├── telemetry.ts                  # Closed telemetry catalogs, payload types, buckets, runtime validator
 └── whatsNew.ts                   # PURE: whether the release-notes dialog opens on this run + the countdown lengths
                                   #   (dev always shows, 2s; release shows once per version, 5s), and whether a

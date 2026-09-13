@@ -17,6 +17,7 @@ import {
   dialogContentClassName,
   dialogContentStyle,
   dialogErrorClassName,
+  dialogMessageTextareaClassName,
   dialogNoteClassName,
   dialogOverlayClassName,
   dialogWarningClassName,
@@ -189,7 +190,7 @@ export function AmendCommitDialog({ commit, surface, onClose }: AmendCommitDialo
                 disabled={message === null || isAmending}
                 rows={8}
                 placeholder={message === null ? 'Loading commit message…' : 'Commit message…'}
-                className="w-full resize-y rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] p-2 font-mono text-sm text-[var(--vscode-input-foreground)] disabled:opacity-60"
+                className={dialogMessageTextareaClassName}
               />
             </div>
 
@@ -258,7 +259,6 @@ export function AmendCommitDialog({ commit, surface, onClose }: AmendCommitDialo
           <div className="mt-6 flex justify-end gap-2">
             <CommitCancelButton
               phase={hookWait.phase}
-              onCancelWait={() => rpcClient.cancelAmend()}
               onCancel={() => handleOpenChange(false)}
             />
             <button

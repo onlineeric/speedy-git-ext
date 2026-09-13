@@ -238,17 +238,15 @@ describe('GitRebaseService.getRebaseRangeCommits', () => {
     const service = new GitRebaseService('/repo', mockLog);
     const spy = vi.spyOn(service['executor'], 'execute').mockResolvedValue({
       success: true,
-      value: { stdout: 'a'.repeat(40) + '\x1faaaaaaa\x1ffixup! X\x1ffixup! X\n\0', stderr: '' },
+      value: { stdout: 'a'.repeat(40) + '\x1ffixup! X\0', stderr: '' },
     });
 
     const result = await service.getRebaseRangeCommits('origin/main');
     expect(spy.mock.calls[0][0].args).toEqual([
       'log', '--reverse', '--topo-order', '--no-merges', '--right-only', '--cherry-pick', '-z',
-      '--format=%H\x1f%h\x1f%s\x1f%B', 'origin/main...HEAD', '--',
+      '--format=%H\x1f%s', 'origin/main...HEAD', '--',
     ]);
-    expect(result.success && result.value).toEqual([
-      { hash: 'a'.repeat(40), abbreviatedHash: 'aaaaaaa', subject: 'fixup! X', message: 'fixup! X', action: 'pick' },
-    ]);
+    expect(result.success && result.value).toEqual([{ hash: 'a'.repeat(40), subject: 'fixup! X' }]);
   });
 });
 

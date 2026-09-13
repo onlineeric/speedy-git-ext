@@ -1,4 +1,4 @@
-import type { RebaseEntry } from '@shared/types';
+import type { RebaseEntry, RebaseRangeCommit } from '@shared/types';
 import { MIN_HASH_TERM_LENGTH } from './searchFilter';
 
 /**
@@ -75,45 +75,62 @@ export function parseAutosquashSubject(subject: string): { kind: AutosquashKind;
   return { kind: outer.kind, targetText: rest };
 }
 
-export function findAutosquashLinks(entries: readonly RebaseEntry[]): AutosquashAnalysis {
+/** The first of `entries[0..end)` matching `predicate`, and whether a second one matches too. */
+function firstEarlierMatch(
+  entries: readonly RebaseRangeCommit[],
+  end: number,
+  predicate: (entry: RebaseRangeCommit) => boolean,
+): { index: number; ambiguous: boolean } {
+  let index = -1;
+  for (let j = 0; j < end; j++) {
+    if (!predicate(entries[j])) continue;
+    if (index >= 0) return { index, ambiguous: true };
+    index = j;
+  }
+  return { index, ambiguous: false };
+}
+
+export function findAutosquashLinks(entries: readonly RebaseRangeCommit[]): AutosquashAnalysis {
   const links: AutosquashLink[] = [];
   const unmatched: string[] = [];
   const ambiguous = new Set<string>();
   /** Subject → index of the first ordinary-or-unmatched commit with it (git's `subject2item`). */
   const indexBySubject = new Map<string, number>();
+  /** Subject → how many earlier commits carry it, linked or not. */
+  const subjectCounts = new Map<string, number>();
 
   entries.forEach((entry, i) => {
     const parsed = parseAutosquashSubject(entry.subject);
-    let targetIndex = -1;
+    let linked = false;
 
     if (parsed) {
       const { targetText } = parsed;
-      const earlier = entries.slice(0, i);
-      const bySubject = indexBySubject.get(targetText);
+      let targetIndex = indexBySubject.get(targetText) ?? -1;
 
-      const hashPrefix = asHashPrefix(targetText);
-      const byHash = hashPrefix === null ? -1 : earlier.findIndex((other) => other.hash.startsWith(hashPrefix));
-
-      if (bySubject !== undefined) {
-        targetIndex = bySubject;
-        if (earlier.filter((other) => other.subject === targetText).length > 1) ambiguous.add(targetText);
-      } else if (byHash >= 0) {
-        targetIndex = byHash;
-      } else if (targetText.length > 0) {
-        targetIndex = earlier.findIndex((other) => other.subject.startsWith(targetText));
-        if (targetIndex >= 0 && earlier.filter((other) => other.subject.startsWith(targetText)).length > 1) {
-          ambiguous.add(targetText);
+      if (targetIndex >= 0) {
+        if ((subjectCounts.get(targetText) ?? 0) > 1) ambiguous.add(targetText);
+      } else {
+        const hashPrefix = asHashPrefix(targetText);
+        if (hashPrefix !== null) {
+          targetIndex = firstEarlierMatch(entries, i, (other) => other.hash.startsWith(hashPrefix)).index;
+        }
+        if (targetIndex < 0 && targetText.length > 0) {
+          const byPrefix = firstEarlierMatch(entries, i, (other) => other.subject.startsWith(targetText));
+          targetIndex = byPrefix.index;
+          if (byPrefix.ambiguous) ambiguous.add(targetText);
         }
       }
 
       if (targetIndex >= 0) {
         links.push({ hash: entry.hash, targetHash: entries[targetIndex].hash, kind: parsed.kind });
-        return;
+        linked = true;
+      } else {
+        unmatched.push(entry.hash);
       }
-      unmatched.push(entry.hash);
     }
 
-    if (!indexBySubject.has(entry.subject)) indexBySubject.set(entry.subject, i);
+    if (!linked && !indexBySubject.has(entry.subject)) indexBySubject.set(entry.subject, i);
+    subjectCounts.set(entry.subject, (subjectCounts.get(entry.subject) ?? 0) + 1);
   });
 
   return { links, unmatched, ambiguousSubjects: [...ambiguous] };

@@ -1,4 +1,5 @@
 import type { RebaseEntry } from '@shared/types';
+import { groupRebaseEntries } from '@shared/rebaseTodo';
 
 /**
  * Where a row sits in the bracket that joins a squash group in the interactive
@@ -20,26 +21,12 @@ export type RebaseGroupPosition = 'lead' | 'member' | 'last' | 'none';
  */
 export function getRebaseGroupPositions(entries: readonly RebaseEntry[]): RebaseGroupPosition[] {
   const positions: RebaseGroupPosition[] = entries.map(() => 'none');
-  let leadIndex = -1;
-  let lastMemberIndex = -1;
-
-  const closeGroup = () => {
-    if (leadIndex < 0 || lastMemberIndex < 0) return;
+  for (const { leadIndex, memberIndices } of groupRebaseEntries(entries)) {
+    if (memberIndices.length === 0) continue;
+    const lastIndex = memberIndices[memberIndices.length - 1];
     positions[leadIndex] = 'lead';
-    for (let i = leadIndex + 1; i < lastMemberIndex; i++) positions[i] = 'member';
-    positions[lastMemberIndex] = 'last';
-  };
-
-  entries.forEach((entry, i) => {
-    if (entry.action === 'pick' || entry.action === 'reword') {
-      closeGroup();
-      leadIndex = i;
-      lastMemberIndex = -1;
-    } else if ((entry.action === 'squash' || entry.action === 'fixup') && leadIndex >= 0) {
-      lastMemberIndex = i;
-    }
-  });
-  closeGroup();
-
+    for (let i = leadIndex + 1; i < lastIndex; i++) positions[i] = 'member';
+    positions[lastIndex] = 'last';
+  }
   return positions;
 }

@@ -1,4 +1,6 @@
+import type { Result } from '../../../shared/errors.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
+import type { WebviewRequestContext } from '../WebviewRequestContext.js';
 
 export const commitHandlers = {
   getCommitMessage: async (message, context) => {
@@ -14,87 +16,66 @@ export const commitHandlers = {
   },
 
   amendCommit: async (message, context) => {
-    // The webview disables the menu item while an operation is in progress, but
-    // its flags are only as fresh as the last refresh — this catches a rebase or
-    // revert started in a terminal moments ago. See "Why all four in-progress
-    // states are blocked" in specs/amend-idea.md: git itself has no single rule
-    // here, and a message-only amend during a conflicted revert silently
-    // destroys the revert state.
-    const operationError = await context.operationGuard.getOperationInProgressError();
-    if (operationError) {
-      context.postMessage({ type: 'error', payload: { error: operationError } });
-      return;
-    }
-
-    const controller = new AbortController();
-    context.runtime.activeCommitController = controller;
-    try {
-      const result = await context.services.current().gitCommitService.amendCommit({
-        message: message.payload.message,
-        includeStaged: message.payload.includeStaged,
-        expectedHead: message.payload.expectedHead,
-        abortSignal: controller.signal,
-      });
-
-      if (result.success) {
-        context.postMessage({ type: 'success', payload: { message: result.value } });
-        await context.refreshCoordinator.reload();
-      } else {
-        context.postMessage({ type: 'error', payload: { error: result.error } });
-      }
-    } finally {
-      if (context.runtime.activeCommitController === controller) {
-        context.runtime.activeCommitController = null;
-      }
-    }
+    await runCancellableCommit(context, (abortSignal) =>
+      context.services.current().gitCommitService.amendCommit({ ...message.payload, abortSignal }),
+    );
   },
 
-  cancelAmend: async (_message, context) => {
+  createFixupCommit: async (message, context) => {
+    await runCancellableCommit(context, (abortSignal) =>
+      context.services.current().gitCommitService.createFixupCommit({ ...message.payload, abortSignal }),
+    );
+  },
+
+  cancelCommitWait: async (_message, context) => {
     // Ends our wait only. The hook process git spawned keeps running, which is
     // why the reported outcome is observed from HEAD rather than assumed.
     context.runtime.activeCommitController?.abort();
   },
 
-  createFixupCommit: async (message, context) => {
-    // Same guard as amend: the webview's in-progress flags are only as fresh as
-    // the last refresh, and committing into a paused sequencer operation
-    // silently changes what that operation continues from.
-    const operationError = await context.operationGuard.getOperationInProgressError();
-    if (operationError) {
-      context.postMessage({ type: 'error', payload: { error: operationError } });
-      return;
-    }
-
-    const controller = new AbortController();
-    context.runtime.activeCommitController = controller;
-    try {
-      const result = await context.services.current().gitCommitService.createFixupCommit({
-        ...message.payload,
-        abortSignal: controller.signal,
-      });
-
-      if (result.success) {
-        context.postMessage({ type: 'success', payload: { message: result.value } });
-        await context.refreshCoordinator.reload();
-      } else {
-        context.postMessage({ type: 'error', payload: { error: result.error } });
-      }
-    } finally {
-      if (context.runtime.activeCommitController === controller) {
-        context.runtime.activeCommitController = null;
-      }
-    }
-  },
-
-  cancelFixupCommit: async (_message, context) => {
-    context.runtime.activeCommitController?.abort();
-  },
-
   getGitVersion: async (_message, context) => {
-    const { raw } = await context.getGitVersion();
-    context.postMessage({ type: 'gitVersion', payload: { raw } });
+    const version = await context.getGitVersion();
+    context.postMessage({ type: 'gitVersion', payload: { version } });
   },
 } satisfies Pick<
   RequestHandlerMap,
-  'getCommitMessage' | 'amendCommit' | 'cancelAmend' | 'createFixupCommit' | 'cancelFixupCommit' | 'getGitVersion'
+  'getCommitMessage' | 'amendCommit' | 'createFixupCommit' | 'cancelCommitWait' | 'getGitVersion'
 >;
+
+/**
+ * Run a commit-writing operation that `cancelCommitWait` can stop waiting on:
+ * guard, hold the controller for the duration, then report and reload.
+ */
+async function runCancellableCommit(
+  context: WebviewRequestContext,
+  run: (abortSignal: AbortSignal) => Promise<Result<string>>,
+): Promise<void> {
+  // The webview disables the menu items while an operation is in progress, but
+  // its flags are only as fresh as the last refresh — this catches a rebase or
+  // revert started in a terminal moments ago. See "Why all four in-progress
+  // states are blocked" in specs/amend-idea.md: git itself has no single rule
+  // here, and a message-only amend during a conflicted revert silently
+  // destroys the revert state. Committing into any paused sequencer operation
+  // likewise changes what that operation continues from.
+  const operationError = await context.operationGuard.getOperationInProgressError();
+  if (operationError) {
+    context.postMessage({ type: 'error', payload: { error: operationError } });
+    return;
+  }
+
+  const controller = new AbortController();
+  context.runtime.activeCommitController = controller;
+  try {
+    const result = await run(controller.signal);
+    if (result.success) {
+      context.postMessage({ type: 'success', payload: { message: result.value } });
+      await context.refreshCoordinator.reload();
+    } else {
+      context.postMessage({ type: 'error', payload: { error: result.error } });
+    }
+  } finally {
+    if (context.runtime.activeCommitController === controller) {
+      context.runtime.activeCommitController = null;
+    }
+  }
+}
