@@ -76,16 +76,16 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
             HEAD that targets the one you clicked, in any of git&apos;s four kinds:
           </p>
           <FeatureGrid>
-            <FeatureCard mark="F" title="Fixup" accent={SHOWCASE_BLUE_COLOR}>
+            <FeatureCard mark="F" title="Fixup" gitFlag="--fixup" accent={SHOWCASE_BLUE_COLOR}>
               Add your changes; the target keeps its message.
             </FeatureCard>
-            <FeatureCard mark="S" title="Squash" accent={SHOWCASE_PURPLE_COLOR}>
+            <FeatureCard mark="S" title="Squash" gitFlag="--squash" accent={SHOWCASE_PURPLE_COLOR}>
               Add your changes and combine the messages, with an optional note of your own.
             </FeatureCard>
-            <FeatureCard mark="A" title="Amend" accent={SHOWCASE_ORANGE_COLOR}>
+            <FeatureCard mark="A" title="Amend" gitFlag="--fixup=amend:" accent={SHOWCASE_ORANGE_COLOR}>
               Add your changes and give the target a new message.
             </FeatureCard>
-            <FeatureCard mark="R" title="Reword" accent={SHOWCASE_GREEN_COLOR}>
+            <FeatureCard mark="R" title="Reword" gitFlag="--fixup=reword:" accent={SHOWCASE_GREEN_COLOR}>
               Just give the target a new message.
             </FeatureCard>
           </FeatureGrid>
@@ -97,16 +97,16 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
 
         <WhatsNewSection title="Apply them with autosquash">
           <StepFlow>
-            <Step number={1} title="Create" accent={SHOWCASE_BLUE_COLOR}>
+            <Step label="1" title="Create" accent={SHOWCASE_BLUE_COLOR}>
               Make fixup commits for the commits you want to change.
             </Step>
-            <Step number={2} title="Rebase" accent={SHOWCASE_PURPLE_COLOR}>
+            <Step label="2A" title="Rebase" accent={SHOWCASE_PURPLE_COLOR}>
               <UiLabel>Rebase Current Branch onto This Commit</UiLabel> has a new <em>Autosquash</em> checkbox
               that folds them into their targets and tells you how many will be applied.
             </Step>
-            <Step number={3} title="Or plan it" accent={SHOWCASE_GREEN_COLOR}>
-              The interactive rebase moves each one under its target before you start — you can still adjust
-              the plan or uncheck it.
+            <Step label="2B" title="Interactive rebase" accent={SHOWCASE_GREEN_COLOR} alternative>
+              <UiLabel>Interactive Rebase onto This Commit</UiLabel> moves each one under its target before you start — you can
+              still adjust the plan or uncheck it.
             </Step>
           </StepFlow>
         </WhatsNewSection>

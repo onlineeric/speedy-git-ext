@@ -5,7 +5,9 @@ import {
   BORDER_COLOR,
   FOREGROUND_COLOR,
   ON_ACCENT_COLOR,
+  SHOWCASE_ORANGE_COLOR,
   SHOWCASE_RED_COLOR,
+  SURFACE_COLOR,
   tint,
 } from '../utils/themeColors';
 import { HeartIcon } from './icons';
@@ -114,12 +116,14 @@ interface FeatureCardProps {
   /** One or two characters shown in the colored tile. */
   mark: string;
   title: string;
+  /** The git flag this card corresponds to, shown beside the title. */
+  gitFlag?: string;
   /** A `SHOWCASE_*` color; the card's border, wash and tile all derive from it. */
   accent: string;
   children: ReactNode;
 }
 
-export function FeatureCard({ mark, title, accent, children }: FeatureCardProps) {
+export function FeatureCard({ mark, title, gitFlag, accent, children }: FeatureCardProps) {
   const style: CSSProperties = {
     borderColor: tint(accent, 35),
     background: `linear-gradient(150deg, ${tint(accent, 16)}, transparent 75%)`,
@@ -127,7 +131,7 @@ export function FeatureCard({ mark, title, accent, children }: FeatureCardProps)
 
   return (
     <div className="rounded-lg border p-3 transition-transform duration-150 hover:-translate-y-0.5" style={style}>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span
           className="grid h-6 w-6 shrink-0 place-items-center rounded-md font-mono text-xs font-bold"
           style={{ background: accent, color: ON_ACCENT_COLOR }}
@@ -137,42 +141,74 @@ export function FeatureCard({ mark, title, accent, children }: FeatureCardProps)
         <span className="text-sm font-semibold" style={{ color: FOREGROUND_COLOR }}>
           {title}
         </span>
+        {gitFlag && (
+          <code className="rounded px-1 py-px text-[11px]" style={{ color: accent, background: tint(accent, 14) }}>
+            {gitFlag}
+          </code>
+        )}
       </div>
       <p className={`${whatsNewBodyTextClassName} mt-1.5`}>{children}</p>
     </div>
   );
 }
 
-/** A menu item or control name, set as a chip so it can be spotted in the real UI. */
+const uiLabelStyle: CSSProperties = {
+  color: FOREGROUND_COLOR,
+  background: tint(SHOWCASE_ORANGE_COLOR, 28),
+  boxShadow: `inset 0 0 0 1px ${tint(SHOWCASE_ORANGE_COLOR, 70)}`,
+};
+
+/**
+ * A menu item or control name, highlighted like a marker pen so the reader goes
+ * looking for exactly that text in the real UI. It wraps like the words around
+ * it, with `box-decoration-clone` giving every line its own rounded box, so a
+ * long label never overflows a narrow card.
+ */
 export function UiLabel({ children }: { children: ReactNode }) {
   return (
-    <span className="whitespace-nowrap rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-1.5 py-px font-medium text-[var(--vscode-foreground)]">
+    <span className="box-decoration-clone rounded px-1.5 py-px font-semibold" style={uiLabelStyle}>
       {children}
     </span>
   );
 }
 
-/** Numbered steps side by side; stacks in a narrow panel. */
+/**
+ * Steps side by side; stacks in a narrow panel. Label alternatives `2A`/`2B` and
+ * mark the second with `alternative` so the two read as a choice, not a sequence.
+ */
 export function StepFlow({ children }: { children: ReactNode }) {
   return <ol className="grid grid-cols-1 gap-3 sm:grid-cols-3">{children}</ol>;
 }
 
 interface StepProps {
-  number: number;
+  /** `1`, `2A`, `2B`… */
+  label: string;
   title: string;
   accent: string;
+  /** An alternative to the step before it: draws an "or" joining the two. */
+  alternative?: boolean;
   children: ReactNode;
 }
 
-export function Step({ number, title, accent, children }: StepProps) {
+export function Step({ label, title, accent, alternative = false, children }: StepProps) {
   return (
     <li className="relative rounded-lg border border-[var(--vscode-panel-border)] p-3">
+      {alternative && (
+        // Sits on the shared edge with the previous card: its top when stacked,
+        // its left side when the steps run in a row.
+        <span
+          className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border px-1.5 text-[10px] font-bold uppercase leading-4 sm:left-0 sm:top-1/2"
+          style={{ borderColor: BORDER_COLOR, background: SURFACE_COLOR, color: FOREGROUND_COLOR }}
+        >
+          or
+        </span>
+      )}
       <div className="flex items-center gap-2">
         <span
-          className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold"
+          className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full px-1 text-[11px] font-bold"
           style={{ background: tint(accent, 25), color: accent, boxShadow: `0 0 0 1px ${tint(accent, 55)}` }}
         >
-          {number}
+          {label}
         </span>
         <span className="text-[13px] font-semibold" style={{ color: FOREGROUND_COLOR }}>
           {title}
