@@ -98,7 +98,7 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
         <WhatsNewSection title="Apply them with autosquash">
           <StepFlow>
             <Step label="1" title="Create" accent={SHOWCASE_BLUE_COLOR}>
-              Make fixup commits for the commits you want to change.
+              <UiLabel>Create Fixup Commit…</UiLabel> on each commit you want to change.
             </Step>
             <Step label="2A" title="Rebase" accent={SHOWCASE_PURPLE_COLOR}>
               <UiLabel>Rebase Current Branch onto This Commit</UiLabel> has a new <em>Autosquash</em> checkbox
