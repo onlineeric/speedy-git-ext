@@ -29,7 +29,7 @@ import { InteractiveRebaseRow } from './InteractiveRebaseRow';
 import { AutosquashWarnings } from './AutosquashWarnings';
 import { CommandPreview } from './CommandPreview';
 import { buildSquashMessages } from '../utils/rebaseSquashMessages';
-import { applyAutosquash, findAutosquashLinks, revertAutosquash } from '../utils/autosquash';
+import { applyAutosquash, findAutosquashLinks, isAutosquashDefaultChecked, revertAutosquash } from '../utils/autosquash';
 import { getRebaseGroupPositions } from '../utils/rebaseGroups';
 import { buildInteractiveRebaseCommand } from '../utils/gitCommandBuilder';
 import { trackUiInteraction } from '../utils/telemetry';
@@ -73,7 +73,7 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, surfac
   // Matched once against the list as git would receive it; the dialog is
   // mounted per open, so `initialEntries` never changes underneath this.
   const [autosquashAnalysis] = useState(() => findAutosquashLinks(initialEntries));
-  const hasAutosquashLinks = autosquashAnalysis.links.length > 0;
+  const hasAutosquashLinks = isAutosquashDefaultChecked(autosquashAnalysis);
   const [autosquash, setAutosquash] = useState(hasAutosquashLinks);
   const [entries, setEntries] = useState<RebaseEntry[]>(() =>
     hasAutosquashLinks ? applyAutosquash(initialEntries, autosquashAnalysis.links) : initialEntries,

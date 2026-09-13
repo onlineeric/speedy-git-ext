@@ -4,6 +4,7 @@ import {
   amendReplacementMessage,
   applyAutosquash,
   findAutosquashLinks,
+  isAutosquashDefaultChecked,
   parseAutosquashSubject,
   revertAutosquash,
 } from '../autosquash';
@@ -117,6 +118,24 @@ describe('findAutosquashLinks + applyAutosquash — git parity', () => {
     const entries = [entry('aaaaaaa', 'A'), entry('bbbbbbb', 'amend! A', 'amend! A\n\nA new\n\nBody')];
     const result = applyAutosquash(entries, findAutosquashLinks(entries).links);
     expect(result[0]).toMatchObject({ action: 'reword', rewordMessage: 'A new\n\nBody' });
+  });
+});
+
+describe('isAutosquashDefaultChecked', () => {
+  it('is ticked when a fixup/squash commit targets a commit in the range', () => {
+    const analysis = findAutosquashLinks([entry('a1', 'Add login'), entry('b2', 'fixup! Add login')]);
+    expect(isAutosquashDefaultChecked(analysis)).toBe(true);
+  });
+
+  it('is unticked when the range has no fixup/squash commits', () => {
+    const analysis = findAutosquashLinks([entry('a1', 'Add login'), entry('b2', 'Update README')]);
+    expect(isAutosquashDefaultChecked(analysis)).toBe(false);
+  });
+
+  it('is unticked when every fixup/squash target lies outside the range', () => {
+    const analysis = findAutosquashLinks([entry('a1', 'Update README'), entry('b2', 'squash! Add login')]);
+    expect(analysis.unmatched).toHaveLength(1);
+    expect(isAutosquashDefaultChecked(analysis)).toBe(false);
   });
 });
 

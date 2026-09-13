@@ -211,7 +211,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── FieldError.tsx                # Validation message under inputs (pairs with aria-invalid/aria-describedby)
 ├── MergeDialog.tsx  RebaseConfirmDialog.tsx  CherryPickDialog.tsx  RevertDialog.tsx
 │                                 #   MergeDialog takes any commit-ish (branch / remote branch / tag / commit) + a kind for wording
-│                                 #   RebaseConfirmDialog: Ignore date + Autosquash (lazy range read → count and warnings)
+│                                 #   RebaseConfirmDialog: Ignore date + Autosquash (range read on open; ticked iff a commit applies)
 ├── DropCommitDialog.tsx  InteractiveRebaseDialog.tsx + InteractiveRebaseRow.tsx (@dnd-kit sortable)
 │                                 #   Autosquash checkbox (pre-checked when anything matches), squash-group bracket per row,
 │                                 #   command preview on every step and the exact todo list on Confirm

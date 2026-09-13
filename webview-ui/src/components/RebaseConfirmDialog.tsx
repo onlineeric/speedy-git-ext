@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import type { RebaseRangeCommit } from '@shared/types';
 import type { UiSurface } from '@shared/telemetry';
 import { buildRebaseCommand } from '../utils/gitCommandBuilder';
-import { findAutosquashLinks } from '../utils/autosquash';
+import { findAutosquashLinks, isAutosquashDefaultChecked } from '../utils/autosquash';
 import { trackUiInteraction } from '../utils/telemetry';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
@@ -33,8 +33,8 @@ interface RebaseConfirmDialogProps {
   surface: UiSurface;
 }
 
-/** The commits a rebase onto `targetRef` would replay, once per dialog open; `null` while loading. */
-type RangeState = { upstream: string; commits: RebaseRangeCommit[] | null } | undefined;
+/** The commits a rebase onto `targetRef` would replay, read once per dialog open; `undefined` until it lands. */
+type RangeState = { upstream: string; commits: RebaseRangeCommit[] } | undefined;
 
 export function RebaseConfirmDialog({
   open,
@@ -51,32 +51,53 @@ export function RebaseConfirmDialog({
   const [range, setRange] = useState<RangeState>(undefined);
   const gitVersion = useGraphStore((s) => s.gitVersion);
 
+  /**
+   * Set once the user ticks or unticks Autosquash, so a range read that lands
+   * afterwards does not overwrite their choice with the computed default.
+   */
+  const autosquashTouchedRef = useRef(false);
+
   const reset = () => {
     setIgnoreDate(false);
     setAutosquash(false);
     setRange(undefined);
+    autosquashTouchedRef.current = false;
   };
 
-  const handleAutosquashChange = (checked: boolean) => {
-    setAutosquash(checked);
-    if (!checked || !targetRef) return;
-    // Both reads are lazy: the version is needed only to choose the command, and
-    // the range only to summarise what autosquash will do.
-    rpcClient.requestGitVersion();
-    if (range?.upstream === targetRef) return;
-    setRange({ upstream: targetRef, commits: null });
+  // The range is read as the dialog opens, because Autosquash's default depends on
+  // it: ticked exactly when a fixup/squash commit in the range will be applied.
+  useEffect(() => {
+    if (!open || !targetRef) return;
+    let cancelled = false;
     rpcClient.getRebaseRangeCommits(targetRef).then(
-      (commits) => setRange((current) => (current?.upstream === targetRef ? { upstream: targetRef, commits } : current)),
+      (commits) => {
+        if (cancelled) return;
+        setRange({ upstream: targetRef, commits });
+        if (autosquashTouchedRef.current) return;
+        const checked = isAutosquashDefaultChecked(findAutosquashLinks(commits));
+        setAutosquash(checked);
+        // Only needed to choose the command, so only once autosquash is in it.
+        if (checked) rpcClient.requestGitVersion();
+      },
       () => {
-        // The summary is advisory; the rebase itself still runs. Forget the
-        // request, so re-ticking the box (or an unrelated error having
-        // rejected it) asks again instead of leaving the summary blank.
-        setRange((current) => (current?.upstream === targetRef ? undefined : current));
+        // The summary is advisory and the rebase still runs; Autosquash simply
+        // stays unticked, which is what it does with nothing to apply.
+        if (!cancelled) setRange(undefined);
       },
     );
+    return () => {
+      cancelled = true;
+    };
+  }, [open, targetRef]);
+
+  const handleAutosquashChange = (checked: boolean) => {
+    autosquashTouchedRef.current = true;
+    setAutosquash(checked);
+    if (checked) rpcClient.requestGitVersion();
   };
 
-  const rangeCommits = range?.commits;
+  // Keyed by upstream so a read for an earlier target never describes this one.
+  const rangeCommits = range && range.upstream === targetRef ? range.commits : null;
   const analysis = useMemo(() => (rangeCommits ? findAutosquashLinks(rangeCommits) : null), [rangeCommits]);
   const appliedCount = analysis?.links.length ?? 0;
 

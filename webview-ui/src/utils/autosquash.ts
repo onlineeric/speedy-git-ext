@@ -136,6 +136,16 @@ export function findAutosquashLinks(entries: readonly RebaseRangeCommit[]): Auto
   return { links, unmatched, ambiguousSubjects: [...ambiguous] };
 }
 
+/**
+ * Whether a rebase dialog's Autosquash box starts ticked: exactly when at least one
+ * commit will actually be applied. A `fixup!` whose target lies outside the rebased
+ * range is `unmatched`, not a link, so a range holding only those starts unticked
+ * too — ticking the box would change nothing but the command.
+ */
+export function isAutosquashDefaultChecked(analysis: AutosquashAnalysis): boolean {
+  return analysis.links.length > 0;
+}
+
 /** The message an `amend!` commit carries for its target: everything below its title line. */
 export function amendReplacementMessage(message: string): string {
   const newline = message.indexOf('\n');
