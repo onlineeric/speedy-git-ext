@@ -20,7 +20,56 @@
   50% { background-color: var(--vscode-editor-findMatchHighlightBackground); }
 }
 
+/* What's New dialog. The countdown bar runs regardless of motion preference —
+   it carries information (how long until Close enables), not decoration. */
+@keyframes whats-new-countdown {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes whats-new-pop {
+  /* Individual `translate`/`scale` rather than `transform`, which would replace the
+     dialog's own -50% centering translate for the length of the animation. */
+  from { opacity: 0; translate: 0 8px; scale: 0.98; }
+  to { opacity: 1; translate: 0 0; scale: 1; }
+}
+/* The autosquash illustration: the fixup commit drops two rows onto its target
+   and vanishes into it, the target flashes and gains its "folded" chip, then the
+   loop resets. All three share one duration so their percentages line up. */
+@keyframes whats-new-fold {
+  0%, 8% { opacity: 0; transform: translateY(-6px); }
+  16%, 34% { opacity: 1; transform: translateY(0); }
+  58% { opacity: 1; transform: translateY(56px); }
+  68%, 100% { opacity: 0; transform: translateY(56px) scale(0.9); }
+}
+@keyframes whats-new-target {
+  0%, 56%, 92%, 100% { box-shadow: none; }
+  64% { box-shadow: 0 0 0 2px var(--vscode-charts-green); }
+}
+@keyframes whats-new-folded {
+  0%, 60% { opacity: 0; transform: scale(0.6); }
+  68%, 90% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
 @layer utilities {
+  .animate-whats-new-countdown {
+    transform-origin: left;
+    animation: whats-new-countdown var(--whats-new-countdown, 5s) linear forwards;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .animate-whats-new-pop {
+      animation: whats-new-pop 0.35s ease-out both;
+    }
+    .animate-whats-new-fold {
+      animation: whats-new-fold 4.5s ease-in-out infinite;
+    }
+    .animate-whats-new-target {
+      animation: whats-new-target 4.5s ease-in-out infinite;
+    }
+    .animate-whats-new-folded {
+      animation: whats-new-folded 4.5s ease-in-out infinite;
+    }
+  }
   .animate-toast-in {
     animation: toast-in 0.3s ease-out forwards;
   }

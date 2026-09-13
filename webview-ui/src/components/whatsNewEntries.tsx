@@ -1,21 +1,36 @@
 import type { ReactNode } from 'react';
-import { rpcClient } from '../rpc/rpcClient';
-import { trackUiInteraction } from '../utils/telemetry';
+import { AutosquashIllustration } from './AutosquashIllustration';
 import { BranchIcon, CloudIcon } from './icons';
 import { SubmoduleBadge } from './FileChangeShared';
 import { InlineRefBadge } from './InlineRefBadge';
 import { RefBadgeLegend } from './RefBadgeLegend';
 import { dialogSectionLabelClassName } from './dialogStyles';
-import { ADDED_COLOR, DELETED_COLOR } from '../utils/themeColors';
+import {
+  ContributorThanks,
+  ExternalLink,
+  FeatureCard,
+  FeatureGrid,
+  Step,
+  StepFlow,
+  UiLabel,
+  WhatsNewSection,
+  whatsNewBodyTextClassName,
+} from './whatsNewBlocks';
+import {
+  ADDED_COLOR,
+  DELETED_COLOR,
+  SHOWCASE_BLUE_COLOR,
+  SHOWCASE_GREEN_COLOR,
+  SHOWCASE_ORANGE_COLOR,
+  SHOWCASE_PURPLE_COLOR,
+} from '../utils/themeColors';
 
 /**
- * The bordered panel each release note groups a topic into, and the body text
- * inside it. Spelled once because a single entry uses each of them many times over
- * — 9 callouts and 22 paragraphs across the current notes — and a release reads as
- * one page only while every block is the same block.
+ * The bordered panel older release notes group a topic into, and the body text
+ * inside it. Newer entries compose the poster pieces in `whatsNewBlocks` instead.
  */
 const calloutClassName = 'rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2';
-const bodyTextClassName = 'text-xs leading-relaxed text-[var(--vscode-descriptionForeground)]';
+const bodyTextClassName = whatsNewBodyTextClassName;
 
 const ADDED_LINE_STYLE = { color: ADDED_COLOR };
 const DELETED_LINE_STYLE = { color: DELETED_COLOR };
@@ -30,25 +45,11 @@ const DELETED_LINE_STYLE = { color: DELETED_COLOR };
 export interface WhatsNewEntry {
   /** Exact `package.json` version this content belongs to. */
   version: string;
-  /** One line under the title saying what the release is about. */
+  /** One line under the title saying what the release is about; the hero's big type. */
   headline: string;
+  /** Optional decorative visual shown beside the headline in the dialog's hero. */
+  illustration?: ReactNode;
   content: ReactNode;
-}
-
-/** A link out of the dialog; the webview cannot navigate itself. */
-function ExternalLink({ url, children }: { url: string; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      className="underline text-[var(--vscode-textLink-foreground)] hover:text-[var(--vscode-textLink-activeForeground)]"
-      onClick={() => {
-        trackUiInteraction('whatsNewDialog', 'whatsNewOpenContribution');
-        rpcClient.openExternal(url);
-      }}
-    >
-      {children}
-    </button>
-  );
 }
 
 /**
@@ -60,57 +61,56 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
   {
     version: '5.16.0',
     headline: 'Create fixup and squash commits from the graph, then autosquash them when you rebase.',
+    illustration: <AutosquashIllustration />,
     content: (
-      <>
-        <section className={calloutClassName}>
-          <h3 className={dialogSectionLabelClassName}>Thanks to our contributor</h3>
-          <p className={bodyTextClassName}>
-            This release comes from a request by{' '}
-            <ExternalLink url="https://github.com/nelson870708">@nelson870708</ExternalLink> in{' '}
-            <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/194">#194</ExternalLink>
-            , asking for fixup and squash commits without dropping to the command line. Thank you!
+      <div className="space-y-6">
+        <ContributorThanks login="nelson870708">
+          This release comes from your request in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/194">#194</ExternalLink>, asking
+          for fixup and squash commits without dropping to the command line.
+        </ContributorThanks>
+
+        <WhatsNewSection title="Four kinds, one right-click">
+          <p className={`${bodyTextClassName} mb-3`}>
+            Right-click any commit and pick <UiLabel>Create Fixup Commit…</UiLabel>. It creates a new commit on
+            HEAD that targets the one you clicked, in any of git&apos;s four kinds:
           </p>
-        </section>
-
-        <p className={`${bodyTextClassName} mt-4`}>
-          Right-click any commit and pick <em>Create Fixup Commit…</em>. It creates a new commit on HEAD
-          that targets the one you clicked, in any of git&apos;s four kinds:
-        </p>
-
-        <ul className={`${bodyTextClassName} mt-3 space-y-2`}>
-          <li>
-            <strong className="text-[var(--vscode-foreground)]">Fixup</strong> — add your changes; the
-            target keeps its message.
-          </li>
-          <li>
-            <strong className="text-[var(--vscode-foreground)]">Squash</strong> — add your changes and
-            combine the messages, with an optional note of your own.
-          </li>
-          <li>
-            <strong className="text-[var(--vscode-foreground)]">Amend</strong> — add your changes and give
-            the target a new message.
-          </li>
-          <li>
-            <strong className="text-[var(--vscode-foreground)]">Reword</strong> — just give the target a
-            new message.
-          </li>
-        </ul>
-
-        <p className={`${bodyTextClassName} mt-3`}>
-          Choose staged changes only or all tracked changes (<code>-a</code>), and the command preview
-          shows exactly what runs.
-        </p>
-
-        <section className={`${calloutClassName} mt-4`}>
-          <h3 className={dialogSectionLabelClassName}>Apply them with autosquash</h3>
-          <p className={bodyTextClassName}>
-            <em>Rebase Current Branch onto This Commit</em> has a new <em>Autosquash</em> checkbox that
-            folds these commits into their targets and tells you how many will be applied. The
-            interactive rebase does it for you: when it finds them, it moves each one under its target
-            before you start, and you can still adjust the plan or uncheck it.
+          <FeatureGrid>
+            <FeatureCard mark="F" title="Fixup" accent={SHOWCASE_BLUE_COLOR}>
+              Add your changes; the target keeps its message.
+            </FeatureCard>
+            <FeatureCard mark="S" title="Squash" accent={SHOWCASE_PURPLE_COLOR}>
+              Add your changes and combine the messages, with an optional note of your own.
+            </FeatureCard>
+            <FeatureCard mark="A" title="Amend" accent={SHOWCASE_ORANGE_COLOR}>
+              Add your changes and give the target a new message.
+            </FeatureCard>
+            <FeatureCard mark="R" title="Reword" accent={SHOWCASE_GREEN_COLOR}>
+              Just give the target a new message.
+            </FeatureCard>
+          </FeatureGrid>
+          <p className={`${bodyTextClassName} mt-3`}>
+            Choose staged changes only or all tracked changes (<code>-a</code>), and the command preview shows
+            exactly what runs.
           </p>
-        </section>
-      </>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="Apply them with autosquash">
+          <StepFlow>
+            <Step number={1} title="Create" accent={SHOWCASE_BLUE_COLOR}>
+              Make fixup commits for the commits you want to change.
+            </Step>
+            <Step number={2} title="Rebase" accent={SHOWCASE_PURPLE_COLOR}>
+              <UiLabel>Rebase Current Branch onto This Commit</UiLabel> has a new <em>Autosquash</em> checkbox
+              that folds them into their targets and tells you how many will be applied.
+            </Step>
+            <Step number={3} title="Or plan it" accent={SHOWCASE_GREEN_COLOR}>
+              The interactive rebase moves each one under its target before you start — you can still adjust
+              the plan or uncheck it.
+            </Step>
+          </StepFlow>
+        </WhatsNewSection>
+      </div>
     ),
   },
   {

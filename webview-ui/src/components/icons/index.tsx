@@ -458,6 +458,28 @@ export function HelpIcon({ className }: IconProps) {
   );
 }
 
+/** Four-point sparkle with a small companion — 12×12, marks "new". Inherits text color via currentColor */
+export function SparkleIcon({ className, style }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} style={style} aria-hidden>
+      <path d="M 5 1 Q 5.6 4.4 9 5 Q 5.6 5.6 5 9 Q 4.4 5.6 1 5 Q 4.4 4.4 5 1 Z" fill="currentColor" />
+      <path d="M 9.5 7.5 Q 9.8 9.2 11.5 9.5 Q 9.8 9.8 9.5 11.5 Q 9.2 9.8 7.5 9.5 Q 9.2 9.2 9.5 7.5 Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Heart — 12×12, for thanking a contributor. Inherits text color via currentColor */
+export function HeartIcon({ className, style }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} style={style} aria-hidden>
+      <path
+        d="M 6 10.5 C 2.5 8.2 1 6.4 1 4.4 C 1 2.9 2.2 1.8 3.6 1.8 C 4.6 1.8 5.5 2.4 6 3.2 C 6.5 2.4 7.4 1.8 8.4 1.8 C 9.8 1.8 11 2.9 11 4.4 C 11 6.4 9.5 8.2 6 10.5 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 /** Info/help affordance — circled "i" (047-signing-verification). */
 export function InfoIcon({ className, style }: IconProps) {
   return (

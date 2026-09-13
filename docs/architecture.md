@@ -231,9 +231,13 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── DiscardDialog.tsx  DiscardAllDialog.tsx  FilePickerDialog.tsx
 ├── RefBadgeLegend.tsx            # Standalone "Badge Legend" section; samples are real `RefLabel`s in lane-0 color
 │                                 #   so it can't drift from the graph. Needs no props — reused by the What's New dialog
-├── WhatsNewDialog.tsx            # First-run release notes; close button counts down before enabling (Esc/outside held too)
+├── WhatsNewDialog.tsx            # First-run release notes, poster layout (gradient hero + headline + optional
+│                                 #   illustration); close button counts down before enabling (Esc/outside held too)
 ├── whatsNewEntries.tsx           # Per-version release-note content, looked up by exact version. A version with no
 │                                 #   entry shows no dialog — that is how a release opts out
+├── whatsNewBlocks.tsx            # Poster pieces entries compose: ContributorThanks, FeatureCard/Grid, Step/StepFlow,
+│                                 #   UiLabel, WhatsNewSection, ExternalLink
+├── AutosquashIllustration.tsx    # 5.16.0 hero: animated mini-graph of a fixup! commit folding into its target
 └── HelpDialog.tsx                # "Help & Feedback": Badge Legend + GitHub Issues + docs/changelog/marketplace + version
 ```
 
