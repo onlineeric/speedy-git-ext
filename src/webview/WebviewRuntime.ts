@@ -1,4 +1,5 @@
 import type { CompareMode, GraphFilters, SlotValue } from '../../shared/types.js';
+import type { GitVersion } from '../../shared/gitVersion.js';
 
 export interface CompareRequestPayload {
   a: SlotValue;
@@ -18,14 +19,22 @@ export class WebviewRuntime {
   /** Held across checkout, optional stash/pull, and the resulting refresh. */
   branchCheckoutInProgress = false;
   /**
-   * The controller for the amend currently in flight, if any.
+   * The controller for the commit currently in flight — an amend or a fixup
+   * commit — if any.
    *
-   * Here for the same reason the compare controller is: `cancelAmend` arrives as
-   * its own message, so the thing it cancels has to outlive the dispatch that
-   * started it. Only one amend can be running — the dialog is modal and there is
-   * only one HEAD.
+   * Here for the same reason the compare controller is: `cancelCommitWait`
+   * arrives as its own message, so the thing it cancels has to outlive the
+   * dispatch that started it. One field serves both flows:
+   * their dialogs are modal and only one commit can be written at a time.
    */
-  activeAmendController: AbortController | null = null;
+  activeCommitController: AbortController | null = null;
+  /**
+   * The installed git's version, read at most once per panel and only when a
+   * feature asks — never on the commit-load path. The binary does not change
+   * per repo, so repo switches keep it. `undefined` means not read yet; the
+   * promise is cached so concurrent askers share one read.
+   */
+  gitVersion: Promise<GitVersion | null> | undefined = undefined;
 
   constructor(public currentRepoPath: string) {}
 

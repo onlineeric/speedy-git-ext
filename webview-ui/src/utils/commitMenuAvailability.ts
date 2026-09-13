@@ -22,6 +22,12 @@ export interface CommitMenuAvailability {
   canMerge: boolean;
   /** `git commit --amend` rewrites the checked-out tip, so only that row offers it. */
   canAmend: boolean;
+  /**
+   * `git commit --fixup=<hash>` takes any real commit as its target — HEAD,
+   * merges, commits on other branches (the dialog warns there). Only a stash
+   * pseudo-commit is not one.
+   */
+  canCreateFixup: boolean;
 }
 
 export interface CommitMenuContext {
@@ -81,6 +87,7 @@ export function getCommitMenuAvailability({
     // Merge commits (parents are preserved) and root commits are fine; a stash
     // entry is a pseudo-commit and cannot be amended.
     canAmend: isCheckedOutTip && !isStash,
+    canCreateFixup: !isStash,
   };
 }
 

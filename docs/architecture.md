@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-09-08**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-09-13**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -24,10 +24,11 @@ src/
 ├── webview/                      # Backend webview subsystem (refactored from the old ~2400-line WebviewProvider)
 │   ├── WebviewProvider.ts        # Thin public facade used by ExtensionController; composes the objects below
 │   ├── WebviewPanelHost.ts       # VS Code panel lifecycle, HTML/CSP/nonce, postMessage, visibility
-│   ├── WebviewRuntime.ts         # Mutable non-service state: repo path, filters, fetch generation, flags
+│   ├── WebviewRuntime.ts         # Mutable non-service state: repo path, filters, fetch generation, flags,
+│                                 #   the in-flight commit controller (amend/fixup) and the cached git version read
 │   ├── GitServiceRegistry.ts     # Holds repo-bound git services; atomic replacement on repo switch
 │   ├── WebviewMessageRouter.ts   # Exhaustive typed RPC dispatch + allowlisted operation telemetry middleware
-│   ├── WebviewRequestContext.ts  # Narrow per-request handler API, including TelemetryService
+│   ├── WebviewRequestContext.ts  # Narrow per-request handler API, including TelemetryService and getGitVersion()
 │   ├── PersistedUIStateStore.ts  # Load/save/validate UI state + per-repo table layout (column-width healing)
 │   ├── RepoDataLoader.ts         # Initial + deferred data, avatar cache hydration/enqueue, submodules, initial-load perf/error telemetry
 │   ├── RefreshCoordinator.ts     # When to load: initial/manual/auto, hidden-panel deferral, loading lifecycle
@@ -43,8 +44,11 @@ src/
 │       ├── remoteHandlers.ts     # fetch/push/pull, add/edit/remove remote
 │       ├── tagHandlers.ts        # create/delete/push tag (optional chained push, remote delete, force — 048)
 │       ├── stashHandlers.ts      # get/apply/pop/drop/create stash
-│       ├── historyHandlers.ts    # reset/cherry-pick/revert/rebase + continue/abort, dropCommit
-│       ├── commitHandlers.ts     # getCommitMessage (%B), amendCommit (guarded, HEAD-verified), cancelAmend
+│       ├── historyHandlers.ts    # reset/cherry-pick/revert/rebase (+ autosquash, version-chosen) + continue/abort,
+│                                 #   getRebaseRangeCommits, dropCommit; a pause with nothing to resolve is reported
+│                                 #   as "stopped at a commit that became empty"
+│       ├── commitHandlers.ts     # getCommitMessage (%B), amendCommit (HEAD-verified) + createFixupCommit through one
+│                                 #   guarded, cancellable runner; cancelCommitWait; getGitVersion
 │       ├── signatureHandlers.ts  # presence detection, verification, signature help
 │       ├── submoduleHandlers.ts  # submodule ops + switchRepo/displayRepo navigation
 │       ├── worktreeHandlers.ts   # list/resolve/add/remove/prune/open/reveal worktree; resolves the base dir once
@@ -66,14 +70,18 @@ src/
 │   ├── GitBranchService.ts       # Checkout, create, rename, delete, fast-forward branches; merge any commit-ish + merge state/continue/abort
 │   ├── GitRemoteService.ts       # Fetch, pull, remote management
 │   ├── GitHistoryService.ts      # Rebase, reset operations
-│   ├── GitRebaseService.ts       # Interactive rebase with drag-drop reordering
+│   ├── GitRebaseService.ts       # Rebase (autosquash via shared/rebaseCommand), interactive rebase (todo + editor
+│                                 #   messages via shared/rebaseTodo), rebase range read, conflict/empty-commit pause info
+│   ├── gitEditorScripts.ts       # "git opens an editor; supply this text": temp dir, #!/bin/sh scripts with paths via
+│                                 #   SPEEDY_* env vars, toShellPath, and the amend!-title-keeping message editor
 │   ├── GitCherryPickService.ts   # Cherry-pick with conflict handling
 │   ├── GitRevertService.ts       # Revert commits
 │   ├── GitTagService.ts          # Create/delete/push tags (incl. remote delete, force), tag metadata from refs/tags (048)
 │   ├── GitStashService.ts        # Apply, pop, drop stash entries
 │   ├── GitIndexService.ts        # Stage/unstage, discard, commit (uncommitted-node operations)
 │   ├── GitCommitService.ts       # Read a commit's full message; amend HEAD (--only / -F, 60s hook ceiling,
-│                                 #   expectedHead guard, cancel outcome observed from HEAD not assumed)
+│                                 #   expectedHead guard, cancel outcome observed from HEAD not assumed);
+│                                 #   createFixupCommit (fixup/squash/amend!/reword! via shared/fixupCommit)
 │   ├── GitWorktreeService.ts     # Worktree list/add/remove; resolves BOTH candidate folders (nested + flat) in
 │                                 #   one round trip; resolveBaseDir takes an already-fetched list; prunes emptied
 │                                 #   parents after remove and sweeps the base dir after prune
@@ -89,7 +97,7 @@ src/
 │   ├── WhatsNewStore.ts          # Owns the one fact the webview can't know: is this the first run on this version.
 │   │                             #   Dev mode always shows and records nothing — the debug host shares one globalState
 │   │                             #   with the installed extension; release records the version once the user closes it
-│   ├── GitConfigService.ts       # Git config reading
+│   ├── GitConfigService.ts       # Git config reading; getGitVersion (read once per panel through the request context)
 │   └── TelemetryService.ts       # Consent-aware backend telemetry funnel; real + no-op implementations
 └── utils/
     ├── gitParsers.ts             # Parse git log lines, refs (%D), branch list, stash base (%P); classify git stderr
@@ -155,7 +163,8 @@ components/
 ├── RepoSelector.tsx              # Multi-root repo picker (FilterableSingleSelectDropdown)
 ├── SubmoduleSelector.tsx         # Parent/submodule navigation picker
 ├── ToastContainer.tsx            # Transient success/error toasts driven by the store
-├── RebaseConflictBanner.tsx      # "Rebase paused due to conflict" bar + continue/abort
+├── RebaseConflictBanner.tsx      # "Rebase paused due to conflict" bar + continue/abort; empty-commit wording when
+│                                 #   git stopped with nothing to resolve
 └── CherryPickConflictBanner.tsx  # Same, for a paused cherry-pick
 ```
 
@@ -194,7 +203,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 
 ```
 ├── dialogStyles.ts               # Shared dialog width/resize, the primary/secondary/danger button variants (one shared
-│                                 #   base) and the note/warning/error message boxes (one shared base)
+│                                 #   base), the note/warning/error message boxes (one shared base) and the commit-message textarea
 ├── ConfirmDialog.tsx             # Generic confirm (danger/warning variants) + CommandPreview; optional focusConfirm
 │                                 #   overrides Radix's default Cancel focus where proceeding is the expected answer
 ├── InputDialog.tsx               # Generic single-input dialog + FieldError
@@ -202,9 +211,18 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── FieldError.tsx                # Validation message under inputs (pairs with aria-invalid/aria-describedby)
 ├── MergeDialog.tsx  RebaseConfirmDialog.tsx  CherryPickDialog.tsx  RevertDialog.tsx
 │                                 #   MergeDialog takes any commit-ish (branch / remote branch / tag / commit) + a kind for wording
-├── DropCommitDialog.tsx  InteractiveRebaseDialog.tsx + InteractiveRebaseRow.tsx (@dnd-kit sortable)
+│                                 #   RebaseConfirmDialog: Ignore date + Autosquash (range read on open; ticked iff a commit applies)
+├── DropCommitDialog.tsx  InteractiveRebaseDialog.tsx + InteractiveRebaseRow.tsx + InteractiveRebaseDragBlock.tsx (@dnd-kit sortable)
+│                                 #   Autosquash checkbox (pre-checked when anything matches), squash-group bracket per row,
+│                                 #   each squash group is one sortable block, so its rows only ever move together,
+│                                 #   command preview on every step and the exact todo list on Confirm
 ├── AmendCommitDialog.tsx         # Amend Last Commit: full-message box, include-staged / force-push options,
 │                                 #   published + signature notes, hook-wait state; stays open on every failure
+├── FixupCommitDialog.tsx         # Create Fixup Commit: kind (fixup/squash/amend/reword, amend/reword gated on git 2.32),
+│                                 #   include staged / -a, message per kind in a height-stable slot, not-an-ancestor and
+│                                 #   untracked warnings, nothing-to-commit note, hook-wait; decisions in fixupCommitOptions
+├── CommitHookWait.tsx            # Hook-wait notice + Cancel / "Cancel wait" button shared by the amend and fixup dialogs
+├── AutosquashWarnings.tsx        # Unmatched / ambiguous autosquash warnings shared by both rebase dialogs
 ├── CreateBranchDialog.tsx  DeleteBranchDialog.tsx  CheckoutWithPullDialog.tsx
 ├── TagCreationDialog.tsx  DeleteTagDialog.tsx  PushTagDialog.tsx
 ├── PushDialog.tsx  RemoteManagementDialog.tsx  StashDialog.tsx
@@ -214,9 +232,13 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── DiscardDialog.tsx  DiscardAllDialog.tsx  FilePickerDialog.tsx
 ├── RefBadgeLegend.tsx            # Standalone "Badge Legend" section; samples are real `RefLabel`s in lane-0 color
 │                                 #   so it can't drift from the graph. Needs no props — reused by the What's New dialog
-├── WhatsNewDialog.tsx            # First-run release notes; close button counts down before enabling (Esc/outside held too)
+├── WhatsNewDialog.tsx            # First-run release notes, poster layout (gradient hero + headline + optional
+│                                 #   illustration); close button counts down before enabling (Esc/outside held too)
 ├── whatsNewEntries.tsx           # Per-version release-note content, looked up by exact version. A version with no
 │                                 #   entry shows no dialog — that is how a release opts out
+├── whatsNewBlocks.tsx            # Poster pieces entries compose: ContributorThanks, FeatureCard/Grid, Step/StepFlow,
+│                                 #   UiLabel, WhatsNewSection, ExternalLink
+├── AutosquashIllustration.tsx    # 5.16.0 hero: animated mini-graph of a fixup! commit folding into its target
 └── HelpDialog.tsx                # "Help & Feedback": Badge Legend + GitHub Issues + docs/changelog/marketplace + version
 ```
 
@@ -248,6 +270,8 @@ hooks/
 ├── useCopyFeedback.ts            # copyToClipboard + short "copied" flash, shared by every copy button
 ├── useSignatureColumnLoader.ts   # Async viewport-first signature verification loader (047)
 ├── useCountdown.ts               # Deadline-based countdown (survives background throttling); + PURE `remainingSeconds`
+├── useCommitHookWait.ts          # idle → running → waitingOnHooks phase + timer for dialogs that write a commit
+├── useGitVersion.ts              # Lazily requests the installed git version once per session (store: gitVersion)
 └── useDialogTelemetry.ts         # One confirmed/cancelled outcome per dialog open cycle
 
 types/displayRefs.ts              # Discriminated union for ref-label rendering (local-branch/remote-branch/tag/HEAD/…)
@@ -263,7 +287,7 @@ utils/
 ├── commitReachability.ts         # Branch reachability per commit; checkers cached by commit-list identity (WeakMap)
 ├── commitRefs.ts                 # Row predicates by ref decoration (isHeadRow/findHeadCommit/findHeadCommitHash,
 │                                 #   isStashPseudoCommit) — used by topology, uncommitted parent, tooltip, Go to HEAD
-├── commitMenuAvailability.ts     # Which commit actions apply (rebase/reset/revert/drop/cherry-pick/merge/amend)
+├── commitMenuAvailability.ts     # Which commit actions apply (rebase/reset/revert/drop/cherry-pick/merge/amend/fixup)
 │                                 #   + hasRemoteCounterpart: does the checked-out branch have a remote (gates force push)
 ├── headNavigation.ts             # "Go to HEAD" decision logic + toast messages
 ├── rowVisibility.ts              # Scroll-offset maths for revealing a row when the details panel resizes the viewport
@@ -275,13 +299,19 @@ utils/
 ├── externalRefParser.ts          # Parse typed commit-ish expressions (HEAD~3, origin/main^2, …)
 ├── resolveDefaultRemote.ts       # Default remote selection; resolvePublishedBranchRemote requires an existing, unambiguous branch destination
 ├── amendMessages.ts              # Post-amend force-push wording; translates git's `stale info` lease rejection
-├── rebaseSquashMessages.ts       # Combined message per squash group — full messages, never subjects
+├── rebaseSquashMessages.ts       # Combined message per squash group — full messages, never subjects; a squashed
+│                                 #   squash!/fixup!/amend! commit's title paragraph is dropped, as git does
+├── autosquash.ts                 # PURE: git's autosquash matching ported from sequencer.c (subject, hash prefix,
+│                                 #   subject prefix; nested prefixes) + apply/revert on the todo list. Both rebase dialogs
+├── rebaseGroups.ts               # PURE: lead/member/last position of each interactive-rebase row, from shared groupRebaseEntries; drag blocks + block move
+├── fixupCommitOptions.ts         # PURE: Create Fixup Commit availability, preselection and confirm rules
 ├── branchCheckout.ts             # Shared checkout decisions and interaction dispatch; menu vs double-click
 │                                 #   pull policy, busy/worktree checks, telemetry; reads store only on interaction
 ├── branchSelection.ts            # getBranchKey (bare name vs remote/name) + additive select-all-local
 ├── mergedCommits.ts              # Detect merged-branch commit grouping for badges
 ├── refNameField.ts               # Live ref-name validation state (error suppressed while pristine)
-├── gitCommandBuilder.ts          # Constructs git command strings for preview display
+├── gitCommandBuilder.ts          # Constructs git command strings for preview display (rebase and fixup previews wrap
+│                                 #   the backend's shared arg builders)
 ├── helpLinks.ts                  # Help dialog links + build-time version (__EXTENSION_VERSION__)
 ├── commitTableLayout.ts          # Column layout persistence & manipulation
 ├── fileTreeBuilder.ts            # Flat file list → tree structure
@@ -338,6 +368,13 @@ shared/
 ├── errors.ts                     # Result<T,E> monad, GitError class, GitErrorCode enum
 ├── gitRefValidation.ts           # git check-ref-format validator + tag/branch/remote wrappers — the same rules
 │                                 #   drive live dialog validation (frontend) and creation guards (backend)
+├── gitVersion.ts                 # PURE: parse `git --version` (vendor suffixes), feature minimums; UI gating fails
+│                                 #   open (supportsGitFeature), command choice takes the universal form
+│                                 #   (usesNonInteractiveAutosquash)
+├── fixupCommit.ts                # PURE: `git commit --fixup/--squash` args — the backend runs and the dialog previews them
+├── rebaseCommand.ts              # PURE: `git rebase` args incl. version-chosen autosquash form (+ no-op sequence editor)
+├── rebaseTodo.ts                 # PURE: interactive rebase todo lines, git's squash-group rule (groupRebaseEntries) +
+│                                 #   editor messages in the order git asks for them
 ├── telemetry.ts                  # Closed telemetry catalogs, payload types, buckets, runtime validator
 └── whatsNew.ts                   # PURE: whether the release-notes dialog opens on this run + the countdown lengths
                                   #   (dev always shows, 2s; release shows once per version, 5s), and whether a

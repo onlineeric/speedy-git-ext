@@ -1,4 +1,7 @@
 import type { PushForceMode, ResetMode, RevertMode, WorktreeBranchMode } from '@shared/types';
+import { buildFixupCommitArgs, type FixupCommitKind } from '@shared/fixupCommit';
+import type { GitVersion } from '@shared/gitVersion';
+import { buildRebaseArgs } from '@shared/rebaseCommand';
 
 export interface PushCommandOptions {
   remote: string;
@@ -18,6 +21,17 @@ export interface MergeCommandOptions {
 export interface RebaseCommandOptions {
   targetRef: string;
   ignoreDate: boolean;
+  autosquash?: boolean;
+  /** Picks the autosquash form; unknown → the `-i` form, exactly as the backend chooses. */
+  gitVersion?: GitVersion | null;
+}
+
+export interface FixupCommitCommandOptions {
+  kind: FixupCommitKind;
+  targetHash: string;
+  includeAllTracked: boolean;
+  /** Squash only: whether `-m` is passed. The text shows as a placeholder. */
+  hasMessage: boolean;
 }
 
 export interface CherryPickCommandOptions {
@@ -107,11 +121,34 @@ export function buildMergeCommand(options: MergeCommandOptions): string {
   return parts.join(' ');
 }
 
+/** Thin wrapper over the backend's own `buildRebaseArgs`, so the preview is the command that runs. */
 export function buildRebaseCommand(options: RebaseCommandOptions): string {
-  const parts = ['git rebase'];
-  if (options.ignoreDate) parts.push('--ignore-date');
-  parts.push(options.targetRef);
-  return parts.join(' ');
+  const { args } = buildRebaseArgs({
+    targetRef: options.targetRef,
+    ignoreDate: options.ignoreDate,
+    autosquash: options.autosquash ?? false,
+    gitVersion: options.gitVersion ?? null,
+  });
+  return ['git', ...args].join(' ');
+}
+
+/** Never `--autosquash`: the dialog's todo list replaces git's, so we never pass it. */
+export function buildInteractiveRebaseCommand(baseHash: string): string {
+  return `git rebase -i ${baseHash}`;
+}
+
+/**
+ * Thin wrapper over the backend's `buildFixupCommitArgs`. amend/reword take
+ * their message through git's editor, so nothing message-shaped appears.
+ */
+export function buildFixupCommitCommand(options: FixupCommitCommandOptions): string {
+  const args = buildFixupCommitArgs({
+    kind: options.kind,
+    targetHash: options.targetHash,
+    includeAllTracked: options.includeAllTracked,
+    message: options.hasMessage ? '<message>' : undefined,
+  });
+  return ['git', ...args].join(' ');
 }
 
 export function buildCherryPickCommand(options: CherryPickCommandOptions): string {

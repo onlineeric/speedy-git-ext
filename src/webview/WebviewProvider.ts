@@ -23,6 +23,8 @@ import { AvatarRefreshQueue } from '../services/AvatarRefreshQueue.js';
 import { GitHubAuthService, type AvatarAuthChange } from '../services/GitHubAuthService.js';
 import { GitHubAvatarService } from '../services/GitHubAvatarService.js';
 import { WhatsNewStore } from '../services/WhatsNewStore.js';
+import { GitConfigService } from '../services/GitConfigService.js';
+import { parseGitVersion, type GitVersion } from '../../shared/gitVersion.js';
 import { clampBatchCommitSize, DEFAULT_USER_SETTINGS } from '../../shared/types.js';
 import { EditorCommandService } from './EditorCommandService.js';
 import { GitServiceRegistry, type GitServiceSet } from './GitServiceRegistry.js';
@@ -341,6 +343,10 @@ export class WebviewProvider {
       },
       getSettings: () => this.getSettingsHandler?.(),
       getBatchSize: () => this.getBatchSize(),
+      getGitVersion: () => {
+        this.runtime.gitVersion ??= this.readGitVersion();
+        return this.runtime.gitVersion;
+      },
       getRepoDiscovery: () => this.gitRepoDiscoveryService,
       getSubmoduleHandlers: () => this.submoduleHandlers,
       onSwitchRepo: (repoPath) => this.onSwitchRepo?.(repoPath),
@@ -372,6 +378,11 @@ export class WebviewProvider {
     }
     const folders = vscode.workspace.workspaceFolders;
     return folders?.[0]?.uri.fsPath;
+  }
+
+  private async readGitVersion(): Promise<GitVersion | null> {
+    const result = await new GitConfigService(this.runtime.currentRepoPath, this.log).getGitVersion();
+    return result.success ? parseGitVersion(result.value) : null;
   }
 
   private getBatchSize(): number {

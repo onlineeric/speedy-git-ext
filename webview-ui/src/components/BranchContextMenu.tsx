@@ -21,7 +21,7 @@ import { DeleteBranchDialog } from './DeleteBranchDialog';
 import { DeleteTagDialog } from './DeleteTagDialog';
 import { PushTagDialog } from './PushTagDialog';
 import { InputDialog } from './InputDialog';
-import { RebaseConfirmDialog } from './RebaseConfirmDialog';
+import { RebaseConfirmDialog, type RebaseConfirmOptions } from './RebaseConfirmDialog';
 import { MergeDialog } from './MergeDialog';
 import { getRefMergeSource } from '../utils/refMergeSource';
 import { PushDialog } from './PushDialog';
@@ -196,10 +196,10 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
     [fastForwardTargetIsCurrent, fastForwardRemote, refInfo.name, fastForwardSetUpstream],
   );
 
-  const handleRebaseConfirm = (ignoreDate: boolean) => {
+  const handleRebaseConfirm = (options: RebaseConfirmOptions) => {
     setRebaseConfirmOpen(false);
     useGraphStore.getState().setLoading(true);
-    rpcClient.rebase(displayName, ignoreDate);
+    rpcClient.rebase(displayName, options);
   };
 
   // Find remote counterpart for local branch (used in delete dialog)
@@ -545,6 +545,7 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
         title="Rebase Current Branch"
         description={`Rebase the current branch onto '${displayName}'? This will rewrite commit history. Pushed commits will require a force-push.`}
         targetRef={displayName}
+        surface={menuSurface}
       />
 
       {/* Create worktree dialog (local branch, remote-only badge, or tag) */}

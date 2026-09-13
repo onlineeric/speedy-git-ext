@@ -34,8 +34,8 @@ const TRACKED_OPERATION_LIST = [
   'resetBranch', 'cherryPick', 'abortCherryPick', 'continueCherryPick',
   'revert', 'continueRevert', 'abortRevert',
   'rebase', 'interactiveRebase', 'abortRebase', 'continueRebase', 'dropCommit',
-  // `getCommitMessage` is a read and `cancelAmend` is a control message; neither is an operation.
-  'amendCommit',
+  // `getCommitMessage` is a read and `cancelCommitWait` is a control message; neither is an operation.
+  'amendCommit', 'createFixupCommit',
   'updateSubmodule', 'initSubmodule',
   'addWorktree', 'removeWorktree', 'pruneWorktree', 'openWorktree',
   'stageFiles', 'unstageFiles', 'stageAll', 'unstageAll', 'discardFiles', 'discardAllUnstaged',
@@ -123,6 +123,13 @@ export const UI_ACTIONS = [
   // checked, so a plain message-only amend emits neither and the message-only
   // share stays derivable from the operation count.
   'amendCommit', 'amendIncludeStaged', 'amendForcePush',
+  // Create Fixup Commit. Same pattern as amend: the menu click, then on confirm
+  // the chosen kind plus each option that was on.
+  'createFixupCommit',
+  'fixupKindFixup', 'fixupKindSquash', 'fixupKindAmend', 'fixupKindReword',
+  'fixupIncludeAllTracked', 'fixupSquashMessage',
+  // Rebase dialog options, emitted on confirm only when the box was checked.
+  'rebaseAutosquash', 'interactiveRebaseAutosquash',
   'resetSoft', 'resetMixed', 'resetHard',
   // Branch / remote-branch / tag badge menus
   'checkout', 'checkoutDoubleClick', 'merge', 'renameBranch', 'push', 'pull', 'fastForward',
@@ -155,6 +162,7 @@ export const DIALOG_IDS = [
   'merge', 'push', 'fastForward',
   'createTag', 'deleteTag', 'pushTag',
   'cherryPick', 'revert', 'reset', 'rebase', 'interactiveRebase', 'dropCommit', 'amendCommit',
+  'createFixupCommit',
   'stash', 'dropStash', 'discard', 'discardAll', 'filePicker',
   'createWorktree', 'removeWorktree', 'pruneWorktree',
   'removeRemote',

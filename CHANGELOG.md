@@ -4,6 +4,24 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.16.0] - 2026-09-13
+
+### Added
+- **Create Fixup Commit.** A new "Create Fixup Commit..." item in the commit menu (row and badge menus, below "Amend Last Commit...") creates a commit on HEAD that targets the clicked commit, by its full hash. One dialog covers all four kinds git offers: **Fixup** (`--fixup`, the target keeps its message), **Squash** (`--squash`, with an optional `-m` message), **Amend** (`--fixup=amend:`, changes plus a replacement message) and **Reword** (`--fixup=reword:`, replacement message only). Choose staged changes only or all tracked changes (`-a`); Reword ignores the index, as git does. Fixup and Squash are unavailable when the chosen option has nothing to commit, and the dialog opens on Reword when there are no changes at all. It warns when untracked files will be left out and when the target is not an ancestor of HEAD, previews the exact command, and waits on commit hooks with a way to stop waiting. Amend and Reword need git 2.32+; on an older git they are disabled with a note naming both versions.
+- **Autosquash in "Rebase Current Branch onto…".** A new "Autosquash fixup/squash commits" checkbox applies `fixup!`, `squash!` and `amend!` commits during the rebase. Ticking it shows how many will be applied and warns about any whose target is outside the rebased range, or whose subject matches more than one commit. On git 2.44+ it runs `git rebase --autosquash`; older git silently ignores that without `-i`, so there it runs `git rebase -i --autosquash --empty=drop` instead. The command preview always shows the command that will run.
+- **Autosquash in the interactive rebase.** When the list contains `fixup!`, `squash!` or `amend!` commits, the new "Autosquash fixup/squash/amend commits" checkbox is pre-checked and moves each one under its target in git's own order. An `amend!` commit turns its target into `reword` with the new message filled in. Unchecking puts those commits back where they were. Rows that squash into the row above are joined by a bracket, a command preview is shown on every step, and the Confirm step shows the exact todo list sent to git.
+
+### Changed
+- **"Start Interactive Rebase from Here" is now "Interactive Rebase onto This Commit".** The behaviour is unchanged: the clicked commit is the base and is not rewritten, which the old label did not make clear.
+- **A rebase that stops on a commit that became empty now says so.** It was reported as "paused due to conflict" even with nothing to resolve; the toast and banner now say git stopped at a commit that became empty, and offer Continue or Abort.
+
+### Fixed
+- **Squash messages no longer keep the `squash! …` title line.** The combined message in the interactive rebase now drops a squashed `squash!`/`fixup!`/`amend!` commit's title line, as git does.
+- **Interactive rebase messages reach the right commit when a squash group comes before a reword.** Editor messages were supplied rewords-first, so a squash group earlier in the list received a later reword's message.
+
+### Credits
+- Thanks to [@nelson870708](https://github.com/nelson870708) for requesting fixup and squash commits in [#194](https://github.com/onlineeric/speedy-git-ext/issues/194)!
+
 ## [5.15.0] - 2026-09-08
 
 ### Added

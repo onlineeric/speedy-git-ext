@@ -3,6 +3,8 @@ import {
   buildPushCommand,
   buildMergeCommand,
   buildRebaseCommand,
+  buildInteractiveRebaseCommand,
+  buildFixupCommitCommand,
   buildCherryPickCommand,
   buildResetCommand,
   buildRevertCommand,
@@ -98,6 +100,32 @@ describe('buildRebaseCommand', () => {
   it('includes --ignore-date', () => {
     expect(buildRebaseCommand({ targetRef: 'origin/main', ignoreDate: true }))
       .toBe('git rebase --ignore-date origin/main');
+  });
+
+  it('shows the version-chosen autosquash command', () => {
+    expect(buildRebaseCommand({ targetRef: 'main', ignoreDate: false, autosquash: true, gitVersion: [2, 44, 0] }))
+      .toBe('git rebase --autosquash main');
+    expect(buildRebaseCommand({ targetRef: 'main', ignoreDate: true, autosquash: true, gitVersion: null }))
+      .toBe('git rebase -i --autosquash --empty=drop --ignore-date main');
+  });
+});
+
+describe('buildInteractiveRebaseCommand', () => {
+  it('never passes --autosquash', () => {
+    expect(buildInteractiveRebaseCommand('abc1234')).toBe('git rebase -i abc1234');
+  });
+});
+
+describe('buildFixupCommitCommand', () => {
+  it('previews each kind', () => {
+    expect(buildFixupCommitCommand({ kind: 'fixup', targetHash: 'abc', includeAllTracked: true, hasMessage: false }))
+      .toBe('git commit -a --fixup=abc');
+    expect(buildFixupCommitCommand({ kind: 'squash', targetHash: 'abc', includeAllTracked: false, hasMessage: true }))
+      .toBe('git commit --squash=abc -m <message>');
+    expect(buildFixupCommitCommand({ kind: 'amend', targetHash: 'abc', includeAllTracked: false, hasMessage: true }))
+      .toBe('git commit --cleanup=whitespace --fixup=amend:abc');
+    expect(buildFixupCommitCommand({ kind: 'reword', targetHash: 'abc', includeAllTracked: true, hasMessage: true }))
+      .toBe('git commit --cleanup=whitespace --fixup=reword:abc');
   });
 });
 

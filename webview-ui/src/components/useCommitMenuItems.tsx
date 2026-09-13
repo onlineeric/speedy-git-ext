@@ -27,10 +27,11 @@ import { TagCreationDialog } from './TagCreationDialog';
 import { CherryPickDialog } from './CherryPickDialog';
 import { MergeDialog } from './MergeDialog';
 import { InteractiveRebaseDialog } from './InteractiveRebaseDialog';
-import { RebaseConfirmDialog } from './RebaseConfirmDialog';
+import { RebaseConfirmDialog, type RebaseConfirmOptions } from './RebaseConfirmDialog';
 import { RevertDialog } from './RevertDialog';
 import { DropCommitDialog } from './DropCommitDialog';
 import { AmendCommitDialog } from './AmendCommitDialog';
+import { FixupCommitDialog } from './FixupCommitDialog';
 import { CreateWorktreeDialog } from './CreateWorktreeDialog';
 import { MenuItem } from './MenuItem';
 import { MenuSubTrigger } from './MenuSubTrigger';
@@ -80,7 +81,7 @@ function buildResetDescription(
  * entries to arrive in the store, then open the dialog. Returns the trigger and
  * the (lazily rendered) dialog so the menu body stays focused on its items.
  */
-function useInteractiveRebase(baseHash: string) {
+function useInteractiveRebase(baseHash: string, surface: UiSurface) {
   const [open, setOpen] = useState(false);
   const [entries, setEntries] = useState<RebaseEntry[]>([]);
   const [awaiting, setAwaiting] = useState(false);
@@ -115,6 +116,7 @@ function useInteractiveRebase(baseHash: string) {
       open
       baseHash={baseHash}
       initialEntries={entries}
+      surface={surface}
       onClose={() => {
         setOpen(false);
         setEntries([]);
@@ -225,6 +227,8 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   // amend has several inputs, and holding the dialog shut behind the slowest of
   // them would make the item feel broken.
   const [amendOpen, setAmendOpen] = useState(false);
+  // Opens first and fetches inside, for the same reason as amend.
+  const [fixupOpen, setFixupOpen] = useState(false);
 
   const branches = useGraphStore((s) => s.branches);
   const selectedCommits = useGraphStore((s) => s.selectedCommits);
@@ -238,7 +242,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   const currentLocalBranch = useCurrentLocalBranch();
 
   // Self-contained dialog clusters (state + async handler + dialog) live in hooks.
-  const interactiveRebase = useInteractiveRebase(commit.hash);
+  const interactiveRebase = useInteractiveRebase(commit.hash, surface);
   const revert = useRevertCommit(commit);
   const drop = useDropCommit(commit);
 
@@ -280,10 +284,10 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
     [isMultiSelectActive, selectedCommits]
   );
 
-  const handleRebaseOntoCommitConfirm = (ignoreDate: boolean) => {
+  const handleRebaseOntoCommitConfirm = (options: RebaseConfirmOptions) => {
     setRebaseOntoConfirmOpen(false);
     useGraphStore.getState().setLoading(true);
-    rpcClient.rebase(commit.hash, ignoreDate);
+    rpcClient.rebase(commit.hash, options);
   };
 
   // FR-015 (Session 2026-05-09): "Compare these commits" sets Base = oldest selected,
@@ -416,6 +420,21 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
         </MenuItem>
       )}
 
+      {/* In the commit group, not the Create group: a branch or tag is created
+         *at* this commit, while a fixup commit is created on HEAD and only
+         targets this one. Sits just above the rebases it is usually followed by. */}
+      {availability.canCreateFixup && (
+        <MenuItem
+          disabled={isOperationInProgress}
+          onSelect={() => {
+            track('createFixupCommit');
+            setFixupOpen(true);
+          }}
+        >
+          Create Fixup Commit...
+        </MenuItem>
+      )}
+
       {availability.canRebase && (
         <>
           {/* The badge menu's parent already offers the ref-flavoured rebase. */}
@@ -437,7 +456,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
               interactiveRebase.start();
             }}
           >
-            Start Interactive Rebase from Here
+            Interactive Rebase onto This Commit
           </MenuItem>
         </>
       )}
@@ -650,6 +669,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
           title="Rebase Current Branch onto Commit"
           description={`Rebase the current branch onto commit ${commit.abbreviatedHash}? This will rewrite commit history. Pushed commits will require a force-push.`}
           targetRef={commit.hash}
+          surface={surface}
         />
       )}
 
@@ -658,6 +678,9 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
       {drop.dialog}
       {amendOpen && (
         <AmendCommitDialog commit={commit} surface={surface} onClose={() => setAmendOpen(false)} />
+      )}
+      {fixupOpen && (
+        <FixupCommitDialog commit={commit} surface={surface} onClose={() => setFixupOpen(false)} />
       )}
     </>
   );

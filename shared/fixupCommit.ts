@@ -1,0 +1,64 @@
+/**
+ * `git commit --fixup` / `--squash` argument building, shared by the backend
+ * that runs the command and the dialog that previews it, so the two can never
+ * describe different commands.
+ */
+
+export type FixupCommitKind = 'fixup' | 'squash' | 'amend' | 'reword';
+
+export interface FixupCommitArgsOptions {
+  kind: FixupCommitKind;
+  /** Always the full hash — never a subject or another identifier. */
+  targetHash: string;
+  /** `-a`. Ignored for `reword`, which git refuses to combine with `-a`. */
+  includeAllTracked: boolean;
+  /**
+   * Squash: the optional `-m` text. Amend/reword: the replacement message, which
+   * git takes only through its editor, so it never becomes an argument.
+   */
+  message?: string;
+}
+
+/**
+ * amend and reword refuse `-m` and `-F`; git takes their message only through
+ * the editor, which the backend scripts.
+ */
+export function fixupKindUsesEditorMessage(kind: FixupCommitKind): boolean {
+  return kind === 'amend' || kind === 'reword';
+}
+
+/**
+ * Whether git accepts `-a` for this kind — equivalently, whether the commit
+ * takes working-tree content at all. `--fixup=reword:` refuses `-a` and ignores the index.
+ */
+export function fixupKindAcceptsAllTracked(kind: FixupCommitKind): boolean {
+  return kind !== 'reword';
+}
+
+export function buildFixupCommitArgs(options: FixupCommitArgsOptions): string[] {
+  const { kind, targetHash, includeAllTracked, message } = options;
+  const args = ['commit'];
+  if (includeAllTracked && fixupKindAcceptsAllTracked(kind)) args.push('-a');
+  // A message that reaches git through the editor is cleaned with `strip` by
+  // default, which deletes every line starting with `#` — an issue reference
+  // like `#123 Fix login` would vanish. The scripted editor leaves no comment
+  // lines of git's in the file, so whitespace cleanup is what `-m` / `-F` get.
+  if (fixupKindUsesEditorMessage(kind)) args.push('--cleanup=whitespace');
+
+  switch (kind) {
+    case 'fixup':
+      args.push(`--fixup=${targetHash}`);
+      break;
+    case 'squash':
+      args.push(`--squash=${targetHash}`);
+      if (message !== undefined) args.push('-m', message);
+      break;
+    case 'amend':
+      args.push(`--fixup=amend:${targetHash}`);
+      break;
+    case 'reword':
+      args.push(`--fixup=reword:${targetHash}`);
+      break;
+  }
+  return args;
+}

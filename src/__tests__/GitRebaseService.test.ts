@@ -175,17 +175,42 @@ describe('GitRebaseService.rebase', () => {
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ args: ['rebase', 'main'] }));
   });
 
-  it('appends --ignore-date when ignoreDate=true', async () => {
+  it('adds --ignore-date before the ref when ignoreDate=true', async () => {
     const service = new GitRebaseService('/repo', mockLog);
     const spy = vi.spyOn(service['executor'], 'execute').mockResolvedValue({
       success: true,
       value: { stdout: '', stderr: '' },
     });
 
-    await service.rebase('main', true);
+    await service.rebase('main', { ignoreDate: true });
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({
-      args: ['rebase', 'main', '--ignore-date'],
+      args: ['rebase', '--ignore-date', 'main'],
     }));
+    expect(spy.mock.calls[0][0].env).toBeUndefined();
+  });
+
+  it('autosquashes without -i on git 2.44+', async () => {
+    const service = new GitRebaseService('/repo', mockLog);
+    const spy = vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: { stdout: '', stderr: '' },
+    });
+
+    await service.rebase('main', { autosquash: true, gitVersion: [2, 44, 0] });
+    expect(spy.mock.calls[0][0].args).toEqual(['rebase', '--autosquash', 'main']);
+    expect(spy.mock.calls[0][0].env).toBeUndefined();
+  });
+
+  it('autosquashes through -i with a no-op sequence editor on older or unknown git', async () => {
+    const service = new GitRebaseService('/repo', mockLog);
+    const spy = vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: { stdout: '', stderr: '' },
+    });
+
+    await service.rebase('main', { autosquash: true, ignoreDate: true, gitVersion: null });
+    expect(spy.mock.calls[0][0].args).toEqual(['rebase', '-i', '--autosquash', '--empty=drop', '--ignore-date', 'main']);
+    expect(spy.mock.calls[0][0].env).toEqual({ GIT_SEQUENCE_EDITOR: 'true' });
   });
 
   it('returns REBASE_CONFLICT error when stderr signals a conflict', async () => {
@@ -199,6 +224,91 @@ describe('GitRebaseService.rebase', () => {
     const result = await service.rebase('main');
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.code).toBe('REBASE_CONFLICT');
+  });
+});
+
+describe('GitRebaseService.getRebaseRangeCommits', () => {
+  it('rejects an invalid upstream', async () => {
+    const service = new GitRebaseService('/repo', mockLog);
+    const result = await service.getRebaseRangeCommits('-x');
+    expect(result.success).toBe(false);
+  });
+
+  it('reads the commits git would replay, in its todo order', async () => {
+    const service = new GitRebaseService('/repo', mockLog);
+    const spy = vi.spyOn(service['executor'], 'execute').mockResolvedValue({
+      success: true,
+      value: { stdout: 'a'.repeat(40) + '\x1ffixup! X\0', stderr: '' },
+    });
+
+    const result = await service.getRebaseRangeCommits('origin/main');
+    expect(spy.mock.calls[0][0].args).toEqual([
+      'log', '--reverse', '--topo-order', '--no-merges', '--right-only', '--cherry-pick', '-z',
+      '--format=%H\x1f%s', 'origin/main...HEAD', '--',
+    ]);
+    expect(result.success && result.value).toEqual([{ hash: 'a'.repeat(40), subject: 'fixup! X' }]);
+  });
+});
+
+describe('GitRebaseService.getConflictInfo', () => {
+  /** `hasAmendFile`: git left `rebase-merge/amend`, as it does at an `edit` stop or a rejected reword. */
+  function stubStatus(service: GitRebaseService, status: string, hasAmendFile = false) {
+    vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });
+    vi.mocked(fs.existsSync).mockImplementation((p) => (String(p).endsWith('amend') ? hasAmendFile : true));
+    vi.spyOn(service['executor'], 'execute').mockResolvedValue({ success: true, value: { stdout: status, stderr: '' } });
+  }
+
+  it('flags a pause with a clean tree as stopped on an empty commit', async () => {
+    const service = new GitRebaseService('/repo', mockLog);
+    stubStatus(service, '?? untracked.txt\n');
+    const result = await service.getConflictInfo();
+    expect(result.success && result.value.stoppedOnEmptyCommit).toBe(true);
+  });
+
+  it('does not flag a clean pause at an edit stop or a rejected reword', async () => {
+    const service = new GitRebaseService('/repo', mockLog);
+    stubStatus(service, '', true);
+    const result = await service.getConflictInfo();
+    expect(result.success && result.value.stoppedOnEmptyCommit).toBe(false);
+  });
+
+  it('does not flag a pause with conflicted files', async () => {
+    const service = new GitRebaseService('/repo', mockLog);
+    stubStatus(service, 'UU a.txt\n');
+    const result = await service.getConflictInfo();
+    expect(result.success && result.value).toMatchObject({ conflictedFiles: ['a.txt'], stoppedOnEmptyCommit: false });
+  });
+
+  it('does not flag a pause with staged changes left over', async () => {
+    const service = new GitRebaseService('/repo', mockLog);
+    stubStatus(service, 'M  a.txt\n');
+    const result = await service.getConflictInfo();
+    expect(result.success && result.value.stoppedOnEmptyCommit).toBe(false);
+  });
+});
+
+describe('GitRebaseService.interactiveRebase temp scripts', () => {
+  it('numbers editor messages in the order git asks for them', async () => {
+    vi.mocked(fs.writeFileSync).mockReset();
+    const service = new GitRebaseService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute').mockResolvedValue({ success: true, value: { stdout: '', stderr: '' } });
+    const entry = (hash: string, action: 'pick' | 'squash' | 'reword' | 'fixup', rewordMessage?: string) =>
+      ({ hash: hash.repeat(40), abbreviatedHash: hash.repeat(7), subject: hash, message: hash, action, rewordMessage });
+
+    await service.interactiveRebase({
+      baseHash: 'f'.repeat(40),
+      entries: [entry('a', 'pick'), entry('b', 'squash'), entry('c', 'reword', 'C new'), entry('d', 'fixup')],
+      squashMessages: [{ groupLeadHash: 'a'.repeat(40), combinedMessage: 'A+B' }],
+    });
+
+    const written = new Map(
+      vi.mocked(fs.writeFileSync).mock.calls.map(([file, content]) => [String(file).split(/[\\/]/).pop(), content]),
+    );
+    expect(written.get('message-0.txt')).toBe('A+B');
+    expect(written.get('message-1.txt')).toBe('C new');
+    expect(written.get('todo.txt')).toBe(
+      `pick ${'a'.repeat(40)} a\nsquash ${'b'.repeat(40)} b\nreword ${'c'.repeat(40)} c\nfixup ${'d'.repeat(40)} d\n`,
+    );
   });
 });
 

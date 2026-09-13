@@ -41,7 +41,7 @@ describe('historyHandlers — no working-tree preconditions of our own', () => {
       context,
     );
 
-    expect(gitRebaseService.rebase).toHaveBeenCalledWith('main', false);
+    expect(gitRebaseService.rebase).toHaveBeenCalledWith('main', { ignoreDate: false, autosquash: undefined, gitVersion: null });
   });
 
   it("passes git's own refusal through untouched", async () => {
@@ -132,5 +132,50 @@ describe('historyHandlers — git preconditions we do keep', () => {
     expect(gitRebaseService.interactiveRebase).not.toHaveBeenCalled();
     expect(postMessage).toHaveBeenCalledWith({ type: 'error', payload: { error: inProgress } });
     expect(postMessage.mock.calls.some(([m]) => m.type === 'rebaseState')).toBe(false);
+  });
+});
+
+describe('historyHandlers — a rebase paused on an empty commit', () => {
+  it('says git stopped on an empty commit instead of blaming a conflict', async () => {
+    const conflictInfo = { conflictedFiles: [], conflictCommitHash: 'abc', conflictCommitMessage: 'x', stoppedOnEmptyCommit: true };
+    const gitRebaseService = {
+      continueRebase: vi.fn().mockResolvedValue(err(new GitError('Rebase paused due to conflict.', 'REBASE_CONFLICT'))),
+      getConflictInfo: vi.fn().mockResolvedValue(ok(conflictInfo)),
+    };
+    const { context, postMessage } = makeContext(gitRebaseService);
+
+    await historyHandlers.continueRebase({ type: 'continueRebase', payload: {} }, context);
+
+    const errorPost = postMessage.mock.calls.find(([m]) => m.type === 'error');
+    expect(errorPost?.[0].payload.error.message).toContain('became empty');
+    expect(errorPost?.[0].payload.error.code).toBe('REBASE_CONFLICT');
+    expect(postMessage).toHaveBeenCalledWith({ type: 'rebaseState', payload: { state: 'in-progress', conflictInfo } });
+  });
+
+  it('keeps the conflict wording when files are conflicted', async () => {
+    const conflictInfo = { conflictedFiles: ['a'], conflictCommitHash: 'abc', conflictCommitMessage: 'x', stoppedOnEmptyCommit: false };
+    const gitRebaseService = {
+      rebase: vi.fn().mockResolvedValue(err(new GitError('Rebase paused due to conflict.', 'REBASE_CONFLICT'))),
+      getConflictInfo: vi.fn().mockResolvedValue(ok(conflictInfo)),
+    };
+    const { context, postMessage } = makeContext(gitRebaseService);
+
+    await historyHandlers.rebase({ type: 'rebase', payload: { targetRef: 'main' } }, context);
+
+    const errorPost = postMessage.mock.calls.find(([m]) => m.type === 'error');
+    expect(errorPost?.[0].payload.error.message).toBe('Rebase paused due to conflict.');
+  });
+
+  it('reads the git version only for an autosquash rebase', async () => {
+    const gitRebaseService = { rebase: vi.fn().mockResolvedValue(ok('done')) };
+    const { context } = makeContext(gitRebaseService);
+    const getGitVersion = vi.fn().mockResolvedValue([2, 44, 0]);
+    (context as unknown as { getGitVersion: typeof getGitVersion }).getGitVersion = getGitVersion;
+
+    await historyHandlers.rebase({ type: 'rebase', payload: { targetRef: 'main' } }, context);
+    expect(getGitVersion).not.toHaveBeenCalled();
+
+    await historyHandlers.rebase({ type: 'rebase', payload: { targetRef: 'main', autosquash: true } }, context);
+    expect(gitRebaseService.rebase).toHaveBeenLastCalledWith('main', { ignoreDate: undefined, autosquash: true, gitVersion: [2, 44, 0] });
   });
 });

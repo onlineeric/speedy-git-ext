@@ -94,6 +94,10 @@ export const buttonDangerClassName =
 export const dialogSectionLabelClassName =
   'mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--vscode-descriptionForeground)]';
 
+/** A commit-message box: monospace, resizable, dimmed while disabled. */
+export const dialogMessageTextareaClassName =
+  'w-full resize-y rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] p-2 font-mono text-sm text-[var(--vscode-input-foreground)] disabled:opacity-60';
+
 /**
  * The three inline message boxes a dialog uses to say something about what is
  * about to happen: a neutral note, a warning, and a failure that came back.

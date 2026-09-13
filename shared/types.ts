@@ -599,6 +599,12 @@ export interface RebaseEntry {
   rewordMessage?: string;
 }
 
+/**
+ * A commit a plain `git rebase <upstream>` would replay: only what autosquash
+ * matching reads, so the lookup never carries every full message in the range.
+ */
+export type RebaseRangeCommit = Pick<RebaseEntry, 'hash' | 'subject'>;
+
 export interface SquashGroupMessage {
   groupLeadHash: string;
   combinedMessage: string;
@@ -788,4 +794,10 @@ export interface RebaseConflictInfo {
   conflictedFiles: string[];
   conflictCommitHash: string;
   conflictCommitMessage: string;
+  /**
+   * The rebase paused with no conflicted files and a clean index and worktree:
+   * `git rebase -i` stopped on a commit that became empty, and there is nothing
+   * to resolve — only continue or abort.
+   */
+  stoppedOnEmptyCommit: boolean;
 }

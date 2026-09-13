@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { ResponseMessage } from '../../shared/messages.js';
 import type { RepoInfo, UserSettings } from '../../shared/types.js';
+import type { GitVersion } from '../../shared/gitVersion.js';
 import type { GitRepoDiscoveryService } from '../services/GitRepoDiscoveryService.js';
 import type { EditorCommandService } from './EditorCommandService.js';
 import type { GitServiceRegistry } from './GitServiceRegistry.js';
@@ -32,6 +33,8 @@ export interface WebviewRequestContext {
   clearAvatarCache(): Promise<void>;
   getSettings(): UserSettings | undefined;
   getBatchSize(): number;
+  /** The installed git's version, read once and cached on the runtime. Never rejects: a failed or unparseable read is null. */
+  getGitVersion(): Promise<GitVersion | null>;
   getRepoDiscovery(): GitRepoDiscoveryService | undefined;
   getSubmoduleHandlers(): SubmoduleNavigationHandlers | undefined;
   onSwitchRepo(repoPath: string): void;

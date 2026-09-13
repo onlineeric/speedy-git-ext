@@ -90,6 +90,20 @@ export const SEARCH_MATCH_SURFACE_COLOR =
 export const SEARCH_MATCH_BORDER_COLOR = 'var(--vscode-list-filterMatchBorder, transparent)';
 
 /**
+ * Decorative accents for the What's New dialog, which advertises a release and so
+ * needs several colors that are distinct from each other rather than colors that
+ * each mean something. The charts tokens are exactly that: theme-defined, and
+ * chosen by each theme to stay distinguishable side by side.
+ */
+export const SHOWCASE_BLUE_COLOR = 'var(--vscode-charts-blue)';
+export const SHOWCASE_PURPLE_COLOR = 'var(--vscode-charts-purple)';
+export const SHOWCASE_ORANGE_COLOR = 'var(--vscode-charts-orange)';
+export const SHOWCASE_GREEN_COLOR = 'var(--vscode-charts-green)';
+export const SHOWCASE_RED_COLOR = 'var(--vscode-charts-red)';
+export const SURFACE_COLOR = 'var(--vscode-editor-background)';
+export const BORDER_COLOR = 'var(--vscode-panel-border)';
+
+/**
  * A faint fill of `color`, for chips and badges that tint their background to
  * match their text. VS Code has no "20% of this token" tokens, and hardcoding the
  * faded shade would reintroduce exactly the problem these constants solve.

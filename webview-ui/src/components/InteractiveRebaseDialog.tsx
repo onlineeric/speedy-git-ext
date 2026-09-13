@@ -1,10 +1,11 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   buttonPrimaryClassName,
   buttonSecondaryClassName,
   dialogContentClassName,
   dialogContentStyle,
+  dialogNoteClassName,
 } from './dialogStyles';
 import {
   DndContext,
@@ -19,11 +20,19 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-  arrayMove,
 } from '@dnd-kit/sortable';
 import type { RebaseEntry, SquashGroupMessage, InteractiveRebaseConfig } from '@shared/types';
+import type { UiSurface } from '@shared/telemetry';
+import { buildRebaseTodoLines } from '@shared/rebaseTodo';
 import { InteractiveRebaseRow } from './InteractiveRebaseRow';
+import { InteractiveRebaseDragBlock } from './InteractiveRebaseDragBlock';
+import { AutosquashWarnings } from './AutosquashWarnings';
+import { CommandPreview } from './CommandPreview';
 import { buildSquashMessages } from '../utils/rebaseSquashMessages';
+import { applyAutosquash, findAutosquashLinks, isAutosquashDefaultChecked, revertAutosquash } from '../utils/autosquash';
+import { getRebaseDragBlocks, getRebaseGroupPositions, moveRebaseDragBlock } from '../utils/rebaseGroups';
+import { buildInteractiveRebaseCommand } from '../utils/gitCommandBuilder';
+import { trackUiInteraction } from '../utils/telemetry';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
@@ -32,8 +41,14 @@ interface InteractiveRebaseDialogProps {
   open: boolean;
   baseHash: string;
   initialEntries: RebaseEntry[];
+  /** Menu surface the dialog was opened from, for UI telemetry. */
+  surface: UiSurface;
   onClose: () => void;
 }
+
+const AUTOSQUASH_TOOLTIP =
+  'Moves each fixup!/squash!/amend! commit under the commit it targets, as git --autosquash does. ' +
+  'Unchecking returns those commits to their original place and to pick, and resets any edits made to them.';
 
 type Step = 1 | 2 | 3;
 
@@ -52,10 +67,17 @@ function validateStep1(entries: RebaseEntry[]): string | null {
   return null;
 }
 
-export function InteractiveRebaseDialog({ open, baseHash, initialEntries, onClose }: InteractiveRebaseDialogProps) {
+export function InteractiveRebaseDialog({ open, baseHash, initialEntries, surface, onClose }: InteractiveRebaseDialogProps) {
   const dialogTelemetry = useDialogTelemetry('interactiveRebase', open);
   const [step, setStep] = useState<Step>(1);
-  const [entries, setEntries] = useState<RebaseEntry[]>(() => initialEntries);
+  // Matched once against the list as git would receive it; the dialog is
+  // mounted per open, so `initialEntries` never changes underneath this.
+  const [autosquashAnalysis] = useState(() => findAutosquashLinks(initialEntries));
+  const hasAutosquashLinks = isAutosquashDefaultChecked(autosquashAnalysis);
+  const [autosquash, setAutosquash] = useState(hasAutosquashLinks);
+  const [entries, setEntries] = useState<RebaseEntry[]>(() =>
+    hasAutosquashLinks ? applyAutosquash(initialEntries, autosquashAnalysis.links) : initialEntries,
+  );
   const [squashMessages, setSquashMessages] = useState<SquashGroupMessage[]>([]);
   const [allDropWarningShown, setAllDropWarningShown] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -69,11 +91,7 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, onClos
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      setEntries((prev) => {
-        const oldIndex = prev.findIndex((e) => e.hash === active.id);
-        const newIndex = prev.findIndex((e) => e.hash === over.id);
-        return arrayMove(prev, oldIndex, newIndex);
-      });
+      setEntries((prev) => moveRebaseDragBlock(prev, String(active.id), String(over.id)));
     }
   }, []);
 
@@ -81,6 +99,19 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, onClos
     setEntries((prev) => prev.map((e) => e.hash === hash ? { ...e, ...updates } : e));
     setValidationError(null);
   }, []);
+
+  const handleAutosquashChange = (checked: boolean) => {
+    setAutosquash(checked);
+    setEntries((prev) =>
+      checked
+        ? applyAutosquash(prev, autosquashAnalysis.links)
+        : revertAutosquash(prev, initialEntries, autosquashAnalysis.links),
+    );
+    setValidationError(null);
+  };
+
+  const groupPositions = useMemo(() => getRebaseGroupPositions(entries), [entries]);
+  const dragBlocks = useMemo(() => getRebaseDragBlocks(entries), [entries]);
 
   const handleNext = () => {
     const error = validateStep1(entries);
@@ -117,6 +148,7 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, onClos
 
   const handleStart = () => {
     dialogTelemetry.confirmed();
+    if (autosquash) trackUiInteraction(surface, 'interactiveRebaseAutosquash');
     const config: InteractiveRebaseConfig = { baseHash, entries, squashMessages };
     useGraphStore.getState().setLoading(true);
     rpcClient.interactiveRebase(config);
@@ -158,17 +190,48 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, onClos
             {step === 1 && (
               <div>
                 <p className="text-xs text-[var(--vscode-descriptionForeground)] mb-3">
-                  Drag to reorder commits. Assign actions for each entry.
+                  Drag to reorder commits; a squash group moves as one. Assign actions for each entry.
                 </p>
+                <label
+                  className={`flex items-center gap-2 mb-2 select-none ${hasAutosquashLinks ? 'cursor-pointer' : 'opacity-60'}`}
+                  title={AUTOSQUASH_TOOLTIP}
+                >
+                  <input
+                    type="checkbox"
+                    checked={autosquash}
+                    disabled={!hasAutosquashLinks}
+                    onChange={(e) => handleAutosquashChange(e.target.checked)}
+                    className="w-4 h-4 accent-[var(--vscode-button-background)]"
+                  />
+                  <span className="text-sm text-[var(--vscode-foreground)]">
+                    Autosquash fixup/squash/amend commits ({autosquashAnalysis.links.length})
+                  </span>
+                </label>
+                {(autosquashAnalysis.unmatched.length > 0 || autosquashAnalysis.ambiguousSubjects.length > 0) && (
+                  <div className="space-y-1 mb-3">
+                    <AutosquashWarnings entries={initialEntries} analysis={autosquashAnalysis} />
+                  </div>
+                )}
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <SortableContext items={entries.map((e) => e.hash)} strategy={verticalListSortingStrategy}>
-                    {entries.map((entry, idx) => (
-                      <InteractiveRebaseRow
-                        key={entry.hash}
-                        entry={entry}
-                        isFirst={idx === 0}
-                        onChange={handleEntryChange}
-                      />
+                  <SortableContext items={dragBlocks.map((block) => block.id)} strategy={verticalListSortingStrategy}>
+                    {dragBlocks.map((block) => (
+                      <InteractiveRebaseDragBlock key={block.id} id={block.id}>
+                        {(dragHandle) =>
+                          block.entries.map((entry, offset) => {
+                            const idx = block.startIndex + offset;
+                            return (
+                              <InteractiveRebaseRow
+                                key={entry.hash}
+                                entry={entry}
+                                isFirst={idx === 0}
+                                groupPosition={groupPositions[idx]}
+                                dragHandle={dragHandle}
+                                onChange={handleEntryChange}
+                              />
+                            );
+                          })
+                        }
+                      </InteractiveRebaseDragBlock>
                     ))}
                   </SortableContext>
                 </DndContext>
@@ -208,8 +271,28 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, onClos
                 <div className="p-3 rounded border border-[var(--vscode-inputValidation-warningBorder)] bg-[var(--vscode-inputValidation-warningBackground)] text-xs text-[var(--vscode-foreground)]">
                   ⚠️ This will rewrite commit history. Pushed commits will require a force-push.
                 </div>
+                <div className="mt-3 space-y-1">
+                  <label htmlFor="interactive-rebase-todo" className="text-sm text-[var(--vscode-descriptionForeground)]">
+                    Todo list:
+                  </label>
+                  <textarea
+                    id="interactive-rebase-todo"
+                    readOnly
+                    wrap="off"
+                    value={buildRebaseTodoLines(entries).join('\n')}
+                    rows={Math.min(Math.max(entries.length, 2), 10)}
+                    className="w-full resize-y rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] p-2 font-mono text-xs text-[var(--vscode-input-foreground)]"
+                  />
+                  <p className={dialogNoteClassName}>
+                    Messages from step 2 are supplied when git asks for them.
+                  </p>
+                </div>
               </div>
             )}
+          </div>
+
+          <div className="mt-3">
+            <CommandPreview command={buildInteractiveRebaseCommand(baseHash)} />
           </div>
 
           {/* Footer */}
