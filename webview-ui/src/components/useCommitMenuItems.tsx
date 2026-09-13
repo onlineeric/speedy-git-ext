@@ -380,21 +380,6 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
         </MenuItem>
       )}
 
-      {/* In the commit group, not the Create group: a branch or tag is created
-         *at* this commit, while a fixup commit is created on HEAD and only
-         targets this one. */}
-      {availability.canCreateFixup && (
-        <MenuItem
-          disabled={isOperationInProgress}
-          onSelect={() => {
-            track('createFixupCommit');
-            setFixupOpen(true);
-          }}
-        >
-          Create Fixup Commit...
-        </MenuItem>
-      )}
-
       {/* Merge commits cherry-pick individually; a multi-select cherry-picks the
          whole selection (disabled if it contains a merge commit); otherwise the
          single commit, clearing any stale selection that doesn't include it. */}
@@ -432,6 +417,21 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
           }}
         >
           Merge into Current Branch
+        </MenuItem>
+      )}
+
+      {/* In the commit group, not the Create group: a branch or tag is created
+         *at* this commit, while a fixup commit is created on HEAD and only
+         targets this one. Sits just above the rebases it is usually followed by. */}
+      {availability.canCreateFixup && (
+        <MenuItem
+          disabled={isOperationInProgress}
+          onSelect={() => {
+            track('createFixupCommit');
+            setFixupOpen(true);
+          }}
+        >
+          Create Fixup Commit...
         </MenuItem>
       )}
 
