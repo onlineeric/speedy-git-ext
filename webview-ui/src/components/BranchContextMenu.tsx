@@ -29,6 +29,7 @@ import { CreateWorktreeDialog } from './CreateWorktreeDialog';
 import { refWorktreeSource } from '../utils/refWorktreeSource';
 import { expectHead, expectLocalBranch, expectRebaseTarget, expectRemoteBranch } from '../utils/refExpectation';
 import { useCapturedRefExpectation } from '../hooks/useCapturedRefExpectation';
+import type { RefExpectation } from '@shared/refRevalidation';
 import { useRemoveWorktreeDialog, WorktreeMenuItems } from './WorktreeMenuItems';
 import { MenuItem } from './MenuItem';
 import { LazyContextMenu } from './LazyContextMenu';
@@ -83,8 +84,8 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
   const [createWorktreeOpen, setCreateWorktreeOpen] = useState(false);
   const [pushTagOpen, setPushTagOpen] = useState(false);
   // Where the target ref stood when each dialog opened — the stale-ref check.
-  const rebaseOntoExpectation = useCapturedRefExpectation();
-  const rebaseHeadExpectation = useCapturedRefExpectation();
+  // A rebase has two movable ends, captured and released together.
+  const rebaseExpectations = useCapturedRefExpectation<{ expect?: RefExpectation; expectHead?: RefExpectation }>();
   const deleteExpectation = useCapturedRefExpectation();
   const loading = useGraphStore((s) => s.loading);
   const branches = useGraphStore((s) => s.branches);
@@ -101,6 +102,8 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
     : refInfo.name;
 
   const isRemoteBranch = refInfo.type === 'remote';
+  // Narrowed once: TypeScript cannot carry the narrowing into the menu item's closure.
+  const remoteOfBadge = refInfo.remote;
   const isLocalBranch = refInfo.type === 'branch';
   const isBranch = isLocalBranch || isRemoteBranch;
   const isTag = refInfo.type === 'tag';
@@ -206,10 +209,7 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
     setRebaseConfirmOpen(false);
     useGraphStore.getState().setLoading(true);
     // Both ends of the replayed range are revalidated: the onto ref and HEAD.
-    rpcClient.rebase(displayName, options, {
-      expect: rebaseOntoExpectation.take(),
-      expectHead: rebaseHeadExpectation.take(),
-    });
+    rpcClient.rebase(displayName, options, rebaseExpectations.take());
   };
 
   // Find remote counterpart for local branch (used in delete dialog)
@@ -280,11 +280,11 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
                     disabled={isOperationInProgress}
                     onSelect={() => {
                       track('rebase');
-                      {
-                        const store = useGraphStore.getState();
-                        rebaseOntoExpectation.capture(expectRebaseTarget(store.branches, displayName));
-                        rebaseHeadExpectation.capture(expectHead(store.mergedCommits));
-                      }
+                      const store = useGraphStore.getState();
+                      rebaseExpectations.capture({
+                        expect: expectRebaseTarget(store.branches, displayName),
+                        expectHead: expectHead(store.mergedCommits),
+                      });
                       setRebaseConfirmOpen(true);
                     }}
                   >
@@ -325,14 +325,12 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
                   </MenuItem>
                 )}
 
-                {isRemoteBranch && refInfo.remote && (
+                {isRemoteBranch && remoteOfBadge && (
                   <MenuItem danger onSelect={() => {
                     track('deleteRemoteBranch');
-                    if (refInfo.remote) {
-                      deleteExpectation.capture(
-                        expectRemoteBranch(useGraphStore.getState().branches, refInfo.remote, refInfo.name),
-                      );
-                    }
+                    deleteExpectation.capture(
+                      expectRemoteBranch(useGraphStore.getState().branches, remoteOfBadge, refInfo.name),
+                    );
                     setDeleteConfirmOpen(true);
                   }}>
                     Delete Remote Branch

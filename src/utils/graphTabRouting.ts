@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { isSubmoduleOf, pathsEqual, sharesObjectStore, type RepoIdentity } from './repoIdentity.js';
+import { isPathInside, isSubmoduleOf, pathsEqual, sharesObjectStore, type RepoIdentity } from './repoIdentity.js';
 
 /**
  * Every "which tab(s)?" answer, as pure functions over snapshots — no VS Code
@@ -64,16 +64,36 @@ export function tabsAffectedByChange(tabs: TabSnapshot[], changed: RepoIdentity)
 }
 
 /**
- * Which tabs must show "another view is busy" while `origin` runs an operation.
+ * Which tabs a change in activity on `workingTreeKey` concerns — the tabs whose
+ * "another view is busy" notice can differ because of it.
  *
  * The same WORKING TREE, not the same object store: a linked worktree has its
- * own checkout, so an operation there is not this tab's operation.
+ * own checkout, so an operation there is not this tab's operation. The key is
+ * the per-worktree git dir, which is what `RepoActivityRegistry` keys on, so the
+ * rule is stated once and the registry and the routing cannot disagree.
+ *
+ * The originating tab is included: `isBusy(key, self)` already excludes its own
+ * operation, so it is told the same way as everyone else rather than by a second
+ * rule about who is exempt.
  */
-export function peersSharingWorkingTree(tabs: TabSnapshot[], origin: TabSnapshot): TabSnapshot[] {
-  if (!origin.identity) return [];
-  const originGitDir = origin.identity.gitDir;
+export function tabsOnWorkingTree(tabs: TabSnapshot[], workingTreeKey: string): TabSnapshot[] {
+  if (!workingTreeKey) return [];
+  return tabs.filter((tab) => tab.identity !== null && pathsEqual(tab.identity.gitDir, workingTreeKey));
+}
+
+/**
+ * Which tabs no longer have a repository after a repo-list change.
+ *
+ * A tab survives when a known repo *is* its top-level repo, or contains what it
+ * currently displays — a submodule of a still-known repo is not orphaned. Every
+ * comparison goes through `pathsEqual`/`isPathInside` rather than raw string
+ * equality, because the discovery paths arrive unnormalised.
+ */
+export function tabsOrphanedByRepoRemoval(tabs: TabSnapshot[], knownRepoPaths: string[]): TabSnapshot[] {
   return tabs.filter(
-    (tab) => tab.id !== origin.id && tab.identity !== null && pathsEqual(tab.identity.gitDir, originGitDir),
+    (tab) => !knownRepoPaths.some(
+      (repoPath) => pathsEqual(repoPath, tab.topLevelRepoPath) || isPathInside(repoPath, tab.displayedRepoPath),
+    ),
   );
 }
 

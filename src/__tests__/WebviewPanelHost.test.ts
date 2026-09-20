@@ -169,7 +169,8 @@ describe('WebviewPanelHost', () => {
     expect(panel.subscriptionDisposals.count).toBe(3);
     expect(callbacks.onViewStateChanged).toHaveBeenLastCalledWith({ visible: false, active: false });
     expect(callbacks.onDisposed).toHaveBeenCalledTimes(1);
-    expect(host.isOpen()).toBe(false);
+    // The panel is gone, so the host no longer reports a column for it.
+    expect(host.viewColumn).toBeUndefined();
   });
 
   it('postMessage after dispose is a no-op', () => {

@@ -29,12 +29,18 @@ export async function revalidateRef(
  * Post the refusal and answer `true` when the handler must stop. One line at
  * each of the five call sites, ahead of the mutation and after the operation
  * guard.
+ *
+ * Variadic because an action can have more than one movable end — a rebase
+ * revalidates the onto ref *and* HEAD. The reads are issued together, but the
+ * refusal reported is the first expectation's, in argument order, so the message
+ * names the ref the caller considers primary.
  */
 export async function postRefMoved(
-  expect: RefExpectation | undefined,
   context: WebviewRequestContext,
+  ...expectations: (RefExpectation | undefined)[]
 ): Promise<boolean> {
-  const moved = await revalidateRef(expect, context);
+  const results = await Promise.all(expectations.map((expect) => revalidateRef(expect, context)));
+  const moved = results.find((result) => result !== null);
   if (!moved) return false;
   context.postMessage({ type: 'error', payload: { error: moved } });
   return true;

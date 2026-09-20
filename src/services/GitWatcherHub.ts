@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { DebouncerByKey } from '../utils/debounceByKey.js';
-import { normalizeRepoPath, type RepoIdentity } from '../utils/repoIdentity.js';
+import type { RepoIdentity } from '../utils/repoIdentity.js';
 import type { GitRepoIdentityService } from './GitRepoIdentityService.js';
 
 const DEBOUNCE_MS = 1000;
@@ -12,8 +12,6 @@ const WORKTREE_PATTERNS = ['HEAD', 'index', 'MERGE_HEAD', 'REBASE_HEAD', 'CHERRY
 const COMMON_PATTERNS = ['refs/**', 'packed-refs', 'FETCH_HEAD', 'ORIG_HEAD'];
 
 interface WatcherSet {
-  /** How many tab subscriptions currently hold this common-dir set. */
-  refCount: number;
   watchers: vscode.FileSystemWatcher[];
   /** Per-worktree watchers, keyed by git dir, so two worktrees share the common set. */
   worktrees: Map<string, { refCount: number; watchers: vscode.FileSystemWatcher[] }>;
@@ -32,12 +30,12 @@ interface WatcherSet {
  */
 export class GitWatcherHub implements vscode.Disposable {
   private readonly sets = new Map<string, WatcherSet>();
-  private readonly listeners = new Set<(changed: RepoIdentity) => void>();
+  private readonly _onDidDetectChange = new vscode.EventEmitter<RepoIdentity>();
   private readonly identitiesByKey = new Map<string, RepoIdentity>();
   private readonly disposables: vscode.Disposable[] = [];
+  /** One `state.onDidChange` subscription per repository root, so a closed-and-reopened folder replaces its own rather than stacking a duplicate. */
+  private readonly repoSubscriptions = new Map<string, vscode.Disposable>();
   private readonly debouncer: DebouncerByKey<string>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private gitApi: any;
   private gitApiSubscribed = false;
 
   constructor(
@@ -47,7 +45,7 @@ export class GitWatcherHub implements vscode.Disposable {
     this.debouncer = new DebouncerByKey({ debounceMs: DEBOUNCE_MS, minIntervalMs: MIN_INTERVAL_MS }, (key) => {
       const identity = this.identitiesByKey.get(key);
       if (!identity) return;
-      for (const listener of this.listeners) listener(identity);
+      this._onDidDetectChange.fire(identity);
     });
   }
 
@@ -56,10 +54,7 @@ export class GitWatcherHub implements vscode.Disposable {
    * to the tabs a change actually affects is the caller's job
    * (`tabsAffectedByChange`), because only the caller knows the open tabs.
    */
-  onDidDetectChange(listener: (changed: RepoIdentity) => void): vscode.Disposable {
-    this.listeners.add(listener);
-    return new vscode.Disposable(() => this.listeners.delete(listener));
-  }
+  readonly onDidDetectChange = this._onDidDetectChange.event;
 
   /**
    * Watch the repository at `repoPath`, joining the existing watcher set when
@@ -84,13 +79,11 @@ export class GitWatcherHub implements vscode.Disposable {
     let set = this.sets.get(identity.commonGitDir);
     if (!set) {
       set = {
-        refCount: 0,
         watchers: this.createWatchers(identity.commonGitDir, COMMON_PATTERNS, identity.commonGitDir),
         worktrees: new Map(),
       };
       this.sets.set(identity.commonGitDir, set);
     }
-    set.refCount += 1;
 
     let worktree = set.worktrees.get(identity.gitDir);
     if (!worktree) {
@@ -137,13 +130,11 @@ export class GitWatcherHub implements vscode.Disposable {
       }
     }
 
-    set.refCount -= 1;
-    if (set.refCount > 0) return;
+    // The common set exists for its worktrees, so it outlives exactly as long as
+    // one of them does — no second ref-count to keep in lockstep with the first.
+    if (set.worktrees.size > 0) return;
 
     for (const watcher of set.watchers) watcher.dispose();
-    for (const remaining of set.worktrees.values()) {
-      for (const watcher of remaining.watchers) watcher.dispose();
-    }
     this.sets.delete(identity.commonGitDir);
     this.identitiesByKey.delete(identity.commonGitDir);
     this.debouncer.cancel(identity.commonGitDir);
@@ -165,21 +156,23 @@ export class GitWatcherHub implements vscode.Disposable {
         return;
       }
       if (!ext.isActive) await ext.activate();
-      this.gitApi = ext.exports.getAPI(1);
-      if (!this.gitApi) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const gitApi: any = ext.exports.getAPI(1);
+      if (!gitApi) {
         this.log.debug('GitWatcherHub: could not get git API v1');
         return;
       }
 
-      for (const repo of this.gitApi.repositories) this.subscribeToRepository(repo);
+      for (const repo of gitApi.repositories) this.subscribeToRepository(repo);
 
       this.disposables.push(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        this.gitApi.onDidOpenRepository((repo: any) => this.subscribeToRepository(repo)),
+        gitApi.onDidOpenRepository((repo: any) => this.subscribeToRepository(repo)),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        gitApi.onDidCloseRepository((repo: any) => this.unsubscribeFromRepository(repo)),
       );
-      // No action needed for onDidCloseRepository — disposables handle cleanup.
 
-      this.log.debug(`GitWatcherHub: subscribed to vscode.git API (${this.gitApi.repositories.length} repos)`);
+      this.log.debug(`GitWatcherHub: subscribed to vscode.git API (${gitApi.repositories.length} repos)`);
     } catch {
       this.log.debug('GitWatcherHub: failed to subscribe to vscode.git API, relying on filesystem watchers');
     }
@@ -188,19 +181,26 @@ export class GitWatcherHub implements vscode.Disposable {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private subscribeToRepository(repo: any): void {
     const rootPath: string | undefined = repo?.rootUri?.fsPath;
+    if (!rootPath || this.repoSubscriptions.has(rootPath)) return;
+    this.repoSubscriptions.set(rootPath, repo.state.onDidChange(() => {
+      void this.emitForRepoPath(rootPath);
+    }));
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private unsubscribeFromRepository(repo: any): void {
+    const rootPath: string | undefined = repo?.rootUri?.fsPath;
     if (!rootPath) return;
-    this.disposables.push(
-      repo.state.onDidChange(() => {
-        void this.emitForRepoPath(rootPath);
-      }),
-    );
+    this.repoSubscriptions.get(rootPath)?.dispose();
+    this.repoSubscriptions.delete(rootPath);
   }
 
   private async emitForRepoPath(repoPath: string): Promise<void> {
-    const key = normalizeRepoPath(repoPath);
-    let identity = this.identities.peek(key);
+    // `peek` and `resolve` each normalize the path themselves, so it is passed
+    // through as given rather than normalized here as well.
+    let identity = this.identities.peek(repoPath);
     if (!identity) {
-      const resolved = await this.identities.resolve(key);
+      const resolved = await this.identities.resolve(repoPath);
       if (!resolved.success) return;
       identity = resolved.value;
     }
@@ -218,7 +218,9 @@ export class GitWatcherHub implements vscode.Disposable {
     }
     this.sets.clear();
     this.identitiesByKey.clear();
-    this.listeners.clear();
+    this._onDidDetectChange.dispose();
+    for (const subscription of this.repoSubscriptions.values()) subscription.dispose();
+    this.repoSubscriptions.clear();
     for (const disposable of this.disposables) disposable.dispose();
     this.disposables.length = 0;
   }

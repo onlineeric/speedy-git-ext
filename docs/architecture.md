@@ -128,7 +128,8 @@ src/
     │                             #   same working tree, same object store, submodule containment. One pathsEqual
     │                             #   rule (drive letter only on win32; POSIX paths stay case-sensitive)
     ├── graphTabRouting.ts        # PURE: every "which tab(s)?" answer — MRU return target, repository-aware SCM
-    │                             #   target, refresh routing, same-working-tree peers, and the editor tab title
+    │                             #   target, refresh routing, same-working-tree peers/activity, which tabs a repo
+    │                             #   removal orphaned, and the editor tab title
     ├── editorSplitFill.ts        # PURE: "Split Editor Right" on a graph. A webview cannot be duplicated, so the
     │                             #   split is recognised from its aftermath — a group that opened EMPTY while the
     │                             #   group the user was in had a graph as its active tab
@@ -142,8 +143,8 @@ src/
     │                             #   dir holding a `.git` entry, so it never walks or empties a worktree's own tree.
     │                             #   `rmdir` is also the type/symlink test, so no path stats before removing
     ├── worktreePathSegments.ts   # PURE: ref → sanitized folder segments (per-segment allowlist, `.`/`..` dropped,
-    │                             #   `/` and `\` both split); normalizePathForCompare (the one "same place?" rule,
-    │                             #   case-insensitive on win32) and the isInsideBaseDir containment guard built on it
+    │                             #   `/` and `\` both split); normalizePathForCompare and isInsideBaseDir now DELEGATE
+    │                             #   to utils/repoIdentity.ts, so "same place?" has one implementation, not two
     └── worktreeErrors.ts         # Map raw git worktree failures → friendly messages
 ```
 
@@ -182,7 +183,8 @@ components/
 ```
 ├── ControlBar.tsx                # Top toolbar with actions, incl. "Open New Graph Tab" beside Go to HEAD and the
 │                                 #   peer-activity notice (informational; it disables nothing)
-├── ResponsiveToolbar.tsx         # Measures visible action widths; collapses right then left into More dropdowns
+├── ResponsiveToolbar.tsx         # Measures visible action widths; collapses right then left into More dropdowns,
+│                                 #   which reuse `menuPanelClass` and hide separators by `data-toolbar-separator`
 ├── ToolbarIconButton.tsx         # Shared toolbar button: icon + optional label (speedyGit.toolbar.showLabels);
 │                                 #   right-click menu toggles labels / Remote button, extensible via extraMenuItems
 ├── TogglePanel.tsx               # Collapsible panel for Filter/Search/Compare widgets
@@ -227,7 +229,8 @@ Menu building blocks — see `CLAUDE.md` for the reuse rules:
 ├── MenuCopySubmenu.tsx           # Shared "Copy" submenu
 ├── CompareMenuItems.tsx          # "Set as Compare Base" / "Compare with Base" pair (042)
 ├── WorktreeMenuItems.tsx         # Worktree entries shared across menus (046)
-└── menuStyles.ts                 # Tailwind class strings composed from one geometry + hover base; item variants exported only to `MenuItem`
+└── menuStyles.ts                 # Tailwind class strings composed from one geometry + hover base; item variants exported only to `MenuItem`.
+                                  #   `menuPanelClass` is the panel shell (theme tokens + slim scrollbar) shared with the collapsed toolbar dropdown
 ```
 
 ### Dialogs

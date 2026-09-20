@@ -103,14 +103,6 @@ export class WebviewPanelHost {
     return this.panel?.viewColumn;
   }
 
-  isOpen(): boolean {
-    return this.panel !== undefined;
-  }
-
-  isVisible(): boolean {
-    return this.panel?.visible ?? false;
-  }
-
   /** Safe after disposal: a result arriving for a closed tab simply goes nowhere. */
   postMessage(message: ResponseMessage): void {
     void this.panel?.webview.postMessage(message);

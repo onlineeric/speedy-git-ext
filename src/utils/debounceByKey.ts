@@ -10,7 +10,8 @@ export interface DebounceByKeyOptions {
 }
 
 interface KeyState {
-  timer: ReturnType<typeof setTimeout>;
+  /** Absent once the pending fire has happened, so nothing clears a dead handle. */
+  timer?: ReturnType<typeof setTimeout>;
   lastFiredAt: number;
 }
 
@@ -31,7 +32,7 @@ export class DebouncerByKey<K> {
     const delay = Math.max(this.options.debounceMs, this.options.minIntervalMs - elapsed);
 
     const timer = setTimeout(() => {
-      this.states.set(key, { timer, lastFiredAt: Date.now() });
+      this.states.set(key, { lastFiredAt: Date.now() });
       this.onFire(key);
     }, delay);
 

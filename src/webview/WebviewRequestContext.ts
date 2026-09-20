@@ -48,7 +48,7 @@ export interface WebviewRequestContext {
   getBatchSize(): number;
   /** The installed git's version, read once and cached on the runtime. Never rejects: a failed or unparseable read is null. */
   getGitVersion(): Promise<GitVersion | null>;
-  getRepoDiscovery(): GitRepoDiscoveryService | undefined;
+  getRepoDiscovery(): GitRepoDiscoveryService;
   /** This tab's selected repository, before any submodule navigation. */
   getTopLevelRepoPath(): string;
   /** Resolved for the displayed repo; null when it is not a git repository. */

@@ -273,7 +273,7 @@ export function ControlBar() {
             </span>
           )}
 
-          <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)] px-1">
+          <span className="text-xs text-[var(--vscode-descriptionForeground)] px-1">
             {totalLoadedWithoutFilter !== null ? totalLoadedWithoutFilter : mergedCommits.length} loaded
           </span>
         </>}

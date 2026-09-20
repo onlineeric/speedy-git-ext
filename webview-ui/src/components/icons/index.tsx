@@ -336,7 +336,10 @@ export function GoToHeadIcon({ className }: IconProps) {
 /** Vertical toolbar divider aligned to icon-button height */
 export function ToolbarSeparatorIcon({ className }: IconProps) {
   return (
-    <svg width={8} height={24} viewBox="0 0 8 24" fill="none" className={className} aria-hidden>
+    // Marked by role rather than by element: the collapsed toolbar dropdown hides
+    // separators by this attribute, so an icon-only control placed directly in a
+    // toolbar group does not silently vanish along with them.
+    <svg data-toolbar-separator width={8} height={24} viewBox="0 0 8 24" fill="none" className={className} aria-hidden>
       <line
         x1={4}
         y1={3}
@@ -508,6 +511,17 @@ export function InfoIcon({ className, style }: IconProps) {
       <circle cx={6} cy={6} r={5} stroke="currentColor" strokeWidth={1.2} />
       <circle cx={6} cy={3.6} r={0.7} fill="currentColor" />
       <line x1={6} y1={5.4} x2={6} y2={8.6} stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** The collapsed toolbar group's trigger — the overflow kebab. */
+export function MoreIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <circle cx={5} cy={12} r={2} />
+      <circle cx={12} cy={12} r={2} />
+      <circle cx={19} cy={12} r={2} />
     </svg>
   );
 }

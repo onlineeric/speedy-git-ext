@@ -13,6 +13,15 @@ vi.mock('vscode', () => ({
     constructor(private readonly callOnDispose: () => void) {}
     dispose() { this.callOnDispose(); }
   },
+  EventEmitter: class {
+    private listeners: Array<(value: unknown) => void> = [];
+    event = (listener: (value: unknown) => void) => {
+      this.listeners.push(listener);
+      return { dispose: vi.fn() };
+    };
+    fire(value: unknown) { this.listeners.forEach((listener) => listener(value)); }
+    dispose() { this.listeners = []; }
+  },
   Uri: { file: (fsPath: string) => ({ fsPath }) },
   RelativePattern: class {
     constructor(public base: { fsPath: string }, public pattern: string) {}

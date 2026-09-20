@@ -11,20 +11,26 @@ import type { RefExpectation } from '@shared/refRevalidation';
  * would always pass. The expectation has to be the position the user actually
  * saw.
  */
-export function useCapturedRefExpectation(): {
-  /** Call where the action starts — the menu click that opens the dialog. */
-  capture: (expectation: RefExpectation | undefined) => void;
+export function useCapturedRefExpectation<T = RefExpectation | undefined>(): {
+  /**
+   * Call where the action starts — the menu click that opens the dialog.
+   *
+   * `T` widens to a *group* of expectations for an action with more than one
+   * movable end — a rebase revalidates both the onto ref and HEAD — so the two
+   * are captured and released as one and cannot get out of step.
+   */
+  capture: (expectation: T) => void;
   /**
    * Call at an intermediate step that git may still turn into a second,
    * stronger attempt — `branch -d` answering `deleteBranchNeedsForce`, whose
    * retry is the `branch -D` that actually discards commits. Keeps the capture
    * so the retry carries the same expectation.
    */
-  peek: () => RefExpectation | undefined;
+  peek: () => T | undefined;
   /** Call at confirm. Clears itself, so a reopened dialog cannot reuse a stale capture. */
-  take: () => RefExpectation | undefined;
+  take: () => T | undefined;
 } {
-  const captured = useRef<RefExpectation | undefined>(undefined);
+  const captured = useRef<T | undefined>(undefined);
   return {
     capture: (expectation) => {
       captured.current = expectation;

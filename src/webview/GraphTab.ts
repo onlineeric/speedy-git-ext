@@ -9,7 +9,7 @@ import { clampBatchCommitSize, DEFAULT_USER_SETTINGS } from '../../shared/types.
 import { panelTitleFor, type TabSnapshot } from '../utils/graphTabRouting.js';
 import { EditorCommandService } from './EditorCommandService.js';
 import { createGitServices } from './createGitServices.js';
-import { GitServiceRegistry, type GitServiceSet } from './GitServiceRegistry.js';
+import { GitServiceRegistry } from './GitServiceRegistry.js';
 import { OperationGuard } from './OperationGuard.js';
 import { PersistedUIStateStore } from './PersistedUIStateStore.js';
 import { RefreshCoordinator } from './RefreshCoordinator.js';
@@ -83,11 +83,7 @@ export class GraphTab {
       postMessage: (message) => this.postMessage(message),
       getSettings: () => options.getSettings(),
       getBatchSize: () => this.getBatchSize(),
-      getSubmoduleHandlers: () => ({
-        getStack: () => [...this.runtime.submoduleStack],
-        openSubmodule: () => {},
-        backToParentRepo: () => this.backToParentRepo(),
-      }),
+      getSubmoduleStack: () => [...this.runtime.submoduleStack],
       telemetry: options.shared.telemetry,
     });
     this.refreshCoordinator = new RefreshCoordinator(this.log, this.dataLoader);
@@ -149,23 +145,21 @@ export class GraphTab {
       },
     });
 
-    await this.resolveIdentity();
+    // The identity costs a `rev-parse` on the first visit to a repo, and the
+    // commit load does not need it, so the two run together rather than in turn.
+    const identity = this.resolveIdentity();
     this.sendWhatsNew();
     this.sendRepoList();
     this.sendSettingsData(this.options.getSettings());
-    // Send the peer-busy state up front, so a tab created while a peer is
-    // mid-operation shows the notice from its first paint rather than only
-    // after the next change.
+    await Promise.all([identity, this.refreshCoordinator.reload()]);
+    // Sent after the identity resolves, since the peer-busy answer is keyed by
+    // it — up front, so a tab created while a peer is mid-operation shows the
+    // notice from its first paint rather than only after the next change.
     this.sendPeerActivity();
-    await this.refreshCoordinator.reload();
   }
 
   reveal(preserveFocus = false): void {
     this.panelHost.reveal(preserveFocus);
-  }
-
-  isPanelOpen(): boolean {
-    return this.panelHost.isOpen();
   }
 
   async reload(): Promise<void> {
@@ -363,4 +357,3 @@ export class GraphTab {
   }
 }
 
-export type GraphTabServiceSet = GitServiceSet;

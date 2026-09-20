@@ -1,6 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { trackUiInteraction } from '../utils/telemetry';
 import { ToolbarIconButton, RemoteButtonToggleItem, TOGGLE_BUTTON_TONES } from './ToolbarIconButton';
+import { MoreIcon } from './icons';
+import { menuPanelClass } from './menuStyles';
 
 const GAP = 4;
 const MORE_WIDTH = 36;
@@ -21,8 +23,14 @@ export function getToolbarCollapseState({ availableWidth, leftWidths, rightWidth
 }
 
 export function getToolbarGroupClassName(collapsed: boolean, open: boolean, side: 'left' | 'right'): string {
+  // Collapsed, the group *is* a menu panel, so it takes the shared shell rather
+  // than re-spelling the theme tokens and the slim scrollbar. Radix's
+  // available-height variable is published only inside a Radix menu, and this is
+  // not one, so the height caps against the viewport instead.
   return collapsed
-    ? `absolute top-full z-50 mt-1 flex w-max max-h-[calc(100vh-64px)] flex-col items-center gap-1 [&>*]:shrink-0 [&>svg]:absolute [&>svg]:invisible overflow-y-auto rounded border border-[var(--vscode-widget-border)] bg-[var(--vscode-menu-background)] p-1 shadow-lg ${side === 'left' ? 'left-0' : 'right-0'} ${open ? '' : 'invisible'}`
+    ? `${menuPanelClass} absolute top-full mt-1 flex w-max max-h-[calc(100vh-64px)] flex-col items-center gap-1 p-1 `
+      + `[&>*]:shrink-0 [&>[data-toolbar-separator]]:absolute [&>[data-toolbar-separator]]:invisible `
+      + `${side === 'left' ? 'left-0' : 'right-0'} ${open ? '' : 'invisible'}`
     : 'flex w-max items-center gap-1';
 }
 
@@ -59,8 +67,10 @@ export function ResponsiveToolbar({ left, right, status }: {
       measure();
     };
     const mutations = new MutationObserver(observe);
-    mutations.observe(leftGroup, { childList: true, subtree: true });
-    mutations.observe(rightGroup, { childList: true, subtree: true });
+    // Direct children only: those are exactly what `measure` sizes, and each one's
+    // own size changes are already covered by the per-child ResizeObserver above.
+    mutations.observe(leftGroup, { childList: true });
+    mutations.observe(rightGroup, { childList: true });
     observe();
     return () => { resize.disconnect(); mutations.disconnect(); };
   }, []);
@@ -126,9 +136,7 @@ export function ToolbarGroup({ side, collapsed, contentRef, children }: {
         <ToolbarIconButton
           ref={triggerRef}
           label="More"
-          icon={<svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
-          </svg>}
+          icon={<MoreIcon className="h-6 w-6" />}
           {...TOGGLE_BUTTON_TONES.inactive}
           className="h-9 w-9 [&>span]:hidden"
           aria-label={`More ${side === 'left' ? 'actions' : 'options'}`}

@@ -9,16 +9,16 @@ import { PersistedUIStateStore } from './webview/PersistedUIStateStore.js';
 import { GitError } from '../shared/errors.js';
 import { PANEL_OPENED_TRIGGERS, toTabCountBucket, type PanelOpenedTrigger } from '../shared/telemetry.js';
 import {
-  peersSharingWorkingTree,
   pickRepoTarget,
   pickReturnTarget,
   tabsAffectedByChange,
+  tabsOnWorkingTree,
+  tabsOrphanedByRepoRemoval,
 } from './utils/graphTabRouting.js';
 import {
   pickSplitFillGroup,
   type EditorGroupSnapshot,
 } from './utils/editorSplitFill.js';
-import { isPathInside, pathsEqual } from './utils/repoIdentity.js';
 import {
   clampAvatarRefreshDays,
   clampBatchCommitSize,
@@ -28,6 +28,23 @@ import {
   type UserDateFormat,
   type UserSettings,
 } from '../shared/types.js';
+
+/** Settings the webview renders from, so a change to one reloads every graph. */
+const WEBVIEW_SETTING_SECTIONS = [
+  'speedyGit.graphColors',
+  'speedyGit.dateFormat',
+  'speedyGit.dateFormatCustom',
+  'speedyGit.avatars.enabled',
+  'speedyGit.avatars.refreshDays',
+  'speedyGit.showRemoteBranches',
+  'speedyGit.showTags',
+  'speedyGit.batchCommitSize',
+  'speedyGit.overScan',
+  'speedyGit.worktree.basePath',
+  'speedyGit.worktree.folderNameStyle',
+  'speedyGit.toolbar.showLabels',
+  'speedyGit.toolbar.showRemoteButton',
+];
 
 /**
  * Owns the window-level surfaces — repo discovery, the status bar, settings,
@@ -74,8 +91,10 @@ export class ExtensionController {
       // A peer's running operation is mirrored as a notice. Never a lock: the
       // tab that owns the operation keeps its own busy state, and everyone else
       // keeps every control enabled.
-      this.shared.activity.onDidChange(() => {
-        for (const tab of this.registry.all()) tab.sendPeerActivity();
+      this.shared.activity.onDidChange(({ workingTreeKey }) => {
+        for (const snapshot of tabsOnWorkingTree(this.registry.snapshots(), workingTreeKey)) {
+          this.registry.get(snapshot.id)?.sendPeerActivity();
+        }
       }),
     );
 
@@ -266,9 +285,9 @@ export class ExtensionController {
       ? (trigger as PanelOpenedTrigger)
       : 'command';
 
-    const target = pickReturnTarget(this.registry.snapshots());
+    const target = this.mostRecentlyActiveTab();
     if (target) {
-      this.registry.get(target.id)?.reveal();
+      target.reveal();
       return;
     }
 
@@ -385,23 +404,17 @@ export class ExtensionController {
    */
   private handleRepoListChanged(): void {
     const repos = this.shared.repoDiscovery.getRepos();
-    const known = new Set(repos.map((repo) => repo.path));
+    const orphaned = tabsOrphanedByRepoRemoval(this.registry.snapshots(), repos.map((repo) => repo.path));
 
-    const orphaned = this.registry.all().filter(
-      (tab) =>
-        !known.has(tab.topLevelRepoPath)
-        && ![...known].some(
-          (repoPath) => pathsEqual(repoPath, tab.topLevelRepoPath) || isPathInside(repoPath, tab.displayedRepoPath),
-        ),
-    );
-
-    if (orphaned.length === 0 || repos.length === 0) {
-      for (const tab of this.registry.all()) tab.sendRepoList();
-      return;
-    }
+    // Every tab's selector is refreshed either way; a retargeted tab simply sends
+    // a second, post-retarget list rather than being excluded from this one.
+    for (const tab of this.registry.all()) tab.sendRepoList();
+    if (orphaned.length === 0 || repos.length === 0) return;
 
     const fallback = repos[0];
-    for (const tab of orphaned) {
+    for (const snapshot of orphaned) {
+      const tab = this.registry.get(snapshot.id);
+      if (!tab) continue;
       // Not user-initiated: a repo disappearing must not move the saved default.
       void tab.setTopLevelRepo(fallback.path, { userInitiated: false }).then(() => {
         tab.sendRepoList();
@@ -410,9 +423,6 @@ export class ExtensionController {
         this.log.error(`Retargeting a graph after its repository was removed failed: ${err}`);
         this.telemetry.sendError('repoDiscovery', err instanceof GitError ? err.code : 'UNKNOWN');
       });
-    }
-    for (const tab of this.registry.all()) {
-      if (!orphaned.includes(tab)) tab.sendRepoList();
     }
 
     const suffix = orphaned.length > 1 ? ` (${orphaned.length} graphs)` : '';
@@ -441,14 +451,6 @@ export class ExtensionController {
     return this.shared.resolveDiffService(repoPath);
   }
 
-  /** Test seam: which tabs would see a peer's operation on this one's working tree. */
-  peerTabsOf(tabId: string): string[] {
-    const snapshots = this.registry.snapshots();
-    const origin = snapshots.find((snapshot) => snapshot.id === tabId);
-    if (!origin) return [];
-    return peersSharingWorkingTree(snapshots, origin).map((snapshot) => snapshot.id);
-  }
-
   dispose() {
     this.registry.dispose();
     this.shared.dispose();
@@ -457,21 +459,7 @@ export class ExtensionController {
   }
 
   private didSpeedyGitWebviewSettingsChange(event: vscode.ConfigurationChangeEvent): boolean {
-    return [
-      'speedyGit.graphColors',
-      'speedyGit.dateFormat',
-      'speedyGit.dateFormatCustom',
-      'speedyGit.avatars.enabled',
-      'speedyGit.avatars.refreshDays',
-      'speedyGit.showRemoteBranches',
-      'speedyGit.showTags',
-      'speedyGit.batchCommitSize',
-      'speedyGit.overScan',
-      'speedyGit.worktree.basePath',
-      'speedyGit.worktree.folderNameStyle',
-      'speedyGit.toolbar.showLabels',
-      'speedyGit.toolbar.showRemoteButton',
-    ].some((section) => event.affectsConfiguration(section));
+    return WEBVIEW_SETTING_SECTIONS.some((section) => event.affectsConfiguration(section));
   }
 
   private readStatusBarText(): string {

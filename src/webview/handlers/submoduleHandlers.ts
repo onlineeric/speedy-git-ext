@@ -56,10 +56,7 @@ export const submoduleHandlers = {
    */
   switchRepo: async (message, context) => {
     const { repoPath } = message.payload;
-    const discovery = context.getRepoDiscovery();
-    if (!discovery) return;
-
-    const knownRepo = discovery.getRepos().find((repo) => repo.path === repoPath);
+    const knownRepo = context.getRepoDiscovery().getRepos().find((repo) => repo.path === repoPath);
     if (!knownRepo) {
       context.postMessage({ type: 'error', payload: { error: { message: `Repository not found: ${repoPath}` } } });
       return;
@@ -78,9 +75,6 @@ export const submoduleHandlers = {
    */
   displayRepo: async (message, context) => {
     const { repoPath } = message.payload;
-    const discovery = context.getRepoDiscovery();
-    if (!discovery) return;
-
     context.runtime.clearBranchFilters();
     context.runtime.isDisplayingSubmodule = repoPath !== context.getTopLevelRepoPath();
 

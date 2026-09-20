@@ -13,13 +13,7 @@
  */
 import type { Branch } from '@shared/types';
 import type { RefExpectation } from '@shared/refRevalidation';
-import { findHeadCommitHash } from './commitRefs';
-
-/** Minimal shape needed to spot the HEAD row by its decorations. */
-interface DecoratedRow {
-  hash: string;
-  refs?: readonly { type: string }[];
-}
+import { findHeadCommitHash, type DecoratedRow } from './commitRefs';
 
 /**
  * `HEAD` itself — used where the action is computed from the current tip
@@ -83,6 +77,14 @@ export function expectRebaseTarget(branches: readonly Branch[], targetRef: strin
   return branch ? { ref: targetRef, expectedHash: branch.hash } : undefined;
 }
 
+/**
+ * A branch's qualified ref name.
+ *
+ * Deliberately NOT `branchSelection`'s `getBranchKey`: that one always prefixes
+ * the remote, while a `Branch` here may already carry a qualified name (covered
+ * by `expectRemoteBranch`'s own test), which would otherwise become
+ * `origin/origin/dev`.
+ */
 function refNameOf(branch: Branch): string {
   if (!branch.remote) return branch.name;
   return branch.name.startsWith(`${branch.remote}/`) ? branch.name : `${branch.remote}/${branch.name}`;

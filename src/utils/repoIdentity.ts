@@ -47,7 +47,7 @@ export function normalizeRepoPath(p: string): string {
   if (!p) return '';
   const platform = platformPath();
   let resolved = platform.resolve(p);
-  if (resolved.length > 1 && (resolved.endsWith(platform.sep) || resolved.endsWith('/'))) {
+  if (resolved.length > 1 && resolved.endsWith(platform.sep)) {
     resolved = resolved.slice(0, -1);
   }
   if (process.platform === 'win32' && /^[a-zA-Z]:/.test(resolved)) {
@@ -57,12 +57,21 @@ export function normalizeRepoPath(p: string): string {
 }
 
 /**
- * Path equality with the platform's case rule applied once, here, so every
- * predicate below agrees about it.
+ * Path equality with normalisation and the platform's case rule applied once,
+ * here, so every predicate below agrees about it.
+ *
+ * Both operands are normalised because most callers do not hold a normalised
+ * string: a `RepoIdentity`'s fields are, but the paths compared against them
+ * come raw from `sourceControl.rootUri.fsPath` and from workspace folders. A
+ * trailing separator or a non-canonical spelling on one side would otherwise
+ * read as a different repository, which is a duplicate graph tab rather than a
+ * revealed one.
  */
 export function pathsEqual(a: string, b: string): boolean {
   if (!a || !b) return false;
-  return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+  const left = normalizeRepoPath(a);
+  const right = normalizeRepoPath(b);
+  return process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
 }
 
 /** Same checkout: HEAD, the index and in-progress operation state are shared. */

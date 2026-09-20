@@ -97,14 +97,22 @@ export const menuGroupNameClass = 'ml-1 min-w-0 truncate normal-case tracking-no
  * Shell styling for `ContextMenu.Content` / `ContextMenu.SubContent`. The
  * per-menu `min-w-[…]` is prepended at the call site; everything else (padding,
  * rounding, shadow, theme background/border, z-index) is shared.
+ *
+ * `menuPanelClass` is the same shell minus Radix's available-height variable, so
+ * a menu-like surface that is not a Radix menu — the collapsed toolbar dropdown —
+ * still gets the theme tokens and the themed slim scrollbar rather than
+ * re-spelling them and drifting.
  */
+export const menuPanelClass =
+  'py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50 menu-scroll';
+
 export const menuContentClass =
-  'py-1 rounded shadow-lg bg-[var(--vscode-menu-background)] border border-[var(--vscode-menu-border)] z-50 ' +
+  `${menuPanelClass} ` +
   // Radix measures the room left between the menu's anchor and the viewport edge
   // and publishes it as this variable. Capping the height against it and scrolling
   // the overflow is what keeps a long menu — a branch badge's runs to ~20 items —
   // usable in a short editor window instead of running off the bottom.
-  'max-h-[var(--radix-context-menu-content-available-height)] menu-scroll';
+  'max-h-[var(--radix-context-menu-content-available-height)]';
 
 /**
  * Gap kept between a menu and the viewport edge. Also feeds the available-height

@@ -1,4 +1,4 @@
-import path from 'node:path';
+import { normalizeRepoPath, isPathInside } from './repoIdentity.js';
 
 /**
  * Turn a git ref into the folder name(s) a worktree is created under, plus the path
@@ -47,24 +47,20 @@ export function buildWorktreeSegments(ref: string): string[] {
 /**
  * Normalize a path for comparison — resolved, and case-insensitive on Windows.
  *
- * The one spelling of "are these two paths the same place", shared by the containment
- * check below and `GitWorktreeService`'s collision check, so the two can never
- * disagree about a pair of paths.
+ * Delegates to `repoIdentity.ts`, which is the one home for "are these two paths
+ * the same place": `GitWorktreeService`'s collision check and the graph-tab
+ * routing rules must never disagree about a pair of paths, and two
+ * implementations of the same question eventually do.
  */
 export function normalizePathForCompare(p: string): string {
-  const resolved = path.resolve(p);
+  const resolved = normalizeRepoPath(p);
   return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
 /**
  * True when `candidate` resolves to a path strictly inside `baseDir`.
  *
- * The trailing separator matters: without it `<base>-other` would read as being
- * inside `<base>` because it shares its prefix.
+ * `false` when the two are equal, and `false` for a sibling whose name merely
+ * starts with the parent's (`<base>-other` is not inside `<base>`).
  */
-export function isInsideBaseDir(baseDir: string, candidate: string): boolean {
-  const base = normalizePathForCompare(baseDir);
-  const target = normalizePathForCompare(candidate);
-  if (target === base) return false;
-  return target.startsWith(base.endsWith(path.sep) ? base : base + path.sep);
-}
+export const isInsideBaseDir = isPathInside;

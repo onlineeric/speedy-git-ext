@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import type { Branch, PushForceMode } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
@@ -14,6 +14,7 @@ import {
 } from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
 import { expectRemoteBranch } from '../utils/refExpectation';
+import { resolveDefaultRemoteName } from '../utils/resolveDefaultRemote';
 
 interface PushDialogProps {
   open: boolean;
@@ -43,7 +44,7 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
    * still change which remote they are pushing to, so the snapshot is kept
    * whole and the expectation built from it at confirm.
    */
-  const [branchesAtOpen, setBranchesAtOpen] = useState<Branch[]>([]);
+  const branchesAtOpen = useRef<Branch[]>([]);
 
   // Reset dialog state once per opening. Keyed on `open` ALONE: the tab
   // auto-refreshes while the dialog sits open and hands the store a fresh
@@ -57,15 +58,16 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
     setForceMode('none');
     setSelectedRemote(resolveDefaultRemoteName(store.remotes));
     setIsPushing(false);
-    setBranchesAtOpen(store.branches);
+    branchesAtOpen.current = store.branches;
   }, [open]);
 
   // Remotes may still be loading when the dialog opens, so heal a selection that
   // names no existing remote — without touching one the user made.
   useEffect(() => {
+    if (!open) return;
     setSelectedRemote((current) =>
       remotes.some((remote) => remote.name === current) ? current : resolveDefaultRemoteName(remotes));
-  }, [remotes]);
+  }, [open, remotes]);
 
   const command = buildPushCommand({ remote: selectedRemote, branch: branchName, setUpstream, forceMode });
   const isForce = forceMode !== 'none';
@@ -82,7 +84,7 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
         branchName,
         setUpstream,
         forceMode,
-        isForce ? expectRemoteBranch(branchesAtOpen, selectedRemote, branchName) : undefined,
+        isForce ? expectRemoteBranch(branchesAtOpen.current, selectedRemote, branchName) : undefined,
       );
     } catch {
       // Error is already shown via store.setError in rpcClient

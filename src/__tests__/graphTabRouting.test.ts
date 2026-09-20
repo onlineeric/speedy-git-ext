@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   panelTitleFor,
-  peersSharingWorkingTree,
   pickRepoTarget,
   pickReturnTarget,
   tabsAffectedByChange,
+  tabsOnWorkingTree,
+  tabsOrphanedByRepoRemoval,
   type TabSnapshot,
 } from '../utils/graphTabRouting.js';
 import type { RepoIdentity } from '../utils/repoIdentity.js';
@@ -131,29 +132,55 @@ describe('tabsAffectedByChange', () => {
   });
 });
 
-describe('peersSharingWorkingTree', () => {
-  it('excludes the origin tab itself', () => {
+describe('tabsOnWorkingTree', () => {
+  it('includes every tab on the key, the originating one among them', () => {
     const origin = tab({ id: 'origin', identity: repoA });
     const peer = tab({ id: 'peer', identity: repoA });
-    expect(peersSharingWorkingTree([origin, peer], origin).map((t) => t.id)).toEqual(['peer']);
+    expect(tabsOnWorkingTree([origin, peer], repoA.gitDir).map((t) => t.id)).toEqual(['origin', 'peer']);
   });
 
-  it('excludes a sibling worktree — a different checkout', () => {
-    const origin = tab({ id: 'origin', identity: repoA });
-    const worktree = tab({ id: 'worktree', identity: worktreeA });
-    expect(peersSharingWorkingTree([origin, worktree], origin)).toEqual([]);
+  it('excludes a sibling worktree and an unresolved tab', () => {
+    const tabs = [
+      tab({ id: 'worktree', identity: worktreeA }),
+      tab({ id: 'unknown', identity: null }),
+      tab({ id: 'other', identity: repoB }),
+    ];
+    expect(tabsOnWorkingTree(tabs, repoA.gitDir)).toEqual([]);
   });
 
-  it('excludes a tab with no identity', () => {
-    const origin = tab({ id: 'origin', identity: repoA });
-    const unknown = tab({ id: 'unknown', identity: null });
-    expect(peersSharingWorkingTree([origin, unknown], origin)).toEqual([]);
+  it('answers nothing for an empty key', () => {
+    expect(tabsOnWorkingTree([tab({ id: 'a', identity: repoA })], '')).toEqual([]);
+  });
+});
+
+describe('tabsOrphanedByRepoRemoval', () => {
+  const tabOnA = tab({ id: 'a', identity: repoA });
+
+  it('keeps a tab whose top-level repo is still known', () => {
+    expect(tabsOrphanedByRepoRemoval([tabOnA], ['/repos/a', '/repos/b'])).toEqual([]);
   });
 
-  it('answers nothing when the origin has no identity', () => {
-    const origin = tab({ id: 'origin', identity: null });
-    const peer = tab({ id: 'peer', identity: repoA });
-    expect(peersSharingWorkingTree([origin, peer], origin)).toEqual([]);
+  it('keeps a tab displaying a submodule of a still-known repo', () => {
+    const inSubmodule = tab({
+      id: 'sub', identity: submoduleA, topLevelRepoPath: '/repos/a', displayedRepoPath: '/repos/a/sub',
+    });
+    expect(tabsOrphanedByRepoRemoval([inSubmodule], ['/repos/a'])).toEqual([]);
+  });
+
+  it('keeps a tab whose repo is spelled with a trailing separator', () => {
+    expect(tabsOrphanedByRepoRemoval([tabOnA], ['/repos/a/'])).toEqual([]);
+  });
+
+  it('orphans a tab whose repo is gone', () => {
+    expect(tabsOrphanedByRepoRemoval([tabOnA], ['/repos/b']).map((t) => t.id)).toEqual(['a']);
+  });
+
+  it('does not treat a prefix-sharing sibling as the same repo', () => {
+    expect(tabsOrphanedByRepoRemoval([tabOnA], ['/repos/a2']).map((t) => t.id)).toEqual(['a']);
+  });
+
+  it('orphans every tab when no repos remain', () => {
+    expect(tabsOrphanedByRepoRemoval([tabOnA], []).map((t) => t.id)).toEqual(['a']);
   });
 });
 

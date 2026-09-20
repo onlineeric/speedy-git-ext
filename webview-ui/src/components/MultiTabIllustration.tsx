@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import {
   BORDER_COLOR,
   FOREGROUND_COLOR,
@@ -53,14 +52,6 @@ function MiniGroup({ title, accent, className = '' }: { title: string; accent: s
 }
 
 /** The toolbar's right end, with the New Tab button that opens the second group. */
-function MiniToolbar({ children }: { children: ReactNode }) {
-  return (
-    <div className="mb-1.5 flex items-center justify-end gap-1.5 px-0.5" style={{ color: NEUTRAL_COLOR }}>
-      {children}
-    </div>
-  );
-}
-
 /**
  * A miniature of the editor for the 5.17.0 hero: the real New Tab button pulses,
  * and a second graph tab opens beside the first. Decorative only — the keyframes
@@ -74,7 +65,7 @@ export function MultiTabIllustration() {
       className="w-full min-w-[15rem] rounded-xl border p-2.5 shadow-lg"
       style={{ borderColor: BORDER_COLOR, background: tint(SURFACE_COLOR, 80) }}
     >
-      <MiniToolbar>
+      <div className="mb-1.5 flex items-center justify-end gap-1.5 px-0.5" style={{ color: NEUTRAL_COLOR }}>
         <span className="h-1 w-4 rounded-full" style={{ background: tint(FOREGROUND_COLOR, 30) }} />
         <span className="h-1 w-3 rounded-full" style={{ background: tint(FOREGROUND_COLOR, 30) }} />
         <span className="relative grid h-4 w-4 place-items-center rounded" style={{ color: SHOWCASE_PURPLE_COLOR }}>
@@ -85,7 +76,7 @@ export function MultiTabIllustration() {
             style={{ borderColor: SHOWCASE_PURPLE_COLOR }}
           />
         </span>
-      </MiniToolbar>
+      </div>
 
       <div className="grid grid-cols-2 gap-1.5">
         <MiniGroup title="web-app" accent={SHOWCASE_BLUE_COLOR} />

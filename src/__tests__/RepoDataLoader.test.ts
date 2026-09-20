@@ -98,7 +98,7 @@ function createLoaderFixture(options: {
     postMessage,
     getSettings: () => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }),
     getBatchSize: () => 500,
-    getSubmoduleHandlers: () => undefined,
+    getSubmoduleStack: () => [],
     telemetry,
   });
 

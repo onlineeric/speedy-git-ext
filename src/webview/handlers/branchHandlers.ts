@@ -101,7 +101,7 @@ export const branchHandlers = {
   deleteBranch: async (message, context) => {
     // `branch -D` succeeds against a branch that advanced, losing the new
     // commits without a word — so the check has to be ours.
-    if (await postRefMoved(message.payload.expect, context)) return;
+    if (await postRefMoved(context, message.payload.expect)) return;
     const result = await context.services.current().gitBranchService.deleteBranch(
       message.payload.name,
       message.payload.force,
@@ -128,7 +128,7 @@ export const branchHandlers = {
   },
 
   deleteRemoteBranch: async (message, context) => {
-    if (await postRefMoved(message.payload.expect, context)) return;
+    if (await postRefMoved(context, message.payload.expect)) return;
     const result = await context.services.current().gitBranchService.deleteRemoteBranch(
       message.payload.remote,
       message.payload.name,

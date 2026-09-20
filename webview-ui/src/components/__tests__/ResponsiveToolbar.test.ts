@@ -161,11 +161,12 @@ describe('dropdown separator CSS', () => {
     })]).process('@tailwind utilities;', { from: undefined });
     const separatorRules: Record<string, string> = {};
     result.root.walkRules((rule) => {
-      if (rule.selector.endsWith('>svg')) {
+      if (rule.selector.endsWith('>[data-toolbar-separator]')) {
         rule.walkDecls((declaration) => { separatorRules[declaration.prop] = declaration.value; });
       }
     });
-    // Direct children only: the SVGs inside buttons must remain visible.
+    // Targeted by role, not by element: an icon-only control placed directly in a
+    // group must stay visible, and the SVGs inside buttons must too.
     // display:none would lose separator width and make collapse decisions oscillate.
     expect(separatorRules).toEqual({ position: 'absolute', visibility: 'hidden' });
 
@@ -179,9 +180,10 @@ describe('dropdown separator CSS', () => {
   });
 
   it('applies separator hiding to the rendered dropdown, then removes it in the toolbar', () => {
-    expect(renderGroup(true)).toContain('[&amp;&gt;svg]:invisible');
-    expect(renderGroup(true)).toContain('[&amp;&gt;svg]:absolute');
-    expect(renderGroup(false)).not.toContain('[&amp;&gt;svg]:invisible');
-    expect(renderGroup(false)).not.toContain('[&amp;&gt;svg]:absolute');
+    expect(renderGroup(true)).toContain('[&amp;&gt;[data-toolbar-separator]]:invisible');
+    expect(renderGroup(true)).toContain('[&amp;&gt;[data-toolbar-separator]]:absolute');
+    expect(renderGroup(true)).toContain('data-toolbar-separator');
+    expect(renderGroup(false)).not.toContain('[&amp;&gt;[data-toolbar-separator]]:invisible');
+    expect(renderGroup(false)).not.toContain('[&amp;&gt;[data-toolbar-separator]]:absolute');
   });
 });

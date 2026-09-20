@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { ResponseMessage } from '../shared/messages.js';
-import { GraphTab, type GraphTabOptions } from './webview/GraphTab.js';
+import { GraphTab } from './webview/GraphTab.js';
 import type { TabSnapshot } from './utils/graphTabRouting.js';
 
 /**
@@ -67,6 +67,3 @@ export class GraphTabRegistry implements vscode.Disposable {
     this.activeSeq.clear();
   }
 }
-
-export type { GraphTabOptions };
-export { GraphTab };
