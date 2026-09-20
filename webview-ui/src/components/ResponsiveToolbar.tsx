@@ -127,13 +127,14 @@ function ToolbarGroup({ side, collapsed, contentRef, children }: {
           }}
         />
       )}
+      {/* Keep separator widths measurable for the toolbar, but remove them from the dropdown layout. */}
       <div
         ref={contentRef}
         id={id}
         role="group"
         aria-label={side === 'left' ? 'Toolbar actions' : 'Toolbar options'}
         className={collapsed
-          ? `absolute top-full z-50 mt-1 flex w-max max-h-[calc(100vh-64px)] flex-col items-center gap-1 [&>*]:shrink-0 overflow-y-auto rounded border border-[var(--vscode-widget-border)] bg-[var(--vscode-menu-background)] p-1 shadow-lg ${side === 'left' ? 'left-0' : 'right-0'} ${open ? '' : 'invisible'}`
+          ? `absolute top-full z-50 mt-1 flex w-max max-h-[calc(100vh-64px)] flex-col items-center gap-1 [&>*]:shrink-0 [&>svg]:absolute [&>svg]:invisible overflow-y-auto rounded border border-[var(--vscode-widget-border)] bg-[var(--vscode-menu-background)] p-1 shadow-lg ${side === 'left' ? 'left-0' : 'right-0'} ${open ? '' : 'invisible'}`
           : 'flex w-max items-center gap-1'}
         onClick={(event) => {
           // Portaled dialogs/context menus remain owned by these same mounted controls.
