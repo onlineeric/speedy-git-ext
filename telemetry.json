@@ -23,7 +23,7 @@
       "trigger": {
         "classification": "SystemMetaData",
         "purpose": "FeatureInsight",
-        "comment": "'command' | 'scmButton' | 'statusBar' | 'toolbarButton' | 'commandPalette' \u2014 how the graph tab was opened. Sent on creation only; revealing an existing graph sends nothing."
+        "comment": "'command' | 'scmButton' | 'statusBar' | 'toolbarButton' | 'commandPalette' | 'splitEditor' \u2014 how the graph tab was opened. Sent on creation only; revealing an existing graph sends nothing."
       },
       "openTabCount": {
         "classification": "SystemMetaData",

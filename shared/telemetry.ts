@@ -74,7 +74,7 @@ export const MUTATING_OPERATIONS: ReadonlySet<RequestMessage['type']> = new Set(
 // ---------------------------------------------------------------------------
 
 export const PANEL_OPENED_TRIGGERS = [
-  'command', 'scmButton', 'statusBar', 'toolbarButton', 'commandPalette',
+  'command', 'scmButton', 'statusBar', 'toolbarButton', 'commandPalette', 'splitEditor',
 ] as const;
 
 export type PanelOpenedTrigger = (typeof PANEL_OPENED_TRIGGERS)[number];

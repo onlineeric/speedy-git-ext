@@ -129,6 +129,9 @@ src/
     │                             #   rule (drive letter only on win32; POSIX paths stay case-sensitive)
     ├── graphTabRouting.ts        # PURE: every "which tab(s)?" answer — MRU return target, repository-aware SCM
     │                             #   target, refresh routing, same-working-tree peers, and the editor tab title
+    ├── editorSplitFill.ts        # PURE: "Split Editor Right" on a graph. A webview cannot be duplicated, so the
+    │                             #   split is recognised from its aftermath — a group that opened EMPTY while the
+    │                             #   group the user was in had a graph as its active tab
     ├── gitShowUri.ts             # PURE: the git-show: URI contract. The FRAGMENT carries the repository (plus an
     │                             #   optional cache-busting nonce for the submodule working-tree side)
     ├── debounceByKey.ts          # PURE: debounce + minimum interval, kept per key, so a storm in one repo cannot
@@ -433,9 +436,10 @@ and RPC lifecycle), and `webview-ui/src/components/__tests__/BranchContextMenu.t
 `webview-ui/src/rpc/__tests__/amendSelection.test.ts` covers post-amend selection and open-details refresh.
 
 Multi-tab coverage is split by decision: the pure rules in `src/__tests__/repoIdentity.test.ts`,
-`graphTabRouting.test.ts`, `gitShowUri.test.ts`, `refRevalidation.test.ts` and `debounceByKey.test.ts`;
-the wiring in `ExtensionController.tabs.test.ts` (reveal vs create, SCM routing, new-tab origin, What's
-New, `panelOpened`, repo removal), `GraphTabRegistry.test.ts`, `ExtensionServices.test.ts`,
+`graphTabRouting.test.ts`, `gitShowUri.test.ts`, `editorSplitFill.test.ts`, `refRevalidation.test.ts`
+and `debounceByKey.test.ts`;
+the wiring in `ExtensionController.tabs.test.ts` (reveal vs create, SCM routing, new-tab origin, split
+editor fill, What's New, `panelOpened`, repo removal), `GraphTabRegistry.test.ts`, `ExtensionServices.test.ts`,
 `GitWatcherHub.test.ts`, `RepoActivityRegistry.test.ts`, `GitShowContentProvider.test.ts` and
 `refRevalidationHandlers.test.ts`. Note the repo's tests are Node-environment only — there is no
 jsdom or React testing library, so component behaviour is covered by extracting it into a pure util

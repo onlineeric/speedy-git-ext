@@ -170,7 +170,7 @@ describe('toTabCountBucket', () => {
 describe('PANEL_OPENED_TRIGGERS', () => {
   it('covers every entry point that creates a graph tab', () => {
     expect([...PANEL_OPENED_TRIGGERS].sort()).toEqual(
-      ['command', 'commandPalette', 'scmButton', 'statusBar', 'toolbarButton'].sort(),
+      ['command', 'commandPalette', 'scmButton', 'splitEditor', 'statusBar', 'toolbarButton'].sort(),
     );
   });
 });

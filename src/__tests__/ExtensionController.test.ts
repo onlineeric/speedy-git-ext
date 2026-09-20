@@ -51,6 +51,13 @@ vi.mock('vscode', () => {
       onDidChangeActiveTextEditor: vi.fn(() => ({ dispose: vi.fn() })),
       showInformationMessage: vi.fn(),
       showErrorMessage: vi.fn(),
+      // Read at construction for the split-editor fill; never fired here.
+      tabGroups: {
+        all: [],
+        activeTabGroup: { viewColumn: 1, tabs: [] },
+        onDidChangeTabGroups: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidChangeTabs: vi.fn(() => ({ dispose: vi.fn() })),
+      },
     },
     workspace: {
       workspaceFolders: [],
@@ -84,6 +91,9 @@ vi.mock('vscode', () => {
       dispose() { this.callOnDispose(); }
     },
     ViewColumn: { One: 1, Two: 2, Active: -1 },
+    TabInputWebview: class {
+      constructor(public readonly viewType: string) {}
+    },
     RelativePattern: class {
       constructor(public base: unknown, public pattern: string) {}
     },

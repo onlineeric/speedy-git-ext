@@ -14,6 +14,10 @@ import {
   pickReturnTarget,
   tabsAffectedByChange,
 } from './utils/graphTabRouting.js';
+import {
+  pickSplitFillGroup,
+  type EditorGroupSnapshot,
+} from './utils/editorSplitFill.js';
 import { isPathInside, pathsEqual } from './utils/repoIdentity.js';
 import {
   clampAvatarRefreshDays,
@@ -38,6 +42,12 @@ export class ExtensionController {
   private readonly shared: ExtensionServices;
   private readonly registry = new GraphTabRegistry();
   private statusBarItem: vscode.StatusBarItem | undefined;
+  /**
+   * The editor group the user was working in, as of the last change we saw.
+   * Remembered because a split has already moved the focus to the new group by
+   * the time its event arrives.
+   */
+  private lastActiveGroup: EditorGroupSnapshot | undefined;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -71,6 +81,7 @@ export class ExtensionController {
 
     this.initRepoDiscovery();
     this.registerSettingsListener();
+    this.registerSplitEditorFill();
   }
 
   private initRepoDiscovery() {
@@ -187,6 +198,59 @@ export class ExtensionController {
         }
       }),
     );
+  }
+
+  /**
+   * Make "Split Editor Right" on a graph mean "open another graph beside this
+   * one", which is what splitting any other editor does.
+   *
+   * A webview cannot be duplicated, so VS Code answers the split with an empty
+   * editor group and there is no command to intercept — the split is instead
+   * recognised from that empty group (see `utils/editorSplitFill.ts`). One
+   * listener therefore covers the editor title button, `Ctrl+\`, split down and
+   * split left alike.
+   *
+   * Both events keep {@link lastActiveGroup} current: a group change fires when
+   * the focused GROUP changes, a tab change when the active tab within one does.
+   */
+  private registerSplitEditorFill() {
+    const tabGroups = vscode.window.tabGroups;
+    this.lastActiveGroup = snapshotGroup(tabGroups.activeTabGroup);
+
+    this.context.subscriptions.push(
+      tabGroups.onDidChangeTabGroups((event) => {
+        const source = this.lastActiveGroup;
+        this.lastActiveGroup = snapshotGroup(tabGroups.activeTabGroup);
+
+        const opened = event.opened.map((group) => ({ group, ...snapshotGroup(group) }));
+        const target = pickSplitFillGroup(opened, source);
+        if (target) void this.fillSplitGroup(target.group);
+      }),
+      tabGroups.onDidChangeTabs(() => {
+        this.lastActiveGroup = snapshotGroup(tabGroups.activeTabGroup);
+      }),
+    );
+  }
+
+  /**
+   * Fill a group a graph's split just emptied, seeded like any other new tab:
+   * the origin graph's TOP-LEVEL repo, normal defaults, nothing else copied.
+   *
+   * The group is re-read a tick later because a tab DRAGGED into a brand-new
+   * group also opens that group empty, and arrives in it immediately after —
+   * that group must keep the dragged tab rather than gain a graph. Nothing is
+   * reported when there is no repository: this was never an explicit request,
+   * so it must not raise an error message.
+   */
+  private async fillSplitGroup(group: vscode.TabGroup): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (group.tabs.length > 0) return;
+
+    const origin = pickReturnTarget(this.registry.snapshots());
+    const repoPath = origin ? origin.topLevelRepoPath : this.savedDefaultRepo();
+    if (!repoPath) return;
+
+    await this.createTab(repoPath, group.viewColumn, 'splitEditor');
   }
 
   /**
@@ -477,6 +541,17 @@ export class ExtensionController {
   private normalizeOverScan(value: number): number {
     return Number.isFinite(value) && value >= 0 ? Math.min(Math.floor(value), 200) : DEFAULT_USER_SETTINGS.overScan;
   }
+}
+
+/** A tab group reduced to what the split rule asks about. */
+function snapshotGroup(group: vscode.TabGroup): EditorGroupSnapshot {
+  const activeInput = group.activeTab?.input;
+  return {
+    viewColumn: group.viewColumn,
+    tabCount: group.tabs.length,
+    activeWebviewViewType:
+      activeInput instanceof vscode.TabInputWebview ? activeInput.viewType : null,
+  };
 }
 
 function isHexColor(value: string): boolean {

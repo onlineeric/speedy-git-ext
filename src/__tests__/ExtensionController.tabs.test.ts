@@ -103,6 +103,55 @@ vi.mock('../ExtensionServices.js', () => ({
   },
 }));
 
+/**
+ * The editor's tab groups, reduced to what the split rule reads: which group is
+ * focused, what its active tab is, and the two change events.
+ */
+const editor = vi.hoisted(() => {
+  interface TabStub { input?: unknown }
+  interface GroupStub { viewColumn: number; tabs: TabStub[]; activeTab?: TabStub }
+  type GroupsEvent = { opened: GroupStub[]; closed: GroupStub[]; changed: GroupStub[] };
+
+  const groupListeners: Array<(event: GroupsEvent) => void> = [];
+  const tabListeners: Array<() => void> = [];
+  const state = {
+    all: [] as GroupStub[],
+    activeTabGroup: { viewColumn: 1, tabs: [] as TabStub[] } as GroupStub,
+  };
+
+  return {
+    state,
+    reset() {
+      groupListeners.length = 0;
+      tabListeners.length = 0;
+      state.all = [];
+      state.activeTabGroup = { viewColumn: 1, tabs: [] };
+    },
+    /** Focus a group, as VS Code's own events would report it. */
+    focus(group: GroupStub) {
+      state.activeTabGroup = group;
+      if (!state.all.includes(group)) state.all.push(group);
+      tabListeners.forEach((listener) => listener());
+    },
+    fireGroupsOpened(opened: GroupStub[]) {
+      state.all.push(...opened);
+      groupListeners.forEach((listener) => listener({ opened, closed: [], changed: [] }));
+    },
+    api: {
+      get all() { return state.all; },
+      get activeTabGroup() { return state.activeTabGroup; },
+      onDidChangeTabGroups: (listener: (event: GroupsEvent) => void) => {
+        groupListeners.push(listener);
+        return { dispose: vi.fn() };
+      },
+      onDidChangeTabs: (listener: () => void) => {
+        tabListeners.push(listener);
+        return { dispose: vi.fn() };
+      },
+    },
+  };
+});
+
 vi.mock('vscode', () => ({
   StatusBarAlignment: { Left: 1, Right: 2 },
   ViewColumn: { One: 1, Two: 2, Active: -1 },
@@ -113,6 +162,10 @@ vi.mock('vscode', () => ({
     onDidChangeActiveTextEditor: vi.fn(() => ({ dispose: vi.fn() })),
     showInformationMessage: vi.fn(),
     showErrorMessage: vi.fn(),
+    tabGroups: editor.api,
+  },
+  TabInputWebview: class {
+    constructor(public readonly viewType: string) {}
   },
   workspace: {
     workspaceFolders: [{ uri: { fsPath: '/repos/fallback' } }],
@@ -142,6 +195,7 @@ beforeEach(() => {
   ];
   tabState.activeRepoPath = '/repos/a';
   tabState.repoListListener = undefined;
+  editor.reset();
   vi.mocked(vscodeStub.window.showInformationMessage).mockClear();
 });
 
@@ -375,5 +429,52 @@ describe('a repository leaving the workspace', () => {
 
     expect(tabState.created[0].sendRepoList).toHaveBeenCalledOnce();
     expect(tabState.created[0].setTopLevelRepo).not.toHaveBeenCalled();
+  });
+});
+
+describe('splitting a graph editor', () => {
+  const graphTab = () => ({ input: new vscodeStub.TabInputWebview('mainThreadWebview-speedyGit') });
+
+  /** Open a graph and leave its group focused, as the user would before splitting. */
+  async function graphFocusedInGroupOne(controller: InstanceType<typeof ExtensionController>) {
+    await controller.showGraph();
+    const tab = graphTab();
+    editor.focus({ viewColumn: 1, tabs: [tab], activeTab: tab });
+  }
+
+  it('fills the empty group the split leaves with another graph on the same repo', async () => {
+    const { controller, telemetry } = createController();
+    await graphFocusedInGroupOne(controller);
+
+    editor.fireGroupsOpened([{ viewColumn: 2, tabs: [] }]);
+    await vi.waitFor(() => expect(tabState.created).toHaveLength(2));
+
+    expect(tabState.created[1].initialRepoPath).toBe('/repos/a');
+    expect(tabState.created[1].viewColumn).toBe(2);
+    expect(telemetry.sendPanelOpened).toHaveBeenLastCalledWith('splitEditor', '2');
+  });
+
+  it('leaves a split of any other editor alone — that one duplicates itself', async () => {
+    const { controller } = createController();
+    await controller.showGraph();
+    const file = { input: { uri: '/repos/a/file.ts' } };
+    editor.focus({ viewColumn: 1, tabs: [file], activeTab: file });
+
+    editor.fireGroupsOpened([{ viewColumn: 2, tabs: [file] }]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(tabState.created).toHaveLength(1);
+  });
+
+  it('leaves a new group alone once a dragged tab has landed in it', async () => {
+    const { controller } = createController();
+    await graphFocusedInGroupOne(controller);
+
+    const opened = { viewColumn: 2, tabs: [] as Array<{ input?: unknown }> };
+    editor.fireGroupsOpened([opened]);
+    opened.tabs.push({ input: { uri: '/repos/a/file.ts' } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(tabState.created).toHaveLength(1);
   });
 });
