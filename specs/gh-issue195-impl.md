@@ -12,8 +12,8 @@ land before anything user-visible.
 
 | Question | Decision |
 | --- | --- |
-| Cross-tab busy state | Coarse mirror: extension-wide activity registry keyed by working tree; peers get a `peerActivity` broadcast that disables mutating UI. No new lock — git still decides conflicts. |
-| Stale-dialog revalidation | Backend-enforced. The webview sends the ref position it displayed; the handler re-resolves immediately before acting and answers `refMoved` instead of acting. |
+| Cross-tab busy state | Coarse mirror: extension-wide activity registry keyed by working tree; peers get a `peerActivity` broadcast that shows a **notice**. Controls stay enabled — disabling them would be a lock by another name. No new lock; git still decides conflicts. |
+| Stale-dialog revalidation | Backend-enforced, **refuse-only**. The webview sends the ref position it displayed; the handler re-resolves immediately before acting and, on a mismatch, returns an ordinary `error` without acting. No re-run-anyway path and no new dialog (revised 2026-09-20). |
 | A tab's repository leaves the workspace | Retarget that tab to the first remaining repo (today's single-panel behaviour), with one notification per removal, not one per tab. |
 | Refresh routing | Shared `--git-common-dir` + submodule parents. One extension-wide watcher hub, ref-counted per common git dir. |
 | Repo selector / saved default | Per-tab selection; `GitRepoDiscoveryService.activeRepoPath` is retained but demoted to *saved default* (seeds the next first-opened graph only). |
@@ -29,9 +29,9 @@ Deliberate low-effort choices, so a later reader does not mistake them for overs
 - **No watcher fallback set.** Absolute `RelativePattern` with recursive globs is supported at our
   `^1.85.0` floor. If an event is ever missed, the `vscode.git` subscription and manual refresh cover
   it — a missed event means "refresh is a click away", never wrong data.
-- **Stale-ref revalidation is one app-level dialog**, not five modified dialogs: the backend echoes the
-  refused request back and `RefMovedDialog` re-sends it. The five dialogs each add one payload field
-  and nothing else.
+- **Stale-ref revalidation rides the existing error path**, not a new mechanism: the backend refuses and
+  posts the ordinary `{ type: 'error' }` every handler already posts. No new RPC, no new dialog, no new
+  store field, no request echo. The five dialogs each add one payload field and nothing else.
 - **Avatar dedupe already exists** (`AvatarRefreshQueue`'s `queued` Set); the task adds a regression
   test, not a mechanism.
 
@@ -650,8 +650,8 @@ current repo path.
 
 ## Task 10 — Cross-tab busy state (`RepoActivityRegistry`)
 
-**Goal:** "tabs showing the same working tree show another tab's in-flight operation as busy", with no
-new extension-level lock.
+**Goal:** "tabs showing the same working tree show that another view is running an operation", as a
+**notice only**, with no new extension-level lock and no disabled controls.
 
 ### New `src/RepoActivityRegistry.ts`
 
@@ -690,23 +690,26 @@ checkout → pull → refresh sequence, because that whole sequence is one await
 `peersSharingWorkingTree(...)`, where `busy = registry.isBusy(key, tab.id)`. A tab whose own operation
 is running is excluded — it already has its own busy state.
 
-### Webview
+### Webview — a notice, never a disabled control
 
 - `graphStore.peerOperationInProgress: boolean`, set from `peerActivity`.
-- `stores/graphSelectors.ts` → `useOperationInProgress` ORs it in, so every existing consumer (toolbar
-  buttons, menu gating, dialogs) inherits the disabled state without a second rule. This is the reason
-  the selector exists.
+- **`useOperationInProgress` is left alone.** It keeps meaning "*this* tab is running an operation", so
+  no menu item, toolbar button or dialog is disabled by a peer's work. Ordering the two into one
+  selector was the tempting shortcut and is the wrong one: a peer's operation can be long (a commit
+  parked in a slow `pre-commit` hook — see `useCommitHookWait`), and the only Cancel lives in the tab
+  that started it, so a merged selector would strand every other view with no way out. Colliding
+  operations are git's to refuse; `index.lock` and `OperationGuard` already report them clearly.
 - A single inline note in the toolbar while `peerOperationInProgress && !ownOperationInProgress`:
   "Another Speedy Git view is running a Git operation." — `dialogNoteClassName` styling,
-  `WARNING_COLOR` tone, no repo or branch name in the text.
-- `commitMenuAvailability` and friends are **not** changed: gating already flows from
-  `useOperationInProgress`.
+  `WARNING_COLOR` tone, no repo or branch name in the text. It informs; it gates nothing.
+- `commitMenuAvailability` and friends are unchanged, and so is `useOperationInProgress`'s consumer
+  list. The notice is the whole of the webview change.
 
 ### Edge cases
 
 | Situation | Behaviour |
 | --- | --- |
-| The initiating tab is closed mid-operation | The handler's `finally` still runs, so the token releases when the operation actually completes, and peers un-busy then. Exactly the idea spec's "in-flight operations of a closed tab run to completion". |
+| The initiating tab is closed mid-operation | The handler's `finally` still runs, so the token releases when the operation actually completes, and the peers' notice clears then. Exactly the idea spec's "in-flight operations of a closed tab run to completion". Because the notice gates nothing, even a token that somehow never released could not block a user. |
 | The handler throws | `finally` releases. Covered by a test. |
 | Identity is null | `beginRepoActivity` returns a no-op disposable; no mirroring, no crash. |
 | Two peers both start an operation | Counter > 1; each sees the other as busy (`isBusy` excludes only the asker). Both reach git; git's `index.lock` decides. No new lock, as decided. |
@@ -718,14 +721,38 @@ is running is excluded — it already has its own busy state.
 release after the owning tab is removed, no-op key.
 `src/__tests__/WebviewMessageRouter.test.ts` (extend): a mutating op begins and ends activity, a
 read-only tracked op (`compareRefs`) does not, an untracked op does not.
-`webview-ui/src/stores/__tests__/graphSelectors.test.ts`: `useOperationInProgress` reflects peer state.
+`webview-ui/src/stores/__tests__/graphSelectors.test.ts`: `useOperationInProgress` reflects **only** this
+tab's operation and is unaffected by `peerOperationInProgress` — the regression test for the
+merged-selector shortcut. `ControlBar.test.tsx`: the peer notice renders when a peer is busy and this
+tab is not, and no control gains `disabled` from it.
 
 ---
 
-## Task 11 — Stale-dialog revalidation for ref-position-dependent actions
+## Task 11 — Stale-ref refusal for ref-position-dependent actions
 
 **Goal:** idea spec §7 — reset, rebase onto, force-push, delete branch and drop commit re-read their
-target immediately before running, and refuse to act on a moved ref.
+target immediately before running, and **refuse to act** when it moved.
+
+These five are exactly the actions git will *not* refuse on its own: `reset --hard`, `push --force` and
+`branch -D` all succeed cheerfully against a ref that moved under an open dialog. Everything else
+(merge, cherry-pick, revert, tag, stash, checkout, non-force push) relies on git failing, per the idea
+spec, and is not touched here.
+
+**This generalises a pattern the codebase already ships.** `GitCommitService.amendCommit` takes an
+`expectedHead`, re-reads HEAD immediately before running, and on a mismatch returns
+`new GitError('The current tip commit changed since this dialog was opened, so nothing was amended. …',
+'HEAD_MOVED')` — refuse-only, no re-run path, surfaced through the ordinary error channel. Task 11 is
+that same shape applied to five more actions, so match its wording and its behaviour rather than
+inventing a second dialect. Add `'REF_MOVED'` to `GIT_ERROR_CODES` in `shared/errors.ts` (one line;
+`telemetry.json`'s `errorCode` field is generic and needs no change) and leave amend's `HEAD_MOVED`
+alone — folding the two together is a tidy-up for another release, not scope for this one.
+
+**Scope note (revised 2026-09-20).** An earlier draft answered a moved ref with a new `refMoved` RPC, a
+`graphStore` field and a `RefMovedDialog` offering "Run anyway", which re-sent the echoed request with
+the new hash patched in. That is cut. It was the bulk of the task, and it was unsafe: `interactiveRebase`
+carries a todo list built from the commits the user saw, so replaying it against a moved tip is the
+silent wrong-target action §7 forbids. Refusing is smaller *and* safer — the tab has already
+auto-refreshed, so reopening the dialog is itself the renewed confirmation.
 
 ### New `shared/refRevalidation.ts` (pure)
 
@@ -736,14 +763,17 @@ export interface RefExpectation {
   /** The hash the dialog displayed when the user opened it. */
   expectedHash: string;
 }
-export interface RefMovedInfo { ref: string; expectedHash: string; actualHash: string | null; }
 export function isRefMoved(expected: RefExpectation, actual: string | null): boolean;
-export function describeRefMoved(info: RefMovedInfo, action: string): string;
+export function describeRefMoved(ref: string, actual: string | null): string;
 ```
 
-`describeRefMoved` produces the user-facing text — "`<ref>` changed since you opened this dialog"
-(or "no longer exists" when `actual` is `null`) — in one place, so the five dialogs cannot word it five
-ways. Hash comparison is full-hash equality; the dialog always has the full hash.
+`describeRefMoved` produces the whole user-facing sentence in one place, so the five actions cannot word
+it five ways:
+
+- moved — ```<ref>` changed since you opened this dialog. Nothing was done — reopen the dialog to act on the current state.``
+- gone (`actual === null`) — ```<ref>` no longer exists. Nothing was done.``
+
+Comparison is full-hash equality; the dialog always has the full hash.
 
 ### Which ref each action checks
 
@@ -755,62 +785,58 @@ ways. Hash comparison is full-hash equality; the dialog always has the full hash
 | `deleteBranch` / `deleteRemoteBranch` | the branch tip | Deleting a branch that advanced loses the new commits. |
 | `dropCommit` | `HEAD` | The rebase that implements the drop is computed from HEAD. |
 
-Non-force pushes, merges, cherry-picks, reverts, tags, stashes and checkouts are **not** revalidated —
-per the idea spec, they rely on git failing.
+### Protocol — the existing error path, nothing new
 
-### Protocol — one generic mechanism, zero changes to the five dialogs
-
-The five dialogs already close on confirm and let the operation run, so re-opening them to re-confirm
-would mean surgery in five components. Instead the refusal is answered by **one app-level dialog**, and
-the backend echoes the request back so the webview can re-send it verbatim.
+Every one of these handlers already ends with
+`context.postMessage({ type: 'error', payload: { error } })` (see `historyHandlers.ts`), and the webview
+already surfaces that. The refusal reuses it:
 
 - Each listed request payload gains an **optional** `expect?: RefExpectation`. Optional keeps every
-  existing call site and test compiling; the five dialogs each add one field to the payload they
-  already build.
+  existing call site and test compiling; the five dialogs each add one field to the payload they already
+  build, and nothing else changes in any component.
 - **Backend**, before any mutation and after the operation guard, via one shared helper
-  `revalidateRef(message, context): Promise<RefMovedInfo | null>`:
-  `git rev-parse --verify <ref>` through the tab's `GitLogService`. On a match (or when `expect` is
-  absent) it returns `null` and the handler proceeds unchanged. On a mismatch or a missing ref it posts
+  `revalidateRef(expect, context): Promise<GitError | null>`: `git rev-parse --verify <ref>` through the
+  tab's `GitLogService`. On a match — or when `expect` is absent — it returns `null` and the handler
+  proceeds unchanged. On a mismatch or a missing ref it returns a `GitError` with code
+  `REF_MOVED` and `describeRefMoved(...)` as the message.
+- Each of the five handlers gains two lines, ahead of the mutation:
 
   ```ts
-  { type: 'refMoved', payload: { ref, expectedHash, actualHash, request: message } }
+  const moved = await revalidateRef(message.payload.expect, context);
+  if (moved) { context.postMessage({ type: 'error', payload: { error: moved } }); return; }
   ```
 
-  and the handler returns **without acting**. Each of the five handlers gains two lines:
-  `const moved = await revalidateRef(message, context); if (moved) return;`
-- **Webview:** `graphStore.refMoved` holds the payload; `App` renders a new
-  `components/RefMovedDialog.tsx` — a thin `ConfirmDialog` showing `describeRefMoved(...)` in a
-  `dialogWarningClassName` box, with **Run anyway** (danger) and **Cancel**. "Run anyway" re-sends
-  `payload.request` verbatim with `expect.expectedHash` replaced by `actualHash`. When `actualHash` is
-  `null` the dialog offers **Close** only.
-- Nothing else in the webview changes: no dialog is kept open, no targeted re-fetch, no per-action UI.
-  The displayed graph catches up through the tab's normal auto-refresh.
+- **Webview:** no change at all. No new RPC, no new store field, no new component. The message lands in
+  the same error surface as any other failed operation, and the graph is already current because the
+  tab auto-refreshed when the ref moved.
 
 ### Edge cases
 
 | Situation | Behaviour |
 | --- | --- |
-| Ref deleted entirely | `actualHash: null` → "no longer exists" wording; `RefMovedDialog` offers Close only, because there is nothing to re-run against. |
+| Ref deleted entirely | `rev-parse` fails → `actual: null` → the "no longer exists" wording. Same refusal path. |
 | Detached HEAD | `ref: 'HEAD'`; `rev-parse --verify HEAD` answers the commit. Works unchanged. |
 | Unborn branch | `rev-parse` fails → treated as "no longer exists". |
-| The move was this tab's own refresh (nothing changed for the user) | Hash comparison is on the value the dialog *displayed*, so a refresh that did not move the ref never triggers the box. |
-| No `expect` sent (a call site we missed) | `revalidateRef` returns `null` and the handler acts as today. A test asserts each of the five call sites supplies it. |
-| The user re-sends and the ref moves *again* in between | The re-send carries the newer hash, so a third move produces a second `refMoved`. The dialog simply reopens with the new information — no special casing. |
+| The ref did not actually move | Comparison is against the value the dialog *displayed*, so an auto-refresh that left the ref alone never produces a refusal. |
+| No `expect` sent (a call site we missed) | `revalidateRef` returns `null` and the handler acts as today — no regression, just no protection. A test asserts each of the five call sites supplies it. |
+| Two checks for one action (`rebase` checks onto **and** HEAD) | First mismatch wins; the message names that ref. |
+| The user reopens and it moves again | The reopened dialog carries the newer hash, so a further move refuses again. No special casing, because there is no re-send path to keep in step. |
+| One extra spawn per mutating action | One `rev-parse --verify`, only when `expect` is present, only on actions that are already about to spawn a mutating git command. Nothing on the commit-load path. |
 
 ### Telemetry
 
-No new event. The extra confirm is counted by `useDialogTelemetry` as part of the same open cycle — a
-user who abandons at the warning records `cancelled`, one who re-confirms records `confirmed`. Note this
-explicitly in the task so the numbers are read correctly.
+No new event. A refusal records as the operation's existing failure outcome, and the dialog's
+`useDialogTelemetry` cycle already closed as `confirmed` when the user pressed the button. Note this in
+the task so the numbers are read correctly: a refused action counts as a confirmed dialog plus a failed
+operation.
 
 ### Tests
 
-`shared/__tests__/refRevalidation.test.ts`: `isRefMoved` (equal, moved, missing), both message forms.
-`src/__tests__/refRevalidationHandlers.test.ts`: the shared `revalidateRef` helper refuses and posts
-`refMoved` (echoing the request) when the ref moved, returns `null` when it matches, and returns `null`
-when `expect` is absent — plus one case per handler asserting it calls the helper before mutating.
-`webview-ui/src/components/__tests__/RefMovedDialog.test.tsx`: renders the moved and the deleted
-wording, re-sends the echoed request with the new hash on "Run anyway", sends nothing on Cancel.
+`shared/__tests__/refRevalidation.test.ts`: `isRefMoved` (equal, moved, missing) and both message forms.
+`src/__tests__/refRevalidationHandlers.test.ts`: the shared `revalidateRef` helper answers a `GitError`
+when the ref moved, `null` when it matches, and `null` when `expect` is absent — plus one case per
+handler asserting it refuses **before** calling its service (the service mock must record zero calls),
+and one asserting the five webview call sites populate `expect`.
 
 ---
 
@@ -885,7 +911,7 @@ from the new repo's key.
 ### `package.json`
 
 ```jsonc
-{ "command": "speedyGit.openNewGraphTab", "title": "Open New Graph Tab", "category": "Speedy Git", "icon": "$(zap)" }
+{ "command": "speedyGit.openNewGraphTab", "title": "Open New Graph Tab", "category": "Speedy Git", "icon": "$(add)" }
 ```
 plus a `commandPalette` entry `{ "command": "speedyGit.openNewGraphTab", "when": "workspaceFolderCount > 0" }`.
 No keybinding, no menu contribution. `extension.ts` registers it as
@@ -976,16 +1002,34 @@ controller plus a test that each trigger value is reachable).
 
 ### Performance validation (idea spec §10)
 
-Before release, on `~/repos/test-repo` and on a large real repository:
+Before release, on `~/repos/test-repo` and on a large real repository. **The pass/fail rules are written
+down here before the measurement, so the result cannot be rationalised afterwards**, and the fallback is
+pre-committed so this cannot turn into an open-ended performance project.
+
+Procedure:
 
 1. Open 5 graph tabs (mixed: same repo twice, a submodule, a linked worktree, a second repo).
-2. Record extension-host memory (VS Code's Process Explorer) at 1 tab and at 5 tabs, and confirm
-   scrolling in the focused tab stays smooth with 4 hidden tabs retained.
-3. Watch the `Speedy Git` output channel (it logs every git command) while running an operation in one
+2. Record extension-host **and** webview-renderer memory (VS Code's Process Explorer) at 1, 2, 3 and 5
+   tabs.
+3. Scroll the focused tab with 4 hidden tabs retained, and again with none.
+4. Watch the `Speedy Git` output channel (it logs every git command) while running an operation in one
    tab: each affected tab refreshes once, unaffected tabs spawn nothing, and the avatar queue issues
    one lookup per interval in total rather than one per tab.
 
-Record the memory numbers in this file under a "Measured" heading when the pass is done.
+Pass rules — judged on **shape**, not on an absolute figure:
+
+- **Flat marginal cost.** Tab 5 must cost about what tab 2 cost. Superlinear growth means something is
+  shared that should not be (or not shared that should be) and is a blocker — this is the rule that
+  actually catches a bug.
+- **No scroll regression.** Scrolling the focused tab with 4 hidden tabs must feel identical to 0 hidden
+  tabs. Any regression is a blocker: "performance first" is about the focused view.
+- **The absolute number is recorded, not gated on.** Write the measured 5-tab figures under a
+  "Measured" heading in this file.
+- **Pre-committed fallback if that absolute number is uncomfortable: documentation, not code.** A note
+  in the README / setting description that many tabs on very large repos cost memory, and that
+  `speedyGit.batchCommitSize` is the dial. No tab cap, no per-tab batch reduction, no dropping
+  `retainContextWhenHidden` — each adds complexity to solve a problem we may not have, and the last one
+  would throw away the instant tab switching the feature exists for.
 
 ---
 
@@ -1013,11 +1057,11 @@ Collected here so nothing above is lost in a task; each row names the task that 
 | 16 | Same file+hash in two repos | Distinct URIs via fragment | 9 |
 | 17 | Fragment-less `git-show:` URI restored by VS Code | Clear thrown error, never a wrong-repo read | 9 |
 | 18 | Operation started in a tab that is then closed | Runs to completion; activity token released in `finally`; no toast anywhere | 3, 10 |
-| 19 | Handler throws mid-operation | Activity token released in `finally` | 10 |
-| 20 | Two tabs start conflicting operations | Both reach git; `index.lock` / `OperationGuard` decide; no new lock | 10 |
-| 21 | New tab opens during a peer's operation | Initial messages include current `peerActivity` | 10 |
-| 22 | Target ref moved while a dialog was open | Backend refuses and echoes the request; one app-level `RefMovedDialog` offers Run anyway / Cancel | 11 |
-| 23 | Target ref deleted while a dialog was open | "No longer exists"; `RefMovedDialog` offers Close only | 11 |
+| 19 | Handler throws mid-operation | Activity token released in `finally`; peer notice clears | 10 |
+| 20 | Two tabs start conflicting operations | Both reach git; `index.lock` / `OperationGuard` decide; no new lock, and the peer notice disables nothing | 10 |
+| 21 | New tab opens during a peer's operation | Initial messages include current `peerActivity`, so the notice is correct from the first paint | 10 |
+| 22 | Target ref moved while a dialog was open | Backend refuses before mutating and posts an ordinary `error`; the user reopens the dialog on refreshed data. No re-run-anyway path | 11 |
+| 23 | Target ref deleted while a dialog was open | Same refusal path, "no longer exists" wording | 11 |
 | 24 | Two tabs saving UI state at once | Last write wins on the global object; each tab's cache intact | 12 |
 | 25 | Repo switch importing a peer's panel layout | Prevented: only the table layout is re-read | 12 |
 | 26 | Duplicate avatar enqueues from two tabs on one repo | `AvatarRefreshQueue`'s existing `queued` Set already dedupes; regression test added | 2 |
@@ -1040,7 +1084,8 @@ Extended:
 `WebviewMessageRouter.test.ts`, `PersistedUIStateStore.test.ts`, `EditorCommandService.test.ts`,
 `AvatarRefreshQueue.test.ts`, `telemetry.test.ts`, `TelemetryService.test.ts`,
 `submoduleHandlers.test.ts`;
-`webview-ui/.../ControlBar.test.tsx`, `graphSelectors.test.ts`, `RefMovedDialog.test.tsx` (new).
+`webview-ui/.../ControlBar.test.tsx` (new-tab button **and** the peer-activity notice),
+`graphSelectors.test.ts`.
 
 Renamed: `WebviewProvider.test.ts` → `GraphTab.test.ts` (must stay green).
 
@@ -1052,8 +1097,9 @@ Renamed: `WebviewProvider.test.ts` → `GraphTab.test.ts` (must stay green).
 - [ ] Native VS Code controls close and arrange graphs; closing the last is allowed. *(T4, T5)*
 - [ ] Repository, filters, search, selection, layout and scroll are per tab. *(T3, T12)*
 - [ ] Git changes update every affected view; unrelated views stay quiet. *(T8)*
-- [ ] Same-repository views share checkout and operation state. *(T8, T10)*
+- [ ] Same-repository views share checkout state, and a peer's running operation is shown as a notice that gates nothing. *(T8, T10)*
 - [ ] Conflicting operations and stale confirmations cannot silently act on invalid assumptions. *(T10, T11)*
+- [ ] Late results from a previous repository or investigation never overwrite a tab's current view — the existing `WebviewRuntime` fetch generation is per tab and stays load-bearing. *(T3)*
 - [ ] Diffs keep their repository across focus changes, repo switches and tab closure. *(T9)*
 - [ ] Tab title is the repository or submodule name only. *(T5)*
 - [ ] SCM Open in Speedy Git reveals or creates; never retargets. *(T6)*
