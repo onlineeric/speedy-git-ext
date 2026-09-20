@@ -16,6 +16,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Auto-refresh now works in linked worktrees and submodules.** Their `.git` is a file pointing elsewhere, so watching `<repo>/.git/...` matched nothing and changes went unnoticed until a manual refresh. The resolved git directory is watched instead, with shared refs watched in the common git directory — so a branch move in a repository or any of its worktrees reaches both, and moving a submodule's pointer refreshes the parent's status.
 - **Diffs keep their repository.** A `git-show:` diff now names its own repository, so switching a graph's repository, moving focus to another graph, or closing the graph that opened it can no longer redirect an open diff to a different repository — including when two repositories contain the same file name at the same commit hash.
 
+### Credits
+- Thanks to [@jinho9265](https://github.com/jinho9265) for requesting multiple graph tabs in [#195](https://github.com/onlineeric/speedy-git-ext/issues/195)! The parent-repository-beside-its-submodule and multi-root workflows described there shaped this release.
+
 ## [5.16.0] - 2026-09-13
 
 ### Added

@@ -50,6 +50,19 @@
   68%, 90% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(1); }
 }
+/* The multi-tab illustration: the New Tab button is clicked, then a second
+   editor group unfolds beside the first and stays for most of the loop, since
+   two graphs side by side is the point. Both share one duration. */
+@keyframes whats-new-newtab {
+  0%, 6% { opacity: 0; transform: scale(0.4); }
+  12% { opacity: 1; transform: scale(1); }
+  28%, 100% { opacity: 0; transform: scale(2.2); }
+}
+@keyframes whats-new-split {
+  0%, 10% { opacity: 0; transform: translateX(-16px) scaleX(0.7); }
+  26%, 86% { opacity: 1; transform: translateX(0) scaleX(1); }
+  96%, 100% { opacity: 0; transform: translateX(-16px) scaleX(0.7); }
+}
 
 @layer utilities {
   .animate-whats-new-countdown {
@@ -68,6 +81,13 @@
     }
     .animate-whats-new-folded {
       animation: whats-new-folded 4.5s ease-in-out infinite;
+    }
+    .animate-whats-new-newtab {
+      animation: whats-new-newtab 5s ease-out infinite;
+    }
+    .animate-whats-new-split {
+      animation: whats-new-split 5s ease-in-out infinite;
+      transform-origin: left center;
     }
   }
   .animate-toast-in {

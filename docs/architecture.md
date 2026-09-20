@@ -266,8 +266,9 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── whatsNewEntries.tsx           # Per-version release-note content, looked up by exact version. A version with no
 │                                 #   entry shows no dialog — that is how a release opts out
 ├── whatsNewBlocks.tsx            # Poster pieces entries compose: ContributorThanks, FeatureCard/Grid, Step/StepFlow,
-│                                 #   UiLabel, WhatsNewSection, ExternalLink
+│                                 #   UiLabel, ToolbarButtonSample, WhatsNewSection, ExternalLink
 ├── AutosquashIllustration.tsx    # 5.16.0 hero: animated mini-graph of a fixup! commit folding into its target
+├── MultiTabIllustration.tsx      # 5.17.0 hero: animated miniature of the New Tab button opening a second graph group
 └── HelpDialog.tsx                # "Help & Feedback": Badge Legend + GitHub Issues + docs/changelog/marketplace + version
 ```
 
