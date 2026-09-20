@@ -137,8 +137,19 @@ export class PersistedUIStateStore {
     private readonly getCurrentRepoPath: () => string,
   ) {}
 
-  invalidateCache(): void {
-    this.uiStateCache = undefined;
+  /**
+   * Re-read ONLY the commit-table layout, for the repository the tab just
+   * switched to.
+   *
+   * Deliberately not a full cache drop. The global members
+   * (`detailsPanelPosition`, `fileViewMode`, the two panel sizes) keep the
+   * values this tab was seeded with when it opened; re-reading them here would
+   * silently import whatever a peer tab last wrote, which is the one thing the
+   * seed-on-open rule forbids.
+   */
+  reloadRepoLayout(): void {
+    if (!this.uiStateCache) return;
+    this.uiStateCache.commitTableLayout = cloneCommitTableLayout(this.loadRepoTableLayout());
   }
 
   loadPersistedUIState(): PersistedUIState {
@@ -200,6 +211,14 @@ export class PersistedUIStateStore {
     void this.context.globalState.update(key, cloneCommitTableLayout(layout));
   }
 
+  /**
+   * Merge a partial into THIS tab's cache and write the whole global object.
+   *
+   * Across tabs this is last-write-wins by construction, and that is the
+   * product rule rather than an implementation detail: a tab's changes apply to
+   * it immediately and are written back as the saved default, but are never
+   * pushed live into another open tab — they only seed tabs opened later.
+   */
   savePersistedUIState(partial: Partial<Omit<PersistedUIState, 'version'>>): void {
     const current = this.loadPersistedUIState();
     const defaults = clonePersistedUIStateDefaults();

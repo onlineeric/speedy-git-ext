@@ -7,6 +7,8 @@ import {
   type ErrorArea,
   type TelemetryEventName,
   type TrackedOperation,
+  type PanelOpenedTrigger,
+  type TabCountBucket,
   type UiTelemetryEvent,
 } from '../../shared/telemetry.js';
 
@@ -36,7 +38,8 @@ export interface TelemetryService extends vscode.Disposable {
     snapshot: SettingsSnapshotProperties,
     measurements: { batchCommitSize: number; overScan: number; avatarRefreshDays: number },
   ): void;
-  sendPanelOpened(trigger: 'command' | 'scmButton'): void;
+  /** Counted on tab CREATION only — a reveal of an existing graph sends nothing. */
+  sendPanelOpened(trigger: PanelOpenedTrigger, openTabCount: TabCountBucket): void;
   /** Called only by the router middleware. */
   sendOperation(operation: TrackedOperation, outcome: 'success' | 'error', durationMs: number, errorCode?: GitErrorCode): void;
   /** Called only by telemetryHandlers after catalog validation. */
@@ -150,8 +153,8 @@ class ReporterTelemetryService implements TelemetryService {
     this.send('settingsSnapshot', { ...snapshot }, { ...measurements });
   }
 
-  sendPanelOpened(trigger: 'command' | 'scmButton'): void {
-    this.send('panelOpened', { trigger });
+  sendPanelOpened(trigger: PanelOpenedTrigger, openTabCount: TabCountBucket): void {
+    this.send('panelOpened', { trigger, openTabCount });
   }
 
   sendOperation(

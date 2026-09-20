@@ -117,7 +117,7 @@ describe('PersistedUIStateStore', () => {
     expect(repoAwareStore.loadPersistedUIState().commitTableLayout.columns.message.preferredWidth).toBe(500);
 
     currentRepoPath = '/repo-b';
-    repoAwareStore.invalidateCache();
+    repoAwareStore.reloadRepoLayout();
 
     expect(repoAwareStore.loadPersistedUIState().commitTableLayout.columns.message.preferredWidth).toBe(300);
     expect(store).toBeDefined();
@@ -134,5 +134,94 @@ describe('PersistedUIStateStore', () => {
     expect(state.commitTableLayout.columns.message.preferredWidth).toBe(
       HEALING_ASSUMED_CONTAINER_WIDTH - (sumOfMinWidths - COMMIT_TABLE_MIN_WIDTHS.message),
     );
+  });
+});
+
+describe('PersistedUIStateStore across multiple graph tabs', () => {
+  /** Two stores over one shared memento — the same shape as two tabs in one window. */
+  function createTwoTabs() {
+    const memento: Record<string, unknown> = {};
+    const extensionContext = {
+      globalState: {
+        get: vi.fn((key: string) => memento[key]),
+        update: vi.fn((key: string, value: unknown) => {
+          memento[key] = value;
+          return Promise.resolve();
+        }),
+      },
+    } as never;
+    const repoPaths = { a: '/repo-a', b: '/repo-a' };
+    return {
+      memento,
+      tabA: new PersistedUIStateStore(extensionContext, () => repoPaths.a),
+      tabB: new PersistedUIStateStore(extensionContext, () => repoPaths.b),
+      repoPaths,
+    };
+  }
+
+  it('does not push one tab\'s save into another tab that is already open', () => {
+    const { tabA, tabB } = createTwoTabs();
+    tabB.loadPersistedUIState(); // B reads its seed before A saves.
+
+    tabA.savePersistedUIState({ detailsPanelPosition: 'right' });
+
+    expect(tabB.loadPersistedUIState().detailsPanelPosition).toBe(
+      DEFAULT_PERSISTED_UI_STATE.detailsPanelPosition,
+    );
+  });
+
+  it('last write wins in storage, and seeds the next tab opened', () => {
+    const { tabA, tabB, memento } = createTwoTabs();
+
+    tabA.savePersistedUIState({ detailsPanelPosition: 'right' });
+    tabB.savePersistedUIState({ detailsPanelPosition: 'bottom' });
+
+    expect((memento['speedyGit.uiState'] as { detailsPanelPosition: string }).detailsPanelPosition)
+      .toBe('bottom');
+  });
+
+  it('neither tab\'s cache is corrupted by the other\'s write', () => {
+    const { tabA, tabB } = createTwoTabs();
+
+    tabA.savePersistedUIState({ detailsPanelPosition: 'right' });
+    tabB.savePersistedUIState({ fileViewMode: 'tree' });
+
+    expect(tabA.loadPersistedUIState().detailsPanelPosition).toBe('right');
+    expect(tabA.loadPersistedUIState().fileViewMode).toBe(DEFAULT_PERSISTED_UI_STATE.fileViewMode);
+    expect(tabB.loadPersistedUIState().fileViewMode).toBe('tree');
+  });
+
+  it('a repo switch re-reads only the table layout, never a peer\'s panel layout', () => {
+    const layoutB = createDefaultCommitTableLayout();
+    layoutB.columns.message.preferredWidth = 321;
+    const memento: Record<string, unknown> = { [repoLayoutKey('/repo-b')]: layoutB };
+    const extensionContext = {
+      globalState: {
+        get: vi.fn((key: string) => memento[key]),
+        update: vi.fn((key: string, value: unknown) => {
+          memento[key] = value;
+          return Promise.resolve();
+        }),
+      },
+    } as never;
+
+    let repoPath = '/repo-a';
+    const tab = new PersistedUIStateStore(extensionContext, () => repoPath);
+    tab.savePersistedUIState({ detailsPanelPosition: 'right' });
+
+    // A peer writes a different panel position while this tab sits on repo-a.
+    memento['speedyGit.uiState'] = {
+      ...(memento['speedyGit.uiState'] as object),
+      detailsPanelPosition: 'bottom',
+    };
+
+    repoPath = '/repo-b';
+    tab.reloadRepoLayout();
+
+    const state = tab.loadPersistedUIState();
+    expect(state.commitTableLayout.columns.message.preferredWidth).toBe(321);
+    // The seeded global value survives the switch — importing the peer's is the
+    // one thing the seed-on-open rule forbids.
+    expect(state.detailsPanelPosition).toBe('right');
   });
 });

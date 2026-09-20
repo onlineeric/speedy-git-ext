@@ -339,12 +339,22 @@ export class GitLogService {
     );
   }
 
-  async verifyRef(ref: string): Promise<Result<boolean>> {
+  /**
+   * The full hash a ref currently points at, or `null` when it cannot be
+   * resolved — deleted, or never born.
+   *
+   * Answers a plain value rather than a `Result` because both outcomes are
+   * ordinary here: "gone" is an answer the stale-dialog check acts on, not a
+   * failure to report.
+   */
+  async resolveRefHash(ref: string): Promise<string | null> {
     const result = await this.executor.execute({
-      args: ['rev-parse', '--verify', ref],
+      args: ['rev-parse', '--verify', `${ref}^{commit}`],
       cwd: this.workspacePath,
     });
-    return ok(result.success);
+    if (!result.success) return null;
+    const hash = result.value.stdout.trim();
+    return hash.length > 0 ? hash : null;
   }
 
   async getCurrentBranch(): Promise<Result<string>> {

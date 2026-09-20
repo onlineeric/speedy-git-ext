@@ -3,6 +3,7 @@ import type { RebaseAction } from '../../../shared/types.js';
 import { REBASE_STOPPED_ON_EMPTY_COMMIT_MESSAGE } from '../../services/GitRebaseService.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 import type { WebviewRequestContext } from '../WebviewRequestContext.js';
+import { postRefMoved } from './revalidateRef.js';
 
 // None of the handlers below pre-check the working tree. Git enforces its own
 // preconditions and its error names what is in the way, so a check here could only be
@@ -11,6 +12,9 @@ import type { WebviewRequestContext } from '../WebviewRequestContext.js';
 
 export const historyHandlers = {
   resetBranch: async (message, context) => {
+    // Resetting a branch that moved discards someone else's commits, and git
+    // will not refuse it — so we do, before touching anything.
+    if (await postRefMoved(context, message.payload.expect)) return;
     const result = await context.services.current().gitHistoryService.reset(
       message.payload.hash,
       message.payload.mode,
@@ -118,6 +122,9 @@ export const historyHandlers = {
 
   rebase: async (message, context) => {
     if (await postOperationInProgress(context)) return;
+    // Both ends define the replayed range, so both are checked; the first
+    // mismatch wins and the message names that ref.
+    if (await postRefMoved(context, message.payload.expect, message.payload.expectHead)) return;
     const { targetRef, ignoreDate, autosquash } = message.payload;
     // The version is read only when it can change the command.
     const gitVersion = autosquash ? await context.getGitVersion() : null;
@@ -131,6 +138,10 @@ export const historyHandlers = {
 
   interactiveRebase: async (message, context) => {
     if (await postOperationInProgress(context)) return;
+    // The todo list was built from the commits the user saw. Replaying it
+    // against a moved tip is exactly the silent wrong-target action this
+    // refusal exists to prevent, so there is no run-anyway path.
+    if (await postRefMoved(context, message.payload.expect, message.payload.expectHead)) return;
     const result = await context.services.current().gitRebaseService.interactiveRebase(message.payload.config);
     await postRebaseResult(context, result);
   },
@@ -196,6 +207,8 @@ export const historyHandlers = {
   dropCommit: async (message, context) => {
     // Drops by rewriting history with an interactive rebase, so the same guard applies.
     if (await postOperationInProgress(context)) return;
+    // The rebase that implements the drop is computed from HEAD.
+    if (await postRefMoved(context, message.payload.expect)) return;
 
     const dropBaseHash = `${message.payload.hash}~1`;
     const commitsResult = await context.services.current().gitRebaseService.getRebaseCommits(dropBaseHash);

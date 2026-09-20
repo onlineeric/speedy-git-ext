@@ -165,4 +165,74 @@ describe('EditorCommandService', () => {
       value: [expect.objectContaining({ path: '/repo-a-linked' })],
     });
   });
+
+  it('marks every git-show URI with the repository the tab is displaying', async () => {
+    // The fragment is what keeps an open diff pointed at the right repo after
+    // the tab switches repo or closes — and what keeps two repos' identical
+    // files apart.
+    const { service } = makeEditorCommandService({ repoPath: '/repos/a', headHash: 'abcdef123456' });
+    const executeCommand = vi.mocked(vscode.commands.executeCommand);
+
+    const gitShowUris = async (run: () => Promise<void>) => {
+      executeCommand.mockClear();
+      await run();
+      return executeCommand.mock.calls
+        .flat()
+        .filter((argument): argument is { scheme: string; fragment: string } =>
+          typeof argument === 'object' && argument !== null && (argument as { scheme?: string }).scheme === 'git-show');
+    };
+
+    const cases: Array<[string, () => Promise<void>]> = [
+      ['openDiffEditor', () => service.openDiffEditor('abc1234', 'src/index.ts', 'def5678')],
+      ['openStagedDiffEditor', () => service.openStagedDiffEditor('src/index.ts')],
+      ['openUncommittedSubmoduleDiff', () => service.openDiffEditor(UNCOMMITTED_HASH, 'sub', undefined, 'modified', true)],
+      ['openCompareDiffEditor', () => service.openCompareDiffEditor({
+        filePath: 'src/index.ts', aHash: 'abc1234', bHash: null, status: 'modified', title: 't', isSubmodule: true,
+      })],
+    ];
+
+    for (const [label, run] of cases) {
+      const uris = await gitShowUris(run);
+      expect(uris.length, `${label} built no git-show URI`).toBeGreaterThan(0);
+      for (const uri of uris) {
+        expect(uri.fragment, `${label} lost the repository`).toContain('repo=%2Frepos%2Fa');
+      }
+    }
+
+    // openFileAtRevision goes through openTextDocument rather than vscode.diff.
+    const openTextDocument = vi.mocked(vscode.workspace.openTextDocument);
+    openTextDocument.mockClear();
+    await service.openFileAtRevision('abc1234', 'src/index.ts');
+    const opened = openTextDocument.mock.calls[0][0] as unknown as { scheme: string; fragment: string };
+    expect(opened.scheme).toBe('git-show');
+    expect(opened.fragment).toContain('repo=%2Frepos%2Fa');
+  });
+
+  it('keeps a cache-busting nonce on the submodule working-tree side, alongside the repo', async () => {
+    // That side's content moves on its own (pointer + git's -dirty suffix), so
+    // reopening must not be served VS Code's cached document.
+    const { service } = makeEditorCommandService({ repoPath: '/repos/a' });
+    const executeCommand = vi.mocked(vscode.commands.executeCommand);
+    executeCommand.mockClear();
+
+    await service.openCompareDiffEditor({
+      filePath: 'sub', aHash: 'abc1234', bHash: null, status: 'modified', title: 't', isSubmodule: true,
+    });
+    await service.openCompareDiffEditor({
+      filePath: 'sub', aHash: 'abc1234', bHash: null, status: 'modified', title: 't', isSubmodule: true,
+    });
+
+    const worktreeFragments = executeCommand.mock.calls
+      .flat()
+      .filter((argument): argument is { authority: string; fragment: string } =>
+        typeof argument === 'object' && argument !== null && (argument as { authority?: string }).authority === 'worktree')
+      .map((uri) => uri.fragment);
+
+    expect(worktreeFragments).toHaveLength(2);
+    for (const fragment of worktreeFragments) {
+      expect(fragment).toContain('repo=%2Frepos%2Fa');
+      expect(fragment).toContain('nonce=');
+    }
+    expect(worktreeFragments[0]).not.toBe(worktreeFragments[1]);
+  });
 });

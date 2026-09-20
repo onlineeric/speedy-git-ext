@@ -4,12 +4,16 @@ import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
 import { RemoteManagementDialog } from './RemoteManagementDialog';
 import { HelpDialog } from './HelpDialog';
+import { ResponsiveToolbar } from './ResponsiveToolbar';
 import { RepoSelector } from './RepoSelector';
 import { SubmoduleSelector } from './SubmoduleSelector';
 import { MultiBranchDropdown } from './MultiBranchDropdown';
 import { addAllLocalBranches } from '../utils/branchSelection';
 import { ViewSettingsDialog } from './ViewSettingsDialog';
 import { ToolbarIconButton, RemoteButtonToggleItem, TOGGLE_BUTTON_TONES } from './ToolbarIconButton';
+import { useOperationInProgress } from '../stores/graphSelectors';
+import { peerActivityNotice } from '../utils/peerActivityNotice';
+import { WARNING_COLOR } from '../utils/themeColors';
 import {
   CloudIcon,
   FilterIcon,
@@ -19,6 +23,7 @@ import {
   RefreshIcon,
   FetchIcon,
   GoToHeadIcon,
+  NewTabIcon,
   HelpIcon,
   ToolbarSeparatorIcon,
   WorktreeIcon,
@@ -99,6 +104,19 @@ export function ControlBar() {
   const [fetching, setFetching] = useState(false);
 
   const goToHeadBusy = useGraphStore((state) => state.goToHeadState !== 'idle');
+  // Informational only — nothing below is disabled by it.
+  const peerBusy = useGraphStore((state) => state.peerOperationInProgress);
+  const peerNotice = peerActivityNotice(peerBusy, useOperationInProgress());
+
+  /**
+   * Never disabled. A graph is open, so there is always a repository to open
+   * another on — and opening a view is not a git operation, so a running one
+   * has no claim on it either.
+   */
+  const handleOpenNewGraphTab = () => {
+    trackUiInteraction('toolbar', 'openNewGraphTab');
+    rpcClient.openNewGraphTab();
+  };
 
   const handleGoToHead = () => {
     trackUiInteraction('toolbar', 'goToHead');
@@ -157,125 +175,152 @@ export function ControlBar() {
 
   return (
     <div className="flex items-center gap-1 px-2 py-1.5 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)]">
-      <RepoSelector />
-      <SubmoduleSelector />
+      <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
+        <RepoSelector />
+        <SubmoduleSelector />
 
-      <MultiBranchDropdown
-        branches={branches}
-        selectedBranches={filters.branches ?? []}
-        onBranchToggle={handleBranchToggle}
-        onClearSelection={handleClearSelection}
-        onSelectAllLocalBranches={handleSelectAllLocalBranches}
-      />
-
-      <ToolbarIconButton
-        label="Filter"
-        icon={<FilterIcon className={iconClass} />}
-        onClick={() => handleToggleWidget('filter')}
-        {...filterTone}
-        title="Filter"
-      />
-
-      <ToolbarIconButton
-        label="Search"
-        icon={<SearchIcon className={iconClass} />}
-        onClick={() => handleToggleWidget('search')}
-        {...searchTone}
-        title="Search commits"
-      />
-
-      <ToolbarIconButton
-        label="Compare"
-        icon={<CompareIcon className={iconClass} />}
-        onClick={() => handleToggleWidget('compare')}
-        {...compareTone}
-        title="Compare refs (Base vs Target)"
-      />
-
-      <ToolbarIconButton
-        label="Worktrees"
-        icon={<WorktreeIcon className={iconClass} />}
-        onClick={() => handleToggleWidget('worktree')}
-        {...worktreeTone}
-        title={worktreeTitle}
-      />
-
-      <ToolbarSeparatorIcon className="h-6 w-4 text-[var(--vscode-panel-border)] opacity-90" />
-
-      <ToolbarIconButton
-        label="Refresh"
-        icon={<RefreshIcon className={`${iconClass}${isRefreshing ? ' animate-spin' : ''}`} />}
-        onClick={handleRefresh}
-        {...(isRefreshing ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
-        title="Refresh"
-      />
-
-      <ToolbarIconButton
-        label="Fetch"
-        icon={<FetchIcon className={iconClass} />}
-        onClick={handleFetch}
-        disabled={fetching || loading || !hasConfiguredRemote}
-        {...(fetching ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
-        title={hasConfiguredRemote ? 'Fetch all remotes' : 'No remotes configured'}
-      />
-
-      <ToolbarSeparatorIcon className="h-6 w-4 text-[var(--vscode-panel-border)] opacity-90" />
-
-      <ToolbarIconButton
-        label="HEAD"
-        icon={<GoToHeadIcon className={iconClass} />}
-        onClick={handleGoToHead}
-        disabled={goToHeadBusy || loading}
-        aria-label="Go to HEAD commit"
-        {...(goToHeadBusy ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
-        title="Go to HEAD commit (current checkout)"
-      />
-
-      <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)] px-1">
-        {totalLoadedWithoutFilter !== null ? totalLoadedWithoutFilter : mergedCommits.length} loaded
-      </span>
-
-      <ViewSettingsDialog />
-
-      {showRemoteButton && (
-        <ToolbarIconButton
-          label="Remote"
-          icon={<CloudIcon className={iconClass} />}
-          onClick={() => {
-            trackUiInteraction('toolbar', 'remote');
-            setRemoteDialogOpen(true);
-          }}
-          aria-label="Manage Remotes"
-          {...TOGGLE_BUTTON_TONES.inactive}
-          title="Manage Remotes"
-          extraMenuItems={<RemoteButtonToggleItem />}
+        <MultiBranchDropdown
+          branches={branches}
+          selectedBranches={filters.branches ?? []}
+          onBranchToggle={handleBranchToggle}
+          onClearSelection={handleClearSelection}
+          onSelectAllLocalBranches={handleSelectAllLocalBranches}
         />
-      )}
+      </div>
 
-      <ToolbarIconButton
-        label="Settings"
-        icon={<SettingsIcon className={iconClass} />}
-        onClick={() => {
-          trackUiInteraction('toolbar', 'settings');
-          rpcClient.openSettings();
-        }}
-        aria-label="Open extension settings"
-        {...TOGGLE_BUTTON_TONES.inactive}
-        title="Extension settings"
-        extraMenuItems={<RemoteButtonToggleItem />}
-      />
+      <ResponsiveToolbar
+        left={<>
+          <ToolbarIconButton
+            label="Filter"
+            icon={<FilterIcon className={iconClass} />}
+            onClick={() => handleToggleWidget('filter')}
+            {...filterTone}
+            title="Filter"
+          />
 
-      <ToolbarIconButton
-        label="Help"
-        icon={<HelpIcon className={iconClass} />}
-        onClick={() => {
-          trackUiInteraction('toolbar', 'help');
-          setHelpDialogOpen(true);
-        }}
-        aria-label="Help and feedback"
-        {...TOGGLE_BUTTON_TONES.inactive}
-        title="Help & feedback"
-        extraMenuItems={<RemoteButtonToggleItem />}
+          <ToolbarIconButton
+            label="Search"
+            icon={<SearchIcon className={iconClass} />}
+            onClick={() => handleToggleWidget('search')}
+            {...searchTone}
+            title="Search commits"
+          />
+
+          <ToolbarIconButton
+            label="Compare"
+            icon={<CompareIcon className={iconClass} />}
+            onClick={() => handleToggleWidget('compare')}
+            {...compareTone}
+            title="Compare refs (Base vs Target)"
+          />
+
+          <ToolbarIconButton
+            label="Worktrees"
+            icon={<WorktreeIcon className={iconClass} />}
+            onClick={() => handleToggleWidget('worktree')}
+            {...worktreeTone}
+            title={worktreeTitle}
+          />
+
+          <ToolbarSeparatorIcon className="h-6 w-4 text-[var(--vscode-panel-border)] opacity-90" />
+
+          <ToolbarIconButton
+            label="Refresh"
+            icon={<RefreshIcon className={`${iconClass}${isRefreshing ? ' animate-spin' : ''}`} />}
+            onClick={handleRefresh}
+            {...(isRefreshing ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
+            title="Refresh"
+          />
+
+          <ToolbarIconButton
+            label="Fetch"
+            icon={<FetchIcon className={iconClass} />}
+            onClick={handleFetch}
+            disabled={fetching || loading || !hasConfiguredRemote}
+            {...(fetching ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
+            title={hasConfiguredRemote ? 'Fetch all remotes' : 'No remotes configured'}
+          />
+
+          <ToolbarSeparatorIcon className="h-6 w-4 text-[var(--vscode-panel-border)] opacity-90" />
+
+          <ToolbarIconButton
+            label="HEAD"
+            icon={<GoToHeadIcon className={iconClass} />}
+            onClick={handleGoToHead}
+            disabled={goToHeadBusy || loading}
+            aria-label="Go to HEAD commit"
+            {...(goToHeadBusy ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
+            title="Go to HEAD commit (current checkout)"
+          />
+
+          <ToolbarIconButton
+            label="New Tab"
+            icon={<NewTabIcon className={iconClass} />}
+            onClick={handleOpenNewGraphTab}
+            aria-label="Open New Graph Tab"
+            {...TOGGLE_BUTTON_TONES.inactive}
+            title="Open New Graph Tab"
+          />
+        </>}
+        status={<>
+          {peerNotice && (
+            <span
+              className="ml-2 text-xs px-1 whitespace-nowrap"
+              style={{ color: WARNING_COLOR }}
+              role="status"
+            >
+              {peerNotice}
+            </span>
+          )}
+
+          <span className="text-xs text-[var(--vscode-descriptionForeground)] px-1">
+            {totalLoadedWithoutFilter !== null ? totalLoadedWithoutFilter : mergedCommits.length} loaded
+          </span>
+        </>}
+        right={<>
+          <ViewSettingsDialog />
+
+          {showRemoteButton && (
+            <ToolbarIconButton
+              label="Remote"
+              icon={<CloudIcon className={iconClass} />}
+              onClick={() => {
+                trackUiInteraction('toolbar', 'remote');
+                setRemoteDialogOpen(true);
+              }}
+              aria-label="Manage Remotes"
+              {...TOGGLE_BUTTON_TONES.inactive}
+              title="Manage Remotes"
+              extraMenuItems={<RemoteButtonToggleItem />}
+            />
+          )}
+
+          <ToolbarIconButton
+            label="Settings"
+            icon={<SettingsIcon className={iconClass} />}
+            onClick={() => {
+              trackUiInteraction('toolbar', 'settings');
+              rpcClient.openSettings();
+            }}
+            aria-label="Open extension settings"
+            {...TOGGLE_BUTTON_TONES.inactive}
+            title="Extension settings"
+            extraMenuItems={<RemoteButtonToggleItem />}
+          />
+
+          <ToolbarIconButton
+            label="Help"
+            icon={<HelpIcon className={iconClass} />}
+            onClick={() => {
+              trackUiInteraction('toolbar', 'help');
+              setHelpDialogOpen(true);
+            }}
+            aria-label="Help and feedback"
+            {...TOGGLE_BUTTON_TONES.inactive}
+            title="Help & feedback"
+            extraMenuItems={<RemoteButtonToggleItem />}
+          />
+        </>}
       />
 
       <RemoteManagementDialog open={remoteDialogOpen} onClose={() => setRemoteDialogOpen(false)} />

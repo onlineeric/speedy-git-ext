@@ -27,6 +27,9 @@ import { getRefMergeSource } from '../utils/refMergeSource';
 import { PushDialog } from './PushDialog';
 import { CreateWorktreeDialog } from './CreateWorktreeDialog';
 import { refWorktreeSource } from '../utils/refWorktreeSource';
+import { expectHead, expectLocalBranch, expectRebaseTarget, expectRemoteBranch } from '../utils/refExpectation';
+import { useCapturedRefExpectation } from '../hooks/useCapturedRefExpectation';
+import type { RefExpectation } from '@shared/refRevalidation';
 import { useRemoveWorktreeDialog, WorktreeMenuItems } from './WorktreeMenuItems';
 import { MenuItem } from './MenuItem';
 import { LazyContextMenu } from './LazyContextMenu';
@@ -80,6 +83,10 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
   const [fastForwardOpen, setFastForwardOpen] = useState(false);
   const [createWorktreeOpen, setCreateWorktreeOpen] = useState(false);
   const [pushTagOpen, setPushTagOpen] = useState(false);
+  // Where the target ref stood when each dialog opened — the stale-ref check.
+  // A rebase has two movable ends, captured and released together.
+  const rebaseExpectations = useCapturedRefExpectation<{ expect?: RefExpectation; expectHead?: RefExpectation }>();
+  const deleteExpectation = useCapturedRefExpectation();
   const loading = useGraphStore((s) => s.loading);
   const branches = useGraphStore((s) => s.branches);
   const remotes = useGraphStore((s) => s.remotes);
@@ -95,6 +102,8 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
     : refInfo.name;
 
   const isRemoteBranch = refInfo.type === 'remote';
+  // Narrowed once: TypeScript cannot carry the narrowing into the menu item's closure.
+  const remoteOfBadge = refInfo.remote;
   const isLocalBranch = refInfo.type === 'branch';
   const isBranch = isLocalBranch || isRemoteBranch;
   const isTag = refInfo.type === 'tag';
@@ -199,7 +208,8 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
   const handleRebaseConfirm = (options: RebaseConfirmOptions) => {
     setRebaseConfirmOpen(false);
     useGraphStore.getState().setLoading(true);
-    rpcClient.rebase(displayName, options);
+    // Both ends of the replayed range are revalidated: the onto ref and HEAD.
+    rpcClient.rebase(displayName, options, rebaseExpectations.take());
   };
 
   // Find remote counterpart for local branch (used in delete dialog)
@@ -270,6 +280,11 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
                     disabled={isOperationInProgress}
                     onSelect={() => {
                       track('rebase');
+                      const store = useGraphStore.getState();
+                      rebaseExpectations.capture({
+                        expect: expectRebaseTarget(store.branches, displayName),
+                        expectHead: expectHead(store.mergedCommits),
+                      });
                       setRebaseConfirmOpen(true);
                     }}
                   >
@@ -301,13 +316,23 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
                 {isBranch && <BranchFilterMenuItem refInfo={refInfo} surface={menuSurface} />}
 
                 {isLocalBranch && !isCurrentBranch && (
-                  <MenuItem danger onSelect={() => { track('deleteBranch'); setDeleteConfirmOpen(true); }}>
+                  <MenuItem danger onSelect={() => {
+                    track('deleteBranch');
+                    deleteExpectation.capture(expectLocalBranch(useGraphStore.getState().branches, refInfo.name));
+                    setDeleteConfirmOpen(true);
+                  }}>
                     Delete Branch
                   </MenuItem>
                 )}
 
-                {isRemoteBranch && refInfo.remote && (
-                  <MenuItem danger onSelect={() => { track('deleteRemoteBranch'); setDeleteConfirmOpen(true); }}>
+                {isRemoteBranch && remoteOfBadge && (
+                  <MenuItem danger onSelect={() => {
+                    track('deleteRemoteBranch');
+                    deleteExpectation.capture(
+                      expectRemoteBranch(useGraphStore.getState().branches, remoteOfBadge, refInfo.name),
+                    );
+                    setDeleteConfirmOpen(true);
+                  }}>
                     Delete Remote Branch
                   </MenuItem>
                 )}
@@ -399,7 +424,7 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
         onConfirm={() => {
           setDeleteConfirmOpen(false);
           if (isRemoteBranch && refInfo.remote) {
-            rpcClient.deleteRemoteBranch(refInfo.remote, refInfo.name);
+            rpcClient.deleteRemoteBranch(refInfo.remote, refInfo.name, deleteExpectation.take());
           }
         }}
         onCancel={() => setDeleteConfirmOpen(false)}
@@ -446,7 +471,9 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
         remoteBranch={remoteBranch}
         onConfirm={(deleteRemote) => {
           setDeleteConfirmOpen(false);
-          rpcClient.deleteBranch(refInfo.name, undefined, deleteRemote);
+          // Kept, not taken: `branch -d` may answer `deleteBranchNeedsForce`,
+          // and the `-D` retry below is the delete git will not refuse.
+          rpcClient.deleteBranch(refInfo.name, undefined, deleteRemote, deleteExpectation.peek());
         }}
         onCancel={() => setDeleteConfirmOpen(false)}
       />
@@ -462,7 +489,7 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
         initialDeleteRemote={!!pendingForceDeleteBranch?.deleteRemote}
         onConfirm={(deleteRemote) => {
           useGraphStore.getState().setPendingForceDeleteBranch(null);
-          rpcClient.deleteBranch(refInfo.name, true, deleteRemote);
+          rpcClient.deleteBranch(refInfo.name, true, deleteRemote, deleteExpectation.take());
         }}
         onCancel={() => useGraphStore.getState().setPendingForceDeleteBranch(null)}
       />

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import type { PushForceMode } from '@shared/types';
+import type { Branch, PushForceMode } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { buildPushCommand } from '../utils/gitCommandBuilder';
@@ -13,6 +13,8 @@ import {
   dialogContentStyle,
 } from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
+import { expectRemoteBranch } from '../utils/refExpectation';
+import { resolveDefaultRemoteName } from '../utils/resolveDefaultRemote';
 
 interface PushDialogProps {
   open: boolean;
@@ -26,27 +28,45 @@ const PUSH_MODE_OPTIONS = [
   { value: 'force', label: '--force' },
 ] as const;
 
-function getDefaultRemote(remotes: { name: string }[]): string {
-  return remotes.find(r => r.name === 'origin')?.name ?? remotes[0]?.name ?? '';
-}
-
 export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
   const dialogTelemetry = useDialogTelemetry('push', open);
   const remotes = useGraphStore((s) => s.remotes);
 
   const [setUpstream, setSetUpstream] = useState(true);
   const [forceMode, setForceMode] = useState<PushForceMode>('none');
-  const [selectedRemote, setSelectedRemote] = useState(() => getDefaultRemote(remotes));
+  const [selectedRemote, setSelectedRemote] = useState(() => resolveDefaultRemoteName(remotes));
   const [isPushing, setIsPushing] = useState(false);
+  /**
+   * The branch list as it stood when the dialog opened.
+   *
+   * A force-push is checked against where the destination's remote-tracking ref
+   * was *then*, not where an auto-refresh has since moved it — and the user may
+   * still change which remote they are pushing to, so the snapshot is kept
+   * whole and the expectation built from it at confirm.
+   */
+  const branchesAtOpen = useRef<Branch[]>([]);
 
-  // Reset dialog state each time it opens, syncing selectedRemote with current remotes
+  // Reset dialog state once per opening. Keyed on `open` ALONE: the tab
+  // auto-refreshes while the dialog sits open and hands the store a fresh
+  // `remotes` array each time, so depending on it would re-run this — throwing
+  // away the user's force selection and, worse, re-snapshotting `branchesAtOpen`
+  // to the position the stale-ref check exists to catch.
   useEffect(() => {
-    if (open) {
-      setSetUpstream(true);
-      setForceMode('none');
-      setSelectedRemote(getDefaultRemote(remotes));
-      setIsPushing(false);
-    }
+    if (!open) return;
+    const store = useGraphStore.getState();
+    setSetUpstream(true);
+    setForceMode('none');
+    setSelectedRemote(resolveDefaultRemoteName(store.remotes));
+    setIsPushing(false);
+    branchesAtOpen.current = store.branches;
+  }, [open]);
+
+  // Remotes may still be loading when the dialog opens, so heal a selection that
+  // names no existing remote — without touching one the user made.
+  useEffect(() => {
+    if (!open) return;
+    setSelectedRemote((current) =>
+      remotes.some((remote) => remote.name === current) ? current : resolveDefaultRemoteName(remotes));
   }, [open, remotes]);
 
   const command = buildPushCommand({ remote: selectedRemote, branch: branchName, setUpstream, forceMode });
@@ -57,7 +77,15 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
     dialogTelemetry.confirmed();
     setIsPushing(true);
     try {
-      await rpcClient.pushAsync(selectedRemote, branchName, setUpstream, forceMode);
+      // Only a force push needs the check: git already refuses a normal push
+      // whose remote moved.
+      await rpcClient.pushAsync(
+        selectedRemote,
+        branchName,
+        setUpstream,
+        forceMode,
+        isForce ? expectRemoteBranch(branchesAtOpen.current, selectedRemote, branchName) : undefined,
+      );
     } catch {
       // Error is already shown via store.setError in rpcClient
     } finally {

@@ -124,6 +124,14 @@ interface GraphStore {
   cherryPickOptions: CherryPickOptions;
   revertOptions: RevertOptions;
   rebaseInProgress: boolean;
+  /**
+   * Another Speedy Git view on this same working tree is running an operation.
+   *
+   * Drives a notice only. Deliberately NOT folded into
+   * `useOperationInProgress`, which means "*this* tab is busy" — merging them
+   * would disable every control in a view that has no way to cancel the work.
+   */
+  peerOperationInProgress: boolean;
   rebaseConflictInfo: RebaseConflictInfo | undefined;
   revertInProgress: boolean;
   /** A merge is paused mid-conflict, so Continue/Abort Merge apply. */
@@ -297,6 +305,7 @@ interface GraphStore {
   setCherryPickOptions: (options: CherryPickOptions) => void;
   setRevertOptions: (options: RevertOptions) => void;
   setRebaseInProgress: (inProgress: boolean) => void;
+  setPeerOperationInProgress: (busy: boolean) => void;
   setRebaseConflictInfo: (info: RebaseConflictInfo | undefined) => void;
   setRevertInProgress: (inProgress: boolean) => void;
   setMergeInProgress: (inProgress: boolean) => void;
@@ -429,6 +438,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   cherryPickOptions: { appendSourceRef: false, noCommit: false },
   revertOptions: { mode: 'commit' },
   rebaseInProgress: false,
+  peerOperationInProgress: false,
   rebaseConflictInfo: undefined,
   revertInProgress: false,
   mergeInProgress: false,
@@ -741,6 +751,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setCherryPickOptions: (cherryPickOptions) => set({ cherryPickOptions }),
   setRevertOptions: (revertOptions) => set({ revertOptions }),
   setRebaseInProgress: (rebaseInProgress) => set({ rebaseInProgress }),
+  setPeerOperationInProgress: (peerOperationInProgress) => set({ peerOperationInProgress }),
   setRebaseConflictInfo: (rebaseConflictInfo) => set({ rebaseConflictInfo }),
   setRevertInProgress: (revertInProgress) => set({ revertInProgress }),
   setMergeInProgress: (mergeInProgress) => set({ mergeInProgress }),

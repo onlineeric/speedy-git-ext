@@ -107,6 +107,33 @@ export function ContributorThanks({ login, children }: ContributorThanksProps) {
   );
 }
 
+interface ToolbarButtonSampleProps {
+  /** The real icon component, at the size the toolbar renders it. */
+  icon: ReactNode;
+  /** The label under it, spelled as the toolbar spells it. */
+  label: string;
+  /** A `SHOWCASE_*` color for the sample's outline and wash. */
+  accent: string;
+}
+
+/**
+ * A toolbar button drawn the way the graph's toolbar draws it — icon above its
+ * small label — so a reader can find a new button by sight rather than by
+ * hunting for its name. Uses the real icon component, so the picture cannot
+ * drift from the button.
+ */
+export function ToolbarButtonSample({ icon, label, accent }: ToolbarButtonSampleProps) {
+  return (
+    <span
+      className="inline-flex flex-col items-center justify-center rounded-md px-2 pb-1 pt-1.5 align-middle"
+      style={{ boxShadow: `inset 0 0 0 1px ${tint(accent, 55)}`, background: tint(accent, 14), color: FOREGROUND_COLOR }}
+    >
+      {icon}
+      <span className="select-none text-[11px] font-semibold leading-[13px] tracking-tight">{label}</span>
+    </span>
+  );
+}
+
 /** A grid of feature cards that collapses to one column in a narrow panel. */
 export function FeatureGrid({ children }: { children: ReactNode }) {
   return <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">{children}</div>;

@@ -51,6 +51,11 @@ export const vscodeCommandHandlers = {
     }
   },
 
+  /** Toolbar "Open New Graph Tab". One-way: nothing is posted back. */
+  openNewGraphTab: async (_message, context) => {
+    context.openNewGraphTab();
+  },
+
   copyToClipboard: async (message, context) => {
     await vscode.env.clipboard.writeText(message.payload.text);
     context.postMessage({ type: 'success', payload: { message: 'Copied to clipboard' } });
@@ -71,5 +76,5 @@ export const vscodeCommandHandlers = {
   },
 } satisfies Pick<
   RequestHandlerMap,
-  'openSettings' | 'getSettings' | 'setToolbarSetting' | 'setWorktreeFolderNameStyle' | 'copyToClipboard' | 'openExternal' | 'updatePersistedUIState' | 'dismissWhatsNew'
+  'openSettings' | 'getSettings' | 'setToolbarSetting' | 'setWorktreeFolderNameStyle' | 'copyToClipboard' | 'openExternal' | 'updatePersistedUIState' | 'dismissWhatsNew' | 'openNewGraphTab'
 >;

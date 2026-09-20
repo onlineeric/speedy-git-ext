@@ -51,9 +51,22 @@ vi.mock('vscode', () => {
       onDidChangeActiveTextEditor: vi.fn(() => ({ dispose: vi.fn() })),
       showInformationMessage: vi.fn(),
       showErrorMessage: vi.fn(),
+      // Read at construction for the split-editor fill; never fired here.
+      tabGroups: {
+        all: [],
+        activeTabGroup: { viewColumn: 1, tabs: [] },
+        onDidChangeTabGroups: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidChangeTabs: vi.fn(() => ({ dispose: vi.fn() })),
+      },
     },
     workspace: {
       workspaceFolders: [],
+      createFileSystemWatcher: vi.fn(() => ({
+        onDidChange: vi.fn(),
+        onDidCreate: vi.fn(),
+        onDidDelete: vi.fn(),
+        dispose: vi.fn(),
+      })),
       getConfiguration: vi.fn(() => ({
         get: vi.fn((key: string, defaultValue?: unknown) => {
           return key in configValues ? configValues[key] : defaultValue;
@@ -66,6 +79,23 @@ vi.mock('vscode', () => {
     },
     extensions: {
       getExtension: vi.fn(() => undefined),
+    },
+    // The controller now builds ExtensionServices, whose GitHubAuthService
+    // subscribes to session changes at construction.
+    authentication: {
+      onDidChangeSessions: vi.fn(() => ({ dispose: vi.fn() })),
+      getSession: vi.fn(async () => undefined),
+    },
+    Disposable: class {
+      constructor(private readonly callOnDispose: () => void) {}
+      dispose() { this.callOnDispose(); }
+    },
+    ViewColumn: { One: 1, Two: 2, Active: -1 },
+    TabInputWebview: class {
+      constructor(public readonly viewType: string) {}
+    },
+    RelativePattern: class {
+      constructor(public base: unknown, public pattern: string) {}
     },
     EventEmitter: class {
       private listeners: Array<(value: unknown) => void> = [];

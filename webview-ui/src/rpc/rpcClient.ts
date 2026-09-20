@@ -1,5 +1,6 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
 import type { FixupCommitArgsOptions } from '@shared/fixupCommit';
+import type { RefExpectation } from '@shared/refRevalidation';
 import type { BranchCheckoutTarget, CherryPickOptions, CompareMode, GraphFilters, InteractiveRebaseConfig, RebaseRangeCommit, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting, WorktreeFolderNameStyle } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import {
@@ -174,6 +175,9 @@ class RpcClient {
         break;
       case 'settingsData':
         store.setUserSettings(message.payload.settings);
+        break;
+      case 'peerActivity':
+        store.setPeerOperationInProgress(message.payload.busy);
         break;
       case 'branches':
         store.setBranches(message.payload.branches);
@@ -538,12 +542,12 @@ class RpcClient {
     this.send({ type: 'renameBranch', payload: { oldName, newName } });
   }
 
-  deleteBranch(name: string, force?: boolean, deleteRemote?: { remote: string; name: string }) {
-    this.send({ type: 'deleteBranch', payload: { name, force, deleteRemote } });
+  deleteBranch(name: string, force?: boolean, deleteRemote?: { remote: string; name: string }, expect?: RefExpectation) {
+    this.send({ type: 'deleteBranch', payload: { name, force, deleteRemote, expect } });
   }
 
-  deleteRemoteBranch(remote: string, name: string) {
-    this.send({ type: 'deleteRemoteBranch', payload: { remote, name } });
+  deleteRemoteBranch(remote: string, name: string, expect?: RefExpectation) {
+    this.send({ type: 'deleteRemoteBranch', payload: { remote, name, expect } });
   }
 
   mergeBranch(branch: string, options?: MergeOptions) {
@@ -563,10 +567,16 @@ class RpcClient {
   }
 
   // Remote ops
-  pushAsync(remote: string, branch: string, setUpstream?: boolean, forceMode?: PushForceMode): Promise<string> {
+  pushAsync(
+    remote: string,
+    branch: string,
+    setUpstream?: boolean,
+    forceMode?: PushForceMode,
+    expect?: RefExpectation,
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       this.pendingPush = { resolve, reject };
-      this.send({ type: 'push', payload: { remote, branch, setUpstream, forceMode } });
+      this.send({ type: 'push', payload: { remote, branch, setUpstream, forceMode, expect } });
     });
   }
 
@@ -621,8 +631,8 @@ class RpcClient {
   }
 
   // History ops
-  resetBranch(hash: string, mode: ResetMode) {
-    this.send({ type: 'resetBranch', payload: { hash, mode } });
+  resetBranch(hash: string, mode: ResetMode, expect?: RefExpectation) {
+    this.send({ type: 'resetBranch', payload: { hash, mode, expect } });
   }
 
   // Cherry-pick ops
@@ -659,8 +669,12 @@ class RpcClient {
   }
 
   // Rebase ops
-  rebase(targetRef: string, options: { ignoreDate: boolean; autosquash: boolean }) {
-    this.send({ type: 'rebase', payload: { targetRef, ...options } });
+  rebase(
+    targetRef: string,
+    options: { ignoreDate: boolean; autosquash: boolean },
+    expectations?: { expect?: RefExpectation; expectHead?: RefExpectation },
+  ) {
+    this.send({ type: 'rebase', payload: { targetRef, ...options, ...expectations } });
   }
 
   /** The commits a rebase onto `upstream` would replay, oldest first. */
@@ -682,8 +696,11 @@ class RpcClient {
     this.send({ type: 'getRebaseCommits', payload: { baseHash } });
   }
 
-  interactiveRebase(config: InteractiveRebaseConfig) {
-    this.send({ type: 'interactiveRebase', payload: { config } });
+  interactiveRebase(
+    config: InteractiveRebaseConfig,
+    expectations?: { expect?: RefExpectation; expectHead?: RefExpectation },
+  ) {
+    this.send({ type: 'interactiveRebase', payload: { config, ...expectations } });
   }
 
   abortRebase() {
@@ -716,8 +733,8 @@ class RpcClient {
     this.send({ type: 'openSignatureHelp', payload: {} });
   }
 
-  dropCommit(hash: string) {
-    this.send({ type: 'dropCommit', payload: { hash } });
+  dropCommit(hash: string, expect?: RefExpectation) {
+    this.send({ type: 'dropCommit', payload: { hash, expect } });
   }
 
   /** A commit's complete raw message, for prefilling the amend dialog. */
@@ -808,6 +825,11 @@ class RpcClient {
   }
 
   // Settings
+  /** Open another graph in its own editor tab. One-way: nothing comes back. */
+  openNewGraphTab() {
+    this.send({ type: 'openNewGraphTab', payload: {} });
+  }
+
   openSettings(query?: string) {
     this.send({ type: 'openSettings', payload: { query } });
   }

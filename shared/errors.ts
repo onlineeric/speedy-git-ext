@@ -54,6 +54,8 @@ export const GIT_ERROR_CODES = [
   'OPERATION_IN_PROGRESS',
   /** `git commit --amend` refused because HEAD moved after the dialog captured it. */
   'HEAD_MOVED',
+  /** A ref-position-dependent action refused because its target moved after the dialog captured it. */
+  'REF_MOVED',
   'CANCELLED',
   'UNKNOWN',
 ] as const;

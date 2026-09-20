@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ExtensionController } from './ExtensionController.js';
+import { GitShowContentProvider } from './GitShowContentProvider.js';
 import { createTelemetryService } from './services/TelemetryService.js';
 
 let controller: ExtensionController | undefined;
@@ -21,8 +22,24 @@ export function activate(context: vscode.ExtensionContext) {
 
   controller = new ExtensionController(context, log, telemetry, activationStart);
 
-  const showGraphCommand = vscode.commands.registerCommand('speedyGit.showGraph', () => {
-    controller?.showGraph();
+  // Registered once, for the window — never per panel. A `git-show:` document
+  // names its own repository in the URI, so it keeps resolving correctly after
+  // the graph that opened it switched repo or closed.
+  context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(
+      'git-show',
+      new GitShowContentProvider((repoPath) => controller!.resolveDiffService(repoPath)),
+    ),
+  );
+
+  // The optional argument is the status bar item's trigger; the controller
+  // re-validates it against the closed catalog.
+  const showGraphCommand = vscode.commands.registerCommand('speedyGit.showGraph', (trigger?: unknown) => {
+    controller?.showGraph(trigger);
+  });
+
+  const openNewGraphTabCommand = vscode.commands.registerCommand('speedyGit.openNewGraphTab', () => {
+    controller?.openNewGraphTab('commandPalette');
   });
 
   const openForRepoCommand = vscode.commands.registerCommand(
@@ -32,7 +49,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  context.subscriptions.push(showGraphCommand, openForRepoCommand);
+  context.subscriptions.push(showGraphCommand, openNewGraphTabCommand, openForRepoCommand);
   context.subscriptions.push({
     dispose: () => {
       controller?.dispose();

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { AutosquashIllustration } from './AutosquashIllustration';
-import { BranchIcon, CloudIcon } from './icons';
+import { MultiTabIllustration } from './MultiTabIllustration';
+import { BranchIcon, CloudIcon, NewTabIcon } from './icons';
 import { SubmoduleBadge } from './FileChangeShared';
 import { InlineRefBadge } from './InlineRefBadge';
 import { RefBadgeLegend } from './RefBadgeLegend';
@@ -12,6 +13,7 @@ import {
   FeatureGrid,
   Step,
   StepFlow,
+  ToolbarButtonSample,
   UiLabel,
   WhatsNewSection,
   whatsNewBodyTextClassName,
@@ -23,6 +25,7 @@ import {
   SHOWCASE_GREEN_COLOR,
   SHOWCASE_ORANGE_COLOR,
   SHOWCASE_PURPLE_COLOR,
+  SHOWCASE_RED_COLOR,
 } from '../utils/themeColors';
 
 /**
@@ -58,6 +61,104 @@ export interface WhatsNewEntry {
  * no other opt-out.
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
+  {
+    version: '5.17.0',
+    headline: 'Speedy Git is now multi-tab — open a graph per repository and arrange them like any other editor.',
+    illustration: <MultiTabIllustration />,
+    content: (
+      <div className="space-y-6">
+        <ContributorThanks login="jinho9265">
+          This release comes from your request in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/195">#195</ExternalLink>, for more
+          than one graph in a window — a parent repository beside its submodule, and a graph of its own per
+          repository in a multi-root workspace.
+        </ContributorThanks>
+
+        <WhatsNewSection title="Open another graph">
+          <div className="flex items-start gap-3">
+            <span className="shrink-0">
+              <ToolbarButtonSample
+                icon={<NewTabIcon className="h-6 w-6" />}
+                label="New Tab"
+                accent={SHOWCASE_PURPLE_COLOR}
+              />
+            </span>
+            <p className={bodyTextClassName}>
+              The new <UiLabel>Open New Graph Tab</UiLabel> button sits beside <em>Go to HEAD</em> in every
+              graph’s toolbar. One click opens another graph straight away — no picker, no confirmation — on the
+              same repository, in the same editor group.{' '}
+              <UiLabel>Speedy Git: Open New Graph Tab</UiLabel> in the Command Palette does the same. Each tab is
+              titled with the repository or submodule it is showing.
+            </p>
+          </div>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="Arrange them the VS Code way">
+          <FeatureGrid>
+            <FeatureCard mark="S" title="Split left and right" accent={SHOWCASE_BLUE_COLOR}>
+              Drag a graph into another editor group: one repository on the left, another on the right. VS Code’s
+              own editor groups do the arranging, so Speedy Git adds no tab bar of its own.
+            </FeatureCard>
+            <FeatureCard mark="P" title="Parent and submodule" accent={SHOWCASE_PURPLE_COLOR}>
+              Keep the parent repository open while a second graph follows its submodule. Moving the submodule’s
+              pointer now refreshes both views.
+            </FeatureCard>
+            <FeatureCard mark="2" title="Two views, one repository" accent={SHOWCASE_GREEN_COLOR}>
+              The same repository may be open in several tabs — one following a release branch while the other
+              searches development history.
+            </FeatureCard>
+            <FeatureCard mark="I" title="Independent by design" accent={SHOWCASE_ORANGE_COLOR}>
+              Repository and submodule selection, filters, search, selection, compare slots, columns and scroll
+              belong to their tab. Changing one never disturbs another.
+            </FeatureCard>
+          </FeatureGrid>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="A repository beside its submodule, in three moves">
+          <StepFlow>
+            <Step label="1" title="Open" accent={SHOWCASE_BLUE_COLOR}>
+              Click <UiLabel>Open New Graph Tab</UiLabel> in the toolbar of the graph you are in.
+            </Step>
+            <Step label="2" title="Split" accent={SHOWCASE_PURPLE_COLOR}>
+              Drag the new tab to the side, or use VS Code’s own split-editor command.
+            </Step>
+            <Step label="3" title="Point it somewhere" accent={SHOWCASE_GREEN_COLOR}>
+              Switch the new graph to another repository or into a submodule. The graph you came from stays
+              exactly as you left it.
+            </Step>
+          </StepFlow>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="Every view keeps its bearings">
+          <FeatureGrid>
+            <FeatureCard mark="↩" title="Opening returns you there" accent={SHOWCASE_BLUE_COLOR}>
+              <UiLabel>Show Speedy Git</UiLabel>, <code>Ctrl/Cmd+Shift+G</code> and the status bar item reveal the
+              graph you were last in, and create one only when none is open. <UiLabel>Open in Speedy Git</UiLabel>{' '}
+              in the Source Control view reveals a graph already showing that repository, or opens a new one.
+              Neither ever retargets a graph you have open.
+            </FeatureCard>
+            <FeatureCard mark="!" title="Nothing acts on stale state" accent={SHOWCASE_RED_COLOR}>
+              Views of one working tree say so while another is mid-operation — a notice only; no control is ever
+              disabled by another view’s work. Reset, rebase, force-push, delete branch and drop commit now re-read
+              their target first and refuse if it moved, and an open diff keeps the repository it came from.
+            </FeatureCard>
+          </FeatureGrid>
+          <p className={`${bodyTextClassName} mt-3`}>
+            Auto-refresh also reaches linked worktrees and submodules now, where <code>.git</code> is a file rather
+            than a folder. Graph tabs themselves are session-only: reloading the window does not bring them back.
+          </p>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="Toolbar buttons fit narrow views">
+          <p className={bodyTextClassName}>
+            When space is tight, the right-hand buttons move into a <UiLabel>…</UiLabel> dropdown first,
+            followed by the left-hand buttons. Widen the view and they return. Your label and button visibility
+            settings still apply, and each button keeps its right-click menu.
+          </p>
+        </WhatsNewSection>
+      </div>
+    ),
+  },
   {
     version: '5.16.0',
     headline: 'Create fixup and squash commits from the graph, then autosquash them when you rebase.',

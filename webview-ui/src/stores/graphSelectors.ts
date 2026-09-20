@@ -12,6 +12,38 @@ import type { Branch } from '@shared/types';
 import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils';
 import { useGraphStore } from './graphStore';
 
+/** The fields that say whether THIS tab is running something. */
+export interface OwnOperationState {
+  loading: boolean;
+  isLoadingRepo: boolean;
+  activeBranchCheckout: unknown;
+  rebaseInProgress: boolean;
+  cherryPickInProgress: boolean;
+  revertInProgress: boolean;
+  mergeInProgress: boolean;
+}
+
+/**
+ * Whether a git operation is occupying the repository **in this tab**.
+ *
+ * `peerOperationInProgress` is deliberately absent. Another view's operation
+ * drives a notice, never a disabled control: a peer's operation can be long — a
+ * commit parked in a slow `pre-commit` hook — and the only Cancel lives in the
+ * tab that started it, so folding the two together would strand every other
+ * view with no way out.
+ */
+export function isOwnOperationInProgress(state: OwnOperationState): boolean {
+  return (
+    state.loading ||
+    state.isLoadingRepo ||
+    state.activeBranchCheckout !== null ||
+    state.rebaseInProgress ||
+    state.cherryPickInProgress ||
+    state.revertInProgress ||
+    state.mergeInProgress
+  );
+}
+
 /**
  * Whether a git operation is occupying the repository.
  *
@@ -19,16 +51,7 @@ import { useGraphStore } from './graphStore';
  * vanishes during the brief refresh a filter change triggers reads as a bug.
  */
 export function useOperationInProgress(): boolean {
-  return useGraphStore(
-    (s) =>
-      s.loading ||
-      s.isLoadingRepo ||
-      s.activeBranchCheckout !== null ||
-      s.rebaseInProgress ||
-      s.cherryPickInProgress ||
-      s.revertInProgress ||
-      s.mergeInProgress
-  );
+  return useGraphStore(isOwnOperationInProgress);
 }
 
 /**

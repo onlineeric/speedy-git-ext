@@ -10,7 +10,7 @@
 import type { Commit } from '@shared/types';
 
 /** Minimal shape needed to spot a row by its decorations. */
-interface DecoratedRow {
+export interface DecoratedRow {
   hash: string;
   refs?: readonly { type: string }[];
 }

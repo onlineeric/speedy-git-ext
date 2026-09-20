@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { InitialDataPayload, ResponseMessage } from '../../shared/messages.js';
-import type { AvatarUrlMap, Commit, GraphFilters, TagMetadata, UncommittedSummary, UserSettings } from '../../shared/types.js';
+import type { AvatarUrlMap, Commit, GraphFilters, SubmoduleNavEntry, TagMetadata, UncommittedSummary, UserSettings } from '../../shared/types.js';
 import { DEFAULT_USER_SETTINGS, worktreeBasePathOf } from '../../shared/types.js';
 import { GitError, type GitErrorCode, type Result } from '../../shared/errors.js';
 import { toCommitCountBucket } from '../../shared/telemetry.js';
@@ -12,12 +12,6 @@ import type { TelemetryService } from '../services/TelemetryService.js';
 import type { GitServiceRegistry } from './GitServiceRegistry.js';
 import type { PersistedUIStateStore } from './PersistedUIStateStore.js';
 import type { WebviewRuntime } from './WebviewRuntime.js';
-
-export interface SubmoduleNavigationHandlers {
-  getStack: () => import('../../shared/types.js').SubmoduleNavEntry[];
-  openSubmodule: (submodulePath: string) => Promise<void> | void;
-  backToParentRepo: () => Promise<void> | void;
-}
 
 /** A repository on github.com, as parsed from the `origin` remote. */
 export interface GitHubRepoRef {
@@ -37,7 +31,8 @@ export interface RepoDataLoaderDependencies {
   readonly postMessage: (message: ResponseMessage) => void;
   readonly getSettings: () => UserSettings | undefined;
   readonly getBatchSize: () => number;
-  readonly getSubmoduleHandlers: () => SubmoduleNavigationHandlers | undefined;
+  /** The breadcrumb the submodules payload carries; navigation itself is the handlers' job. */
+  readonly getSubmoduleStack: () => SubmoduleNavEntry[];
   readonly telemetry: TelemetryService;
 }
 
@@ -363,7 +358,7 @@ export class RepoDataLoader {
         type: 'submodulesData',
         payload: {
           submodules: result.value,
-          stack: this.deps.getSubmoduleHandlers()?.getStack() ?? [],
+          stack: this.deps.getSubmoduleStack(),
         },
       });
     } else {

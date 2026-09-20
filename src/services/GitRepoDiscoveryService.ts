@@ -37,14 +37,11 @@ export class GitRepoDiscoveryService implements vscode.Disposable {
         gitApi.onDidCloseRepository((repo: any) => {
           this.log.info(`GitRepoDiscoveryService: repo closed: ${repo.rootUri.fsPath}`);
           this._repos = this.buildRepoList(this.collectRepoPaths(gitApi));
+          // The user-facing notice belongs to the controller, which knows how
+          // many graph tabs the removal actually moved — announcing it here
+          // would fire once per repo regardless, and say nothing about tabs.
           if (!this._repos.find((r) => r.path === this._activeRepoPath)) {
-            const removedName = path.basename(this._activeRepoPath);
             this._activeRepoPath = this._repos[0]?.path ?? '';
-            if (this._repos.length > 0) {
-              vscode.window.showInformationMessage(
-                `Speedy Git: Repository "${removedName}" was removed. Switched to "${this._repos[0].displayName}".`
-              );
-            }
           }
           this._onDidChangeRepos.fire(this._repos);
         })
