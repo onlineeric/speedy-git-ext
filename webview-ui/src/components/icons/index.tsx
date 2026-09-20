@@ -295,21 +295,28 @@ export function FetchIcon({ className }: IconProps) {
   );
 }
 
-/** Locate reticle around a commit node — go to the HEAD commit — 12×12, inherits text color via currentColor */
-/** A plus over an editor panel — "open another graph in its own tab". */
+/**
+ * A plus inside an editor panel — "open another graph in its own tab".
+ *
+ * The plus sits *inside* the panel body rather than over its corner: the icon
+ * renders at 24px (`w-6 h-6` overrides the 12px attributes), and at that size a
+ * plus straddling the outline merges with it and the panel stops reading as a
+ * rectangle.
+ */
 export function NewTabIcon({ className }: IconProps) {
   return (
     <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
       {/* Panel outline, with its title bar */}
-      <rect x={0.6} y={1.6} width={8.8} height={8.8} rx={1.2} stroke="currentColor" strokeWidth={1.2} />
-      <line x1={0.6} y1={4} x2={9.4} y2={4} stroke="currentColor" strokeWidth={1.2} />
-      {/* Plus, overlapping the panel's lower-right corner */}
-      <line x1={8.4} y1={6} x2={8.4} y2={10.8} stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" />
-      <line x1={6} y1={8.4} x2={10.8} y2={8.4} stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" />
+      <rect x={0.8} y={1.8} width={10.4} height={8.4} rx={1.2} stroke="currentColor" strokeWidth={1.2} />
+      <line x1={0.8} y1={4.3} x2={11.2} y2={4.3} stroke="currentColor" strokeWidth={1.2} />
+      {/* Plus, centered in the panel body below the title bar */}
+      <line x1={6} y1={5.6} x2={6} y2={9} stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" />
+      <line x1={4.3} y1={7.3} x2={7.7} y2={7.3} stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" />
     </svg>
   );
 }
 
+/** Locate reticle around a commit node — go to the HEAD commit — 12×12, inherits text color via currentColor */
 export function GoToHeadIcon({ className }: IconProps) {
   return (
     <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
