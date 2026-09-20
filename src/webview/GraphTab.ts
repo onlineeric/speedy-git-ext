@@ -57,6 +57,8 @@ export class GraphTab {
   private readonly log: vscode.LogOutputChannel;
   /** Released and replaced on every repo change; disposed with the tab. */
   private watcherSubscription: vscode.Disposable | undefined;
+  /** Set by {@link dispose}, so a subscription still in flight is released rather than stored. */
+  private disposed = false;
 
   constructor(private readonly options: GraphTabOptions) {
     this.shared = options.shared;
@@ -244,6 +246,7 @@ export class GraphTab {
    * handles.
    */
   dispose(): void {
+    this.disposed = true;
     this.watcherSubscription?.dispose();
     this.watcherSubscription = undefined;
     this.panelHost.dispose();
@@ -255,7 +258,16 @@ export class GraphTab {
     this.runtime.identity = resolved.success ? resolved.value : null;
   }
 
+  /**
+   * Subscribing is async, so the tab can close while a `watch()` is in flight.
+   * Storing the result then would strand a ref-counted watcher set for the rest
+   * of the session, so a late arrival is released instead.
+   */
   setWatcherSubscription(subscription: vscode.Disposable): void {
+    if (this.disposed) {
+      subscription.dispose();
+      return;
+    }
     this.watcherSubscription?.dispose();
     this.watcherSubscription = subscription;
   }

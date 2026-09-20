@@ -14,6 +14,13 @@ import type { RefExpectation } from '@shared/refRevalidation';
 export function useCapturedRefExpectation(): {
   /** Call where the action starts — the menu click that opens the dialog. */
   capture: (expectation: RefExpectation | undefined) => void;
+  /**
+   * Call at an intermediate step that git may still turn into a second,
+   * stronger attempt — `branch -d` answering `deleteBranchNeedsForce`, whose
+   * retry is the `branch -D` that actually discards commits. Keeps the capture
+   * so the retry carries the same expectation.
+   */
+  peek: () => RefExpectation | undefined;
   /** Call at confirm. Clears itself, so a reopened dialog cannot reuse a stale capture. */
   take: () => RefExpectation | undefined;
 } {
@@ -22,6 +29,7 @@ export function useCapturedRefExpectation(): {
     capture: (expectation) => {
       captured.current = expectation;
     },
+    peek: () => captured.current,
     take: () => {
       const expectation = captured.current;
       captured.current = undefined;

@@ -473,7 +473,9 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
         remoteBranch={remoteBranch}
         onConfirm={(deleteRemote) => {
           setDeleteConfirmOpen(false);
-          rpcClient.deleteBranch(refInfo.name, undefined, deleteRemote, deleteExpectation.take());
+          // Kept, not taken: `branch -d` may answer `deleteBranchNeedsForce`,
+          // and the `-D` retry below is the delete git will not refuse.
+          rpcClient.deleteBranch(refInfo.name, undefined, deleteRemote, deleteExpectation.peek());
         }}
         onCancel={() => setDeleteConfirmOpen(false)}
       />
@@ -489,7 +491,7 @@ function BranchContextMenuBody({ refInfo, commit }: { refInfo: RefInfo; commit: 
         initialDeleteRemote={!!pendingForceDeleteBranch?.deleteRemote}
         onConfirm={(deleteRemote) => {
           useGraphStore.getState().setPendingForceDeleteBranch(null);
-          rpcClient.deleteBranch(refInfo.name, true, deleteRemote);
+          rpcClient.deleteBranch(refInfo.name, true, deleteRemote, deleteExpectation.take());
         }}
         onCancel={() => useGraphStore.getState().setPendingForceDeleteBranch(null)}
       />

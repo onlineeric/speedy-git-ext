@@ -27,17 +27,13 @@ const PUSH_MODE_OPTIONS = [
   { value: 'force', label: '--force' },
 ] as const;
 
-function getDefaultRemote(remotes: { name: string }[]): string {
-  return remotes.find(r => r.name === 'origin')?.name ?? remotes[0]?.name ?? '';
-}
-
 export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
   const dialogTelemetry = useDialogTelemetry('push', open);
   const remotes = useGraphStore((s) => s.remotes);
 
   const [setUpstream, setSetUpstream] = useState(true);
   const [forceMode, setForceMode] = useState<PushForceMode>('none');
-  const [selectedRemote, setSelectedRemote] = useState(() => getDefaultRemote(remotes));
+  const [selectedRemote, setSelectedRemote] = useState(() => resolveDefaultRemoteName(remotes));
   const [isPushing, setIsPushing] = useState(false);
   /**
    * The branch list as it stood when the dialog opened.
@@ -49,16 +45,27 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
    */
   const [branchesAtOpen, setBranchesAtOpen] = useState<Branch[]>([]);
 
-  // Reset dialog state each time it opens, syncing selectedRemote with current remotes
+  // Reset dialog state once per opening. Keyed on `open` ALONE: the tab
+  // auto-refreshes while the dialog sits open and hands the store a fresh
+  // `remotes` array each time, so depending on it would re-run this — throwing
+  // away the user's force selection and, worse, re-snapshotting `branchesAtOpen`
+  // to the position the stale-ref check exists to catch.
   useEffect(() => {
-    if (open) {
-      setSetUpstream(true);
-      setForceMode('none');
-      setSelectedRemote(getDefaultRemote(remotes));
-      setIsPushing(false);
-      setBranchesAtOpen(useGraphStore.getState().branches);
-    }
-  }, [open, remotes]);
+    if (!open) return;
+    const store = useGraphStore.getState();
+    setSetUpstream(true);
+    setForceMode('none');
+    setSelectedRemote(resolveDefaultRemoteName(store.remotes));
+    setIsPushing(false);
+    setBranchesAtOpen(store.branches);
+  }, [open]);
+
+  // Remotes may still be loading when the dialog opens, so heal a selection that
+  // names no existing remote — without touching one the user made.
+  useEffect(() => {
+    setSelectedRemote((current) =>
+      remotes.some((remote) => remote.name === current) ? current : resolveDefaultRemoteName(remotes));
+  }, [remotes]);
 
   const command = buildPushCommand({ remote: selectedRemote, branch: branchName, setUpstream, forceMode });
   const isForce = forceMode !== 'none';

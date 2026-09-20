@@ -246,8 +246,7 @@ export class ExtensionController {
     await new Promise((resolve) => setTimeout(resolve, 0));
     if (group.tabs.length > 0) return;
 
-    const origin = pickReturnTarget(this.registry.snapshots());
-    const repoPath = origin ? origin.topLevelRepoPath : this.savedDefaultRepo();
+    const repoPath = this.mostRecentlyActiveTab()?.topLevelRepoPath ?? this.savedDefaultRepo();
     if (!repoPath) return;
 
     await this.createTab(repoPath, group.viewColumn, 'splitEditor');
@@ -314,17 +313,24 @@ export class ExtensionController {
    * starts from normal defaults; it deliberately copies none of the origin's
    * filters, search, selection or scroll.
    */
-  async openNewGraphTab(trigger: 'toolbarButton' | 'commandPalette'): Promise<void> {
-    const origin = pickReturnTarget(this.registry.snapshots());
-    const repoPath = origin ? origin.topLevelRepoPath : this.savedDefaultRepo();
+  async openNewGraphTab(trigger: 'toolbarButton' | 'commandPalette', origin?: GraphTab): Promise<void> {
+    // The toolbar button names its own graph; the Command Palette names none, so
+    // it falls back to the most recently active one.
+    const source = origin ?? this.mostRecentlyActiveTab();
+    const repoPath = source?.topLevelRepoPath ?? this.savedDefaultRepo();
     if (!repoPath) {
       vscode.window.showErrorMessage('Speedy Git: No workspace folder open');
       return;
     }
 
     // A hidden origin reports no view column; land in the active group instead.
-    const viewColumn = (origin && this.registry.get(origin.id)?.viewColumn) ?? vscode.ViewColumn.Active;
+    const viewColumn = source?.viewColumn ?? vscode.ViewColumn.Active;
     await this.createTab(repoPath, viewColumn, trigger);
+  }
+
+  private mostRecentlyActiveTab(): GraphTab | undefined {
+    const target = pickReturnTarget(this.registry.snapshots());
+    return target ? this.registry.get(target.id) : undefined;
   }
 
   /** The one creation path. Every entry point funnels through it. */
@@ -345,8 +351,8 @@ export class ExtensionController {
         this.registry.remove(disposedId);
       },
       onActivated: (activatedId) => this.registry.markActivated(activatedId),
-      openNewGraphTab: () => {
-        void this.openNewGraphTab('toolbarButton');
+      openNewGraphTab: (origin) => {
+        void this.openNewGraphTab('toolbarButton', origin);
       },
       onDisplayedRepoChanged: (changed) => {
         void this.subscribeWatcher(changed);
@@ -400,6 +406,9 @@ export class ExtensionController {
       void tab.setTopLevelRepo(fallback.path, { userInitiated: false }).then(() => {
         tab.sendRepoList();
         return tab.reload();
+      }).catch((err: unknown) => {
+        this.log.error(`Retargeting a graph after its repository was removed failed: ${err}`);
+        this.telemetry.sendError('repoDiscovery', err instanceof GitError ? err.code : 'UNKNOWN');
       });
     }
     for (const tab of this.registry.all()) {

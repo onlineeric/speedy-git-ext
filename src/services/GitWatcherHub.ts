@@ -145,6 +145,7 @@ export class GitWatcherHub implements vscode.Disposable {
       for (const watcher of remaining.watchers) watcher.dispose();
     }
     this.sets.delete(identity.commonGitDir);
+    this.identitiesByKey.delete(identity.commonGitDir);
     this.debouncer.cancel(identity.commonGitDir);
   }
 

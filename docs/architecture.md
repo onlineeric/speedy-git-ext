@@ -430,6 +430,9 @@ esbuild.config.mjs                # Production-only telemetry destination inject
 ```
 
 Tests live in `__tests__/` directories beside the code they cover (Vitest).
+`webview-ui/src/components/__tests__/ResponsiveToolbar.test.ts` covers collapse thresholds,
+label/button visibility in inline and dropdown rendering, the Remote context-menu toggle,
+and compiled separator CSS. Static React rendering does not exercise DOM observers or layout.
 Branch checkout coverage includes `src/__tests__/branchCheckoutHandlers.test.ts` (execution, guards,
 recovery and navigation races), `webview-ui/src/utils/__tests__/branchCheckout.test.ts` (gesture policy
 and RPC lifecycle), and `webview-ui/src/components/__tests__/BranchContextMenu.test.ts` (badge events).
@@ -443,5 +446,5 @@ the wiring in `ExtensionController.tabs.test.ts` (reveal vs create, SCM routing,
 editor fill, What's New, `panelOpened`, repo removal), `GraphTabRegistry.test.ts`, `ExtensionServices.test.ts`,
 `GitWatcherHub.test.ts`, `RepoActivityRegistry.test.ts`, `GitShowContentProvider.test.ts` and
 `refRevalidationHandlers.test.ts`. Note the repo's tests are Node-environment only — there is no
-jsdom or React testing library, so component behaviour is covered by extracting it into a pure util
-(`peerActivityNotice`, `refExpectation`, `isOwnOperationInProgress`) rather than by rendering.
+jsdom or React testing library, so component behaviour is covered through static rendering or pure utils
+such as `peerActivityNotice`, `refExpectation` and `isOwnOperationInProgress`.

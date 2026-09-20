@@ -5,10 +5,25 @@ import { ToolbarIconButton, RemoteButtonToggleItem, TOGGLE_BUTTON_TONES } from '
 const GAP = 4;
 const MORE_WIDTH = 36;
 
-function rowWidth(element: HTMLElement): number {
-  const items = Array.from(element.children);
-  return items.reduce((width, item) => width + item.getBoundingClientRect().width, 0)
-    + Math.max(0, items.length - 1) * GAP;
+/** Widths include separators even while they are invisible in a dropdown. */
+export function getToolbarCollapseState({ availableWidth, leftWidths, rightWidths, statusWidth }: {
+  availableWidth: number;
+  leftWidths: number[];
+  rightWidths: number[];
+  statusWidth: number;
+}) {
+  const rowWidth = (widths: number[]) => widths.reduce((sum, width) => sum + width, 0)
+    + Math.max(0, widths.length - 1) * GAP;
+  const available = availableWidth - statusWidth - GAP * 2;
+  const leftWidth = rowWidth(leftWidths);
+  const right = leftWidth + rowWidth(rightWidths) > available;
+  return { left: right && leftWidth + MORE_WIDTH > available, right };
+}
+
+export function getToolbarGroupClassName(collapsed: boolean, open: boolean, side: 'left' | 'right'): string {
+  return collapsed
+    ? `absolute top-full z-50 mt-1 flex w-max max-h-[calc(100vh-64px)] flex-col items-center gap-1 [&>*]:shrink-0 [&>svg]:absolute [&>svg]:invisible overflow-y-auto rounded border border-[var(--vscode-widget-border)] bg-[var(--vscode-menu-background)] p-1 shadow-lg ${side === 'left' ? 'left-0' : 'right-0'} ${open ? '' : 'invisible'}`
+    : 'flex w-max items-center gap-1';
 }
 
 /** Measure the actual controls, including labels and conditional buttons, without mounting copies. */
@@ -29,13 +44,13 @@ export function ResponsiveToolbar({ left, right, status }: {
     const rightGroup = rightRef.current!;
     const statusLabel = statusRef.current!;
     const measure = () => {
-      const available = bar.clientWidth - statusLabel.getBoundingClientRect().width - GAP * 2;
-      const leftWidth = rowWidth(leftGroup);
-      const rightWidth = rowWidth(rightGroup);
-      const rightCollapsed = leftWidth + rightWidth > available;
-      const leftCollapsed = rightCollapsed && leftWidth + MORE_WIDTH > available;
-      setCollapsed((previous) => previous.left === leftCollapsed && previous.right === rightCollapsed
-        ? previous : { left: leftCollapsed, right: rightCollapsed });
+      const next = getToolbarCollapseState({
+        availableWidth: bar.clientWidth,
+        leftWidths: Array.from(leftGroup.children, (item) => item.getBoundingClientRect().width),
+        rightWidths: Array.from(rightGroup.children, (item) => item.getBoundingClientRect().width),
+        statusWidth: statusLabel.getBoundingClientRect().width,
+      });
+      setCollapsed((previous) => previous.left === next.left && previous.right === next.right ? previous : next);
     };
     const resize = new ResizeObserver(measure);
     const observe = () => {
@@ -61,7 +76,7 @@ export function ResponsiveToolbar({ left, right, status }: {
   );
 }
 
-function ToolbarGroup({ side, collapsed, contentRef, children }: {
+export function ToolbarGroup({ side, collapsed, contentRef, children }: {
   side: 'left' | 'right';
   collapsed: boolean;
   contentRef: RefObject<HTMLDivElement>;
@@ -133,9 +148,7 @@ function ToolbarGroup({ side, collapsed, contentRef, children }: {
         id={id}
         role="group"
         aria-label={side === 'left' ? 'Toolbar actions' : 'Toolbar options'}
-        className={collapsed
-          ? `absolute top-full z-50 mt-1 flex w-max max-h-[calc(100vh-64px)] flex-col items-center gap-1 [&>*]:shrink-0 [&>svg]:absolute [&>svg]:invisible overflow-y-auto rounded border border-[var(--vscode-widget-border)] bg-[var(--vscode-menu-background)] p-1 shadow-lg ${side === 'left' ? 'left-0' : 'right-0'} ${open ? '' : 'invisible'}`
-          : 'flex w-max items-center gap-1'}
+        className={getToolbarGroupClassName(collapsed, open, side)}
         onClick={(event) => {
           // Portaled dialogs/context menus remain owned by these same mounted controls.
           if (collapsed && event.target instanceof Element && contentRef.current?.contains(event.target)
