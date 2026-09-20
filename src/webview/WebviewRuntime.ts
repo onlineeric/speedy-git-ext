@@ -1,5 +1,6 @@
-import type { CompareMode, GraphFilters, SlotValue } from '../../shared/types.js';
+import type { CompareMode, GraphFilters, SlotValue, SubmoduleNavEntry } from '../../shared/types.js';
 import type { GitVersion } from '../../shared/gitVersion.js';
+import type { RepoIdentity } from '../utils/repoIdentity.js';
 
 export interface CompareRequestPayload {
   a: SlotValue;
@@ -11,6 +12,24 @@ export interface CompareRequestPayload {
 export class WebviewRuntime {
   /** Incremented on each repo switch to discard stale async responses. */
   fetchGeneration = 0;
+  /**
+   * The tab's selected repository, BEFORE any submodule navigation.
+   *
+   * `currentRepoPath` is "what is displayed"; this is "which repo is this a
+   * graph for". The selector shows it, `Open New Graph Tab` seeds a new tab
+   * with it, and SCM `openForRepo` matches against it — all three must keep
+   * pointing at the top-level repo while the tab sits inside a submodule.
+   */
+  topLevelRepoPath: string;
+  /** Where the tab came from, so "back to parent" can unwind one level at a time. */
+  submoduleStack: SubmoduleNavEntry[] = [];
+  submoduleNavigating = false;
+  /**
+   * Resolved for `currentRepoPath` after each repo change. Drives watcher
+   * subscription and peer-busy mirroring; null when the path is not a git repo,
+   * which simply means this tab routes to nothing.
+   */
+  identity: RepoIdentity | null = null;
   currentFilters: Partial<GraphFilters> = {};
   isDisplayingSubmodule = false;
   initialLoadSent = false;
@@ -24,8 +43,10 @@ export class WebviewRuntime {
    *
    * Here for the same reason the compare controller is: `cancelCommitWait`
    * arrives as its own message, so the thing it cancels has to outlive the
-   * dispatch that started it. One field serves both flows:
-   * their dialogs are modal and only one commit can be written at a time.
+   * dispatch that started it. One field serves both flows: their dialogs are
+   * modal and only one commit at a time can be written *per tab*. Two tabs may
+   * each have one in flight; serialising across them is not this field's job
+   * (and is deliberately not done at all — git's index lock decides).
    */
   activeCommitController: AbortController | null = null;
   /**
@@ -36,7 +57,9 @@ export class WebviewRuntime {
    */
   gitVersion: Promise<GitVersion | null> | undefined = undefined;
 
-  constructor(public currentRepoPath: string) {}
+  constructor(public currentRepoPath: string) {
+    this.topLevelRepoPath = currentRepoPath;
+  }
 
   resetRepoScopedState(currentRepoPath: string): void {
     this.currentRepoPath = currentRepoPath;

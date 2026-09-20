@@ -1,3 +1,4 @@
+import * as path from 'path';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 
 export const submoduleHandlers = {
@@ -6,19 +7,18 @@ export const submoduleHandlers = {
   },
 
   openSubmodule: async (message, context) => {
-    const handlers = context.getSubmoduleHandlers();
-    if (handlers) {
-      await handlers.openSubmodule(message.payload.submodulePath);
-      await context.refreshCoordinator.reload();
-    }
+    const parentPath = context.runtime.currentRepoPath;
+    if (!parentPath) return;
+    context.pushSubmoduleEntry({ repoPath: parentPath, repoName: path.basename(parentPath) });
+    context.runtime.isDisplayingSubmodule = true;
+    const generation = await context.setDisplayedRepo(path.resolve(parentPath, message.payload.submodulePath));
+    if (generation !== context.runtime.fetchGeneration) return;
+    await context.refreshCoordinator.reload();
   },
 
   backToParentRepo: async (_message, context) => {
-    const handlers = context.getSubmoduleHandlers();
-    if (handlers) {
-      await handlers.backToParentRepo();
-      await context.refreshCoordinator.reload();
-    }
+    await context.backToParentRepo();
+    await context.refreshCoordinator.reload();
   },
 
   updateSubmodule: async (message, context) => {
@@ -49,6 +49,11 @@ export const submoduleHandlers = {
     }
   },
 
+  /**
+   * An explicit user repository switch. This is the ONE path that moves the
+   * saved default, and it moves it for the next first-opened graph only —
+   * peer tabs are neither notified nor reloaded.
+   */
   switchRepo: async (message, context) => {
     const { repoPath } = message.payload;
     const discovery = context.getRepoDiscovery();
@@ -60,27 +65,27 @@ export const submoduleHandlers = {
       return;
     }
 
-    const currentGeneration = context.runtime.beginNavigation();
     context.runtime.clearBranchFilters();
-    context.runtime.isDisplayingSubmodule = false;
-
-    context.onSwitchRepo(repoPath);
-    context.sendRepoList(discovery.getRepos(), discovery.getActiveRepoPath());
-    if (currentGeneration !== context.runtime.fetchGeneration) return;
+    const generation = await context.setTopLevelRepo(repoPath);
+    context.sendRepoList();
+    if (generation !== context.runtime.fetchGeneration) return;
     await context.refreshCoordinator.reload();
   },
 
+  /**
+   * Submodule navigation. Never touches the saved default and never notifies
+   * another tab: where this tab is looking is this tab's business.
+   */
   displayRepo: async (message, context) => {
     const { repoPath } = message.payload;
     const discovery = context.getRepoDiscovery();
     if (!discovery) return;
 
-    const currentGeneration = context.runtime.beginNavigation();
     context.runtime.clearBranchFilters();
-    context.runtime.isDisplayingSubmodule = repoPath !== discovery.getActiveRepoPath();
+    context.runtime.isDisplayingSubmodule = repoPath !== context.getTopLevelRepoPath();
 
-    context.onDisplayRepo(repoPath);
-    if (currentGeneration !== context.runtime.fetchGeneration) return;
+    const generation = await context.setDisplayedRepo(repoPath);
+    if (generation !== context.runtime.fetchGeneration) return;
     await context.refreshCoordinator.reload();
   },
 } satisfies Pick<

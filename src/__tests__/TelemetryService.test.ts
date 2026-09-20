@@ -77,7 +77,7 @@ describe('createTelemetryService gating', () => {
     expect(reporterConstructor).not.toHaveBeenCalled();
     expect(channelInfo).toHaveBeenCalledWith('telemetry disabled (reason: no connection string)');
 
-    service.sendPanelOpened('command');
+    service.sendPanelOpened('command', '1');
     service.sendOperation('mergeBranch', 'success', 12);
     service.sendError('watcher', 'UNKNOWN');
     expect(sendTelemetryEvent).not.toHaveBeenCalled();
@@ -88,7 +88,7 @@ describe('createTelemetryService gating', () => {
     const service = createTelemetryService(developmentContext(), 'InstrumentationKey=abc');
     expect(reporterConstructor).not.toHaveBeenCalled();
     expect(channelInfo).toHaveBeenCalledWith('telemetry disabled (reason: dev mode)');
-    service.sendPanelOpened('command');
+    service.sendPanelOpened('command', '1');
     expect(sendTelemetryEvent).not.toHaveBeenCalled();
   });
 
@@ -102,11 +102,12 @@ describe('createTelemetryService gating', () => {
 describe('real implementation', () => {
   it('appends common.* properties to every event', () => {
     const service = createTelemetryService(productionContext(), 'InstrumentationKey=abc');
-    service.sendPanelOpened('scmButton');
+    service.sendPanelOpened('scmButton', '2');
     expect(sendTelemetryEvent).toHaveBeenCalledWith(
       'panelOpened',
       {
         trigger: 'scmButton',
+        openTabCount: '2',
         'common.appName': 'Visual Studio Code',
         'common.appHost': 'desktop',
         'common.uiKind': 'desktop',
@@ -193,7 +194,7 @@ describe('real implementation', () => {
       throw new Error('reporter exploded');
     });
     const service = createTelemetryService(productionContext(), 'InstrumentationKey=abc');
-    expect(() => service.sendPanelOpened('command')).not.toThrow();
+    expect(() => service.sendPanelOpened('command', '1')).not.toThrow();
     expect(() => service.sendOperation('push', 'success', 1)).not.toThrow();
   });
 
@@ -218,7 +219,7 @@ describe('extension setting gate (speedyGit.telemetry.enabled)', () => {
     configListener?.(settingChangeEvent);
     expect(channelInfo).toHaveBeenCalledWith('telemetry disabled (reason: extension setting)');
 
-    service.sendPanelOpened('command');
+    service.sendPanelOpened('command', '1');
     service.sendOperation('push', 'success', 1);
     service.sendError('watcher', 'UNKNOWN');
     expect(sendTelemetryEvent).not.toHaveBeenCalled();
@@ -230,13 +231,13 @@ describe('extension setting gate (speedyGit.telemetry.enabled)', () => {
 
     extensionSettingValue = false;
     configListener?.(settingChangeEvent);
-    service.sendPanelOpened('command');
+    service.sendPanelOpened('command', '1');
     expect(sendTelemetryEvent).not.toHaveBeenCalled();
 
     extensionSettingValue = true;
     configListener?.(settingChangeEvent);
     expect(channelInfo).toHaveBeenCalledWith('telemetry enabled');
-    service.sendPanelOpened('command');
+    service.sendPanelOpened('command', '1');
     expect(sendTelemetryEvent).toHaveBeenCalledTimes(1);
   });
 
@@ -254,7 +255,7 @@ describe('extension setting gate (speedyGit.telemetry.enabled)', () => {
     telemetryEnabledListener?.();
     channelInfo.mockClear();
 
-    service.sendPanelOpened('command');
+    service.sendPanelOpened('command', '1');
     service.sendOperation('push', 'success', 1);
     service.sendError('watcher', 'UNKNOWN');
 

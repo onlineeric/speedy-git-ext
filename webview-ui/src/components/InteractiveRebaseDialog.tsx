@@ -36,6 +36,7 @@ import { trackUiInteraction } from '../utils/telemetry';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
+import { expectHead } from '../utils/refExpectation';
 
 interface InteractiveRebaseDialogProps {
   open: boolean;
@@ -82,6 +83,10 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, surfac
   const [allDropWarningShown, setAllDropWarningShown] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const lastStep2EntriesRef = useRef<string | null>(null);
+  // Where HEAD stood when the dialog opened. The dialog is mounted per open, so
+  // this initializer runs exactly once per opening — which is the moment the
+  // user saw these commits.
+  const [headAtOpen] = useState(() => expectHead(useGraphStore.getState().mergedCommits));
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -151,7 +156,10 @@ export function InteractiveRebaseDialog({ open, baseHash, initialEntries, surfac
     if (autosquash) trackUiInteraction(surface, 'interactiveRebaseAutosquash');
     const config: InteractiveRebaseConfig = { baseHash, entries, squashMessages };
     useGraphStore.getState().setLoading(true);
-    rpcClient.interactiveRebase(config);
+    // The todo list names the commits the user just arranged, so replaying it
+    // against a tip that moved would rewrite the wrong history. The base is a
+    // commit hash and cannot move; only HEAD needs revalidating.
+    rpcClient.interactiveRebase(config, { expectHead: headAtOpen });
     onClose();
   };
 

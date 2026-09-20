@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import type { PushForceMode } from '@shared/types';
+import type { Branch, PushForceMode } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { buildPushCommand } from '../utils/gitCommandBuilder';
@@ -13,6 +13,7 @@ import {
   dialogContentStyle,
 } from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
+import { expectRemoteBranch } from '../utils/refExpectation';
 
 interface PushDialogProps {
   open: boolean;
@@ -38,6 +39,15 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
   const [forceMode, setForceMode] = useState<PushForceMode>('none');
   const [selectedRemote, setSelectedRemote] = useState(() => getDefaultRemote(remotes));
   const [isPushing, setIsPushing] = useState(false);
+  /**
+   * The branch list as it stood when the dialog opened.
+   *
+   * A force-push is checked against where the destination's remote-tracking ref
+   * was *then*, not where an auto-refresh has since moved it — and the user may
+   * still change which remote they are pushing to, so the snapshot is kept
+   * whole and the expectation built from it at confirm.
+   */
+  const [branchesAtOpen, setBranchesAtOpen] = useState<Branch[]>([]);
 
   // Reset dialog state each time it opens, syncing selectedRemote with current remotes
   useEffect(() => {
@@ -46,6 +56,7 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
       setForceMode('none');
       setSelectedRemote(getDefaultRemote(remotes));
       setIsPushing(false);
+      setBranchesAtOpen(useGraphStore.getState().branches);
     }
   }, [open, remotes]);
 
@@ -57,7 +68,15 @@ export function PushDialog({ open, branchName, onCancel }: PushDialogProps) {
     dialogTelemetry.confirmed();
     setIsPushing(true);
     try {
-      await rpcClient.pushAsync(selectedRemote, branchName, setUpstream, forceMode);
+      // Only a force push needs the check: git already refuses a normal push
+      // whose remote moved.
+      await rpcClient.pushAsync(
+        selectedRemote,
+        branchName,
+        setUpstream,
+        forceMode,
+        isForce ? expectRemoteBranch(branchesAtOpen, selectedRemote, branchName) : undefined,
+      );
     } catch {
       // Error is already shown via store.setError in rpcClient
     } finally {

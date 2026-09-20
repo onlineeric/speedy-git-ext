@@ -55,6 +55,42 @@ export type TrackedOperation = (typeof TRACKED_OPERATION_LIST)[number];
  */
 export const TRACKED_OPERATIONS: ReadonlySet<RequestMessage['type']> = new Set(TRACKED_OPERATION_LIST);
 
+/**
+ * The tracked operations that actually CHANGE the repository — the tracked list
+ * minus the two read-only members documented above.
+ *
+ * Derived rather than spelled out again, so the two lists cannot drift. This is
+ * what the router mirrors to peer tabs as "another view is busy"; a read-only
+ * operation is nobody else's business.
+ */
+const READ_ONLY_TRACKED_OPERATIONS: ReadonlySet<RequestMessage['type']> = new Set(['compareRefs', 'locateHead']);
+
+export const MUTATING_OPERATIONS: ReadonlySet<RequestMessage['type']> = new Set(
+  TRACKED_OPERATION_LIST.filter((operation) => !READ_ONLY_TRACKED_OPERATIONS.has(operation)),
+);
+
+// ---------------------------------------------------------------------------
+// Panel opening (which entry point, and how many graphs are now open)
+// ---------------------------------------------------------------------------
+
+export const PANEL_OPENED_TRIGGERS = [
+  'command', 'scmButton', 'statusBar', 'toolbarButton', 'commandPalette',
+] as const;
+
+export type PanelOpenedTrigger = (typeof PANEL_OPENED_TRIGGERS)[number];
+
+/** Bucketed so an exact tab count never becomes a fingerprint. */
+export const TAB_COUNT_BUCKETS = ['1', '2', '3-5', '6+'] as const;
+
+export type TabCountBucket = (typeof TAB_COUNT_BUCKETS)[number];
+
+export function toTabCountBucket(n: number): TabCountBucket {
+  if (!Number.isFinite(n) || n <= 1) return '1';
+  if (n === 2) return '2';
+  if (n <= 5) return '3-5';
+  return '6+';
+}
+
 // ---------------------------------------------------------------------------
 // Commit-count buckets (anti-fingerprinting, FR-013)
 // ---------------------------------------------------------------------------
@@ -100,7 +136,7 @@ export type UiSurface = (typeof UI_SURFACES)[number];
 
 export const UI_ACTIONS = [
   // Toolbar buttons (ControlBar)
-  'filter', 'search', 'compare', 'worktrees', 'refresh', 'fetch', 'goToHead', 'view', 'remote', 'settings', 'help',
+  'filter', 'search', 'compare', 'worktrees', 'refresh', 'fetch', 'goToHead', 'openNewGraphTab', 'view', 'remote', 'settings', 'help',
   // Toolbar right-click menu
   'toggleLabels', 'toggleRemoteButton',
   // Help dialog links (which support surface the user chose)

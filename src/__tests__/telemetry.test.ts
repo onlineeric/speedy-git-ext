@@ -7,6 +7,12 @@ import {
   isValidUiTelemetryEvent,
   toCommitCountBucket,
 } from '../../shared/telemetry.js';
+import {
+  MUTATING_OPERATIONS,
+  PANEL_OPENED_TRIGGERS,
+  TAB_COUNT_BUCKETS,
+  toTabCountBucket,
+} from '../../shared/telemetry.js';
 
 describe('toCommitCountBucket', () => {
   it.each([
@@ -136,5 +142,48 @@ describe('isValidUiTelemetryEvent', () => {
     expect(isValidUiTelemetryEvent('uiInteraction')).toBe(false);
     expect(isValidUiTelemetryEvent(42)).toBe(false);
     expect(isValidUiTelemetryEvent([])).toBe(false);
+  });
+});
+
+describe('toTabCountBucket', () => {
+  it('buckets at the documented boundaries', () => {
+    expect(toTabCountBucket(0)).toBe('1');
+    expect(toTabCountBucket(1)).toBe('1');
+    expect(toTabCountBucket(2)).toBe('2');
+    expect(toTabCountBucket(3)).toBe('3-5');
+    expect(toTabCountBucket(5)).toBe('3-5');
+    expect(toTabCountBucket(6)).toBe('6+');
+    expect(toTabCountBucket(50)).toBe('6+');
+  });
+
+  it('never leaks an exact count — every answer is in the closed catalog', () => {
+    for (let n = 0; n <= 60; n++) {
+      expect(TAB_COUNT_BUCKETS).toContain(toTabCountBucket(n));
+    }
+  });
+
+  it('buckets a non-finite count rather than throwing', () => {
+    expect(toTabCountBucket(Number.NaN)).toBe('1');
+  });
+});
+
+describe('PANEL_OPENED_TRIGGERS', () => {
+  it('covers every entry point that creates a graph tab', () => {
+    expect([...PANEL_OPENED_TRIGGERS].sort()).toEqual(
+      ['command', 'commandPalette', 'scmButton', 'statusBar', 'toolbarButton'].sort(),
+    );
+  });
+});
+
+describe('MUTATING_OPERATIONS', () => {
+  it('is the tracked list minus the two read-only members, derived rather than respelled', () => {
+    const missing = [...TRACKED_OPERATIONS].filter((operation) => !MUTATING_OPERATIONS.has(operation));
+    expect(missing.sort()).toEqual(['compareRefs', 'locateHead']);
+  });
+
+  it('adds nothing the tracked list does not already carry', () => {
+    for (const operation of MUTATING_OPERATIONS) {
+      expect(TRACKED_OPERATIONS.has(operation)).toBe(true);
+    }
   });
 });

@@ -2,7 +2,7 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "5.16.0",
+  "version": "5.17.0",
   "publisher": "onlineeric",
   "license": "MIT",
   "repository": {
@@ -61,6 +61,12 @@
         "category": "Speedy Git"
       },
       {
+        "command": "speedyGit.openNewGraphTab",
+        "title": "Open New Graph Tab",
+        "category": "Speedy Git",
+        "icon": "$(add)"
+      },
+      {
         "command": "speedyGit.openForRepo",
         "title": "Open in Speedy Git",
         "category": "Speedy Git",
@@ -79,6 +85,10 @@
       "commandPalette": [
         {
           "command": "speedyGit.showGraph",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "speedyGit.openNewGraphTab",
           "when": "workspaceFolderCount > 0"
         }
       ],

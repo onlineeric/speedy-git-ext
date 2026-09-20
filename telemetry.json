@@ -23,7 +23,12 @@
       "trigger": {
         "classification": "SystemMetaData",
         "purpose": "FeatureInsight",
-        "comment": "'command' | 'scmButton' \u2014 how the graph panel was opened."
+        "comment": "'command' | 'scmButton' | 'statusBar' | 'toolbarButton' | 'commandPalette' \u2014 how the graph tab was opened. Sent on creation only; revealing an existing graph sends nothing."
+      },
+      "openTabCount": {
+        "classification": "SystemMetaData",
+        "purpose": "FeatureInsight",
+        "comment": "'1' | '2' | '3-5' | '6+' \u2014 bucketed number of open Speedy Git graph tabs after this one opened."
       }
     },
     "operation": {

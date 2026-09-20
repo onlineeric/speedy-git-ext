@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { GitError, err, ok, type Result } from '../../shared/errors.js';
 import type { FileChangeStatus, WorktreeInfo } from '../../shared/types.js';
 import { UNCOMMITTED_HASH } from '../../shared/types.js';
+import { buildGitShowUriParts, STAGED_AUTHORITY, WORKTREE_AUTHORITY } from '../utils/gitShowUri.js';
 import type { GitServiceRegistry } from './GitServiceRegistry.js';
 import type { WebviewRuntime } from './WebviewRuntime.js';
 
@@ -28,6 +29,45 @@ export class EditorCommandService {
     return result.success ? result.value : '';
   }
 
+  /**
+   * A `git-show:` URI for the repository this tab currently DISPLAYS — which is
+   * the repository the file belongs to.
+   *
+   * The repo travels inside the URI rather than being looked up when the
+   * document is read, so the diff stays correct after this tab switches repo or
+   * closes, and two repos holding the same file at the same hash stay distinct
+   * documents.
+   */
+  private buildGitShowUri(revision: string, filePath: string, label: string, nonce?: string): vscode.Uri {
+    return vscode.Uri.from({
+      scheme: 'git-show',
+      ...buildGitShowUriParts({
+        repoPath: this.runtime.currentRepoPath,
+        revision,
+        filePath,
+        label,
+        ...(nonce ? { nonce } : {}),
+      }),
+    });
+  }
+
+  /**
+   * The working-tree side of a *submodule* diff, routed through the `git-show`
+   * content provider instead of a `file://` URI.
+   *
+   * A checked-out submodule is a directory, so `vscode.diff` cannot open it as a
+   * text document at all — the diff either fails or shows nothing. The provider
+   * answers the `worktree` sentinel with the submodule's current pointer line,
+   * which is the same thing `git diff` renders for that side.
+   *
+   * VS Code caches virtual documents by URI, and this side's content moves on
+   * its own (the pointer and git's `-dirty` suffix), so it carries a nonce
+   * alongside the repository.
+   */
+  private buildWorktreeSubmoduleUri(filePath: string, fileName: string): vscode.Uri {
+    return this.buildGitShowUri(WORKTREE_AUTHORITY, filePath, `Working Tree: ${fileName}`, randomUUID());
+  }
+
   async openDiffEditor(hash: string, filePath: string, parentHash?: string, status?: FileChangeStatus, isSubmodule?: boolean): Promise<void> {
     if (hash === UNCOMMITTED_HASH) {
       await this.openUncommittedDiff(filePath, status, isSubmodule);
@@ -36,8 +76,8 @@ export class EditorCommandService {
 
     const parent = parentHash ?? `${hash}~1`;
     const fileName = filePath.split('/').pop() ?? filePath;
-    const leftUri = vscode.Uri.from({ scheme: 'git-show', authority: parent, path: `/${parent.slice(0, 8)}: ${fileName}`, query: filePath });
-    const rightUri = vscode.Uri.from({ scheme: 'git-show', authority: hash, path: `/${hash.slice(0, 8)}: ${fileName}`, query: filePath });
+    const leftUri = this.buildGitShowUri(parent, filePath, `${parent.slice(0, 8)}: ${fileName}`);
+    const rightUri = this.buildGitShowUri(hash, filePath, `${hash.slice(0, 8)}: ${fileName}`);
     const title = `${filePath} (${hash.slice(0, 7)})`;
 
     try {
@@ -55,18 +95,8 @@ export class EditorCommandService {
       this.log.warn(`Cannot resolve HEAD for staged diff: ${filePath}`);
       return;
     }
-    const leftUri = vscode.Uri.from({
-      scheme: 'git-show',
-      authority: headHash,
-      path: `/${headHash.slice(0, 8)}: ${fileName}`,
-      query: filePath,
-    });
-    const rightUri = vscode.Uri.from({
-      scheme: 'git-show',
-      authority: 'staged',
-      path: `/Staged: ${fileName}`,
-      query: filePath,
-    });
+    const leftUri = this.buildGitShowUri(headHash, filePath, `${headHash.slice(0, 8)}: ${fileName}`);
+    const rightUri = this.buildGitShowUri(STAGED_AUTHORITY, filePath, `Staged: ${fileName}`);
     const title = `${filePath} (Staged)`;
     try {
       await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
@@ -78,12 +108,7 @@ export class EditorCommandService {
   async openFileAtRevision(hash: string, filePath: string): Promise<void> {
     const shortHash = hash.slice(0, 8);
     const fileName = filePath.split('/').pop() ?? filePath;
-    const uri = vscode.Uri.from({
-      scheme: 'git-show',
-      authority: hash,
-      path: `/${shortHash}: ${fileName}`,
-      query: filePath,
-    });
+    const uri = this.buildGitShowUri(hash, filePath, `${shortHash}: ${fileName}`);
 
     try {
       const doc = await vscode.workspace.openTextDocument(uri);
@@ -94,6 +119,11 @@ export class EditorCommandService {
     }
   }
 
+  /**
+   * Opens the real file on disk, resolved against this tab's own workspace path —
+   * so it needs no repository marker of its own, unlike every `git-show:` URI
+   * above.
+   */
   async openCurrentFile(filePath: string): Promise<void> {
     const resolvedPath = this.resolveWorkspaceFilePath(filePath);
     if (!resolvedPath) return;
@@ -124,15 +154,10 @@ export class EditorCommandService {
         // Working-tree slot. A submodule has no file to point at here — see
         // `buildWorktreeSubmoduleUri`.
         return payload.isSubmodule
-          ? buildWorktreeSubmoduleUri(payload.filePath, fileName)
+          ? this.buildWorktreeSubmoduleUri(payload.filePath, fileName)
           : vscode.Uri.file(path.join(this.runtime.currentRepoPath, payload.filePath));
       }
-      return vscode.Uri.from({
-        scheme: 'git-show',
-        authority: hash,
-        path: `/${hash.slice(0, 8)}: ${fileName}`,
-        query: payload.filePath,
-      });
+      return this.buildGitShowUri(hash, payload.filePath, `${hash.slice(0, 8)}: ${fileName}`);
     };
 
     try {
@@ -201,19 +226,14 @@ export class EditorCommandService {
       return;
     }
 
-    const leftUri = vscode.Uri.from({
-      scheme: 'git-show',
-      authority: headHash,
-      path: `/${headHash.slice(0, 8)}: ${fileName}`,
-      query: filePath,
-    });
+    const leftUri = this.buildGitShowUri(headHash, filePath, `${headHash.slice(0, 8)}: ${fileName}`);
 
     if (status === 'deleted') {
       await this.tryOpenDiff(leftUri, vscode.Uri.parse(`untitled:${fileName}`), `${filePath} (Deleted)`, `Diff editor failed for deleted file: ${filePath}`);
       return;
     }
 
-    const rightUri = isSubmodule ? buildWorktreeSubmoduleUri(filePath, fileName) : vscode.Uri.file(absolutePath);
+    const rightUri = isSubmodule ? this.buildWorktreeSubmoduleUri(filePath, fileName) : vscode.Uri.file(absolutePath);
     await this.tryOpenDiff(leftUri, rightUri, `${filePath} (Working Tree)`, `Diff editor failed for uncommitted file: ${filePath}`);
   }
 
@@ -236,25 +256,4 @@ export class EditorCommandService {
 
     return resolvedPath;
   }
-}
-
-/**
- * The working-tree side of a *submodule* diff, routed through the `git-show` content
- * provider instead of a `file://` URI.
- *
- * A checked-out submodule is a directory, so `vscode.diff` cannot open it as a text
- * document at all — the diff either fails or shows nothing. The provider answers the
- * `worktree` sentinel with the submodule's current pointer line, which is the same thing
- * `git diff` renders for that side.
- */
-function buildWorktreeSubmoduleUri(filePath: string, fileName: string): vscode.Uri {
-  return vscode.Uri.from({
-    scheme: 'git-show',
-    authority: 'worktree',
-    path: `/Working Tree: ${fileName}`,
-    query: filePath,
-    // VS Code caches virtual documents by URI. Reopening must read the current
-    // pointer and dirty suffix, even when the submodule path is unchanged.
-    fragment: randomUUID(),
-  });
 }

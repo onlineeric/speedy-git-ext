@@ -1,4 +1,5 @@
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
+import { postRefMoved } from './revalidateRef.js';
 
 export const remoteHandlers = {
   fetch: async (message, context) => {
@@ -18,6 +19,10 @@ export const remoteHandlers = {
   },
 
   push: async (message, context) => {
+    // Only a FORCE push needs this: a plain push is already refused by git when
+    // the remote moved. A force-push after a peer fetched new upstream commits
+    // is the classic data loss, and git performs it without complaint.
+    if (await postRefMoved(message.payload.expect, context)) return;
     const result = await context.services.current().gitRemoteService.push(
       message.payload.remote,
       message.payload.branch,

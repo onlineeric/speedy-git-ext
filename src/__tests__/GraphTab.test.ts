@@ -137,7 +137,7 @@ function createRepoDataLoaderFixture(options: {
   return { dataLoader, runtime, services, postMessage, gitLogService, commits };
 }
 
-describe('WebviewProvider initial load performance', () => {
+describe('GraphTab initial load performance', () => {
   it('posts initialData without waiting for deferred repo data or authors', async () => {
     const deferredUncommitted = new Promise<never>(() => undefined);
     const commit = makeTestCommit('aaa1111');
@@ -295,7 +295,7 @@ describe('WebviewMessageRouter', () => {
   });
 });
 
-describe('WebviewProvider switchRepo', () => {
+describe('GraphTab switchRepo', () => {
   it('clears remembered branch filters before reloading the new repository', async () => {
     const runtime = new WebviewRuntime('/repo-a');
     runtime.currentFilters = { branches: ['feature/test'], author: 'Alice', maxCount: 250 };
@@ -310,7 +310,7 @@ describe('WebviewProvider switchRepo', () => {
         ],
         getActiveRepoPath: () => '/repo-b',
       }),
-      onSwitchRepo: vi.fn(),
+      setTopLevelRepo: vi.fn(async () => runtime.beginNavigation()),
       sendRepoList: vi.fn(),
       postMessage: vi.fn(),
     } as unknown as WebviewRequestContext;
@@ -334,7 +334,8 @@ describe('WebviewProvider switchRepo', () => {
       getRepoDiscovery: () => ({
         getActiveRepoPath: () => '/repo-a',
       }),
-      onDisplayRepo: vi.fn(),
+      getTopLevelRepoPath: () => '/repo-a',
+      setDisplayedRepo: vi.fn(async () => runtime.beginNavigation()),
       postMessage: vi.fn(),
     } as unknown as WebviewRequestContext;
 
@@ -345,12 +346,12 @@ describe('WebviewProvider switchRepo', () => {
 
     expect(runtime.isDisplayingSubmodule).toBe(true);
     expect(runtime.currentFilters).toEqual({ maxCount: 250 });
-    expect(context.onDisplayRepo).toHaveBeenCalledWith('/repo-a/submodule');
+    expect(context.setDisplayedRepo).toHaveBeenCalledWith('/repo-a/submodule');
     expect(reload).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('WebviewProvider per-repo column layout', () => {
+describe('GraphTab per-repo column layout', () => {
   it('loads default layout when no per-repo layout is saved', () => {
     const { store } = createUIStateStore();
 
@@ -440,9 +441,9 @@ describe('WebviewProvider per-repo column layout', () => {
     const stateA = repoAwareStore.loadPersistedUIState();
     expect(stateA.commitTableLayout.columns.message.preferredWidth).toBe(500);
 
-    // Switch to repo-b by simulating reinitializeServices cache clearing
+    // Switch to repo-b the way a tab does: re-read only the table layout.
     currentRepoPath = '/repo-b';
-    repoAwareStore.invalidateCache();
+    repoAwareStore.reloadRepoLayout();
 
     // Load repo-b layout
     const stateB = repoAwareStore.loadPersistedUIState();
@@ -452,7 +453,7 @@ describe('WebviewProvider per-repo column layout', () => {
 
 });
 
-describe('WebviewProvider validateCommitTableLayout healing', () => {
+describe('GraphTab validateCommitTableLayout healing', () => {
   // The backend "heals" persisted widths so a column whose stored preferredWidth
   // would push neighbours below their minimum cannot make the layout
   // unrecoverable. Healing happens lazily when the layout is loaded.
@@ -543,7 +544,7 @@ describe('WebviewProvider validateCommitTableLayout healing', () => {
   });
 });
 
-describe('WebviewProvider computeCommitFingerprint', () => {
+describe('GraphTab computeCommitFingerprint', () => {
   function makeCommit(hash: string, refs: Commit['refs'] = []): Commit {
     return {
       hash,

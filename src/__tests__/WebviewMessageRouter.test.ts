@@ -26,6 +26,10 @@ function createTrackedTestSetup(serviceOverrides: Record<string, unknown>) {
   const services = new GitServiceRegistry(serviceOverrides as never);
   const postMessage = vi.fn();
   const sendOperation = vi.fn();
+  const activityReleases: string[] = [];
+  const beginRepoActivity = vi.fn((operation: string) => ({
+    dispose: () => activityReleases.push(operation),
+  }));
   const context = {
     services,
     postMessage,
@@ -34,9 +38,10 @@ function createTrackedTestSetup(serviceOverrides: Record<string, unknown>) {
     operationGuard: { getOperationInProgressError: vi.fn().mockResolvedValue(null) },
     refreshCoordinator: { reload: vi.fn().mockResolvedValue(undefined) },
     telemetry: { sendOperation },
+    beginRepoActivity,
   } as never;
   const router = new WebviewMessageRouter(testLog, context);
-  return { router, postMessage, sendOperation };
+  return { router, postMessage, sendOperation, beginRepoActivity, activityReleases };
 }
 
 describe('WebviewMessageRouter operation telemetry middleware', () => {
@@ -233,5 +238,48 @@ describe('WebviewMessageRouter', () => {
       type: 'authorList',
       payload: { authors: [{ name: 'Alice', email: 'a@example.com' }] },
     });
+  });
+
+  it('mirrors a mutating operation to peers, and releases it when the handler returns', async () => {
+    const { router, beginRepoActivity, activityReleases } = createTrackedTestSetup({
+      gitStashService: { applyStash: vi.fn().mockResolvedValue({ success: true, value: 'Applied' }) },
+    });
+
+    await router.dispatch({ type: 'applyStash', payload: { index: 0 } });
+
+    expect(beginRepoActivity).toHaveBeenCalledExactlyOnceWith('applyStash');
+    expect(activityReleases).toEqual(['applyStash']);
+  });
+
+  it('releases the activity token when the handler throws', async () => {
+    const { router, activityReleases } = createTrackedTestSetup({
+      gitStashService: { applyStash: vi.fn().mockRejectedValue(new Error('boom')) },
+    });
+
+    await expect(router.dispatch({ type: 'applyStash', payload: { index: 0 } })).rejects.toThrow('boom');
+    expect(activityReleases).toEqual(['applyStash']);
+  });
+
+  it('does not mirror a read-only tracked operation — a peer has no business knowing', async () => {
+    const { router, beginRepoActivity } = createTrackedTestSetup({
+      gitDiffService: { compareRefs: vi.fn().mockResolvedValue({ success: true, value: { files: [] } }) },
+    });
+
+    await router.dispatch({
+      type: 'compareRefs',
+      payload: { a: { kind: 'branch', name: 'main' }, b: { kind: 'branch', name: 'dev' }, mode: 'two-dot', requestId: 'r1' },
+    }).catch(() => {});
+
+    expect(beginRepoActivity).not.toHaveBeenCalled();
+  });
+
+  it('does not mirror an untracked operation', async () => {
+    const { router, beginRepoActivity } = createTrackedTestSetup({
+      gitStashService: { getStashes: vi.fn().mockResolvedValue({ success: true, value: [] }) },
+    });
+
+    await router.dispatch({ type: 'getStashes', payload: {} });
+
+    expect(beginRepoActivity).not.toHaveBeenCalled();
   });
 });

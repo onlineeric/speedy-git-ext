@@ -10,6 +10,9 @@ import { MultiBranchDropdown } from './MultiBranchDropdown';
 import { addAllLocalBranches } from '../utils/branchSelection';
 import { ViewSettingsDialog } from './ViewSettingsDialog';
 import { ToolbarIconButton, RemoteButtonToggleItem, TOGGLE_BUTTON_TONES } from './ToolbarIconButton';
+import { useOperationInProgress } from '../stores/graphSelectors';
+import { peerActivityNotice } from '../utils/peerActivityNotice';
+import { WARNING_COLOR } from '../utils/themeColors';
 import {
   CloudIcon,
   FilterIcon,
@@ -19,6 +22,7 @@ import {
   RefreshIcon,
   FetchIcon,
   GoToHeadIcon,
+  NewTabIcon,
   HelpIcon,
   ToolbarSeparatorIcon,
   WorktreeIcon,
@@ -99,6 +103,19 @@ export function ControlBar() {
   const [fetching, setFetching] = useState(false);
 
   const goToHeadBusy = useGraphStore((state) => state.goToHeadState !== 'idle');
+  // Informational only — nothing below is disabled by it.
+  const peerBusy = useGraphStore((state) => state.peerOperationInProgress);
+  const peerNotice = peerActivityNotice(peerBusy, useOperationInProgress());
+
+  /**
+   * Never disabled. A graph is open, so there is always a repository to open
+   * another on — and opening a view is not a git operation, so a running one
+   * has no claim on it either.
+   */
+  const handleOpenNewGraphTab = () => {
+    trackUiInteraction('toolbar', 'openNewGraphTab');
+    rpcClient.openNewGraphTab();
+  };
 
   const handleGoToHead = () => {
     trackUiInteraction('toolbar', 'goToHead');
@@ -230,6 +247,25 @@ export function ControlBar() {
         {...(goToHeadBusy ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
         title="Go to HEAD commit (current checkout)"
       />
+
+      <ToolbarIconButton
+        label="New Tab"
+        icon={<NewTabIcon className={iconClass} />}
+        onClick={handleOpenNewGraphTab}
+        aria-label="Open New Graph Tab"
+        {...TOGGLE_BUTTON_TONES.inactive}
+        title="Open New Graph Tab"
+      />
+
+      {peerNotice && (
+        <span
+          className="ml-2 text-xs px-1 whitespace-nowrap"
+          style={{ color: WARNING_COLOR }}
+          role="status"
+        >
+          {peerNotice}
+        </span>
+      )}
 
       <span className="ml-auto text-xs text-[var(--vscode-descriptionForeground)] px-1">
         {totalLoadedWithoutFilter !== null ? totalLoadedWithoutFilter : mergedCommits.length} loaded

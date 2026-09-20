@@ -83,7 +83,7 @@ policy, performance invariants, or the tech stack. Routine feature files belong 
 ### Data Flow
 
 1. Backend services fetch git data via `GitExecutor`, return `Result<T, GitError>`
-2. `WebviewPanelHost` receives the message and `WebviewMessageRouter` dispatches it to a domain handler in `webview/handlers/`; allowlisted user operations are wrapped once to record outcome and duration
+2. `WebviewPanelHost` receives the message and `WebviewMessageRouter` dispatches it to a domain handler in `webview/handlers/`; allowlisted user operations are wrapped once to record outcome and duration, and mutating ones are mirrored to peer tabs for the duration of the call
 3. UI-only telemetry uses the one-way `trackUiEvent` RPC; `telemetryHandlers` re-validates it and forwards it to the backend-only `TelemetryService`
 4. Frontend `rpcClient` sends `RequestMessage`, updates Zustand store on response
 5. Graph topology is computed entirely in the frontend (`graphTopology.ts`), not backend; its initial computation reports one bucketed performance event
@@ -92,9 +92,9 @@ policy, performance invariants, or the tech stack. Routine feature files belong 
 
 The `src/webview/` subsystem was split out of a former ~2400-line `WebviewProvider`. Ownership is deliberate — put new state in the object that owns that concern:
 
-- `WebviewProvider` — thin facade used by `ExtensionController`; composes everything below
-- `WebviewPanelHost` — panel lifecycle, HTML/CSP/nonce, postMessage, visibility
-- `WebviewRuntime` — mutable non-service state: repo path, filters, fetch generation, flags
+- `GraphTab` — one graph = one editor tab; owns everything view-scoped and composes everything below
+- `WebviewPanelHost` — one panel's lifecycle, HTML/CSP/nonce, postMessage, visible/active state
+- `WebviewRuntime` — mutable non-service state: displayed + top-level repo path, resolved identity, submodule stack, filters, fetch generation, flags
 - `GitServiceRegistry` — repo-bound git services, atomically replaced on repo switch
 - `WebviewMessageRouter` — typed RPC dispatch + operation telemetry middleware
 - `RefreshCoordinator` — *when* to load: initial/manual/auto, hidden-panel deferral
@@ -110,6 +110,19 @@ Rules:
 - **Handlers must stay stateless about repos**: resolve git services via `context.services` (the `GitServiceRegistry`) *at request time*. Never capture a service instance at construction — repo switching and submodule navigation atomically replace the registry, so captured references go stale.
 - **Don't pass the provider to handlers**: give them only what they need through `WebviewRequestContext`.
 - **State ownership**: table layout is per-repo; other UI state is global.
+
+### Multiple Graph Tabs — One Tab Owns a View
+
+Speedy Git opens any number of graphs, each its own native editor tab. The split is by **what must exist once**:
+
+- **`GraphTab` owns everything view-scoped** — repository and submodule navigation, filters, search, selection, compare, layout, scroll, its `GitServiceRegistry`, its `PersistedUIStateStore`, its watcher subscription. Changing any of it in one tab must never change another, including another tab on the same repository.
+- **`ExtensionServices` owns everything that must be single** — repo discovery, telemetry, the avatar cache/auth/service/queue (the rate-limit budget belongs to an identity, not a panel), `WhatsNewStore` plus the "first graph of this session" flag, `GitRepoIdentityService`, `GitWatcherHub`, `RepoActivityRegistry`, and the `git-show:` diff-service map. Creating it per tab is the bug this structure exists to prevent.
+- **`GraphTabRegistry`** holds the open tabs and their most-recently-active order (a monotonic counter read at snapshot time — never a list to repair on close). `ExtensionController` turns entry points into "reveal this tab" or "create one".
+- **A handler never reaches the registry.** Cross-tab work goes through `WebviewRequestContext` (`openNewGraphTab()`, `beginRepoActivity()`, `setTopLevelRepo()`); a handler still learns nothing about which tab it is beyond its `tabId`.
+- **A revealed tab is never reloaded or retargeted.** Ordinary Open returns to the MRU graph; the SCM button is repository-aware (reveal a graph already showing that repo, else create one). Only an explicit repo switch moves the *saved default*, and that seeds the next first-opened graph — never a live tab.
+- **`panelOpened` fires on creation only**, with a bucketed count of open tabs. A reveal sends nothing.
+- **Refresh routes by repository, not globally**: `GitWatcherHub` watches the **resolved** git dirs (never `<repo>/.git/...` — a linked worktree and a submodule both have a `.git` *file*), and `tabsAffectedByChange` wakes tabs sharing an object store plus the parent of a changed submodule. Hidden tabs defer and catch up when shown.
+- **Peer activity is a notice, never a lock.** `RepoActivityRegistry` mirrors a running operation to tabs on the same *working tree*; `useOperationInProgress` still means "this tab", so no control is ever disabled by a peer's work. Colliding operations are git's to refuse.
 
 ### Shared Logic — Reuse, Don't Reimplement
 
@@ -135,6 +148,11 @@ These exist because the rule they encode is subtle or shared across several call
 - `stores/graphSelectors.ts` — derived store reads (`useOperationInProgress`, `useCurrentLocalBranch`), one selector each so callers can't disagree on the derivation
 - `utils/themeColors.ts` — **the one place a color *meaning* is named.** Semantic constants (`ADDED_COLOR`, `WARNING_COLOR`, `ACCENT_COLOR`, `UNCOMMITTED_COLOR`, `SIGNATURE_*`…) over `var(--vscode-*)` tokens, plus `tint()` for the faint chip/badge fill. They are plain CSS values for inline `style`, never class strings — Tailwind's JIT only emits classes it can see spelled out, so `text-[${SOME_COLOR}]` compiles to a class that never exists. A call site needing a pseudo-state pairs the inline color with a class carrying only the state (`opacity-70 hover:opacity-100`)
 - `shared/types.ts` — cross-boundary setting clamps: `clampBatchCommitSize`, and `clampAvatarRefreshDays` (takes the input's raw string or a number; empty box means "keep current", not zero). A setting clamped on both sides belongs here, never once per side. `growBatchForTarget` sits beside them: how large a targeted "Go to HEAD" load may grow, so both rules bounding one batch stay together
+- `src/utils/repoIdentity.ts` — **the three ways two repository paths can be related, answered once.** `isSameWorkingTree` (same `gitDir`: one checkout, one index, one set of in-progress operations), `sharesObjectStore` (same `commonGitDir`: a repo and each of its linked worktrees, which is the refresh-routing key) and `isSubmoduleOf` (path containment, deliberately *not* a `.gitmodules` read — a nested repo that is not a registered submodule still changes the parent's `git status`). Every comparison routes through one `pathsEqual`, which lowercases a Windows **drive letter only**: lowercasing a POSIX path would merge distinct repos
+- `src/utils/graphTabRouting.ts` — every "which tab(s)?" answer as a pure function over `TabSnapshot[]`. `pickRepoTarget` matches on `topLevelRepoPath`, not what is displayed, so a tab inside a submodule of X is still "a graph for X" and revealing it cannot retarget it. `tabsAffectedByChange` is deliberately one-directional (a parent wakes for its submodule, never the reverse — a parent's commit does not change the submodule's history), and `peersSharingWorkingTree` keys on `gitDir` rather than `commonGitDir`, because a sibling worktree's checkout is not this tab's. `panelTitleFor` is the basename, never `RepoInfo.displayName`: short titles with duplicates accepted is the product decision
+- `src/utils/gitShowUri.ts` — **the `git-show:` fragment carries the repository.** That is what lets an open diff keep resolving after its tab switched repo or closed, and what keeps two repos' identical files at an identical hash apart while two views of one file still share a document. The fragment also carries an optional nonce, for the submodule working-tree side whose content moves under a stable URI. A fragment-less URI is refused, never resolved against a "current" service
+- `shared/refRevalidation.ts` + `src/webview/handlers/revalidateRef.ts` — **the five actions git will not refuse on its own**: reset, rebase onto, force-push, delete branch, drop commit. `reset --hard`, `push --force` and `branch -D` all succeed against a ref that moved under an open dialog. The handler re-reads the ref immediately before acting and **refuses** on a mismatch (`REF_MOVED`, through the ordinary `error` channel) — there is no re-run-anyway path, because an interactive rebase's todo list must never be replayed against a different tip. Match `amendCommit`'s `HEAD_MOVED` wording rather than inventing a second dialect
+- `webview-ui/src/utils/refExpectation.ts` + `hooks/useCapturedRefExpectation.ts` — the webview half. A remote branch is always sent **qualified** (`origin/main`); the expectation is captured when the dialog **opens**, because the tab auto-refreshes while it sits open and a confirm-time read would always agree with itself
 - `shared/gitVersion.ts` — the installed git's version and which features it has. **Two opposite defaults, one function each**: `supportsGitFeature` gates UI and **fails open** on an unknown version (disabled-never-hidden only when git is *known* too old), while `usesNonInteractiveAutosquash` chooses a command and takes the **universal form** when unknown. Mixing them up either locks users out of a working feature or runs a command their git silently ignores. The version is read at most once per panel via `context.getGitVersion()` (cached on `WebviewRuntime`), and in the webview via `useGitVersion` / `rpcClient.requestGitVersion()` — never on the commit-load path
 - `shared/fixupCommit.ts` / `shared/rebaseCommand.ts` / `shared/rebaseTodo.ts` — **a previewed command comes from the same function that builds the backend's args.** `gitCommandBuilder`'s rebase and fixup previews are thin wrappers, and the interactive rebase's Confirm step shows `buildRebaseTodoLines` verbatim. `groupRebaseEntries` is git's one grouping rule (a `pick`/`reword` leads; `squash`/`fixup` join the nearest lead above; `drop` neither) — the row brackets, squash messages and editor messages all derive from it. `buildRebaseEditorMessages` numbers the scripted editor's messages **in the order git asks**: once per `reword`, once at the end of each group containing a `squash` — writing all rewords first hands a squash group's message to a later reword
 - `src/services/gitEditorScripts.ts` — the one mechanism for "git will open an editor; supply this text instead" (interactive rebase, `--fixup=amend:`/`reword:`). Scripts are fixed `#!/bin/sh` bodies; every path reaches them through `SPEEDY_*` env vars, never interpolated into the script. `prepareMessageReplacingEditor` keeps git's first line (`amend! <subject>`, which autosquash matches on)
@@ -158,6 +176,7 @@ to spend that budget as rarely as possible:
   retries next cycle. `buildAvatarLookupCandidates` lives there too: which commits a batch offers per
   author, **oldest sighting first** — GitHub only knows *pushed* commits, and the newest rows are the
   ones most likely to be local-only, so reversing that order spends the rate limit on 422s.
+- **The whole avatar subsystem is extension-wide** (`ExtensionServices`), not per graph tab: N tabs must not mean N caches, N auth listeners or N trickle queues. Batches are broadcast to every open tab, and two tabs on one repo enqueue the same emails — `AvatarRefreshQueue`'s `queued` Set dedupes them, which is now load-bearing rather than incidental.
 - **The tracked rate limit belongs to an identity, not to the extension.** Authorizing swaps the
   60/hr budget shared by everyone behind one IP for the user's own 5000/hr one, so a spent budget and
   its reset time stop describing anything real — removing the token or a revoked session invalidates

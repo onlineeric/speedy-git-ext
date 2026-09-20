@@ -20,6 +20,8 @@ import { setSlotsAndCompare } from '../utils/compareDispatch';
 import { getReachabilityChecker } from '../utils/commitReachability';
 import { getCommitMenuAvailability, hasRemoteCounterpart } from '../utils/commitMenuAvailability';
 import { isStashPseudoCommit } from '../utils/commitRefs';
+import { expectCurrentBranch, expectHead } from '../utils/refExpectation';
+import { useCapturedRefExpectation } from '../hooks/useCapturedRefExpectation';
 import { CompareMenuItems } from './CompareMenuItems';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CreateBranchDialog } from './CreateBranchDialog';
@@ -172,10 +174,13 @@ function useRevertCommit(commit: Commit) {
 function useDropCommit(commit: Commit) {
   const [open, setOpen] = useState(false);
   const [pushed, setPushed] = useState(false);
+  // The rebase that implements the drop is computed from HEAD.
+  const expectation = useCapturedRefExpectation();
 
   const start = async () => {
     try {
       setPushed(await rpcClient.isCommitPushed(commit.hash));
+      expectation.capture(expectHead(useGraphStore.getState().mergedCommits));
       setOpen(true);
     } catch {
       // Store error state is already set by the RPC client.
@@ -191,7 +196,7 @@ function useDropCommit(commit: Commit) {
       isPushed={pushed}
       onConfirm={() => {
         setOpen(false);
-        rpcClient.dropCommit(commit.hash);
+        rpcClient.dropCommit(commit.hash, expectation.take());
       }}
     />
   );
@@ -221,6 +226,8 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   const [pendingResetMode, setPendingResetMode] = useState<ResetMode | null>(null);
   const [cherryPickCommits, setCherryPickCommits] = useState<Commit[]>([]);
   const [rebaseOntoConfirmOpen, setRebaseOntoConfirmOpen] = useState(false);
+  const resetExpectation = useCapturedRefExpectation();
+  const rebaseExpectation = useCapturedRefExpectation();
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   // Unlike the drop cluster, amend needs no hook of its own: it opens the dialog
   // *first* and lets it fetch. Drop awaits a single cheap call before opening;
@@ -287,7 +294,9 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   const handleRebaseOntoCommitConfirm = (options: RebaseConfirmOptions) => {
     setRebaseOntoConfirmOpen(false);
     useGraphStore.getState().setLoading(true);
-    rpcClient.rebase(commit.hash, options);
+    // The onto side is a commit hash here, which cannot move; only the near end
+    // of the replayed range needs revalidating.
+    rpcClient.rebase(commit.hash, options, { expectHead: rebaseExpectation.take() });
   };
 
   // FR-015 (Session 2026-05-09): "Compare these commits" sets Base = oldest selected,
@@ -321,11 +330,17 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
   };
 
   const handleResetSelect = (mode: ResetMode) => {
+    // Resetting a branch that moved discards someone else's commits, so capture
+    // where it stood at the click — not at confirm, by which time an
+    // auto-refresh may already have taken the new position.
+    const store = useGraphStore.getState();
+    const expected = expectCurrentBranch(store.branches, store.mergedCommits);
     if (mode === 'hard' || hasRemoteUpstream) {
+      resetExpectation.capture(expected);
       setPendingResetMode(mode);
       setResetConfirmOpen(true);
     } else {
-      rpcClient.resetBranch(commit.hash, mode);
+      rpcClient.resetBranch(commit.hash, mode, expected);
     }
   };
 
@@ -443,6 +458,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
               disabled={isOperationInProgress}
               onSelect={() => {
                 track('rebase');
+                rebaseExpectation.capture(expectHead(useGraphStore.getState().mergedCommits));
                 setRebaseOntoConfirmOpen(true);
               }}
             >
@@ -628,7 +644,7 @@ export function useCommitMenuItems({ commit, surface, variant }: UseCommitMenuIt
         open={resetConfirmOpen}
         onConfirm={() => {
           setResetConfirmOpen(false);
-          if (pendingResetMode) rpcClient.resetBranch(commit.hash, pendingResetMode);
+          if (pendingResetMode) rpcClient.resetBranch(commit.hash, pendingResetMode, resetExpectation.take());
           setPendingResetMode(null);
         }}
         onCancel={() => {

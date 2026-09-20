@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import type { RequestMessage, ResponseMessage } from '../../shared/messages.js';
 import { GIT_ERROR_CODES, type GitErrorCode } from '../../shared/errors.js';
-import { TRACKED_OPERATIONS, type TrackedOperation } from '../../shared/telemetry.js';
+import { MUTATING_OPERATIONS, TRACKED_OPERATIONS, type TrackedOperation } from '../../shared/telemetry.js';
 import type { WebviewRequestContext } from './WebviewRequestContext.js';
 import { avatarHandlers } from './handlers/avatarHandlers.js';
 import { branchHandlers } from './handlers/branchHandlers.js';
@@ -101,6 +101,15 @@ export class WebviewMessageRouter {
     // both generic and domain-specific failure responses are outcome signals.
     // True interim responses (checkoutNeedsStash, deleteBranchNeedsForce, …)
     // still count as success.
+    // Peer-tab activity mirroring rides the same wrapper. It is a notice, never
+    // a lock: `begin`/`dispose` around one awaited handler call covers even the
+    // branch-checkout sequence (stash → checkout → pull → refresh), and the
+    // `finally` releases it whether the handler returns, throws, or the tab that
+    // started it has since closed.
+    const activity = MUTATING_OPERATIONS.has(message.type)
+      ? this.context.beginRepoActivity(message.type as TrackedOperation)
+      : null;
+
     const start = performance.now();
     let outcome: 'success' | 'error' = 'success';
     let errorCode: GitErrorCode | undefined;
@@ -123,6 +132,7 @@ export class WebviewMessageRouter {
       errorCode = 'UNKNOWN';
       throw error;
     } finally {
+      activity?.dispose();
       this.context.telemetry.sendOperation(
         message.type as TrackedOperation,
         outcome,

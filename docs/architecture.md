@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-09-13**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-09-20**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -17,19 +17,34 @@ policy, performance invariants — see `CLAUDE.md`.
 
 ```
 src/
-├── extension.ts                  # Entry point; creates telemetry service, registers speedyGit.showGraph
-├── ExtensionController.ts        # Orchestrates services, repo discovery, settings, session telemetry
-├── WebviewProvider.ts            # Compatibility re-export of webview/WebviewProvider
-├── GitShowContentProvider.ts     # git-show:// URI protocol for diffs; `staged`/`worktree` authority sentinels
+├── extension.ts                  # Entry point; telemetry service, the git-show content provider (registered once
+│                                 #   for the window), speedyGit.showGraph / openNewGraphTab / openForRepo
+├── ExtensionController.ts        # Window-level surfaces (repo discovery, status bar, settings, session telemetry)
+│                                 #   plus the graph-tab collection: which tab an entry point reveals or creates,
+│                                 #   watcher routing, peer-busy broadcast, repo-removal retargeting
+├── ExtensionServices.ts          # Everything that must exist exactly ONCE per window: repo discovery, telemetry,
+│                                 #   the avatar cache/auth/service/queue, WhatsNewStore + the first-graph flag,
+│                                 #   repo identities, the watcher hub, the activity registry, the diff-service map
+├── GraphTabRegistry.ts           # The open graph tabs and their most-recently-active order (monotonic counter)
+├── RepoActivityRegistry.ts       # Which working trees have an operation running, and which tab started it.
+│                                 #   A coarse mirror for the peer notice — never a lock
+├── GitShowContentProvider.ts     # git-show:// URI protocol for diffs; resolves the repo from the URI fragment,
+│                                 #   never from a global "current" service; `staged`/`worktree` authority sentinels
 ├── webview/                      # Backend webview subsystem (refactored from the old ~2400-line WebviewProvider)
-│   ├── WebviewProvider.ts        # Thin public facade used by ExtensionController; composes the objects below
-│   ├── WebviewPanelHost.ts       # VS Code panel lifecycle, HTML/CSP/nonce, postMessage, visibility
-│   ├── WebviewRuntime.ts         # Mutable non-service state: repo path, filters, fetch generation, flags,
-│                                 #   the in-flight commit controller (amend/fixup) and the cached git version read
+│   ├── GraphTab.ts               # ONE graph = one editor tab: everything view-scoped, composed from the objects below
+│   ├── createGitServices.ts      # Builds the whole repo-bound service set in one place
+│   ├── WebviewPanelHost.ts       # One VS Code panel: lifecycle, HTML/CSP/nonce, postMessage, visible/active state
+│   ├── WebviewRuntime.ts         # Mutable non-service state: displayed + top-level repo path, resolved identity,
+│                                 #   submodule stack, filters, fetch generation, flags, the in-flight commit
+│                                 #   controller (amend/fixup) and the cached git version read
 │   ├── GitServiceRegistry.ts     # Holds repo-bound git services; atomic replacement on repo switch
 │   ├── WebviewMessageRouter.ts   # Exhaustive typed RPC dispatch + allowlisted operation telemetry middleware
-│   ├── WebviewRequestContext.ts  # Narrow per-request handler API, including TelemetryService and getGitVersion()
-│   ├── PersistedUIStateStore.ts  # Load/save/validate UI state + per-repo table layout (column-width healing)
+│   ├── WebviewRequestContext.ts  # Narrow per-request handler API: services, TelemetryService, getGitVersion(),
+│                                 #   the tab's id/identity/top-level repo, and the cross-tab seams
+│                                 #   (openNewGraphTab, beginRepoActivity) — never the tab or the registry
+│   ├── PersistedUIStateStore.ts  # Load/save/validate UI state + per-repo table layout (column-width healing).
+│                                 #   Seed-on-open, last-write-wins across tabs; reloadRepoLayout re-reads only
+│                                 #   the table layout on a repo switch
 │   ├── RepoDataLoader.ts         # Initial + deferred data, avatar cache hydration/enqueue, submodules, initial-load perf/error telemetry
 │   ├── RefreshCoordinator.ts     # When to load: initial/manual/auto, hidden-panel deferral, loading lifecycle
 │   ├── EditorCommandService.ts   # VS Code diff/file/compare editors, worktree folder/reveal, signature help.
@@ -50,7 +65,9 @@ src/
 │       ├── commitHandlers.ts     # getCommitMessage (%B), amendCommit (HEAD-verified) + createFixupCommit through one
 │                                 #   guarded, cancellable runner; cancelCommitWait; getGitVersion
 │       ├── signatureHandlers.ts  # presence detection, verification, signature help
-│       ├── submoduleHandlers.ts  # submodule ops + switchRepo/displayRepo navigation
+│       ├── submoduleHandlers.ts  # submodule ops + switchRepo/displayRepo navigation, per tab
+│       ├── revalidateRef.ts      # Re-reads a ref immediately before a ref-position-dependent action and refuses
+│                                 #   (REF_MOVED, ordinary error channel) when it moved — no re-run-anyway path
 │       ├── worktreeHandlers.ts   # list/resolve/add/remove/prune/open/reveal worktree; resolves the base dir once
 │                                 #   per request and threads it into the list payload, remove-prune and prune-sweep
 │       ├── workingTreeHandlers.ts# uncommitted changes, stage/unstage/discard, diff editors
@@ -60,7 +77,7 @@ src/
 │       ├── updateSpeedyGitSetting.ts # Writes one speedyGit.* setting; ExtensionController broadcasts the change.
 │                                 #   …InDefinedScope writes to Workspace when a workspace value already exists,
 │                                 #   so a Global write cannot be silently shadowed
-│       └── vscodeCommandHandlers.ts # settings, clipboard, openExternal, updatePersistedUIState
+│       └── vscodeCommandHandlers.ts # settings, clipboard, openExternal, updatePersistedUIState, openNewGraphTab
 ├── services/                     # All repo-bound; every method returns Result<T, GitError>
 │   ├── index.ts                  # Barrel export for all services
 │   ├── GitExecutor.ts            # Spawns git processes, 30s timeout — the only place git is invoked
@@ -87,8 +104,10 @@ src/
 │                                 #   parents after remove and sweeps the base dir after prune
 │   ├── GitSignatureService.ts    # GPG/SSH signature verification
 │   ├── GitSubmoduleService.ts    # Submodule status, init, update
-│   ├── GitWatcherService.ts      # File system watcher for auto-refresh
-│   ├── GitRepoDiscoveryService.ts # Multi-root workspace scanning
+│   ├── GitWatcherHub.ts          # One watcher set per object store, ref-counted across tabs; watches the RESOLVED
+│                                 #   git dirs (so linked worktrees and submodules work), per-key debounce
+│   ├── GitRepoIdentityService.ts # Resolves+caches gitDir / commonGitDir / topLevel per repo, one spawn, coalesced
+│   ├── GitRepoDiscoveryService.ts # Multi-root workspace scanning (the removal NOTICE lives in ExtensionController)
 │   ├── GitHubAvatarService.ts    # Stateless one-shot GitHub avatar lookup + rate-limit tracking (reset on authorization)
 │   ├── avatarCachePolicy.ts      # PURE: avatar expiry, lookup-outcome state machine, queue priority, LRU eviction (bounds/clamp live in shared/types.ts)
 │   ├── AvatarCacheStore.ts       # Persistent email→avatar cache in globalState; debounced writes, LRU cap 1000 (512KB extension-state budget)
@@ -105,6 +124,15 @@ src/
     ├── gitQueries.ts             # Shared read-only git queries. isDirtyWorkingTree counts untracked
     │                             #   files — for `worktree remove` only; never gate rebase/pick/revert on it
     ├── gitValidation.ts          # Input validation (backend wrappers over shared/gitRefValidation)
+    ├── repoIdentity.ts           # PURE: gitDir / commonGitDir / topLevel and the three questions built on them —
+    │                             #   same working tree, same object store, submodule containment. One pathsEqual
+    │                             #   rule (drive letter only on win32; POSIX paths stay case-sensitive)
+    ├── graphTabRouting.ts        # PURE: every "which tab(s)?" answer — MRU return target, repository-aware SCM
+    │                             #   target, refresh routing, same-working-tree peers, and the editor tab title
+    ├── gitShowUri.ts             # PURE: the git-show: URI contract. The FRAGMENT carries the repository (plus an
+    │                             #   optional cache-busting nonce for the submodule working-tree side)
+    ├── debounceByKey.ts          # PURE: debounce + minimum interval, kept per key, so a storm in one repo cannot
+    │                             #   delay another repo's refresh
     ├── emptyDirCleanup.ts        # Delete folders a worktree removal emptied. `rmdir` IS the emptiness test (never
     │                             #   readdir-then-delete); symlinks never followed; baseDir never deleted; failures
     │                             #   logged and swallowed, so a caller's Result never changes. The sweep stops at any
@@ -149,7 +177,8 @@ components/
 ### Toolbar, panels, widgets
 
 ```
-├── ControlBar.tsx                # Top toolbar with actions
+├── ControlBar.tsx                # Top toolbar with actions, incl. "Open New Graph Tab" beside Go to HEAD and the
+│                                 #   peer-activity notice (informational; it disables nothing)
 ├── ToolbarIconButton.tsx         # Shared toolbar button: icon + optional label (speedyGit.toolbar.showLabels);
 │                                 #   right-click menu toggles labels / Remote button, extensible via extraMenuItems
 ├── TogglePanel.tsx               # Collapsible panel for Filter/Search/Compare widgets
@@ -261,7 +290,8 @@ stores/
 │                                 #   044-code-refactor replaced whole-store subscriptions with selectors
 │                                 #   rather than splitting the file
 └── graphSelectors.ts             # Derived reads shared by several components (useOperationInProgress,
-                                  #   useCurrentLocalBranch) — one selector each, so callers can't disagree
+                                  #   useCurrentLocalBranch) — one selector each, so callers can't disagree.
+                                  #   isOwnOperationInProgress is the PURE half: THIS tab only, never a peer's
 
 rpc/rpcClient.ts                  # Singleton RPC client, webview↔extension via acquireVsCodeApi()
 
@@ -272,7 +302,9 @@ hooks/
 ├── useCountdown.ts               # Deadline-based countdown (survives background throttling); + PURE `remainingSeconds`
 ├── useCommitHookWait.ts          # idle → running → waitingOnHooks phase + timer for dialogs that write a commit
 ├── useGitVersion.ts              # Lazily requests the installed git version once per session (store: gitVersion)
-└── useDialogTelemetry.ts         # One confirmed/cancelled outcome per dialog open cycle
+├── useDialogTelemetry.ts         # One confirmed/cancelled outcome per dialog open cycle
+└── useCapturedRefExpectation.ts  # Holds where a dialog's target ref stood WHEN IT OPENED — capturing at confirm
+                                  #   would defeat the check, since the tab auto-refreshes while a dialog is open
 
 types/displayRefs.ts              # Discriminated union for ref-label rendering (local-branch/remote-branch/tag/HEAD/…)
 ```
@@ -332,6 +364,11 @@ utils/
 │                                 #   switch verdict (ignore/switch/confirm), save-default link visibility. Re-exports
 │                                 #   WORKTREE_STYLE_LABELS / ResolvedWorktreePaths from shared/types (the backend's
 │                                 #   toast must name the style the dialog does)
+├── refExpectation.ts             # PURE: builds the RefExpectation a dialog sends for the stale-ref check —
+│                                 #   HEAD from the graph's own HEAD row, a local branch, a remote branch always
+│                                 #   qualified `<remote>/<name>`, and the rebase target. `undefined` when unknown
+├── peerActivityNotice.ts         # PURE: whether to say "another Speedy Git view is running a Git operation",
+│                                 #   and in what words. A notice only — it gates no control
 ├── telemetry.ts                  # Fire-and-forget webview telemetry helpers
 ├── searchQuery.ts                # PURE: query → AND-ed terms; a `"quoted run"` is one literal term, an unterminated
 │                                 #   quote is literal from the quote on. Owns EMPTY_SEARCH_TERMS. `:` is reserved
@@ -375,7 +412,10 @@ shared/
 ├── rebaseCommand.ts              # PURE: `git rebase` args incl. version-chosen autosquash form (+ no-op sequence editor)
 ├── rebaseTodo.ts                 # PURE: interactive rebase todo lines, git's squash-group rule (groupRebaseEntries) +
 │                                 #   editor messages in the order git asks for them
-├── telemetry.ts                  # Closed telemetry catalogs, payload types, buckets, runtime validator
+├── refRevalidation.ts            # PURE: the stale-dialog check — RefExpectation, isRefMoved, and the one wording
+│                                 #   for both "changed" and "no longer exists". Refuse-only; no re-run path
+├── telemetry.ts                  # Closed telemetry catalogs, payload types, buckets (incl. the open-tab-count
+│                                 #   bucket and the five panelOpened triggers), MUTATING_OPERATIONS, validator
 └── whatsNew.ts                   # PURE: whether the release-notes dialog opens on this run + the countdown lengths
                                   #   (dev always shows, 2s; release shows once per version, 5s), and whether a
                                   #   dismissal may be recorded at all (never in dev — shared globalState)
@@ -390,3 +430,12 @@ recovery and navigation races), `webview-ui/src/utils/__tests__/branchCheckout.t
 and RPC lifecycle), and `webview-ui/src/components/__tests__/BranchContextMenu.test.ts` (badge events).
 
 `webview-ui/src/rpc/__tests__/amendSelection.test.ts` covers post-amend selection and open-details refresh.
+
+Multi-tab coverage is split by decision: the pure rules in `src/__tests__/repoIdentity.test.ts`,
+`graphTabRouting.test.ts`, `gitShowUri.test.ts`, `refRevalidation.test.ts` and `debounceByKey.test.ts`;
+the wiring in `ExtensionController.tabs.test.ts` (reveal vs create, SCM routing, new-tab origin, What's
+New, `panelOpened`, repo removal), `GraphTabRegistry.test.ts`, `ExtensionServices.test.ts`,
+`GitWatcherHub.test.ts`, `RepoActivityRegistry.test.ts`, `GitShowContentProvider.test.ts` and
+`refRevalidationHandlers.test.ts`. Note the repo's tests are Node-environment only — there is no
+jsdom or React testing library, so component behaviour is covered by extracting it into a pure util
+(`peerActivityNotice`, `refExpectation`, `isOwnOperationInProgress`) rather than by rendering.

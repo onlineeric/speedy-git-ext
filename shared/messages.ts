@@ -33,6 +33,7 @@ import type { GitError, GitErrorCode } from './errors.js';
 import type { FixupCommitArgsOptions } from './fixupCommit.js';
 import type { GitVersion } from './gitVersion.js';
 import type { UiTelemetryEvent } from './telemetry.js';
+import type { RefExpectation } from './refRevalidation.js';
 
 export type RequestMessage =
   | { type: 'getCommits'; payload: { filters?: Partial<GraphFilters> } }
@@ -48,13 +49,13 @@ export type RequestMessage =
   // Branch ops
   | { type: 'createBranch'; payload: { name: string; startPoint?: string; checkout?: boolean } }
   | { type: 'renameBranch'; payload: { oldName: string; newName: string } }
-  | { type: 'deleteBranch'; payload: { name: string; force?: boolean; deleteRemote?: { remote: string; name: string } } }
-  | { type: 'deleteRemoteBranch'; payload: { remote: string; name: string } }
+  | { type: 'deleteBranch'; payload: { name: string; force?: boolean; deleteRemote?: { remote: string; name: string }; expect?: RefExpectation } }
+  | { type: 'deleteRemoteBranch'; payload: { remote: string; name: string; expect?: RefExpectation } }
   | { type: 'mergeBranch'; payload: { branch: string; noFastForward?: boolean; squash?: boolean; noCommit?: boolean } }
   | { type: 'continueMerge'; payload: Record<string, never> }
   | { type: 'abortMerge'; payload: Record<string, never> }
   // Remote ops
-  | { type: 'push'; payload: { remote: string; branch: string; setUpstream?: boolean; forceMode?: PushForceMode } }
+  | { type: 'push'; payload: { remote: string; branch: string; setUpstream?: boolean; forceMode?: PushForceMode; expect?: RefExpectation } }
   | { type: 'pull'; payload: { remote?: string; branch?: string; rebase?: boolean } }
   | { type: 'fastForwardLocalBranch'; payload: { remote: string; branch: string; setUpstream?: boolean } }
   | { type: 'getRemotes'; payload: Record<string, never> }
@@ -71,7 +72,7 @@ export type RequestMessage =
   | { type: 'popStash'; payload: { index: number } }
   | { type: 'dropStash'; payload: { index: number } }
   // History ops
-  | { type: 'resetBranch'; payload: { hash: string; mode: ResetMode } }
+  | { type: 'resetBranch'; payload: { hash: string; mode: ResetMode; expect?: RefExpectation } }
   // Cherry-pick ops
   | { type: 'cherryPick'; payload: { hashes: string[]; options: CherryPickOptions } }
   | { type: 'abortCherryPick'; payload: Record<string, never> }
@@ -80,8 +81,8 @@ export type RequestMessage =
   | { type: 'continueRevert'; payload: Record<string, never> }
   | { type: 'abortRevert'; payload: Record<string, never> }
   // Rebase ops
-  | { type: 'rebase'; payload: { targetRef: string; ignoreDate?: boolean; autosquash?: boolean } }
-  | { type: 'interactiveRebase'; payload: { config: InteractiveRebaseConfig } }
+  | { type: 'rebase'; payload: { targetRef: string; ignoreDate?: boolean; autosquash?: boolean; expect?: RefExpectation; expectHead?: RefExpectation } }
+  | { type: 'interactiveRebase'; payload: { config: InteractiveRebaseConfig; expect?: RefExpectation; expectHead?: RefExpectation } }
   | { type: 'getRebaseCommits'; payload: { baseHash: string } }
   /** The commits `git rebase <upstream>` would replay, for the rebase dialog's autosquash summary. */
   | { type: 'getRebaseRangeCommits'; payload: { upstream: string } }
@@ -92,7 +93,7 @@ export type RequestMessage =
   | { type: 'detectSignaturePresence'; payload: { hashes: string[] } }
   | { type: 'verifySignatures'; payload: { hashes: string[] } }
   | { type: 'openSignatureHelp'; payload: Record<string, never> }
-  | { type: 'dropCommit'; payload: { hash: string } }
+  | { type: 'dropCommit'; payload: { hash: string; expect?: RefExpectation } }
   // Commit ops (amend)
   /** Read a commit's complete raw message, to prefill the amend dialog. */
   | { type: 'getCommitMessage'; payload: { hash: string } }
@@ -225,6 +226,7 @@ export type RequestMessage =
    * response. The payload is re-validated against the closed catalog in
    * `shared/telemetry.ts` before anything is recorded.
    */
+  | { type: 'openNewGraphTab'; payload: Record<string, never> }
   | { type: 'trackUiEvent'; payload: { event: UiTelemetryEvent } };
 
 export type ResponseMessage =
@@ -304,7 +306,12 @@ export type ResponseMessage =
   | { type: 'initialData'; payload: InitialDataPayload }
   // Compare refs (042-compare-refs)
   | { type: 'compareResult'; payload: { requestId: string; result: CompareResult } }
-  | { type: 'compareError'; payload: { requestId: string; error: GitError | { message: string } } };
+  | { type: 'compareError'; payload: { requestId: string; error: GitError | { message: string } } }
+  /**
+   * Another Speedy Git view on THIS working tree is running a git operation.
+   * A notice only — it never disables a control. See `RepoActivityRegistry`.
+   */
+  | { type: 'peerActivity'; payload: { busy: boolean } };
 
 export type Message = RequestMessage | ResponseMessage;
 
@@ -344,6 +351,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   getConflictState: true, openStagedDiff: true,
   compareRefs: true, cancelCompare: true, openCompareDiff: true,
   trackUiEvent: true,
+  openNewGraphTab: true,
 };
 
 const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
@@ -361,6 +369,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   whatsNew: true,
   initialData: true,
   compareResult: true, compareError: true,
+  peerActivity: true,
 };
 
 export function isRequestMessage(msg: Message): msg is RequestMessage {

@@ -87,3 +87,37 @@ describe('AvatarRefreshQueue rate-limit pause', () => {
     queue.dispose();
   });
 });
+
+describe('AvatarRefreshQueue deduplication across tabs', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('spends the rate limit once when two tabs on one repo enqueue the same author', async () => {
+    // Now load-bearing: the queue is extension-wide, so both tabs' commit
+    // batches reach this one queue rather than one queue each.
+    const { service, lookup } = createAvatarServiceStub(Date.now() + 60_000);
+    const { queue } = createQueue(service);
+
+    queue.enqueue([TASK]);
+    queue.enqueue([TASK]);
+    queue.enqueue([{ ...TASK, hashes: ['9876543210'] }]);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(lookup).toHaveBeenCalledTimes(1);
+    queue.dispose();
+  });
+
+  it('still looks up a second, distinct author', async () => {
+    const { service, lookup } = createAvatarServiceStub(Date.now() + 60_000);
+    const { queue } = createQueue(service);
+
+    queue.enqueue([TASK]);
+    queue.enqueue([{ ...TASK, email: 'other@example.com' }]);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(lookup).toHaveBeenCalledTimes(2);
+    queue.dispose();
+  });
+});

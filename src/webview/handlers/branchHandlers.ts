@@ -4,6 +4,7 @@ import type { Result } from '../../../shared/errors.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 import { branchCheckoutHandlers } from './branchCheckoutHandlers.js';
 import type { WebviewRequestContext } from '../WebviewRequestContext.js';
+import { postRefMoved } from './revalidateRef.js';
 
 export const branchHandlers = {
   ...branchCheckoutHandlers,
@@ -98,6 +99,9 @@ export const branchHandlers = {
   },
 
   deleteBranch: async (message, context) => {
+    // `branch -D` succeeds against a branch that advanced, losing the new
+    // commits without a word — so the check has to be ours.
+    if (await postRefMoved(message.payload.expect, context)) return;
     const result = await context.services.current().gitBranchService.deleteBranch(
       message.payload.name,
       message.payload.force,
@@ -124,6 +128,7 @@ export const branchHandlers = {
   },
 
   deleteRemoteBranch: async (message, context) => {
+    if (await postRefMoved(message.payload.expect, context)) return;
     const result = await context.services.current().gitBranchService.deleteRemoteBranch(
       message.payload.remote,
       message.payload.name,

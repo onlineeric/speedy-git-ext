@@ -296,6 +296,20 @@ export function FetchIcon({ className }: IconProps) {
 }
 
 /** Locate reticle around a commit node — go to the HEAD commit — 12×12, inherits text color via currentColor */
+/** A plus over an editor panel — "open another graph in its own tab". */
+export function NewTabIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      {/* Panel outline, with its title bar */}
+      <rect x={0.6} y={1.6} width={8.8} height={8.8} rx={1.2} stroke="currentColor" strokeWidth={1.2} />
+      <line x1={0.6} y1={4} x2={9.4} y2={4} stroke="currentColor" strokeWidth={1.2} />
+      {/* Plus, overlapping the panel's lower-right corner */}
+      <line x1={8.4} y1={6} x2={8.4} y2={10.8} stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" />
+      <line x1={6} y1={8.4} x2={10.8} y2={8.4} stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function GoToHeadIcon({ className }: IconProps) {
   return (
     <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
