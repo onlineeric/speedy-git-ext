@@ -182,6 +182,7 @@ components/
 ```
 ├── ControlBar.tsx                # Top toolbar with actions, incl. "Open New Graph Tab" beside Go to HEAD and the
 │                                 #   peer-activity notice (informational; it disables nothing)
+├── ResponsiveToolbar.tsx         # Measures visible action widths; collapses right then left into More dropdowns
 ├── ToolbarIconButton.tsx         # Shared toolbar button: icon + optional label (speedyGit.toolbar.showLabels);
 │                                 #   right-click menu toggles labels / Remote button, extensible via extraMenuItems
 ├── TogglePanel.tsx               # Collapsible panel for Filter/Search/Compare widgets

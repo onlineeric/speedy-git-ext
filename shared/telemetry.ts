@@ -137,6 +137,7 @@ export type UiSurface = (typeof UI_SURFACES)[number];
 export const UI_ACTIONS = [
   // Toolbar buttons (ControlBar)
   'filter', 'search', 'compare', 'worktrees', 'refresh', 'fetch', 'goToHead', 'openNewGraphTab', 'view', 'remote', 'settings', 'help',
+  'moreActions', 'moreOptions',
   // Toolbar right-click menu
   'toggleLabels', 'toggleRemoteButton',
   // Help dialog links (which support surface the user chose)

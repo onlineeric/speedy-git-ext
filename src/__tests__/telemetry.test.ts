@@ -73,6 +73,10 @@ describe('isValidUiTelemetryEvent', () => {
     }
   });
 
+  it.each(['moreActions', 'moreOptions'])('accepts toolbar overflow action %s', (action) => {
+    expect(isValidUiTelemetryEvent({ kind: 'uiInteraction', surface: 'toolbar', action })).toBe(true);
+  });
+
   it('accepts every dialogOutcome shape in the catalog', () => {
     for (const dialog of DIALOG_IDS) {
       expect(isValidUiTelemetryEvent({ kind: 'dialogOutcome', dialog, outcome: 'confirmed' })).toBe(true);

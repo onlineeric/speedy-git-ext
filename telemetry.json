@@ -63,7 +63,7 @@
       "action": {
         "classification": "SystemMetaData",
         "purpose": "FeatureInsight",
-        "comment": "Action id from the closed catalog (e.g. cherryPick, copyHash, checkoutDoubleClick)."
+        "comment": "Action id from the closed catalog (e.g. cherryPick, copyHash, checkoutDoubleClick, moreActions, moreOptions)."
       }
     },
     "dialogOutcome": {
