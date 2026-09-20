@@ -148,6 +148,14 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
             than a folder. Graph tabs themselves are session-only: reloading the window does not bring them back.
           </p>
         </WhatsNewSection>
+
+        <WhatsNewSection title="Toolbar buttons fit narrow views">
+          <p className={bodyTextClassName}>
+            When space is tight, the right-hand buttons move into a <UiLabel>…</UiLabel> dropdown first,
+            followed by the left-hand buttons. Widen the view and they return. Your label and button visibility
+            settings still apply, and each button keeps its right-click menu.
+          </p>
+        </WhatsNewSection>
       </div>
     ),
   },
