@@ -788,12 +788,19 @@ export interface ComparePanelUIState {
   inlineError: string | null;
   /** Active compare requestId (used by Cancel to identify which request to abort). */
   activeRequestId: string | null;
+  /**
+   * True when the active request is an automatic re-run of a working-tree
+   * compare after a refresh. It runs quietly: the shown result stays on screen
+   * with no loading state, and the panel is never reopened for it.
+   */
+  refreshing: boolean;
 }
 
 export const EMPTY_COMPARE_PANEL_UI_STATE: ComparePanelUIState = {
   loading: false,
   inlineError: null,
   activeRequestId: null,
+  refreshing: false,
 };
 
 export interface RebaseConflictInfo {

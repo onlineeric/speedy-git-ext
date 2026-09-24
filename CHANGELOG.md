@@ -11,8 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **New Children row.** Below Parents, **Children** lists the commits whose parent is this one, with the same copy link, tooltip and "Go to child commit" icon. Git stores no link from a commit to its children, so they are read from the commits loaded in the graph, which covers every child in the current view.
 - **Parent and child hashes are copy links with a tooltip.** Clicking one copies the full hash, like **Hash**. Hovering shows the commit message, so the two parents of a merge are easy to tell apart. Multiple hashes are spaced apart, and a hash never wraps away from its icon.
 
-### Credits
+### Fixed
+- **A Compare with the working tree now stays put.** Every automatic refresh re-ran the compare, and refreshes fire on many `.git` events even when no file changed. Each re-run cleared the result into a loading state and drew it again, losing scroll position and expanded folders, and reopened the panel if you had closed it. The re-run is now quiet: the result stays on screen, changes only when the working tree actually changed, and never reopens a closed panel. A failed re-run keeps the last result and shows the error under the Compare widget.
+
+### Credits — Parent and child navigation (#196)
 - Thanks to [@nelson870708](https://github.com/nelson870708) for requesting navigable parent and child commits in [#196](https://github.com/onlineeric/speedy-git-ext/issues/196)!
+
+### Credits — Compare with the working tree (#199)
+- Thanks to [@jinho9265](https://github.com/jinho9265) for reporting that a Compare with the working tree kept refreshing on its own in [#199](https://github.com/onlineeric/speedy-git-ext/issues/199)!
 
 ## [5.17.0] - 2026-09-20
 

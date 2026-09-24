@@ -189,3 +189,109 @@ describe('graphStore compare actions', () => {
     expect(recents.length).toBe(2);
   });
 });
+
+describe('working-tree compare re-run after a refresh (#199)', () => {
+  const WT_RESULT: CompareResult = {
+    ...FAKE_RESULT,
+    b: { kind: 'workingTree' },
+    bResolvedHash: null,
+    files: [{ path: 'src/a.ts', status: 'modified' }],
+    stats: { additions: 1, deletions: 0 },
+  };
+
+  function showWorkingTreeCompare(panelOpen = true) {
+    useGraphStore.setState({
+      compareSelection: { ...useGraphStore.getState().compareSelection, a: WT_RESULT.a, b: { kind: 'workingTree' } },
+      compareResult: WT_RESULT,
+      detailsPanelOpen: panelOpen,
+    });
+  }
+
+  function rerun() {
+    useGraphStore.getState().maybeRerunCompareForWorkingTree();
+    return useGraphStore.getState().comparePanelUI.activeRequestId;
+  }
+
+  beforeEach(() => {
+    useGraphStore.getState().clearCompareState();
+  });
+
+  it('keeps the shown result on screen, with no loading state', () => {
+    showWorkingTreeCompare();
+    const requestId = rerun();
+
+    const state = useGraphStore.getState();
+    expect(requestId).not.toBeNull();
+    expect(state.comparePanelUI.loading).toBe(false);
+    expect(state.comparePanelUI.refreshing).toBe(true);
+    expect(state.compareResult).toBe(WT_RESULT);
+  });
+
+  it('keeps the same object when the re-run finds nothing changed', () => {
+    showWorkingTreeCompare();
+    rerun();
+
+    useGraphStore.getState().endCompareSuccess(structuredClone(WT_RESULT));
+
+    expect(useGraphStore.getState().compareResult).toBe(WT_RESULT);
+    expect(useGraphStore.getState().comparePanelUI.activeRequestId).toBeNull();
+  });
+
+  it('updates the result when the working tree changed', () => {
+    showWorkingTreeCompare();
+    rerun();
+    const changed = { ...WT_RESULT, stats: { additions: 5, deletions: 2 } };
+
+    useGraphStore.getState().endCompareSuccess(changed);
+
+    expect(useGraphStore.getState().compareResult).toEqual(changed);
+  });
+
+  it('never reopens a panel the user closed', () => {
+    showWorkingTreeCompare(false);
+    rerun();
+
+    useGraphStore.getState().endCompareSuccess({ ...WT_RESULT, stats: { additions: 9, deletions: 0 } });
+
+    expect(useGraphStore.getState().detailsPanelOpen).toBe(false);
+  });
+
+  it('drops the answer when the compare was dismissed meanwhile', () => {
+    showWorkingTreeCompare();
+    rerun();
+    useGraphStore.setState({ compareResult: null });
+
+    useGraphStore.getState().endCompareSuccess(WT_RESULT);
+
+    expect(useGraphStore.getState().compareResult).toBeNull();
+  });
+
+  it('keeps the old result and reports the error when the re-run fails', () => {
+    showWorkingTreeCompare();
+    rerun();
+
+    useGraphStore.getState().endCompareError('boom');
+
+    expect(useGraphStore.getState().compareResult).toBe(WT_RESULT);
+    expect(useGraphStore.getState().comparePanelUI.inlineError).toBe('boom');
+  });
+
+  it('still shows the loading state and opens the panel for a compare the user starts', () => {
+    showWorkingTreeCompare(false);
+    useGraphStore.getState().beginCompare('user-req');
+
+    const state = useGraphStore.getState();
+    expect(state.comparePanelUI.loading).toBe(true);
+    expect(state.comparePanelUI.refreshing).toBe(false);
+    expect(state.detailsPanelOpen).toBe(true);
+  });
+
+  it('does not re-run a compare without the working tree', () => {
+    useGraphStore.setState({
+      compareSelection: { ...useGraphStore.getState().compareSelection, a: FAKE_RESULT.a, b: FAKE_RESULT.b },
+      compareResult: FAKE_RESULT,
+    });
+
+    expect(rerun()).toBeNull();
+  });
+});

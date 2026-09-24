@@ -74,6 +74,13 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           between related commits without searching for a hash.
         </ContributorThanks>
 
+        <ContributorThanks login="jinho9265">
+          Thank you for reporting in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/199">#199</ExternalLink> that a
+          Compare with the working tree kept refreshing on its own. It is fixed: the result now stays put, and
+          updates only when your files change.
+        </ContributorThanks>
+
         <WhatsNewSection title="Parents and children, one click away">
           <FeatureGrid>
             <FeatureCard mark="→" title="Go to it" accent={SHOWCASE_ORANGE_COLOR}>

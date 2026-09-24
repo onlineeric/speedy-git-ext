@@ -1417,25 +1417,38 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     comparePanelUI: { ...EMPTY_COMPARE_PANEL_UI_STATE },
   }),
   beginCompare: (requestId) => set({
-    comparePanelUI: { loading: true, inlineError: null, activeRequestId: requestId },
+    comparePanelUI: { loading: true, inlineError: null, activeRequestId: requestId, refreshing: false },
     compareResult: null,
     detailsPanelOpen: true,
   }),
-  endCompareSuccess: (result) => set((state) => ({
-    compareResult: result,
-    comparePanelUI: { loading: false, inlineError: null, activeRequestId: null },
-    detailsPanelOpen: true,
-    compareSelection: {
-      ...state.compareSelection,
-      aResolvedHash: result.aResolvedHash,
-      bResolvedHash: result.bResolvedHash,
-    },
-  })),
+  endCompareSuccess: (result) => set((state) => {
+    const idle = { ...EMPTY_COMPARE_PANEL_UI_STATE };
+    if (state.comparePanelUI.refreshing) {
+      // A quiet re-run (#199). The compare was dismissed meanwhile (a commit
+      // was selected) → drop the answer. Unchanged → keep the shown object, so
+      // nothing re-renders and scroll/expanded folders survive. The panel's
+      // open state is the user's either way.
+      if (!state.compareResult || sameCompareResult(state.compareResult, result)) {
+        return { comparePanelUI: idle };
+      }
+      return { compareResult: result, comparePanelUI: idle };
+    }
+    return {
+      compareResult: result,
+      comparePanelUI: idle,
+      detailsPanelOpen: true,
+      compareSelection: {
+        ...state.compareSelection,
+        aResolvedHash: result.aResolvedHash,
+        bResolvedHash: result.bResolvedHash,
+      },
+    };
+  }),
   endCompareError: (message) => set({
-    comparePanelUI: { loading: false, inlineError: message, activeRequestId: null },
+    comparePanelUI: { ...EMPTY_COMPARE_PANEL_UI_STATE, inlineError: message },
   }),
   endCompareCancelled: () => set({
-    comparePanelUI: { loading: false, inlineError: null, activeRequestId: null },
+    comparePanelUI: { ...EMPTY_COMPARE_PANEL_UI_STATE },
   }),
   maybeRerunCompareForWorkingTree: () => {
     const state = get();
@@ -1444,16 +1457,27 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const involvesWorkingTree = a?.kind === 'workingTree' || b?.kind === 'workingTree';
     if (!involvesWorkingTree) return;
     if (!a || !b) return;
-    // Re-dispatch with the current selection. requestId generated here so the
-    // store can match the upcoming compareResult / error response.
+    // Re-dispatch with the current selection, quietly: an auto-refresh fires on
+    // many `.git` events that change nothing, so the shown result must not blank
+    // into a loading state or reopen a closed panel (#199). The requestId still
+    // goes through latest-wins, so a compare the user starts supersedes it.
     const requestId = generateCompareRequestId();
-    state.beginCompare(requestId);
+    set({ comparePanelUI: { loading: false, inlineError: null, activeRequestId: requestId, refreshing: true } });
     import('../rpc/rpcClient').then(({ rpcClient }) => {
       const mode = computeEffectiveMode(a, b, state.compareSelection.modeOverride);
       rpcClient.send({ type: 'compareRefs', payload: { a, b, mode, requestId } });
     });
   },
 }));
+
+/**
+ * Whether a re-run produced the same compare as the one on screen. Both come
+ * from the same backend serializer, so a structural string comparison is exact,
+ * and it runs once per refresh rather than per render.
+ */
+function sameCompareResult(a: CompareResult, b: CompareResult): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
 
 function generateCompareRequestId(): string {
   // Lightweight ID generator — does not need to be cryptographically unique,
