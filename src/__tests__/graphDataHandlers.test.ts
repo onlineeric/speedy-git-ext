@@ -30,6 +30,38 @@ function locateHeadMessage(displayedHeadHash: string | null) {
 }
 
 describe('graphDataHandlers.locateHead', () => {
+  it('locates a given target hash without resolving HEAD', async () => {
+    const gitLogService: Partial<LogServiceMock> = {
+      getHeadCommitHash: vi.fn(),
+      getCommitPosition: vi.fn().mockResolvedValue(ok(7000)),
+    };
+    const { context, postMessage } = makeContext(gitLogService);
+
+    await graphDataHandlers.locateHead(
+      { type: 'locateHead', payload: { filters: {}, displayedHeadHash: null, targetHash: 'parent1' } },
+      context,
+    );
+
+    expect(gitLogService.getHeadCommitHash).not.toHaveBeenCalled();
+    expect(gitLogService.getCommitPosition).toHaveBeenCalledWith('parent1', {});
+    expect(postMessage).toHaveBeenCalledWith({ type: 'headLocation', payload: { hash: 'parent1', index: 7000 } });
+  });
+
+  it('answers headLocationFailed when locating a target hash fails', async () => {
+    const error = new GitError('boom', 'COMMAND_FAILED');
+    const gitLogService: Partial<LogServiceMock> = {
+      getCommitPosition: vi.fn().mockResolvedValue(err(error)),
+    };
+    const { context, postMessage } = makeContext(gitLogService);
+
+    await graphDataHandlers.locateHead(
+      { type: 'locateHead', payload: { filters: {}, displayedHeadHash: null, targetHash: 'parent1' } },
+      context,
+    );
+
+    expect(postMessage).toHaveBeenCalledWith({ type: 'headLocationFailed', payload: { error } });
+  });
+
   it('confirms a displayed HEAD without walking the log', async () => {
     const gitLogService: Partial<LogServiceMock> = {
       getHeadCommitHash: vi.fn().mockResolvedValue(ok('abc123')),

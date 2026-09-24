@@ -56,6 +56,7 @@ import { type GraphTopology } from '../utils/graphTopology';
 import { computeHiddenCommitHashes } from '../utils/commitVisibility';
 import { computeMergedTopology, type UncommittedContext } from '../utils/mergedCommits';
 import { findHeadCommitHash } from '../utils/commitRefs';
+import type { CommitNavigationTarget } from '../utils/headNavigation';
 import { toCommitCountBucket } from '@shared/telemetry';
 import { trackUi } from '../utils/telemetry';
 import { joinRepoPath } from '../utils/repoPath';
@@ -161,6 +162,12 @@ interface GraphStore {
   goToHeadState: 'idle' | 'locating' | 'loading';
   /** Target of an in-flight Go to HEAD that still needs commits loaded. */
   pendingHead: { hash: string; targetIndex: number; attempts: number } | null;
+  /**
+   * What the current (or last) navigation heads for — HEAD from the toolbar, or
+   * a parent/child from the details panel. It only picks the toast wording, so
+   * it is set when a navigation starts and never needs resetting.
+   */
+  navigationTarget: CommitNavigationTarget;
   /** Row briefly highlighted (and centered) after a Go to HEAD navigation. */
   flashCommitHash: string | null;
   /**
@@ -282,6 +289,7 @@ interface GraphStore {
   moveSelection: (delta: number) => void;
   setGoToHeadState: (state: 'idle' | 'locating' | 'loading') => void;
   setPendingHead: (pending: { hash: string; targetIndex: number; attempts: number } | null) => void;
+  setNavigationTarget: (target: CommitNavigationTarget) => void;
   /**
    * Complete a Go to HEAD navigation: select the row (like a plain click) and
    * mark it for the centered scroll + flash highlight. No-op that just resets
@@ -459,6 +467,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   // Monotonic across the session — never reset with the rest of the flash state,
   // so two navigations to the same row are always distinguishable.
   flashToken: 0,
+  navigationTarget: 'head',
   totalLoadedWithoutFilter: null,
   pendingCheckout: null,
   checkoutDialog: null,
@@ -671,6 +680,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
   setGoToHeadState: (goToHeadState) => set({ goToHeadState }),
   setPendingHead: (pendingHead) => set({ pendingHead }),
+  setNavigationTarget: (navigationTarget) => set({ navigationTarget }),
   navigateToCommit: (hash) => {
     const index = get().mergedCommits.findIndex((commit) => commit.hash === hash);
     if (index < 0) {

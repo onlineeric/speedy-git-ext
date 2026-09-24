@@ -113,6 +113,15 @@ export function decideHeadContinuation(context: HeadContinuationContext): HeadCo
   return { kind: 'loadMore', targetIndex: Math.max(context.targetIndex, context.loadedCount) };
 }
 
+/**
+ * Which commit a navigation is heading for. The same state machine drives the
+ * toolbar "Go to HEAD" and the details panel's "Go to parent/child commit";
+ * only the wording of the outcomes differs.
+ */
+export type CommitNavigationTarget = 'head' | 'parent' | 'child';
+
+type NavigationMessageKind = 'hiddenByFilter' | 'notInView' | 'unresolved' | 'unreachable';
+
 /** User-facing toast messages for the non-navigating outcomes. */
 export const HEAD_NAVIGATION_MESSAGES = {
   hiddenByFilter: 'The HEAD commit is hidden by the current author or search filter.',
@@ -120,6 +129,49 @@ export const HEAD_NAVIGATION_MESSAGES = {
   unresolved: 'Could not resolve HEAD — the repository may not have any commits yet.',
   unreachable: 'Could not reach the HEAD commit. Refresh and try again.',
 } as const;
+
+function relatedCommitMessages(label: 'parent' | 'child'): Record<NavigationMessageKind, string> {
+  return {
+    hiddenByFilter: `The ${label} commit is hidden by the current author or search filter.`,
+    notInView: `The ${label} commit is not in the current view. Clear filters or refresh and try again.`,
+    // A parent/child navigation starts from a known hash, so this is a stale
+    // view rather than an empty repository.
+    unresolved: `Could not find the ${label} commit. Refresh and try again.`,
+    unreachable: `Could not reach the ${label} commit. Refresh and try again.`,
+  };
+}
+
+/** Toast messages per navigation target; `head` is {@link HEAD_NAVIGATION_MESSAGES}. */
+export const COMMIT_NAVIGATION_MESSAGES: Record<CommitNavigationTarget, Record<NavigationMessageKind, string>> = {
+  head: HEAD_NAVIGATION_MESSAGES,
+  parent: relatedCommitMessages('parent'),
+  child: relatedCommitMessages('child'),
+};
+
+/** Webview-side state for a parent/child navigation, before asking the backend. */
+export interface LoadedCommitContext {
+  /** The target's index in the displayed (merged) row list; -1 when not displayed. */
+  mergedIndex: number;
+  /** True when the target is loaded but hidden by a client-side author/search filter. */
+  isHiddenClientSide: boolean;
+}
+
+export type LoadedCommitDecision =
+  | { kind: 'scrollTo' }
+  | { kind: 'hiddenByFilter' }
+  /** Not loaded yet — ask the backend for its position (`locateHead` with a `targetHash`). */
+  | { kind: 'locate' };
+
+/**
+ * First step of a navigation whose hash is already known (parent/child). A row
+ * that is displayed or filtered out needs no backend round trip; only a commit
+ * deeper than the loaded batches must be located first.
+ */
+export function decideLoadedCommitNavigation(context: LoadedCommitContext): LoadedCommitDecision {
+  if (context.mergedIndex >= 0) return { kind: 'scrollTo' };
+  if (context.isHiddenClientSide) return { kind: 'hiddenByFilter' };
+  return { kind: 'locate' };
+}
 
 /**
  * Safety cap on how many follow-up `loadMoreCommits` requests one Go to HEAD

@@ -4,11 +4,13 @@ import type { RefExpectation } from '@shared/refRevalidation';
 import type { BranchCheckoutTarget, CherryPickOptions, CompareMode, GraphFilters, InteractiveRebaseConfig, RebaseRangeCommit, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting, WorktreeFolderNameStyle } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import {
+  COMMIT_NAVIGATION_MESSAGES,
   decideHeadContinuation,
   decideHeadNavigation,
-  HEAD_NAVIGATION_MESSAGES,
+  decideLoadedCommitNavigation,
   type HeadContinuationDecision,
   type HeadNavigationDecision,
+  type LoadedCommitDecision,
 } from '../utils/headNavigation';
 import { findHeadCommitHash } from '../utils/commitRefs';
 import type { ResolvedWorktreePaths } from '../utils/worktreePathChoice';
@@ -963,6 +965,7 @@ class RpcClient {
   goToHead() {
     const store = useGraphStore.getState();
     if (store.goToHeadState !== 'idle' || store.loading) return;
+    store.setNavigationTarget('head');
     store.setGoToHeadState('locating');
     this.send({
       type: 'locateHead',
@@ -975,11 +978,38 @@ class RpcClient {
   }
 
   /**
+   * Details panel "Go to parent/child commit": the Go to HEAD navigation with a
+   * known hash. A loaded row is decided here; only a commit deeper than the
+   * loaded batches is located by the backend, then loaded like HEAD would be.
+   */
+  goToRelatedCommit(hash: string, target: 'parent' | 'child') {
+    const store = useGraphStore.getState();
+    if (store.goToHeadState !== 'idle' || store.loading) return;
+    store.setNavigationTarget(target);
+    const decision = decideLoadedCommitNavigation({
+      mergedIndex: store.mergedCommits.findIndex((c) => c.hash === hash),
+      isHiddenClientSide: store.hiddenCommitHashes.has(hash),
+    });
+    if (decision.kind !== 'locate') {
+      this.applyHeadNavigation(decision, hash);
+      return;
+    }
+    store.setGoToHeadState('locating');
+    this.send({
+      type: 'locateHead',
+      payload: { filters: backendFilters(store.filters), displayedHeadHash: null, targetHash: hash },
+    });
+  }
+
+  /**
    * Execute the decided next step of a Go to HEAD navigation — either half of
    * it: the initial `locateHead` answer and each follow-up batch produce the
    * same decision kinds, so they share one executor.
    */
-  private applyHeadNavigation(decision: HeadNavigationDecision | HeadContinuationDecision, hash: string | null) {
+  private applyHeadNavigation(
+    decision: HeadNavigationDecision | HeadContinuationDecision | Exclude<LoadedCommitDecision, { kind: 'locate' }>,
+    hash: string | null,
+  ) {
     const store = useGraphStore.getState();
     switch (decision.kind) {
       case 'scrollTo':
@@ -1002,7 +1032,7 @@ class RpcClient {
       // user-facing message key, so one branch handles all the terminal cases.
       default:
         store.resetGoToHead();
-        store.setError(HEAD_NAVIGATION_MESSAGES[decision.kind]);
+        store.setError(COMMIT_NAVIGATION_MESSAGES[store.navigationTarget][decision.kind]);
         break;
     }
   }

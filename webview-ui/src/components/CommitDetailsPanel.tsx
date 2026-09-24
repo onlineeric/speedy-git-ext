@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef, useEffect, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useEffect, useState } from 'react';
 import type { CommitDetails, CompareResult, FileChange, DetailsPanelPosition, FileViewMode, CommitSignatureInfo, SlotValue } from '@shared/types';
 import { UNCOMMITTED_HASH } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
@@ -8,7 +8,9 @@ import { renderInlineCode } from '../utils/inlineCodeRenderer';
 import { slotLabel } from '../utils/compareSlot';
 import { signatureGlyph } from '../utils/signatureGlyph';
 import { ADDED_COLOR, DELETED_COLOR, ERROR_COLOR, NEUTRAL_COLOR } from '../utils/themeColors';
-import { CloseIcon, MoveRightIcon, MoveBottomIcon, ChevronDownIcon, ChevronRightIcon, InfoIcon } from './icons';
+import { buildChildLinks, buildParentLinks, relatedCommitTooltip, type RelatedCommitLink } from '../utils/commitRelations';
+import { trackUiInteraction } from '../utils/telemetry';
+import { CloseIcon, MoveRightIcon, MoveBottomIcon, ChevronDownIcon, ChevronRightIcon, InfoIcon, GoToHeadIcon } from './icons';
 import { FileChangesTreeView } from './FileChangesTreeView';
 import { FileChangeRow, ViewModeToggle } from './FileChangeShared';
 import { AuthorBadge } from './AuthorBadge';
@@ -479,13 +481,7 @@ function CommitMetadata({ details }: { details: CommitDetails }) {
   return (
     <div className="space-y-1 border-b border-[var(--vscode-panel-border)] px-3 py-2 text-xs">
       <MetadataRow label="Hash" value={details.hash} mono copyable />
-      {details.parents.length > 0 && (
-        <MetadataRow
-          label={details.parents.length > 1 ? 'Parents' : 'Parent'}
-          value={details.parents.map((parent) => parent.slice(0, 7)).join(', ')}
-          mono
-        />
-      )}
+      <CommitRelations details={details} />
       <div className="flex gap-2">
         <span className="w-16 flex-shrink-0 text-[var(--vscode-descriptionForeground)]">Author:</span>
         <AuthorBadge name={details.author} email={details.authorEmail} variant="inline" />
@@ -504,6 +500,80 @@ function CommitMetadata({ details }: { details: CommitDetails }) {
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+/** The Parents and Children rows; each hash copies on click and has a "Go to" icon. */
+function CommitRelations({ details }: { details: CommitDetails }) {
+  const commits = useGraphStore((state) => state.commits);
+  const isStash = useGraphStore((state) => state.stashes.some((stash) => stash.hash === details.hash));
+  const parents = useMemo(() => buildParentLinks(details, commits, isStash), [details, commits, isStash]);
+  const children = useMemo(() => buildChildLinks(commits, details.hash), [commits, details.hash]);
+
+  return (
+    <>
+      {parents.length > 0 && (
+        <RelatedCommitsRow label={parents.length > 1 ? 'Parents' : 'Parent'} links={parents} target="parent" />
+      )}
+      {children.length > 0 && (
+        <RelatedCommitsRow label={children.length > 1 ? 'Children' : 'Child'} links={children} target="child" />
+      )}
+    </>
+  );
+}
+
+function RelatedCommitsRow({
+  label,
+  links,
+  target,
+}: {
+  label: string;
+  links: RelatedCommitLink[];
+  target: 'parent' | 'child';
+}) {
+  // Same busy rule as the toolbar's Go to HEAD: one navigation at a time.
+  const navigationBusy = useGraphStore((state) => state.goToHeadState !== 'idle' || state.loading);
+
+  const handleNavigate = (hash: string) => {
+    trackUiInteraction('commitDetails', target === 'parent' ? 'goToParent' : 'goToChild');
+    rpcClient.goToRelatedCommit(hash, target);
+  };
+
+  return (
+    <div className="flex gap-2">
+      <span className="w-16 flex-shrink-0 text-[var(--vscode-descriptionForeground)]">
+        {label}:
+      </span>
+      {/* Each hash + icon (+ trailing comma) is one nowrap unit, so a wrap can
+          only fall between two commits, never between a hash and its icon. */}
+      <span className="flex min-w-0 flex-wrap items-center gap-x-2 font-mono">
+        {links.map((link, index) => (
+          <span key={link.hash} className="inline-flex items-center whitespace-nowrap">
+            <span
+              className="cursor-pointer hover:text-[var(--vscode-textLink-foreground)]"
+              title={relatedCommitTooltip(link)}
+              onClick={() => rpcClient.copyToClipboard(link.hash)}
+            >
+              {link.hash.slice(0, 7)}
+            </span>
+            {link.navigable && (
+              <button
+                className="ml-1 rounded p-0.5 text-[var(--vscode-descriptionForeground)] hover:text-[var(--vscode-foreground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] disabled:cursor-default disabled:opacity-50"
+                onClick={() => handleNavigate(link.hash)}
+                disabled={navigationBusy}
+                title={target === 'parent' ? 'Go to parent commit' : 'Go to child commit'}
+                aria-label={target === 'parent' ? 'Go to parent commit' : 'Go to child commit'}
+              >
+                <GoToHeadIcon />
+              </button>
+            )}
+            {index < links.length - 1 && (
+              <span className="ml-2 text-[var(--vscode-descriptionForeground)]">,</span>
+            )}
+          </span>
+        ))}
+      </span>
     </div>
   );
 }

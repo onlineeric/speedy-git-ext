@@ -71,6 +71,15 @@ export const graphDataHandlers = {
   locateHead: async (message, context) => {
     const gitLogService = context.services.current().gitLogService;
 
+    const { targetHash } = message.payload;
+    if (targetHash) {
+      const positionResult = await gitLogService.getCommitPosition(targetHash, message.payload.filters);
+      context.postMessage(positionResult.success
+        ? { type: 'headLocation', payload: { hash: targetHash, index: positionResult.value } }
+        : { type: 'headLocationFailed', payload: { error: positionResult.error } });
+      return;
+    }
+
     const headResult = await gitLogService.getHeadCommitHash();
     if (!headResult.success) {
       // Unresolvable HEAD (e.g. unborn branch in a fresh repo) is a normal

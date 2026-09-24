@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-09-20**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-09-24**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -83,7 +83,7 @@ src/
 │   ├── GitExecutor.ts            # Spawns git processes, 30s timeout — the only place git is invoked
 │   ├── GitLogService.ts          # Parses git log (null-byte format), branches, branches-containing-a-commit. Default 500 commits.
 │   │                             #   Also walks stash base commits, so a stash survives its branch moving
-│   ├── GitDiffService.ts         # Commit details, file changes, file content at revision; submodule (gitlink) pointers
+│   ├── GitDiffService.ts         # Commit details (+ parent subjects), file changes, file content at revision; submodule (gitlink) pointers
 │   ├── GitBranchService.ts       # Checkout, create, rename, delete, fast-forward branches; merge any commit-ish + merge state/continue/abort
 │   ├── GitRemoteService.ts       # Fetch, pull, remote management
 │   ├── GitHistoryService.ts      # Rebase, reset operations
@@ -163,7 +163,8 @@ components/
 │                                 #   the message/author/hash/badge cells
 ├── CommitTableHeader.tsx         # Draggable/resizable column headers (@dnd-kit); Author gear shortcut to avatar setup
 ├── GraphCell.tsx                 # SVG graph rendering (LANE_WIDTH: 16px, 8 cycling colors)
-├── CommitDetailsPanel.tsx        # Resizable bottom/right panel, commit metadata + file changes
+├── CommitDetailsPanel.tsx        # Resizable bottom/right panel, commit metadata (Parents/Children links with
+│                                 #   Go to parent/child) + file changes
 ├── CommitTooltip.tsx             # Radix popover tooltip for a row: refs, parents, external ref parsing
 ├── RefLabel.tsx                  # One ref badge (branch/tag/worktree), styled per ref kind; presentation only — content decisions live in `utils/refBadgeContent.ts`.
 │                                 #   Optional `searchTerms` boxes matches in the label; `searchRing` outlines a badge that matched on text it doesn't show
@@ -329,7 +330,10 @@ utils/
 │                                 #   isStashPseudoCommit) — used by topology, uncommitted parent, tooltip, Go to HEAD
 ├── commitMenuAvailability.ts     # Which commit actions apply (rebase/reset/revert/drop/cherry-pick/merge/amend/fixup)
 │                                 #   + hasRemoteCounterpart: does the checked-out branch have a remote (gates force push)
-├── headNavigation.ts             # "Go to HEAD" decision logic + toast messages
+├── headNavigation.ts             # "Go to HEAD" decision logic + toast messages; also drives the details panel's
+│                                 #   Go to parent/child (decideLoadedCommitNavigation, per-target messages)
+├── commitRelations.ts            # Details panel Parents/Children links: children read off loaded commits,
+│                                 #   parent subjects, stash first-parent-only navigation, hash tooltip
 ├── rowVisibility.ts              # Scroll-offset maths for revealing a row when the details panel resizes the viewport
 ├── commitVisibility.ts           # Visibility/filter predicates for the virtualized row list
 ├── compareSlot.ts                # Compare panel slot model (Base/Target, commit-ish parsing)

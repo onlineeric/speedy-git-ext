@@ -385,6 +385,12 @@ export interface CommitDetails {
   hash: string;
   abbreviatedHash: string;
   parents: string[];
+  /**
+   * Subject line of each parent, index-aligned with `parents`, so the details
+   * panel can say which parent is which even when it is not loaded in the graph.
+   * Absent when it could not be read — a hash-only tooltip is the fallback.
+   */
+  parentSubjects?: string[];
   author: string;
   authorEmail: string;
   authorDate: number;
