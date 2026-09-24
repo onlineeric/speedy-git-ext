@@ -277,6 +277,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 │                                 #   UiLabel, ToolbarButtonSample, WhatsNewSection, ExternalLink
 ├── AutosquashIllustration.tsx    # 5.16.0 hero: animated mini-graph of a fixup! commit folding into its target
 ├── MultiTabIllustration.tsx      # 5.17.0 hero: animated miniature of the New Tab button opening a second graph group
+├── CommitNavigationIllustration.tsx # 5.18.0 hero: animated miniature of Go to parent commit landing on the parent row
 └── HelpDialog.tsx                # "Help & Feedback": Badge Legend + GitHub Issues + docs/changelog/marketplace + version
 ```
 

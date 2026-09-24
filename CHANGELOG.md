@@ -4,6 +4,16 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.18.0] - 2026-09-24
+
+### Added
+- **Go to a commit's parent or child from the details panel.** Each hash in the **Parents** row now has a "Go to parent commit" icon beside it, always shown. Clicking it works like Go to HEAD: the graph scrolls to the parent, selects it and highlights it, and the details panel stays open and shows the parent. A parent deeper than the loaded commits is loaded automatically. If it is hidden by the author or search filter, or is outside the current branch/date filter, a message says so. Merge commits get an icon for each parent; a stash navigates only to its first parent, since its other parents are Git's internal index/untracked commits, which the graph does not show.
+- **New Children row.** Below Parents, **Children** lists the commits whose parent is this one, with the same copy link, tooltip and "Go to child commit" icon. Git stores no link from a commit to its children, so they are read from the commits loaded in the graph, which covers every child in the current view.
+- **Parent and child hashes are copy links with a tooltip.** Clicking one copies the full hash, like **Hash**. Hovering shows the commit message, so the two parents of a merge are easy to tell apart. Multiple hashes are spaced apart, and a hash never wraps away from its icon.
+
+### Credits
+- Thanks to [@nelson870708](https://github.com/nelson870708) for requesting navigable parent and child commits in [#196](https://github.com/onlineeric/speedy-git-ext/issues/196)!
+
 ## [5.17.0] - 2026-09-20
 
 ### Added
