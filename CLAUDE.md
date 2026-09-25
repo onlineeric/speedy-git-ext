@@ -323,3 +323,11 @@ Menu/dialog composition:
 - **Packages**: NEVER auto-install; provide install commands for me to run manually
 - **Git**: NEVER commit or merge; only readonly operations (`git log`, `git status`, `git diff`) and create PR, create branch only if I ask you to do so, or if speckit workflow requires it.
 - **Claude Code cloud sessions are the exception to the Git rule above.** That rule is for local sessions on my machine. A cloud session (claude.ai/code — a fresh, ephemeral container) loses anything not pushed, so there you may create branches, commit and push to the session's working branch without asking. Still never merge, never force-push a shared branch, and never push to a branch other than the one the session was given unless I ask.
+  - **Commit identity in cloud sessions: I am the author, Claude is the committer.** Before the first commit, set it in the repo's local config:
+    ```bash
+    git config author.name  "Eric Cheng"
+    git config author.email "online.eric@gmail.com"
+    git config committer.name  "Claude"
+    git config committer.email "noreply@anthropic.com"
+    ```
+    The author email is what GitHub counts on my Contributions graph. The committer must stay Claude because the container signs commits with Claude's key — a signature only shows **Verified** when it matches the committer. Check with `git log -1 --format='%an <%ae> | %cn <%ce>'`. Local sessions need none of this: my own `user.name`/`user.email` cover both roles there.
