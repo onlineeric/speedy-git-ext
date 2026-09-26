@@ -60,9 +60,10 @@ export class GitDiffService {
     const numstatArgs = isMerge
       ? ['diff-tree', '--no-commit-id', '--numstat', '-r', '-z', `${hash}^1`, hash]
       : ['diff-tree', '--no-commit-id', '--numstat', '-r', '--root', '-z', hash];
-    const [filesResult, statsResult] = await Promise.all([
+    const [filesResult, statsResult, parentSubjects] = await Promise.all([
       this.getDiffFileChanges(hash, isMerge),
       this.executor.execute({ args: numstatArgs, cwd: this.workspacePath }),
+      this.getParentSubjects(meta.parents),
     ]);
 
     if (!filesResult.success) {
@@ -79,9 +80,29 @@ export class GitDiffService {
 
     return ok({
       ...meta,
+      ...(parentSubjects ? { parentSubjects } : {}),
       files: filesResult.value,
       stats,
     });
+  }
+
+  /**
+   * Subject line of each parent, in `parents` order, or undefined when it could
+   * not be read. Only a tooltip depends on it, so a failure never fails the details.
+   */
+  private async getParentSubjects(parents: string[]): Promise<string[] | undefined> {
+    if (parents.length === 0) return [];
+    // `--no-walk=unsorted` lists exactly the given commits, in the given order.
+    const result = await this.executor.execute({
+      args: ['log', '--no-walk=unsorted', '--format=%s', ...parents, '--'],
+      cwd: this.workspacePath,
+    });
+    if (!result.success) {
+      this.log.warn(`Parent subjects lookup failed: ${result.error.message}`);
+      return undefined;
+    }
+    const subjects = result.value.stdout.split('\n').slice(0, parents.length);
+    return subjects.length === parents.length ? subjects : undefined;
   }
 
   async getDiffFileChanges(hash: string, isMerge = false): Promise<Result<FileChange[]>> {

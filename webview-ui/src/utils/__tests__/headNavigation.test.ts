@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
+  COMMIT_NAVIGATION_MESSAGES,
   decideHeadContinuation,
   decideHeadNavigation,
+  decideLoadedCommitNavigation,
+  HEAD_NAVIGATION_MESSAGES,
   MAX_GO_TO_HEAD_LOADS,
   type HeadContinuationContext,
   type HeadLocationContext,
@@ -134,5 +137,32 @@ describe('decideHeadContinuation', () => {
     expect(
       decideHeadContinuation(continuation({ targetIndex: 1200, loadedCount: 1500 })),
     ).toEqual({ kind: 'loadMore', targetIndex: 1500 });
+  });
+});
+
+describe('decideLoadedCommitNavigation', () => {
+  it('scrolls to a displayed row without asking the backend', () => {
+    expect(decideLoadedCommitNavigation({ mergedIndex: 3, isHiddenClientSide: false })).toEqual({ kind: 'scrollTo' });
+  });
+
+  it('reports a loaded row hidden by the author/search filter', () => {
+    expect(decideLoadedCommitNavigation({ mergedIndex: -1, isHiddenClientSide: true })).toEqual({ kind: 'hiddenByFilter' });
+  });
+
+  it('asks the backend to locate a commit that is not loaded', () => {
+    expect(decideLoadedCommitNavigation({ mergedIndex: -1, isHiddenClientSide: false })).toEqual({ kind: 'locate' });
+  });
+});
+
+describe('COMMIT_NAVIGATION_MESSAGES', () => {
+  it('keeps the HEAD wording for Go to HEAD', () => {
+    expect(COMMIT_NAVIGATION_MESSAGES.head).toBe(HEAD_NAVIGATION_MESSAGES);
+  });
+
+  it('names the parent or child commit in every outcome', () => {
+    for (const kind of ['hiddenByFilter', 'notInView', 'unresolved', 'unreachable'] as const) {
+      expect(COMMIT_NAVIGATION_MESSAGES.parent[kind]).toContain('parent commit');
+      expect(COMMIT_NAVIGATION_MESSAGES.child[kind]).toContain('child commit');
+    }
   });
 });

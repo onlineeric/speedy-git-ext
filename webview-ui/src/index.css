@@ -63,6 +63,28 @@
   26%, 86% { opacity: 1; transform: translateX(0) scaleX(1); }
   96%, 100% { opacity: 0; transform: translateX(-16px) scaleX(0.7); }
 }
+/* The commit navigation illustration: the "Go to parent commit" icon is clicked,
+   the selection leaves the current row and lands on the parent, which flashes
+   twice like the real navigation, then the loop resets. All three share one
+   duration so their percentages line up. */
+@keyframes whats-new-nav-click {
+  0%, 14% { opacity: 0; transform: scale(0.4); }
+  20% { opacity: 1; transform: scale(1); }
+  32%, 100% { opacity: 0; transform: scale(2.2); }
+}
+@keyframes whats-new-nav-from {
+  0%, 24% { opacity: 1; }
+  30%, 94% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes whats-new-nav-to {
+  0%, 26% { opacity: 0; box-shadow: none; }
+  32% { opacity: 1; box-shadow: 0 0 0 1.5px var(--vscode-charts-orange); }
+  40% { opacity: 1; box-shadow: none; }
+  48% { opacity: 1; box-shadow: 0 0 0 1.5px var(--vscode-charts-orange); }
+  56%, 90% { opacity: 1; box-shadow: none; }
+  96%, 100% { opacity: 0; box-shadow: none; }
+}
 
 @layer utilities {
   .animate-whats-new-countdown {
@@ -88,6 +110,15 @@
     .animate-whats-new-split {
       animation: whats-new-split 5s ease-in-out infinite;
       transform-origin: left center;
+    }
+    .animate-whats-new-nav-click {
+      animation: whats-new-nav-click 5s ease-out infinite;
+    }
+    .animate-whats-new-nav-from {
+      animation: whats-new-nav-from 5s ease-in-out infinite;
+    }
+    .animate-whats-new-nav-to {
+      animation: whats-new-nav-to 5s ease-in-out infinite;
     }
   }
   .animate-toast-in {

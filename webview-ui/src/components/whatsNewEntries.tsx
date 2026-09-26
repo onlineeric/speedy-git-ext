@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { AutosquashIllustration } from './AutosquashIllustration';
+import { CommitNavigationIllustration } from './CommitNavigationIllustration';
 import { MultiTabIllustration } from './MultiTabIllustration';
-import { BranchIcon, CloudIcon, NewTabIcon } from './icons';
+import { BranchIcon, CloudIcon, GoToHeadIcon, NewTabIcon } from './icons';
 import { SubmoduleBadge } from './FileChangeShared';
 import { InlineRefBadge } from './InlineRefBadge';
 import { RefBadgeLegend } from './RefBadgeLegend';
@@ -61,6 +62,51 @@ export interface WhatsNewEntry {
  * no other opt-out.
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
+  {
+    version: '5.18.0',
+    headline: 'Jump to a commit’s parent or child straight from the details panel.',
+    illustration: <CommitNavigationIllustration />,
+    content: (
+      <div className="space-y-6">
+        <ContributorThanks login="nelson870708">
+          This release comes from your request in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/196">#196</ExternalLink>, to move
+          between related commits without searching for a hash.
+        </ContributorThanks>
+
+        <ContributorThanks login="jinho9265">
+          Thank you for reporting in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/199">#199</ExternalLink> that a
+          Compare with the working tree kept refreshing on its own. It is fixed: the result now stays put, and
+          updates only when your files change.
+        </ContributorThanks>
+
+        <WhatsNewSection title="Parents and children, one click away">
+          <FeatureGrid>
+            <FeatureCard mark="→" title="Go to it" accent={SHOWCASE_ORANGE_COLOR}>
+              Click the <GoToHeadIcon className="inline h-3 w-3 align-[-1px]" /> icon beside a hash —{' '}
+              <UiLabel>Go to parent commit</UiLabel> or <UiLabel>Go to child commit</UiLabel>. The graph scrolls
+              to it and highlights it, like Go to HEAD, and the details panel follows.
+            </FeatureCard>
+            <FeatureCard mark="C" title="New Children row" accent={SHOWCASE_GREEN_COLOR}>
+              A new <UiLabel>Children</UiLabel> row under <UiLabel>Parents</UiLabel> lists the commits built on
+              this one that are in the current view.
+            </FeatureCard>
+            <FeatureCard mark="?" title="Which parent is which?" accent={SHOWCASE_PURPLE_COLOR}>
+              Hover a hash to see its commit message — handy for the two parents of a merge.
+            </FeatureCard>
+            <FeatureCard mark="#" title="Click to copy" accent={SHOWCASE_BLUE_COLOR}>
+              A parent or child hash copies the full hash on click, just like <UiLabel>Hash</UiLabel>.
+            </FeatureCard>
+          </FeatureGrid>
+          <p className={`${bodyTextClassName} mt-3`}>
+            A parent further back than the loaded commits is loaded for you. If a filter hides it, a message
+            says so.
+          </p>
+        </WhatsNewSection>
+      </div>
+    ),
+  },
   {
     version: '5.17.0',
     headline: 'Speedy Git is now multi-tab — open a graph per repository and arrange them like any other editor.',

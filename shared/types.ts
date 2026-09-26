@@ -385,6 +385,12 @@ export interface CommitDetails {
   hash: string;
   abbreviatedHash: string;
   parents: string[];
+  /**
+   * Subject line of each parent, index-aligned with `parents`, so the details
+   * panel can say which parent is which even when it is not loaded in the graph.
+   * Absent when it could not be read — a hash-only tooltip is the fallback.
+   */
+  parentSubjects?: string[];
   author: string;
   authorEmail: string;
   authorDate: number;
@@ -782,12 +788,19 @@ export interface ComparePanelUIState {
   inlineError: string | null;
   /** Active compare requestId (used by Cancel to identify which request to abort). */
   activeRequestId: string | null;
+  /**
+   * True when the active request is an automatic re-run of a working-tree
+   * compare after a refresh. It runs quietly: the shown result stays on screen
+   * with no loading state, and the panel is never reopened for it.
+   */
+  refreshing: boolean;
 }
 
 export const EMPTY_COMPARE_PANEL_UI_STATE: ComparePanelUIState = {
   loading: false,
   inlineError: null,
   activeRequestId: null,
+  refreshing: false,
 };
 
 export interface RebaseConflictInfo {

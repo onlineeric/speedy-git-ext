@@ -42,10 +42,11 @@ describe('GitDiffService.getCommitDetails', () => {
       'fix: bug',
       'body line 1',
     ].join(NUL);
-    vi.spyOn(service['executor'], 'execute')
-      .mockResolvedValueOnce({ success: true, value: { stdout: meta, stderr: '' } }) // show meta
-      .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } })   // diff name-status
-      .mockResolvedValueOnce({ success: true, value: { stdout: '', stderr: '' } });  // numstat
+    vi.spyOn(service['executor'], 'execute').mockImplementation(async ({ args }) => {
+      if (args[0] === 'show') return { success: true, value: { stdout: meta, stderr: '' } };
+      if (args[0] === 'log') return { success: true, value: { stdout: 'feat: parent subject\n', stderr: '' } };
+      return { success: true, value: { stdout: '', stderr: '' } }; // diff-tree raw + numstat
+    });
 
     const result = await service.getCommitDetails('1234567890abcdef1234567890abcdef12345678');
     expect(result.success).toBe(true);
@@ -57,6 +58,42 @@ describe('GitDiffService.getCommitDetails', () => {
       expect(result.value.authorDate).toBe(1700000000 * 1000);
       expect(result.value.committerDate).toBe(1700000010 * 1000);
       expect(result.value.files).toEqual([]);
+      expect(result.value.parentSubjects).toEqual(['feat: parent subject']);
+    }
+  });
+
+  it('reads parent subjects in parent order with one no-walk log', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    const meta = ['c'.repeat(40), 'ccccccc', 'p1 p2', 'A', 'a@x', '1', 'A', 'a@x', '1', 'Merge', ''].join(NUL);
+    const execute = vi.spyOn(service['executor'], 'execute').mockImplementation(async ({ args }) => {
+      if (args[0] === 'show') return { success: true, value: { stdout: meta, stderr: '' } };
+      if (args[0] === 'log') return { success: true, value: { stdout: 'first parent\nsecond parent\n', stderr: '' } };
+      return { success: true, value: { stdout: '', stderr: '' } };
+    });
+
+    const result = await service.getCommitDetails('c'.repeat(40));
+
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({
+      args: ['log', '--no-walk=unsorted', '--format=%s', 'p1', 'p2', '--'],
+    }));
+    expect(result.success && result.value.parentSubjects).toEqual(['first parent', 'second parent']);
+  });
+
+  it('still returns the details, without subjects, when the subject lookup fails', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    const meta = ['c'.repeat(40), 'ccccccc', 'p1', 'A', 'a@x', '1', 'A', 'a@x', '1', 'fix', ''].join(NUL);
+    vi.spyOn(service['executor'], 'execute').mockImplementation(async ({ args }) => {
+      if (args[0] === 'show') return { success: true, value: { stdout: meta, stderr: '' } };
+      if (args[0] === 'log') return { success: false, error: new GitError('boom', 'COMMAND_FAILED') };
+      return { success: true, value: { stdout: '', stderr: '' } };
+    });
+
+    const result = await service.getCommitDetails('c'.repeat(40));
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.parents).toEqual(['p1']);
+      expect(result.value.parentSubjects).toBeUndefined();
     }
   });
 });

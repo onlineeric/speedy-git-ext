@@ -125,13 +125,18 @@ export type RequestMessage =
    * `headLocation` (or `headLocationFailed`) response; used by the toolbar
    * "Go to HEAD" navigation.
    *
+   * `targetHash` locates that commit instead of HEAD — the details panel's
+   * "Go to parent commit" for a parent deeper than the loaded batches. It is
+   * the same navigation with a known hash, so it shares this request and its
+   * responses rather than duplicating them.
+   *
    * `displayedHeadHash` is the commit the webview currently shows as HEAD, or
    * null when HEAD is not on screen. When it matches the repository's actual
    * HEAD the backend skips the position walk entirely — the webview can scroll
    * to a row it already holds — which keeps the common case a single
    * `rev-parse` instead of a full log traversal.
    */
-  | { type: 'locateHead'; payload: { filters: { branches?: string[]; afterDate?: string; beforeDate?: string }; displayedHeadHash: string | null } }
+  | { type: 'locateHead'; payload: { filters: { branches?: string[]; afterDate?: string; beforeDate?: string }; displayedHeadHash: string | null; targetHash?: string } }
   | { type: 'openSettings'; payload: { query?: string } }
   /**
    * Current avatar authorization state, answered with `avatarAuthState`. Sent

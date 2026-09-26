@@ -130,6 +130,7 @@ export const UI_SURFACES = [
   'panelToggle',
   'columnHeader',
   'avatarSettings',
+  'commitDetails',
 ] as const;
 
 export type UiSurface = (typeof UI_SURFACES)[number];
@@ -187,6 +188,8 @@ export const UI_ACTIONS = [
   'columnShowHash', 'columnHideHash', 'columnShowMessage', 'columnHideMessage',
   'columnShowAuthor', 'columnHideAuthor', 'columnShowDate', 'columnHideDate',
   'columnShowSignature', 'columnHideSignature',
+  // Commit details panel: the navigate icon beside a Parents/Children hash
+  'goToParent', 'goToChild',
   // Avatar settings section (View popover) + the Author-header shortcut to it
   'avatarAuthorizeClick', 'avatarRemoveTokenClick', 'avatarRefreshDaysChange', 'avatarSettingsShortcut', 'avatarClearCache',
 ] as const;

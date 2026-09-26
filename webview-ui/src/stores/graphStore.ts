@@ -56,6 +56,7 @@ import { type GraphTopology } from '../utils/graphTopology';
 import { computeHiddenCommitHashes } from '../utils/commitVisibility';
 import { computeMergedTopology, type UncommittedContext } from '../utils/mergedCommits';
 import { findHeadCommitHash } from '../utils/commitRefs';
+import type { CommitNavigationTarget } from '../utils/headNavigation';
 import { toCommitCountBucket } from '@shared/telemetry';
 import { trackUi } from '../utils/telemetry';
 import { joinRepoPath } from '../utils/repoPath';
@@ -161,6 +162,12 @@ interface GraphStore {
   goToHeadState: 'idle' | 'locating' | 'loading';
   /** Target of an in-flight Go to HEAD that still needs commits loaded. */
   pendingHead: { hash: string; targetIndex: number; attempts: number } | null;
+  /**
+   * What the current (or last) navigation heads for — HEAD from the toolbar, or
+   * a parent/child from the details panel. It only picks the toast wording, so
+   * it is set when a navigation starts and never needs resetting.
+   */
+  navigationTarget: CommitNavigationTarget;
   /** Row briefly highlighted (and centered) after a Go to HEAD navigation. */
   flashCommitHash: string | null;
   /**
@@ -282,6 +289,7 @@ interface GraphStore {
   moveSelection: (delta: number) => void;
   setGoToHeadState: (state: 'idle' | 'locating' | 'loading') => void;
   setPendingHead: (pending: { hash: string; targetIndex: number; attempts: number } | null) => void;
+  setNavigationTarget: (target: CommitNavigationTarget) => void;
   /**
    * Complete a Go to HEAD navigation: select the row (like a plain click) and
    * mark it for the centered scroll + flash highlight. No-op that just resets
@@ -459,6 +467,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   // Monotonic across the session — never reset with the rest of the flash state,
   // so two navigations to the same row are always distinguishable.
   flashToken: 0,
+  navigationTarget: 'head',
   totalLoadedWithoutFilter: null,
   pendingCheckout: null,
   checkoutDialog: null,
@@ -671,6 +680,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
   setGoToHeadState: (goToHeadState) => set({ goToHeadState }),
   setPendingHead: (pendingHead) => set({ pendingHead }),
+  setNavigationTarget: (navigationTarget) => set({ navigationTarget }),
   navigateToCommit: (hash) => {
     const index = get().mergedCommits.findIndex((commit) => commit.hash === hash);
     if (index < 0) {
@@ -1407,25 +1417,38 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     comparePanelUI: { ...EMPTY_COMPARE_PANEL_UI_STATE },
   }),
   beginCompare: (requestId) => set({
-    comparePanelUI: { loading: true, inlineError: null, activeRequestId: requestId },
+    comparePanelUI: { loading: true, inlineError: null, activeRequestId: requestId, refreshing: false },
     compareResult: null,
     detailsPanelOpen: true,
   }),
-  endCompareSuccess: (result) => set((state) => ({
-    compareResult: result,
-    comparePanelUI: { loading: false, inlineError: null, activeRequestId: null },
-    detailsPanelOpen: true,
-    compareSelection: {
-      ...state.compareSelection,
-      aResolvedHash: result.aResolvedHash,
-      bResolvedHash: result.bResolvedHash,
-    },
-  })),
+  endCompareSuccess: (result) => set((state) => {
+    const idle = { ...EMPTY_COMPARE_PANEL_UI_STATE };
+    if (state.comparePanelUI.refreshing) {
+      // A quiet re-run (#199). The compare was dismissed meanwhile (a commit
+      // was selected) → drop the answer. Unchanged → keep the shown object, so
+      // nothing re-renders and scroll/expanded folders survive. The panel's
+      // open state is the user's either way.
+      if (!state.compareResult || sameCompareResult(state.compareResult, result)) {
+        return { comparePanelUI: idle };
+      }
+      return { compareResult: result, comparePanelUI: idle };
+    }
+    return {
+      compareResult: result,
+      comparePanelUI: idle,
+      detailsPanelOpen: true,
+      compareSelection: {
+        ...state.compareSelection,
+        aResolvedHash: result.aResolvedHash,
+        bResolvedHash: result.bResolvedHash,
+      },
+    };
+  }),
   endCompareError: (message) => set({
-    comparePanelUI: { loading: false, inlineError: message, activeRequestId: null },
+    comparePanelUI: { ...EMPTY_COMPARE_PANEL_UI_STATE, inlineError: message },
   }),
   endCompareCancelled: () => set({
-    comparePanelUI: { loading: false, inlineError: null, activeRequestId: null },
+    comparePanelUI: { ...EMPTY_COMPARE_PANEL_UI_STATE },
   }),
   maybeRerunCompareForWorkingTree: () => {
     const state = get();
@@ -1434,16 +1457,27 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const involvesWorkingTree = a?.kind === 'workingTree' || b?.kind === 'workingTree';
     if (!involvesWorkingTree) return;
     if (!a || !b) return;
-    // Re-dispatch with the current selection. requestId generated here so the
-    // store can match the upcoming compareResult / error response.
+    // Re-dispatch with the current selection, quietly: an auto-refresh fires on
+    // many `.git` events that change nothing, so the shown result must not blank
+    // into a loading state or reopen a closed panel (#199). The requestId still
+    // goes through latest-wins, so a compare the user starts supersedes it.
     const requestId = generateCompareRequestId();
-    state.beginCompare(requestId);
+    set({ comparePanelUI: { loading: false, inlineError: null, activeRequestId: requestId, refreshing: true } });
     import('../rpc/rpcClient').then(({ rpcClient }) => {
       const mode = computeEffectiveMode(a, b, state.compareSelection.modeOverride);
       rpcClient.send({ type: 'compareRefs', payload: { a, b, mode, requestId } });
     });
   },
 }));
+
+/**
+ * Whether a re-run produced the same compare as the one on screen. Both come
+ * from the same backend serializer, so a structural string comparison is exact,
+ * and it runs once per refresh rather than per render.
+ */
+function sameCompareResult(a: CompareResult, b: CompareResult): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
 
 function generateCompareRequestId(): string {
   // Lightweight ID generator — does not need to be cryptographically unique,
