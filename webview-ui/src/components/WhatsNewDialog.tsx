@@ -62,7 +62,7 @@ const versionPillStyle: CSSProperties = {
  * entry there and nothing here.
  */
 export function WhatsNewDialog({ version, lastShownVersion, countdownSeconds, open, onClose }: WhatsNewDialogProps) {
-  const entry = findUnseenWhatsNewEntry(version, lastShownVersion);
+  const entry = findUnseenWhatsNewEntry({ version, lastShownVersion });
   const telemetry = useDialogTelemetry('whatsNew', open);
   const remaining = useCountdown(countdownSeconds, open && entry !== undefined);
   const closeRef = useRef<HTMLButtonElement>(null);

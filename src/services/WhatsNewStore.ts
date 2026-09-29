@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { decideWhatsNew, isExactVersion, shouldRecordWhatsNew, type WhatsNewPayload } from '../../shared/whatsNew.js';
+import { buildWhatsNewPayload, isExactVersion, shouldRecordWhatsNew, type WhatsNewPayload } from '../../shared/whatsNew.js';
 
 /**
  * Version of the "What's new" *entry* the user last dismissed — which, for a
@@ -14,10 +14,9 @@ const LAST_SHOWN_KEY = 'speedyGit.whatsNewVersion';
  * user last dismissed.
  *
  * The webview owns the content, so this store deliberately knows nothing about
- * what the dialog says — including which versions have entries. It reports "this
- * run qualifies" along with the stored entry version; the webview resolves the
- * running version to its entry and stays silent if that entry was already seen
- * or there is none.
+ * what the dialog says — including which versions have entries. It hands over
+ * the stored entry version; the webview resolves the running version to its
+ * entry and stays silent if that entry was already seen or there is none.
  */
 export class WhatsNewStore {
   constructor(
@@ -35,15 +34,13 @@ export class WhatsNewStore {
     return this.context.extensionMode === vscode.ExtensionMode.Development;
   }
 
-  /** The payload to offer the webview, or `undefined` when this run does not qualify. */
-  decide(): WhatsNewPayload | undefined {
-    const version = this.currentVersion;
-    const { show, countdownSeconds, lastShownVersion } = decideWhatsNew({
-      currentVersion: version,
-      lastShownVersion: this.context.globalState.get<string>(LAST_SHOWN_KEY),
+  /** What to offer the webview; it decides whether there is anything unseen to show. */
+  payload(): WhatsNewPayload {
+    return buildWhatsNewPayload({
+      currentVersion: this.currentVersion,
+      storedVersion: this.context.globalState.get<string>(LAST_SHOWN_KEY),
       isDevelopment: this.isDevelopment,
     });
-    return show ? { version, lastShownVersion, countdownSeconds } : undefined;
   }
 
   /**

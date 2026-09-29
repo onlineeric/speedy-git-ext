@@ -280,18 +280,15 @@ export class GraphTab {
   }
 
   /**
-   * Offer the "What's new" dialog when this run qualifies AND this is the first
-   * graph of the session. Later graphs never offer it, even while the first
+   * Offer the "What's new" dialog to the first graph of the session; the webview
+   * shows it only if the running version has an entry not yet dismissed. Later graphs never offer it, even while the first
    * one's dialog is still open.
    */
   private sendWhatsNew(): void {
     if (this.shared.whatsNewOfferedThisSession) return;
     this.shared.whatsNewOfferedThisSession = true;
 
-    const decision = this.shared.whatsNew.decide();
-    if (!decision) return;
-
-    this.postMessage({ type: 'whatsNew', payload: decision });
+    this.postMessage({ type: 'whatsNew', payload: this.shared.whatsNew.payload() });
   }
 
   private async handleMessage(message: RequestMessage): Promise<void> {

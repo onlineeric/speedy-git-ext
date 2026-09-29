@@ -431,7 +431,7 @@ shared/
 │                                 #   for both "changed" and "no longer exists". Refuse-only; no re-run path
 ├── telemetry.ts                  # Closed telemetry catalogs, payload types, buckets (incl. the open-tab-count
 │                                 #   bucket and the five panelOpened triggers), MUTATING_OPERATIONS, validator
-└── whatsNew.ts                   # PURE: whether the release-notes dialog is offered on this run + the countdown,
+└── whatsNew.ts                   # PURE: the payload the backend offers the first graph of a session + the countdown,
                                   #   which entry a version resolves to (latest in its major.minor at or below it) and
                                   #   whether it was seen (once per entry, so patches don't re-show), and whether a
                                   #   dismissal may be recorded at all (never in dev — shared globalState)

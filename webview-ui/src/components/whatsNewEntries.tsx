@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { chooseWhatsNewEntryVersion } from '@shared/whatsNew';
+import { chooseUnseenWhatsNewEntry, type WhatsNewPayload } from '@shared/whatsNew';
 import { AutosquashIllustration } from './AutosquashIllustration';
 import { CommitNavigationIllustration } from './CommitNavigationIllustration';
 import { MultiTabIllustration } from './MultiTabIllustration';
@@ -553,24 +553,12 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
   },
 ];
 
-/** The entry filed under exactly this version, or `undefined` when there is none. */
-export function findWhatsNewEntry(version: string): WhatsNewEntry | undefined {
-  return WHATS_NEW_ENTRIES.find((entry) => entry.version === version);
-}
-
 /**
  * The entry the running version should show — its series' latest notes at or
- * below it — or `undefined` when there are none or `lastShownVersion` says they
- * were already dismissed.
+ * below it — or `undefined` when there are none or they were already dismissed.
  */
 export function findUnseenWhatsNewEntry(
-  currentVersion: string,
-  lastShownVersion: string | undefined,
+  whatsNew: Pick<WhatsNewPayload, 'version' | 'lastShownVersion'>,
 ): WhatsNewEntry | undefined {
-  const entryVersion = chooseWhatsNewEntryVersion({
-    currentVersion,
-    lastShownVersion,
-    entryVersions: WHATS_NEW_ENTRIES.map((entry) => entry.version),
-  });
-  return entryVersion === undefined ? undefined : findWhatsNewEntry(entryVersion);
+  return chooseUnseenWhatsNewEntry(whatsNew, WHATS_NEW_ENTRIES);
 }

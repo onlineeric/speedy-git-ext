@@ -137,9 +137,13 @@ export function ResponsiveToolbar({ left, right, status }: {
 
 /** Enabled buttons in the order they are drawn, which `order` can make differ from the DOM's. */
 function visibleButtons(panel: HTMLElement): HTMLButtonElement[] {
-  const buttons = Array.from(panel.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
-  const order = (button: HTMLElement) => Number(getComputedStyle(button).order) || 0;
-  return buttons.sort((a, b) => order(a) - order(b));
+  // Read each button's order once rather than inside the comparator.
+  return Array.from(panel.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'), (button) => ({
+    button,
+    order: Number(getComputedStyle(button).order) || 0,
+  }))
+    .sort((a, b) => a.order - b.order)
+    .map(({ button }) => button);
 }
 
 /**
