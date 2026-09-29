@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-09-24**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-09-29**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -113,9 +113,9 @@ src/
 │   ├── AvatarCacheStore.ts       # Persistent email→avatar cache in globalState; debounced writes, LRU cap 1000 (512KB extension-state budget)
 │   ├── AvatarRefreshQueue.ts     # Paced background drain (1/sec), interruptible rate-limit pause, batched result posting
 │   ├── GitHubAuthService.ts      # Explicit opt-in gate for the GitHub session used by avatar lookups
-│   ├── WhatsNewStore.ts          # Owns the one fact the webview can't know: is this the first run on this version.
+│   ├── WhatsNewStore.ts          # Owns the one fact the webview can't know: which entry version was last dismissed.
 │   │                             #   Dev mode always shows and records nothing — the debug host shares one globalState
-│   │                             #   with the installed extension; release records the version once the user closes it
+│   │                             #   with the installed extension; release records the shown ENTRY version on close
 │   ├── GitConfigService.ts       # Git config reading; getGitVersion (read once per panel through the request context)
 │   └── TelemetryService.ts       # Consent-aware backend telemetry funnel; real + no-op implementations
 └── utils/
@@ -184,8 +184,10 @@ components/
 ```
 ├── ControlBar.tsx                # Top toolbar with actions, incl. "Open New Graph Tab" beside Go to HEAD and the
 │                                 #   peer-activity notice (informational; it disables nothing)
-├── ResponsiveToolbar.tsx         # Measures visible action widths; collapses right then left into More dropdowns,
-│                                 #   which reuse `menuPanelClass` and hide separators by `data-toolbar-separator`
+├── ResponsiveToolbar.tsx         # Measures visible action widths; collapses right, then the left group in two
+│                                 #   phases (unpinned items first, then pinned Refresh/Fetch/HEAD) into More
+│                                 #   dropdowns, which reuse `menuPanelClass` and hide separators by
+│                                 #   `data-toolbar-separator`. Items keep row position via flex `order`
 ├── ToolbarIconButton.tsx         # Shared toolbar button: icon + optional label (speedyGit.toolbar.showLabels);
 │                                 #   right-click menu toggles labels / Remote button, extensible via extraMenuItems
 ├── TogglePanel.tsx               # Collapsible panel for Filter/Search/Compare widgets
@@ -271,8 +273,8 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 │                                 #   so it can't drift from the graph. Needs no props — reused by the What's New dialog
 ├── WhatsNewDialog.tsx            # First-run release notes, poster layout (gradient hero + headline + optional
 │                                 #   illustration); close button counts down before enabling (Esc/outside held too)
-├── whatsNewEntries.tsx           # Per-version release-note content, looked up by exact version. A version with no
-│                                 #   entry shows no dialog — that is how a release opts out
+├── whatsNewEntries.tsx           # Per-version release-note content. A patch with no entry inherits its series'
+│                                 #   notes (5.18.1 → 5.18.0) unless already seen; a series with no entry shows nothing
 ├── whatsNewBlocks.tsx            # Poster pieces entries compose: ContributorThanks, FeatureCard/Grid, Step/StepFlow,
 │                                 #   UiLabel, ToolbarButtonSample, WhatsNewSection, ExternalLink
 ├── AutosquashIllustration.tsx    # 5.16.0 hero: animated mini-graph of a fixup! commit folding into its target
@@ -429,8 +431,9 @@ shared/
 │                                 #   for both "changed" and "no longer exists". Refuse-only; no re-run path
 ├── telemetry.ts                  # Closed telemetry catalogs, payload types, buckets (incl. the open-tab-count
 │                                 #   bucket and the five panelOpened triggers), MUTATING_OPERATIONS, validator
-└── whatsNew.ts                   # PURE: whether the release-notes dialog opens on this run + the countdown lengths
-                                  #   (dev always shows, 2s; release shows once per version, 5s), and whether a
+└── whatsNew.ts                   # PURE: the payload the backend offers the first graph of a session + the countdown,
+                                  #   which entry a version resolves to (latest in its major.minor at or below it) and
+                                  #   whether it was seen (once per entry, so patches don't re-show), and whether a
                                   #   dismissal may be recorded at all (never in dev — shared globalState)
 
 telemetry.json                    # Machine-readable event manifest for VS Code telemetry inspection
@@ -438,7 +441,7 @@ esbuild.config.mjs                # Production-only telemetry destination inject
 ```
 
 Tests live in `__tests__/` directories beside the code they cover (Vitest).
-`webview-ui/src/components/__tests__/ResponsiveToolbar.test.ts` covers collapse thresholds,
+`webview-ui/src/components/__tests__/ResponsiveToolbar.test.ts` covers collapse thresholds (incl. the left group's two phases),
 label/button visibility in inline and dropdown rendering, the Remote context-menu toggle,
 and compiled separator CSS. Static React rendering does not exercise DOM observers or layout.
 Branch checkout coverage includes `src/__tests__/branchCheckoutHandlers.test.ts` (execution, guards,

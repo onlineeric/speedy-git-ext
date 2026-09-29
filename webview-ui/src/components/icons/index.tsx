@@ -334,12 +334,12 @@ export function GoToHeadIcon({ className }: IconProps) {
 }
 
 /** Vertical toolbar divider aligned to icon-button height */
-export function ToolbarSeparatorIcon({ className }: IconProps) {
+export function ToolbarSeparatorIcon({ className, style }: IconProps) {
   return (
     // Marked by role rather than by element: the collapsed toolbar dropdown hides
     // separators by this attribute, so an icon-only control placed directly in a
     // toolbar group does not silently vanish along with them.
-    <svg data-toolbar-separator width={8} height={24} viewBox="0 0 8 24" fill="none" className={className} aria-hidden>
+    <svg data-toolbar-separator width={8} height={24} viewBox="0 0 8 24" fill="none" className={className} style={style} aria-hidden>
       <line
         x1={4}
         y1={3}

@@ -952,8 +952,8 @@ class RpcClient {
     this.send({ type: 'openExternal', payload: { url } });
   }
 
-  dismissWhatsNew() {
-    this.send({ type: 'dismissWhatsNew', payload: {} });
+  dismissWhatsNew(entryVersion: string) {
+    this.send({ type: 'dismissWhatsNew', payload: { version: entryVersion } });
   }
 
   // Pagination

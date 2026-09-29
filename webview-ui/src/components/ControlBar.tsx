@@ -143,6 +143,7 @@ export function ControlBar() {
   };
 
   const iconClass = 'w-6 h-6';
+  const separatorClass = 'h-6 w-4 text-[var(--vscode-panel-border)] opacity-90';
 
   const hasAnyFilter = (graphFilters.branches?.length ?? 0) > 0
     || (graphFilters.authors?.length ?? 0) > 0
@@ -189,79 +190,87 @@ export function ControlBar() {
       </div>
 
       <ResponsiveToolbar
-        left={<>
-          <ToolbarIconButton
-            label="Filter"
-            icon={<FilterIcon className={iconClass} />}
-            onClick={() => handleToggleWidget('filter')}
-            {...filterTone}
-            title="Filter"
-          />
-
-          <ToolbarIconButton
-            label="Search"
-            icon={<SearchIcon className={iconClass} />}
-            onClick={() => handleToggleWidget('search')}
-            {...searchTone}
-            title="Search commits"
-          />
-
-          <ToolbarIconButton
-            label="Compare"
-            icon={<CompareIcon className={iconClass} />}
-            onClick={() => handleToggleWidget('compare')}
-            {...compareTone}
-            title="Compare refs (Base vs Target)"
-          />
-
-          <ToolbarIconButton
-            label="Worktrees"
-            icon={<WorktreeIcon className={iconClass} />}
-            onClick={() => handleToggleWidget('worktree')}
-            {...worktreeTone}
-            title={worktreeTitle}
-          />
-
-          <ToolbarSeparatorIcon className="h-6 w-4 text-[var(--vscode-panel-border)] opacity-90" />
-
-          <ToolbarIconButton
-            label="Refresh"
-            icon={<RefreshIcon className={`${iconClass}${isRefreshing ? ' animate-spin' : ''}`} />}
-            onClick={handleRefresh}
-            {...(isRefreshing ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
-            title="Refresh"
-          />
-
-          <ToolbarIconButton
-            label="Fetch"
-            icon={<FetchIcon className={iconClass} />}
-            onClick={handleFetch}
-            disabled={fetching || loading || !hasConfiguredRemote}
-            {...(fetching ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
-            title={hasConfiguredRemote ? 'Fetch all remotes' : 'No remotes configured'}
-          />
-
-          <ToolbarSeparatorIcon className="h-6 w-4 text-[var(--vscode-panel-border)] opacity-90" />
-
-          <ToolbarIconButton
-            label="HEAD"
-            icon={<GoToHeadIcon className={iconClass} />}
-            onClick={handleGoToHead}
-            disabled={goToHeadBusy || loading}
-            aria-label="Go to HEAD commit"
-            {...(goToHeadBusy ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
-            title="Go to HEAD commit (current checkout)"
-          />
-
-          <ToolbarIconButton
-            label="New Tab"
-            icon={<NewTabIcon className={iconClass} />}
-            onClick={handleOpenNewGraphTab}
-            aria-label="Open New Graph Tab"
-            {...TOGGLE_BUTTON_TONES.inactive}
-            title="Open New Graph Tab"
-          />
-        </>}
+        left={[
+          { key: 'filter', element: (
+            <ToolbarIconButton
+              label="Filter"
+              icon={<FilterIcon className={iconClass} />}
+              onClick={() => handleToggleWidget('filter')}
+              {...filterTone}
+              title="Filter"
+            />
+          ) },
+          { key: 'search', element: (
+            <ToolbarIconButton
+              label="Search"
+              icon={<SearchIcon className={iconClass} />}
+              onClick={() => handleToggleWidget('search')}
+              {...searchTone}
+              title="Search commits"
+            />
+          ) },
+          { key: 'compare', element: (
+            <ToolbarIconButton
+              label="Compare"
+              icon={<CompareIcon className={iconClass} />}
+              onClick={() => handleToggleWidget('compare')}
+              {...compareTone}
+              title="Compare refs (Base vs Target)"
+            />
+          ) },
+          { key: 'worktrees', element: (
+            <ToolbarIconButton
+              label="Worktrees"
+              icon={<WorktreeIcon className={iconClass} />}
+              onClick={() => handleToggleWidget('worktree')}
+              {...worktreeTone}
+              title={worktreeTitle}
+            />
+          ) },
+          { key: 'panelsSeparator', element: <ToolbarSeparatorIcon className={separatorClass} /> },
+          // Pinned: the last to move into More when the toolbar narrows.
+          { key: 'refresh', pinned: true, element: (
+            <ToolbarIconButton
+              label="Refresh"
+              icon={<RefreshIcon className={`${iconClass}${isRefreshing ? ' animate-spin' : ''}`} />}
+              onClick={handleRefresh}
+              {...(isRefreshing ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
+              title="Refresh"
+            />
+          ) },
+          { key: 'fetch', pinned: true, element: (
+            <ToolbarIconButton
+              label="Fetch"
+              icon={<FetchIcon className={iconClass} />}
+              onClick={handleFetch}
+              disabled={fetching || loading || !hasConfiguredRemote}
+              {...(fetching ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
+              title={hasConfiguredRemote ? 'Fetch all remotes' : 'No remotes configured'}
+            />
+          ) },
+          { key: 'navigationSeparator', pinned: true, element: <ToolbarSeparatorIcon className={separatorClass} /> },
+          { key: 'head', pinned: true, element: (
+            <ToolbarIconButton
+              label="HEAD"
+              icon={<GoToHeadIcon className={iconClass} />}
+              onClick={handleGoToHead}
+              disabled={goToHeadBusy || loading}
+              aria-label="Go to HEAD commit"
+              {...(goToHeadBusy ? TOGGLE_BUTTON_TONES.attention : TOGGLE_BUTTON_TONES.inactive)}
+              title="Go to HEAD commit (current checkout)"
+            />
+          ) },
+          { key: 'newTab', element: (
+            <ToolbarIconButton
+              label="New Tab"
+              icon={<NewTabIcon className={iconClass} />}
+              onClick={handleOpenNewGraphTab}
+              aria-label="Open New Graph Tab"
+              {...TOGGLE_BUTTON_TONES.inactive}
+              title="Open New Graph Tab"
+            />
+          ) },
+        ]}
         status={<>
           {peerNotice && (
             <span

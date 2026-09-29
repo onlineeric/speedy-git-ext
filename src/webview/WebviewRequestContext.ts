@@ -76,6 +76,6 @@ export interface WebviewRequestContext {
   /** Re-send THIS tab's repo list with its own selection. */
   sendRepoList(): void;
   sendSettingsData(settings: UserSettings): void;
-  /** Persist that the running version's "What's new" dialog has been seen. */
-  markWhatsNewShown(): Promise<void>;
+  /** Persist that the "What's new" entry for `entryVersion` has been seen. */
+  markWhatsNewShown(entryVersion: string): Promise<void>;
 }

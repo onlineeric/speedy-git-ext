@@ -155,10 +155,11 @@ export function App() {
         <WhatsNewDialog
           open
           version={whatsNew.version}
+          lastShownVersion={whatsNew.lastShownVersion}
           countdownSeconds={whatsNew.countdownSeconds}
-          onClose={() => {
+          onClose={(shownVersion) => {
             setWhatsNew(null);
-            rpcClient.dismissWhatsNew();
+            rpcClient.dismissWhatsNew(shownVersion);
           }}
         />
       )}

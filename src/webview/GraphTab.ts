@@ -280,21 +280,15 @@ export class GraphTab {
   }
 
   /**
-   * Offer the "What's new" dialog when this run qualifies AND this is the first
-   * graph of the session. Later graphs never offer it, even while the first
+   * Offer the "What's new" dialog to the first graph of the session; the webview
+   * shows it only if the running version has an entry not yet dismissed. Later graphs never offer it, even while the first
    * one's dialog is still open.
    */
   private sendWhatsNew(): void {
     if (this.shared.whatsNewOfferedThisSession) return;
     this.shared.whatsNewOfferedThisSession = true;
 
-    const { show, countdownSeconds } = this.shared.whatsNew.decide();
-    if (!show) return;
-
-    this.postMessage({
-      type: 'whatsNew',
-      payload: { version: this.shared.whatsNew.currentVersion, countdownSeconds },
-    });
+    this.postMessage({ type: 'whatsNew', payload: this.shared.whatsNew.payload() });
   }
 
   private async handleMessage(message: RequestMessage): Promise<void> {
@@ -338,7 +332,7 @@ export class GraphTab {
         this.shared.activity.begin(this.runtime.identity?.gitDir ?? '', this.options.id, operation),
       sendRepoList: () => this.sendRepoList(),
       sendSettingsData: (settings) => this.sendSettingsData(settings),
-      markWhatsNewShown: () => this.shared.whatsNew.markShown(),
+      markWhatsNewShown: (entryVersion) => this.shared.whatsNew.markShown(entryVersion),
     };
   }
 

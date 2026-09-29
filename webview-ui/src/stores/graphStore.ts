@@ -62,6 +62,7 @@ import { trackUi } from '../utils/telemetry';
 import { joinRepoPath } from '../utils/repoPath';
 import { stripLocalBranchPrefix } from '../utils/worktreeDisplay';
 import { EMPTY_SEARCH_TERMS, type SearchTerm } from '../utils/searchQuery';
+import type { WhatsNewPayload } from '@shared/whatsNew';
 
 interface WorktreeLookups {
   worktreeByHead: Map<string, WorktreeInfo[]>;
@@ -358,8 +359,8 @@ interface GraphStore {
   setUncommittedChanges: (payload: UncommittedSummary) => void;
   setConflictState: (state: ConflictState) => void;
   /** Release notes to show, or null once dismissed / when this run doesn't qualify. */
-  whatsNew: { version: string; countdownSeconds: number } | null;
-  setWhatsNew: (payload: { version: string; countdownSeconds: number } | null) => void;
+  whatsNew: WhatsNewPayload | null;
+  setWhatsNew: (payload: WhatsNewPayload | null) => void;
   recomputeVisibility: () => void;
   resetAllFilters: (options?: { preserveBranches?: boolean }) => void;
   setIsRefreshing: (value: boolean) => void;

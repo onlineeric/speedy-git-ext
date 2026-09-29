@@ -71,8 +71,8 @@ export const vscodeCommandHandlers = {
 
   // Recorded on close rather than on send, so a reload before the user read it
   // shows the dialog again.
-  dismissWhatsNew: async (_message, context) => {
-    await context.markWhatsNewShown();
+  dismissWhatsNew: async (message, context) => {
+    await context.markWhatsNewShown(message.payload.version);
   },
 } satisfies Pick<
   RequestHandlerMap,
