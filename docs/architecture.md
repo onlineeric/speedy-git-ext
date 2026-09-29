@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-09-24**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-09-29**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -184,8 +184,10 @@ components/
 ```
 ├── ControlBar.tsx                # Top toolbar with actions, incl. "Open New Graph Tab" beside Go to HEAD and the
 │                                 #   peer-activity notice (informational; it disables nothing)
-├── ResponsiveToolbar.tsx         # Measures visible action widths; collapses right then left into More dropdowns,
-│                                 #   which reuse `menuPanelClass` and hide separators by `data-toolbar-separator`
+├── ResponsiveToolbar.tsx         # Measures visible action widths; collapses right, then the left group in two
+│                                 #   phases (unpinned items first, then pinned Refresh/Fetch/HEAD) into More
+│                                 #   dropdowns, which reuse `menuPanelClass` and hide separators by
+│                                 #   `data-toolbar-separator`. Items keep row position via flex `order`
 ├── ToolbarIconButton.tsx         # Shared toolbar button: icon + optional label (speedyGit.toolbar.showLabels);
 │                                 #   right-click menu toggles labels / Remote button, extensible via extraMenuItems
 ├── TogglePanel.tsx               # Collapsible panel for Filter/Search/Compare widgets
@@ -438,7 +440,7 @@ esbuild.config.mjs                # Production-only telemetry destination inject
 ```
 
 Tests live in `__tests__/` directories beside the code they cover (Vitest).
-`webview-ui/src/components/__tests__/ResponsiveToolbar.test.ts` covers collapse thresholds,
+`webview-ui/src/components/__tests__/ResponsiveToolbar.test.ts` covers collapse thresholds (incl. the left group's two phases),
 label/button visibility in inline and dropdown rendering, the Remote context-menu toggle,
 and compiled separator CSS. Static React rendering does not exercise DOM observers or layout.
 Branch checkout coverage includes `src/__tests__/branchCheckoutHandlers.test.ts` (execution, guards,
