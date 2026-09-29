@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findWhatsNewEntry, WHATS_NEW_ENTRIES } from '../whatsNewEntries';
+import { findUnseenWhatsNewEntry, findWhatsNewEntry, WHATS_NEW_ENTRIES } from '../whatsNewEntries';
 
 /** Exactly what `package.json` versions look like — the only strings a lookup can match. */
 const EXACT_VERSION = /^\d+\.\d+\.\d+$/;
@@ -17,6 +17,13 @@ describe('whatsNewEntries', () => {
 
   it('returns nothing for a version with no notes, which is how a release opts out', () => {
     expect(findWhatsNewEntry('0.0.0-nonexistent')).toBeUndefined();
+  });
+
+  it('resolves every entry for its own version until that entry has been seen', () => {
+    for (const entry of WHATS_NEW_ENTRIES) {
+      expect(findUnseenWhatsNewEntry(entry.version, undefined)).toBe(entry);
+      expect(findUnseenWhatsNewEntry(entry.version, entry.version)).toBeUndefined();
+    }
   });
 
   it('gives every entry a unique version, so the lookup cannot be ambiguous', () => {

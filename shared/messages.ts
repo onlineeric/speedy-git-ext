@@ -34,6 +34,7 @@ import type { FixupCommitArgsOptions } from './fixupCommit.js';
 import type { GitVersion } from './gitVersion.js';
 import type { UiTelemetryEvent } from './telemetry.js';
 import type { RefExpectation } from './refRevalidation.js';
+import type { WhatsNewPayload } from './whatsNew.js';
 
 export type RequestMessage =
   | { type: 'getCommits'; payload: { filters?: Partial<GraphFilters> } }
@@ -204,7 +205,7 @@ export type RequestMessage =
   // External browser
   | { type: 'openExternal'; payload: { url: string } }
   /** User closed the "What's new" dialog; stops it reappearing for this version. */
-  | { type: 'dismissWhatsNew'; payload: Record<string, never> }
+  | { type: 'dismissWhatsNew'; payload: { version: string } }
   // File actions
   | { type: 'openCurrentFile'; payload: { filePath: string } }
   // UI state persistence
@@ -304,7 +305,7 @@ export type ResponseMessage =
    * Sent only on a run that qualifies — the webview does not decide *whether*,
    * only whether it has content for `version` to show.
    */
-  | { type: 'whatsNew'; payload: { version: string; countdownSeconds: number } }
+  | { type: 'whatsNew'; payload: WhatsNewPayload }
   | { type: 'authorList'; payload: { authors: Author[] } }
   | { type: 'uncommittedChanges'; payload: UncommittedSummary }
   | { type: 'conflictState'; payload: ConflictState }

@@ -288,13 +288,10 @@ export class GraphTab {
     if (this.shared.whatsNewOfferedThisSession) return;
     this.shared.whatsNewOfferedThisSession = true;
 
-    const { show, countdownSeconds } = this.shared.whatsNew.decide();
-    if (!show) return;
+    const decision = this.shared.whatsNew.decide();
+    if (!decision) return;
 
-    this.postMessage({
-      type: 'whatsNew',
-      payload: { version: this.shared.whatsNew.currentVersion, countdownSeconds },
-    });
+    this.postMessage({ type: 'whatsNew', payload: decision });
   }
 
   private async handleMessage(message: RequestMessage): Promise<void> {
@@ -338,7 +335,7 @@ export class GraphTab {
         this.shared.activity.begin(this.runtime.identity?.gitDir ?? '', this.options.id, operation),
       sendRepoList: () => this.sendRepoList(),
       sendSettingsData: (settings) => this.sendSettingsData(settings),
-      markWhatsNewShown: () => this.shared.whatsNew.markShown(),
+      markWhatsNewShown: (entryVersion) => this.shared.whatsNew.markShown(entryVersion),
     };
   }
 

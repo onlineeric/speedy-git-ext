@@ -17,15 +17,18 @@ import {
   dialogOverlayClassName,
 } from './dialogStyles';
 import { SparkleIcon } from './icons';
-import { findWhatsNewEntry } from './whatsNewEntries';
+import { findUnseenWhatsNewEntry } from './whatsNewEntries';
 
 interface WhatsNewDialogProps {
-  /** Which release's content to show; nothing renders if that version has no entry. */
+  /** The running version; resolved to its series' notes, nothing renders if there are none. */
   version: string;
+  /** Entry version last dismissed; that entry does not render again. */
+  lastShownVersion: string | undefined;
   /** Seconds the close button stays disabled — shorter in development. */
   countdownSeconds: number;
   open: boolean;
-  onClose: () => void;
+  /** Receives the entry version shown, which is what gets recorded as seen. */
+  onClose: (shownVersion: string) => void;
 }
 
 /** The hero's wash: two theme accents fading into the dialog surface. */
@@ -41,7 +44,9 @@ const versionPillStyle: CSSProperties = {
 };
 
 /**
- * "What's new in vX.Y.Z", shown once per version on the first run after install.
+ * "What's new in vX.Y.Z", shown once per entry on the first run after install —
+ * a patch release without notes of its own shows its series' notes, and only if
+ * they have not been seen yet.
  *
  * Laid out as a poster rather than a notice — a gradient hero carrying the
  * headline and an optional illustration, then the entry's content — because its
@@ -56,8 +61,8 @@ const versionPillStyle: CSSProperties = {
  * Content comes from `whatsNewEntries`, so adding a release means adding an
  * entry there and nothing here.
  */
-export function WhatsNewDialog({ version, countdownSeconds, open, onClose }: WhatsNewDialogProps) {
-  const entry = findWhatsNewEntry(version);
+export function WhatsNewDialog({ version, lastShownVersion, countdownSeconds, open, onClose }: WhatsNewDialogProps) {
+  const entry = findUnseenWhatsNewEntry(version, lastShownVersion);
   const telemetry = useDialogTelemetry('whatsNew', open);
   const remaining = useCountdown(countdownSeconds, open && entry !== undefined);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -68,7 +73,7 @@ export function WhatsNewDialog({ version, countdownSeconds, open, onClose }: Wha
   const handleClose = () => {
     if (locked) return;
     telemetry.confirmed();
-    onClose();
+    onClose(entry.version);
   };
 
   return (

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { chooseWhatsNewEntryVersion } from '@shared/whatsNew';
 import { AutosquashIllustration } from './AutosquashIllustration';
 import { CommitNavigationIllustration } from './CommitNavigationIllustration';
 import { MultiTabIllustration } from './MultiTabIllustration';
@@ -47,7 +48,10 @@ const DELETED_LINE_STYLE = { color: DELETED_COLOR };
  * release notes demonstrate the actual badges instead of describing them.
  */
 export interface WhatsNewEntry {
-  /** Exact `package.json` version this content belongs to. */
+  /**
+   * Exact `package.json` version this content belongs to. It also covers the
+   * later patches of its series that have no entry of their own.
+   */
   version: string;
   /** One line under the title saying what the release is about; the hero's big type. */
   headline: string;
@@ -57,9 +61,10 @@ export interface WhatsNewEntry {
 }
 
 /**
- * Release notes shown on first run of a version. A version absent from this list
- * simply shows no dialog, so a release with nothing worth interrupting for needs
- * no other opt-out.
+ * Release notes shown on first run of a version. A patch absent from this list
+ * inherits its series' notes (5.18.1 → 5.18.0), shown only to users who have not
+ * seen them; a series with no entry at all shows no dialog, so a minor release
+ * with nothing worth interrupting for needs no other opt-out.
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
   {
@@ -548,7 +553,24 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
   },
 ];
 
-/** The content for a version, or `undefined` when that release has nothing to announce. */
+/** The entry filed under exactly this version, or `undefined` when there is none. */
 export function findWhatsNewEntry(version: string): WhatsNewEntry | undefined {
   return WHATS_NEW_ENTRIES.find((entry) => entry.version === version);
+}
+
+/**
+ * The entry the running version should show — its series' latest notes at or
+ * below it — or `undefined` when there are none or `lastShownVersion` says they
+ * were already dismissed.
+ */
+export function findUnseenWhatsNewEntry(
+  currentVersion: string,
+  lastShownVersion: string | undefined,
+): WhatsNewEntry | undefined {
+  const entryVersion = chooseWhatsNewEntryVersion({
+    currentVersion,
+    lastShownVersion,
+    entryVersions: WHATS_NEW_ENTRIES.map((entry) => entry.version),
+  });
+  return entryVersion === undefined ? undefined : findWhatsNewEntry(entryVersion);
 }
