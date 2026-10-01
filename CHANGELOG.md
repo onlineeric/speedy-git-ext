@@ -4,6 +4,19 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.18.2] - 2026-10-01
+
+### Fixed
+- **Author tooltips now show the email.** Hovering an author's name in the Author column, or in the commit details panel, shows `Name <email>` the way Git prints it. Before, the column's tooltip repeated only the name and the details panel had no tooltip at all. The author chips in the filter bar show the same tooltip.
+
+## [5.18.1] - 2026-09-29
+
+### Changed
+- **The left toolbar group collapses in two steps.** When the toolbar narrows, the left group no longer moves into its three-dot dropdown all at once. Filter, Search, Compare, Worktrees and Open New Graph Tab collapse first, while Refresh, Fetch and Go to HEAD stay in the row; only when space runs out does the rest follow. Every button keeps its right-click menu and dialogs in either place, and the full-width layout is unchanged.
+
+### Fixed
+- **Patch releases now show their release's What's New notes.** A patch with no notes of its own showed no dialog, so updating straight from an older version to a patch skipped the notes for the release it belongs to. A patch now shows its release's notes, once, to anyone who has not already seen them, and never again to someone who has.
+
 ## [5.18.0] - 2026-09-24
 
 ### Added
