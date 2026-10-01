@@ -378,7 +378,10 @@ function renderColumn({
           {avatarsEnabled && commit.author && !isUncommitted ? (
             <AuthorAvatar author={commit.author} email={commit.authorEmail} />
           ) : null}
-          <span className="truncate text-xs text-[var(--vscode-descriptionForeground)]" title={formatAuthorIdentity(commit.author, commit.authorEmail)}>
+          <span
+            className="truncate text-xs text-[var(--vscode-descriptionForeground)]"
+            title={formatAuthorIdentity(commit.author, commit.authorEmail)}
+          >
             <HighlightedText text={commit.author} terms={searchTerms} />
           </span>
         </div>
