@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react';
 import type { Commit, CommitTableColumnId, TagMetadata, UserSettings, WorktreeInfo } from '@shared/types';
 import type { GraphTopology } from '../utils/graphTopology';
 import { useGraphStore } from '../stores/graphStore';
+import { formatAuthorIdentity } from '../utils/authorIdentity';
 import { GraphCell } from './GraphCell';
 import { CommitContextMenu } from './CommitContextMenu';
 import { BranchContextMenu } from './BranchContextMenu';
@@ -377,7 +378,7 @@ function renderColumn({
           {avatarsEnabled && commit.author && !isUncommitted ? (
             <AuthorAvatar author={commit.author} email={commit.authorEmail} />
           ) : null}
-          <span className="truncate text-xs text-[var(--vscode-descriptionForeground)]" title={commit.author}>
+          <span className="truncate text-xs text-[var(--vscode-descriptionForeground)]" title={formatAuthorIdentity(commit.author, commit.authorEmail)}>
             <HighlightedText text={commit.author} terms={searchTerms} />
           </span>
         </div>

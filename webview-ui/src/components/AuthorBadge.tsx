@@ -1,3 +1,4 @@
+import { formatAuthorIdentity } from '../utils/authorIdentity';
 import { AuthorAvatar } from './AuthorAvatar';
 
 type AuthorBadgeVariant = 'chip' | 'inline';
@@ -27,7 +28,9 @@ export function AuthorBadge({
       className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded ${VARIANT_CLASSES[variant]} ${className ?? ''}`}
     >
       <AuthorAvatar author={name} email={email} />
-      <span className="truncate max-w-[120px]">{name}</span>
+      <span className="truncate max-w-[120px]" title={formatAuthorIdentity(name, email)}>
+        {name}
+      </span>
       {onRemove && (
         <button
           onClick={(e) => {
