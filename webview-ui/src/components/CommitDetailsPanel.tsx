@@ -14,6 +14,7 @@ import { CloseIcon, MoveRightIcon, MoveBottomIcon, ChevronDownIcon, ChevronRight
 import { FileChangesTreeView } from './FileChangesTreeView';
 import { FileChangeRow, ViewModeToggle } from './FileChangeShared';
 import { AuthorBadge } from './AuthorBadge';
+import { formatAuthorIdentity } from '../utils/authorIdentity';
 import { DiscardDialog } from './DiscardDialog';
 
 const MIN_SIZE = 120;
@@ -490,7 +491,7 @@ function CommitMetadata({ details }: { details: CommitDetails }) {
       {details.committer !== details.author && (
         <MetadataRow
           label="Committer"
-          value={`${details.committer} <${details.committerEmail}>`}
+          value={formatAuthorIdentity(details.committer, details.committerEmail)}
         />
       )}
       {details.body && (

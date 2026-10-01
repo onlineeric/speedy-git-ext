@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { buildGravatarUrl, getAvatarBackgroundColor, getGravatarCacheState, getInitials, setGravatarCacheState } from '../utils/gravatar';
 import { useGraphStore } from '../stores/graphStore';
+import { formatAuthorIdentity } from '../utils/authorIdentity';
 
 interface AuthorAvatarProps {
   author: string;
@@ -40,7 +41,7 @@ export function AuthorAvatar({ author, email }: AuthorAvatarProps) {
 
   const initials = getInitials(author);
   const backgroundColor = getAvatarBackgroundColor(email);
-  const title = email ? `${author} <${email}>` : author;
+  const title = formatAuthorIdentity(author, email);
   const effectiveState = loadState.email === email ? loadState.state : cachedState ?? 'loading';
   const effectiveGitHubUrl = gitHubAvatarFailed ? undefined : gitHubAvatarUrl;
   const avatarSrc = effectiveGitHubUrl ?? (effectiveState === 'loaded' ? buildGravatarUrl(email) : null);

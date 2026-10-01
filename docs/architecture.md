@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-09-29**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-10-01**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -401,6 +401,7 @@ utils/
 ├── colorUtils.ts                 # Graph color cycling + theme helpers
 ├── formatDate.ts                 # Commit-date formatting
 ├── gravatar.ts                   # Gravatar URL builder + load-state cache
+├── authorIdentity.ts             # formatAuthorIdentity: `Name <email>` (git's form) for author/committer tooltips
 ├── stashMessage.ts               # Format stash entries for display
 ├── uncommittedUtils.ts           # Helpers for the uncommitted-node row
 ├── repoPath.ts                   # Repo path normalization
