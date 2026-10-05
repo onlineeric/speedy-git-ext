@@ -4,6 +4,14 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.18.3] - 2026-10-05
+
+### Fixed
+- **Stashes now show their untracked files.** A stash made with untracked files included (`git stash -u`, or Speedy Git's own Stash) keeps them in a separate snapshot commit, and the details panel did not read it. A stash holding only untracked files showed "0 files changed" and an empty list. The details panel now lists them, like `git stash show -u`: tracked changes under **Changes**, untracked files under **Untracked Files**, and the summary counts them, for example "1 file changed (1 untracked)". Clicking an untracked file opens its stashed content in a diff.
+
+### Credits — Stash untracked files (#204)
+- Thanks to [@asharifauzan](https://github.com/asharifauzan) for reporting that stashed untracked files were missing from the details panel in [#204](https://github.com/onlineeric/speedy-git-ext/issues/204)!
+
 ## [5.18.2] - 2026-10-01
 
 ### Fixed

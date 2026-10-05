@@ -391,6 +391,12 @@ export interface CommitDetails {
    * Absent when it could not be read — a hash-only tooltip is the fallback.
    */
   parentSubjects?: string[];
+  /**
+   * A stash made with `-u`: its untracked-files snapshot commit (the third parent).
+   * Files read from it are in `files` with status `untracked`, and their content
+   * lives in this commit, not in the stash commit itself. Absent for every other commit.
+   */
+  stashUntrackedHash?: string;
   author: string;
   authorEmail: string;
   authorDate: number;

@@ -24,6 +24,13 @@ const SUBMODULE_DIRTY_SUFFIX = '-dirty';
  *  We use %x00 instead of literal \x00 because Node.js spawn rejects args containing null bytes. */
 const SHOW_FORMAT = '%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x00%s%x00%b';
 
+/**
+ * Subject git gives the untracked-files snapshot of `git stash -u` (builtin/stash.c).
+ * Together with "third parent of the commit" it is what tells a stash's snapshot apart
+ * from the third parent of an ordinary octopus merge.
+ */
+const STASH_UNTRACKED_SUBJECT_PREFIX = 'untracked files on ';
+
 export class GitDiffService {
   private executor: GitExecutor;
 
@@ -60,10 +67,15 @@ export class GitDiffService {
     const numstatArgs = isMerge
       ? ['diff-tree', '--no-commit-id', '--numstat', '-r', '-z', `${hash}^1`, hash]
       : ['diff-tree', '--no-commit-id', '--numstat', '-r', '--root', '-z', hash];
-    const [filesResult, statsResult, parentSubjects] = await Promise.all([
+    // A stash made with `-u` keeps its untracked files in a third, parentless commit,
+    // which the first-parent diff never sees. Read it alongside, like `git stash show -u`;
+    // only a three-parent commit pays the extra spawns, and only a stash keeps the result.
+    const untrackedCandidate = meta.parents.length === 3 ? meta.parents[2] : undefined;
+    const [filesResult, statsResult, parentSubjects, untrackedResult] = await Promise.all([
       this.getDiffFileChanges(hash, isMerge),
       this.executor.execute({ args: numstatArgs, cwd: this.workspacePath }),
       this.getParentSubjects(meta.parents),
+      untrackedCandidate ? this.getStashUntrackedFiles(untrackedCandidate) : Promise.resolve(undefined),
     ]);
 
     if (!filesResult.success) {
@@ -78,12 +90,47 @@ export class GitDiffService {
       ? parseNumstat(statsResult.value.stdout, filesResult.value, this.log)
       : { additions: 0, deletions: 0 };
 
+    const isStashUntracked = untrackedResult !== undefined
+      && parentSubjects?.[2]?.startsWith(STASH_UNTRACKED_SUBJECT_PREFIX) === true;
+    const files = isStashUntracked ? [...filesResult.value, ...untrackedResult.files] : filesResult.value;
+    if (isStashUntracked) {
+      stats.additions += untrackedResult.stats.additions;
+      stats.deletions += untrackedResult.stats.deletions;
+    }
+
     return ok({
       ...meta,
       ...(parentSubjects ? { parentSubjects } : {}),
-      files: filesResult.value,
+      ...(isStashUntracked ? { stashUntrackedHash: untrackedCandidate } : {}),
+      files,
       stats,
     });
+  }
+
+  /**
+   * The files in a stash's untracked snapshot, tagged `untracked`. The snapshot is a
+   * root commit, so `--root` lists every file in it as added. Undefined when it could
+   * not be read — the stash still shows its tracked changes.
+   */
+  private async getStashUntrackedFiles(
+    untrackedHash: string,
+  ): Promise<{ files: FileChange[]; stats: { additions: number; deletions: number } } | undefined> {
+    const [filesResult, statsResult] = await Promise.all([
+      this.getDiffFileChanges(untrackedHash),
+      this.executor.execute({
+        args: ['diff-tree', '--no-commit-id', '--numstat', '-r', '--root', '-z', untrackedHash],
+        cwd: this.workspacePath,
+      }),
+    ]);
+    if (!filesResult.success) {
+      this.log.warn(`Stash untracked files lookup failed: ${filesResult.error.message}`);
+      return undefined;
+    }
+    const files = filesResult.value.map((file): FileChange => ({ ...file, status: 'untracked' }));
+    const stats = statsResult.success
+      ? parseNumstat(statsResult.value.stdout, files, this.log)
+      : { additions: 0, deletions: 0 };
+    return { files, stats };
   }
 
   /**

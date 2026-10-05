@@ -98,6 +98,62 @@ describe('GitDiffService.getCommitDetails', () => {
   });
 });
 
+describe('GitDiffService.getCommitDetails — stash untracked files', () => {
+  const stash = 'e'.repeat(40);
+  const untracked = 'f'.repeat(40);
+
+  function mockStash(service: GitDiffService, untrackedSubject: string) {
+    const meta = [stash, 'eeeeeee', `base index ${untracked}`, 'A', 'a@x', '1', 'A', 'a@x', '1', 'WIP on main: abc fix', ''].join(NUL);
+    return vi.spyOn(service['executor'], 'execute').mockImplementation(async ({ args }) => {
+      if (args[0] === 'show') return { success: true, value: { stdout: meta, stderr: '' } };
+      if (args[0] === 'log') return { success: true, value: { stdout: `abc fix\nindex on main\n${untrackedSubject}\n`, stderr: '' } };
+      const target = args[args.length - 1];
+      if (target === untracked) {
+        const stdout = args.includes('--numstat')
+          ? ['3\t0\tnew.txt', '-\t-\timg.png'].join(NUL) + NUL
+          : [':000000 100644 0000000 aaaaaaa A', 'new.txt', ':000000 100644 0000000 bbbbbbb A', 'img.png'].join(NUL) + NUL;
+        return { success: true, value: { stdout, stderr: '' } };
+      }
+      const stdout = args.includes('--numstat')
+        ? ['1\t1\tsrc/a.ts'].join(NUL) + NUL
+        : [':100644 100644 ccccccc ddddddd M', 'src/a.ts'].join(NUL) + NUL;
+      return { success: true, value: { stdout, stderr: '' } };
+    });
+  }
+
+  it('lists the untracked snapshot\'s files as untracked, like `git stash show -u`', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    mockStash(service, 'untracked files on main: abc fix');
+
+    const result = await service.getCommitDetails(stash);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.stashUntrackedHash).toBe(untracked);
+      expect(result.value.files).toEqual([
+        { path: 'src/a.ts', status: 'modified', additions: 1, deletions: 1 },
+        { path: 'new.txt', status: 'untracked', additions: 3, deletions: 0 },
+        { path: 'img.png', status: 'untracked' },
+      ]);
+      expect(result.value.stats).toEqual({ additions: 4, deletions: 1 });
+    }
+  });
+
+  it('leaves a three-parent commit that is not a stash untouched', async () => {
+    const service = new GitDiffService('/repo', mockLog);
+    mockStash(service, 'feat: third branch of an octopus merge');
+
+    const result = await service.getCommitDetails(stash);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.stashUntrackedHash).toBeUndefined();
+      expect(result.value.files).toEqual([{ path: 'src/a.ts', status: 'modified', additions: 1, deletions: 1 }]);
+      expect(result.value.stats).toEqual({ additions: 1, deletions: 1 });
+    }
+  });
+});
+
 describe('GitDiffService.getDiffFileChanges', () => {
   it('parses simple modified/added/deleted entries', async () => {
     const service = new GitDiffService('/repo', mockLog);

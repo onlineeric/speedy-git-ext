@@ -68,6 +68,34 @@ export interface WhatsNewEntry {
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
   {
+    version: '5.18.3',
+    headline: 'Stashes now show the untracked files they hold.',
+    content: (
+      <div className="space-y-6">
+        <ContributorThanks login="asharifauzan">
+          Thank you for reporting in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/204">#204</ExternalLink> that a
+          stash with untracked files showed “0 files changed”. It is fixed: the details panel now lists them, like{' '}
+          <code>git stash show -u</code>.
+        </ContributorThanks>
+
+        <WhatsNewSection title="Everything in the stash, in one place">
+          <FeatureGrid>
+            <FeatureCard mark="U" title="Untracked files are listed" gitFlag="-u" accent={SHOWCASE_GREEN_COLOR}>
+              Click a stash made with untracked files included. They appear in their own{' '}
+              <UiLabel>Untracked Files</UiLabel> section, under the stash’s <UiLabel>Changes</UiLabel>, and the
+              summary counts them — for example <UiLabel>1 file changed (1 untracked)</UiLabel>.
+            </FeatureCard>
+            <FeatureCard mark="↔" title="Open them like any file" accent={SHOWCASE_BLUE_COLOR}>
+              Click an untracked file to see its stashed content in a diff, or open it at that stash with the file’s
+              own icon.
+            </FeatureCard>
+          </FeatureGrid>
+        </WhatsNewSection>
+      </div>
+    ),
+  },
+  {
     version: '5.18.0',
     headline: 'Jump to a commit’s parent or child straight from the details panel.',
     illustration: <CommitNavigationIllustration />,

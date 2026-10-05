@@ -7,7 +7,7 @@ import { formatRelativeDate } from '../utils/formatDate';
 import { renderInlineCode } from '../utils/inlineCodeRenderer';
 import { slotLabel } from '../utils/compareSlot';
 import { signatureGlyph } from '../utils/signatureGlyph';
-import { ADDED_COLOR, DELETED_COLOR, ERROR_COLOR, NEUTRAL_COLOR } from '../utils/themeColors';
+import { ADDED_COLOR, DELETED_COLOR, ERROR_COLOR, NEUTRAL_COLOR, UNTRACKED_COLOR } from '../utils/themeColors';
 import { buildChildLinks, buildParentLinks, relatedCommitTooltip, type RelatedCommitLink } from '../utils/commitRelations';
 import { trackUiInteraction } from '../utils/telemetry';
 import { CloseIcon, MoveRightIcon, MoveBottomIcon, ChevronDownIcon, ChevronRightIcon, InfoIcon, GoToHeadIcon } from './icons';
@@ -746,6 +746,11 @@ function FileChangesList({
       }
       return;
     }
+    if (file.status === 'untracked' && details.stashUntrackedHash) {
+      // A stash's untracked file lives in its untracked snapshot, not in the stash commit.
+      rpcClient.openDiff(details.stashUntrackedHash, file.path, details.parents[0]);
+      return;
+    }
     if (file.status === 'deleted') {
       const parentHash = details.parents[0];
       if (parentHash) {
@@ -778,7 +783,7 @@ function FileChangesList({
           <ViewModeToggle />
         </div>
         {conflictFiles.length > 0 && (
-          <UncommittedFileSection
+          <FileChangeSection
             title={`${conflictType === 'rebase' ? 'Rebase' : conflictType === 'cherry-pick' ? 'Cherry-pick' : 'Merge'} Conflicts`}
             files={conflictFiles}
             commitHash={details.hash}
@@ -789,7 +794,7 @@ function FileChangesList({
           />
         )}
         {stagedFiles.length > 0 && (
-          <UncommittedFileSection
+          <FileChangeSection
             title="Staged Changes"
             files={stagedFiles}
             commitHash={details.hash}
@@ -802,7 +807,7 @@ function FileChangesList({
           />
         )}
         {unstagedFiles.length > 0 && (
-          <UncommittedFileSection
+          <FileChangeSection
             title="Unstaged Changes"
             files={unstagedFiles}
             commitHash={details.hash}
@@ -821,6 +826,44 @@ function FileChangesList({
           file={discardFile}
           onConfirm={handleDiscardConfirm}
         />
+      </div>
+    );
+  }
+
+  if (details.stashUntrackedHash) {
+    const trackedFiles = details.files.filter((file) => file.status !== 'untracked');
+    const untrackedFiles = details.files.filter((file) => file.status === 'untracked');
+    return (
+      <div className={`px-3 py-2 ${splitLayout ? 'h-full' : ''}`}>
+        <div className="mb-1 flex items-center gap-2">
+          <span className="text-xs text-[var(--vscode-descriptionForeground)]">
+            {details.files.length} file{details.files.length !== 1 ? 's' : ''} changed
+            {untrackedFiles.length > 0 && ` (${untrackedFiles.length} untracked)`}
+          </span>
+          <ViewModeToggle />
+        </div>
+        {trackedFiles.length > 0 && (
+          <FileChangeSection
+            title="Changes"
+            files={trackedFiles}
+            commitHash={details.hash}
+            parentHash={details.parents[0]}
+            onFileClick={handleFileClick}
+            fileViewMode={fileViewMode}
+            variant="changes"
+          />
+        )}
+        {untrackedFiles.length > 0 && (
+          <FileChangeSection
+            title="Untracked Files"
+            files={untrackedFiles}
+            commitHash={details.stashUntrackedHash}
+            parentHash={details.parents[0]}
+            onFileClick={handleFileClick}
+            fileViewMode={fileViewMode}
+            variant="untracked"
+          />
+        )}
       </div>
     );
   }
@@ -857,7 +900,7 @@ function FileChangesList({
   );
 }
 
-function UncommittedFileSection({
+function FileChangeSection({
   title,
   files,
   commitHash,
@@ -875,7 +918,7 @@ function UncommittedFileSection({
   parentHash?: string;
   onFileClick: (file: FileChange) => void;
   fileViewMode: FileViewMode;
-  variant: 'staged' | 'unstaged' | 'conflict';
+  variant: 'staged' | 'unstaged' | 'conflict' | 'changes' | 'untracked';
   onBulkAction?: () => void;
   bulkActionLabel?: string;
   onDiscardClick?: (file: FileChange) => void;
@@ -887,7 +930,9 @@ function UncommittedFileSection({
       ? ERROR_COLOR
       : variant === 'staged'
         ? ADDED_COLOR
-        : NEUTRAL_COLOR;
+        : variant === 'untracked'
+          ? UNTRACKED_COLOR
+          : NEUTRAL_COLOR;
 
   return (
     <div className="mb-2">
