@@ -17,6 +17,11 @@ export default defineConfig({
   build: {
     outDir: '../dist/webview',
     emptyOutDir: true,
+    // Inline every imported asset (images in What's New) as a data: URL. An
+    // emitted file would be referenced as `/assets/…`, which the webview cannot
+    // resolve: the page's origin is not the extension folder, and the script is
+    // not a module, so there is no `import.meta.url` to resolve against.
+    assetsInlineLimit: () => true,
     rollupOptions: {
       input: resolve(__dirname, 'index.html'),
       output: {

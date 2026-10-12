@@ -274,6 +274,7 @@ Menu/dialog composition:
   - **Every menu item or control name is a `UiLabel`** — the orange marker highlight, which wraps rather than overflowing a narrow card — so readers can spot the exact text in the real UI. Spell it exactly as the menu does.
   - **Alternatives are not a sequence**: label them `2A`/`2B` and mark the second `alternative` (draws the "or" joint), rather than numbering choices as consecutive steps.
   - All colors via `themeColors.ts` (`SHOWCASE_*` accents + `tint()`); the layout must still work in a narrow panel (grids collapse to one column).
+  - **A real screenshot** goes through `Screenshot` (optionally with numbered `pins` + a `ScreenshotPinLegend`; 5.19.0 is the example). Import the PNG from `resources/` — the webview build inlines every imported asset as a `data:` URL (`vite.config.ts`), because an emitted file cannot resolve inside the webview. Every byte lands in `index.js`, so keep screenshots small and cropped.
 
   Their general leanings — still confirm each release rather than applying these silently:
 

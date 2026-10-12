@@ -179,6 +179,9 @@ components/
 ├── AuthorAvatar.tsx              # Gravatar/GitHub avatar with initials fallback + load-state cache
 ├── AuthorBadge.tsx               # Author chip/inline label wrapping AuthorAvatar
 └── icons/index.tsx               # All SVG icon components
+
+webview-ui/src/assets.d.ts        # `*.png` imports are `data:` URLs — vite.config.ts inlines every asset, since an
+                                  #   emitted `/assets/…` file cannot resolve in the webview (CSP: `img-src data:`)
 ```
 
 ### Toolbar, panels, widgets
@@ -280,11 +283,13 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── RefBadgeLegend.tsx            # Standalone "Badge Legend" section; samples are real `RefLabel`s in lane-0 color
 │                                 #   so it can't drift from the graph. Needs no props — reused by the What's New dialog
 ├── WhatsNewDialog.tsx            # First-run release notes, poster layout (gradient hero + headline + optional
-│                                 #   illustration); close button counts down before enabling (Esc/outside held too)
+│                                 #   illustration); hero scrolls with the content, only the footer is pinned;
+│                                 #   close button counts down before enabling (Esc/outside held too)
 ├── whatsNewEntries.tsx           # Per-version release-note content. A patch with no entry inherits its series'
 │                                 #   notes (5.18.1 → 5.18.0) unless already seen; a series with no entry shows nothing
 ├── whatsNewBlocks.tsx            # Poster pieces entries compose: ContributorThanks, FeatureCard/Grid, Step/StepFlow,
-│                                 #   UiLabel, ToolbarButtonSample, WhatsNewSection, ExternalLink
+│                                 #   UiLabel, ToolbarButtonSample, WhatsNewSection, ExternalLink, Screenshot (+ numbered
+│                                 #   pins in percent) and ScreenshotPinLegend/Item. Screenshots live in `resources/`
 ├── AutosquashIllustration.tsx    # 5.16.0 hero: animated mini-graph of a fixup! commit folding into its target
 ├── MultiTabIllustration.tsx      # 5.17.0 hero: animated miniature of the New Tab button opening a second graph group
 ├── CommitNavigationIllustration.tsx # 5.18.0 hero: animated miniature of Go to parent commit landing on the parent row
