@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { GitError } from '../../../shared/errors.js';
+import { isHttpUrl } from '../../../shared/autolinks.js';
 import { normalizeWorktreeFolderNameStyle, WORKTREE_STYLE_LABELS } from '../../../shared/types.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
 import { updateSpeedyGitSetting, updateSpeedyGitSettingInDefinedScope } from './updateSpeedyGitSetting.js';
@@ -61,7 +62,12 @@ export const vscodeCommandHandlers = {
     context.postMessage({ type: 'success', payload: { message: 'Copied to clipboard' } });
   },
 
+  /**
+   * Only http(s) is opened. Commit messages now feed this through autolinks built
+   * from user settings, so a `command:` or `file:` URL must never get through.
+   */
   openExternal: async (message) => {
+    if (!isHttpUrl(message.payload.url)) return;
     await vscode.env.openExternal(vscode.Uri.parse(message.payload.url));
   },
 

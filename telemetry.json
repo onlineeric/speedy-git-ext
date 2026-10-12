@@ -58,12 +58,12 @@
       "surface": {
         "classification": "SystemMetaData",
         "purpose": "FeatureInsight",
-        "comment": "UI surface id from the closed catalog (e.g. commitMenu, toolbar, branchBadge, commitDetails)."
+        "comment": "UI surface id from the closed catalog (e.g. commitMenu, toolbar, branchBadge, commitDetails, commitRow, commitTooltip, autolinkSettings)."
       },
       "action": {
         "classification": "SystemMetaData",
         "purpose": "FeatureInsight",
-        "comment": "Action id from the closed catalog (e.g. cherryPick, copyHash, checkoutDoubleClick, moreActions, moreOptions, goToParent, goToChild)."
+        "comment": "Action id from the closed catalog (e.g. cherryPick, copyHash, checkoutDoubleClick, moreActions, moreOptions, goToParent, goToChild, openAutolinkCustom, openAutolinkGitHub, openAutolinkGitLab)."
       }
     },
     "dialogOutcome": {
@@ -109,6 +109,11 @@
         "purpose": "FeatureInsight",
         "comment": "'true' | 'false'."
       },
+      "remoteAutolinksEnabled": {
+        "classification": "SystemMetaData",
+        "purpose": "FeatureInsight",
+        "comment": "'true' | 'false' \u2014 whether #123-style references link to the GitHub/GitLab remote."
+      },
       "statusBarText": {
         "classification": "SystemMetaData",
         "purpose": "FeatureInsight",
@@ -136,6 +141,12 @@
         "purpose": "FeatureInsight",
         "isMeasurement": true,
         "comment": "Configured days before a cached avatar is refreshed (clamped 1-365). Reviewed numeric setting; never repository or author data."
+      },
+      "customAutolinkCount": {
+        "classification": "SystemMetaData",
+        "purpose": "FeatureInsight",
+        "isMeasurement": true,
+        "comment": "Number of configured custom autolink entries. A count only; never their prefixes or URLs."
       }
     },
     "perf": {

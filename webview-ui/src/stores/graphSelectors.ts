@@ -9,6 +9,7 @@
  */
 import type { CSSProperties } from 'react';
 import type { Branch } from '@shared/types';
+import { getAutolinkRules, type AutolinkRule } from '../utils/autolinks';
 import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils';
 import { useGraphStore } from './graphStore';
 
@@ -76,4 +77,18 @@ export function useFirstLaneBadgeStyle(): { laneColor: string; laneColorStyle: C
   const graphColors = useGraphStore((s) => s.userSettings.graphColors);
   const laneColor = getColor(0, resolvePalette(graphColors));
   return { laneColor, laneColorStyle: getLaneColorStyle(laneColor) };
+}
+
+/**
+ * The autolink rules for this tab's repository: custom entries plus, when
+ * enabled and confidently detected, the GitHub/GitLab remote's references.
+ *
+ * Returns the same array until a setting or the remote list changes, so every
+ * row, the details panel and the tooltip can each ask without breaking a memo.
+ */
+export function useAutolinkRules(): readonly AutolinkRule[] {
+  const customAutolinks = useGraphStore((s) => s.userSettings.customAutolinks);
+  const remoteAutolinksEnabled = useGraphStore((s) => s.userSettings.remoteAutolinksEnabled);
+  const remotes = useGraphStore((s) => s.remotes);
+  return getAutolinkRules(customAutolinks, remoteAutolinksEnabled, remotes);
 }

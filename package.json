@@ -2,7 +2,7 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "5.18.3",
+  "version": "5.19.0",
   "publisher": "onlineeric",
   "license": "MIT",
   "repository": {
@@ -217,6 +217,43 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Show the Remote (Manage Remotes) button in the toolbar. You can also toggle this by right-clicking the View, Remote, or Settings toolbar button."
+        },
+        "speedyGit.autolinks.remoteProvider.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Turn issue and pull request references in commit messages into links to the repository's GitHub or GitLab page: `#123` and `GH-123` on GitHub, `#123` (issue) and `!123` (merge request) on GitLab, and `owner/repo#123` on either. Links are added only when the remote is on `github.com` or `gitlab.com`: the remote is the only one, or `upstream`, or else `origin`. Any other host gets no links, so a link never points somewhere it might be wrong."
+        },
+        "speedyGit.autolinks.custom": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "required": [
+              "prefix",
+              "url"
+            ],
+            "properties": {
+              "prefix": {
+                "type": "string",
+                "markdownDescription": "Text that comes before the number, e.g. `ABCD-`."
+              },
+              "url": {
+                "type": "string",
+                "markdownDescription": "Link to open, with `<num>` where the number goes, e.g. `https://jira.example.com/browse/ABCD-<num>`. Must be an `http://` or `https://` URL."
+              },
+              "ignoreCase": {
+                "type": "boolean",
+                "default": false,
+                "markdownDescription": "Match the prefix in any letter case."
+              },
+              "alphanumeric": {
+                "type": "boolean",
+                "default": false,
+                "markdownDescription": "Match letters and digits after the prefix, not only digits."
+              }
+            }
+          },
+          "markdownDescription": "Turn ticket references in commit messages into links, e.g. Jira keys like `ABCD-123`. Each entry is a `prefix` and a `url` with `<num>` where the number goes. The format matches GitLens's `gitlens.autolinks`, so an existing GitLens list can be copied in. You can also edit this list from the graph's **View** settings."
         },
         "speedyGit.worktree.basePath": {
           "type": "string",

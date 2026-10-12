@@ -4,6 +4,19 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.19.0] - 2026-10-12
+
+### Added
+- **Custom autolinks.** Ticket references in commit messages, such as Jira keys like `ABCD-123`, can now be links. Add an entry with a prefix (`ABCD-`) and a URL with `<num>` where the number goes (`https://jira.example.com/browse/ABCD-<num>`), and every matching reference opens its ticket in the browser. Set them up in the new **Autolinks** section of the **View** settings dialog, or in the `speedyGit.autolinks.custom` VS Code setting; both edit the same setting. Saving checks every entry first: a missing prefix, a URL without `<num>`, a URL that is not `http://` or `https://`, or a repeated prefix is pointed out, and nothing is saved until it is fixed. The format is GitLens's `gitlens.autolinks`, including the optional `ignoreCase` and `alphanumeric` options, so an existing GitLens list can be copied in.
+- **GitHub and GitLab autolinks.** Issue and pull request references in commit messages now link to the repository's page: `#123` and `GH-123` on GitHub, `#123` (issue) and `!123` (merge request) on GitLab, and `owner/repo#123` on either. A link is added only when it is clear which repository a reference means: the remote must be on `github.com` or `gitlab.com`, and it must be the only remote, or `upstream`, or otherwise `origin`. Self-hosted servers and any other set of remotes get no links, so a link never points somewhere it might be wrong. On by default; turn it off in the **View** settings dialog or with `speedyGit.autolinks.remoteProvider.enabled`.
+- **Autolinks appear everywhere a commit message does.** In the commit list's Message column, the details panel's subject and body, and the commit tooltip's External Links. Clicking a link opens it in the browser without selecting the row, and hovering shows where it goes. References inside `` `inline code` `` or inside a URL already in the message are not linked.
+
+### Changed
+- **The commit tooltip's External Links use the same rules.** They used to link `#123` against the first GitHub remote found, whichever it was, and list Jira-style keys as plain text. They now show exactly the links the message itself shows.
+
+### Credits — Autolinks (#206)
+- Thanks to [@jinho9265](https://github.com/jinho9265) for requesting links from Jira ticket keys in commit messages in [#206](https://github.com/onlineeric/speedy-git-ext/issues/206)!
+
 ## [5.18.3] - 2026-10-05
 
 ### Fixed

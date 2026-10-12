@@ -3,6 +3,7 @@ import type { RequestMessage, ResponseMessage } from '../../shared/messages.js';
 import { GIT_ERROR_CODES, type GitErrorCode } from '../../shared/errors.js';
 import { MUTATING_OPERATIONS, TRACKED_OPERATIONS, type TrackedOperation } from '../../shared/telemetry.js';
 import type { WebviewRequestContext } from './WebviewRequestContext.js';
+import { autolinkHandlers } from './handlers/autolinkHandlers.js';
 import { avatarHandlers } from './handlers/avatarHandlers.js';
 import { branchHandlers } from './handlers/branchHandlers.js';
 import { commitHandlers } from './handlers/commitHandlers.js';
@@ -44,6 +45,7 @@ export const requestHandlers = {
   ...vscodeCommandHandlers,
   ...telemetryHandlers,
   ...avatarHandlers,
+  ...autolinkHandlers,
 } satisfies RequestHandlerMap;
 
 /**

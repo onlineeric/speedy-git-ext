@@ -28,6 +28,7 @@ import {
   setCommitTableColumnVisibility,
 } from '../utils/commitTableLayout';
 import { trackUiInteraction } from '../utils/telemetry';
+import { AutolinkSettingsSection } from './AutolinkSettingsSection';
 import { AvatarSettingsSection } from './AvatarSettingsSection';
 import {
   buttonSecondaryClassName,
@@ -143,11 +144,12 @@ export function ViewSettingsDialog() {
             View settings
           </Dialog.Title>
           <Dialog.Description className="mb-4 text-xs text-[var(--vscode-descriptionForeground)]">
-            Choose which columns appear in the commit list and how author avatars are loaded.
+            Choose which columns appear in the commit list, how author avatars are loaded, and which references in commit messages become links.
           </Dialog.Description>
 
-          {/* Two columns so neither half grows tall enough to need scrolling.
-              Stacks on narrow panels, where side-by-side would be unreadable. */}
+          {/* Two columns so neither half grows tall enough to need scrolling, with
+              Autolinks spanning both below them. Stacks on narrow panels, where
+              side-by-side would be unreadable. */}
           <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto md:grid-cols-2">
             <section className="min-w-0">
               <div className={dialogSectionLabelClassName}>Columns</div>
@@ -191,6 +193,10 @@ export function ViewSettingsDialog() {
 
             <div className="min-w-0 md:border-l md:border-[var(--vscode-panel-border)] md:pl-6">
               <AvatarSettingsSection />
+            </div>
+
+            <div className="min-w-0 border-t border-[var(--vscode-panel-border)] pt-4 md:col-span-2">
+              <AutolinkSettingsSection />
             </div>
           </div>
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { chooseUnseenWhatsNewEntry, type WhatsNewPayload } from '@shared/whatsNew';
+import { AutolinksIllustration } from './AutolinksIllustration';
 import { AutosquashIllustration } from './AutosquashIllustration';
 import { CommitNavigationIllustration } from './CommitNavigationIllustration';
 import { MultiTabIllustration } from './MultiTabIllustration';
@@ -67,6 +68,60 @@ export interface WhatsNewEntry {
  * with nothing worth interrupting for needs no other opt-out.
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
+  {
+    version: '5.19.0',
+    headline: 'Jira keys and issue numbers in commit messages are now links.',
+    illustration: <AutolinksIllustration />,
+    content: (
+      <div className="space-y-6">
+        <ContributorThanks login="jinho9265">
+          This release comes from your request in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/206">#206</ExternalLink>, to open
+          the Jira ticket a commit message mentions straight from the graph.
+        </ContributorThanks>
+
+        <WhatsNewSection title="Two kinds of autolinks">
+          <FeatureGrid>
+            <FeatureCard mark="J" title="Custom autolinks" accent={SHOWCASE_BLUE_COLOR}>
+              Give a prefix and a URL — <code>ABCD-</code> and{' '}
+              <code>https://jira.example.com/browse/ABCD-&lt;num&gt;</code> — and every <code>ABCD-123</code> becomes
+              a link to its ticket. Same format as GitLens’s <code>gitlens.autolinks</code>, so an existing list can
+              be copied in.
+            </FeatureCard>
+            <FeatureCard mark="#" title="GitHub and GitLab" accent={SHOWCASE_GREEN_COLOR}>
+              <code>#123</code> opens the repository’s issue or pull request, and <code>!123</code> a GitLab merge
+              request. On by default, and only for remotes on github.com or gitlab.com — when the repository is not
+              clear, nothing is linked rather than guessed.
+            </FeatureCard>
+          </FeatureGrid>
+          <p className={`${bodyTextClassName} mt-3`}>
+            Links appear in the commit list, the details panel and the commit tooltip. Click one to open it in your
+            browser; clicking a link in a row does not select the row.
+          </p>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="Link your Jira in three moves">
+          <StepFlow>
+            <Step label="1" title="Open" accent={SHOWCASE_BLUE_COLOR}>
+              Click <UiLabel>View</UiLabel> in the toolbar and find the new <UiLabel>Autolinks</UiLabel> section.
+            </Step>
+            <Step label="2" title="Add" accent={SHOWCASE_PURPLE_COLOR}>
+              Click <UiLabel>Add autolink</UiLabel>, then fill in the prefix and the URL, with{' '}
+              <code>&lt;num&gt;</code> where the ticket number goes.
+            </Step>
+            <Step label="3" title="Save" accent={SHOWCASE_GREEN_COLOR}>
+              Click <UiLabel>Save autolinks</UiLabel>. An entry that is not valid is pointed out, and nothing is saved
+              until it is fixed.
+            </Step>
+          </StepFlow>
+          <p className={`${bodyTextClassName} mt-3`}>
+            Both are VS Code settings too — <code>speedyGit.autolinks.custom</code> and{' '}
+            <code>speedyGit.autolinks.remoteProvider.enabled</code> — so they can live in your workspace’s settings.
+          </p>
+        </WhatsNewSection>
+      </div>
+    ),
+  },
   {
     version: '5.18.3',
     headline: 'Stashes now show the untracked files they hold.',

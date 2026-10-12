@@ -13,6 +13,14 @@ import {
 } from '../../shared/telemetry.js';
 
 /** Closed property set for the once-per-session `settingsSnapshot` event. */
+export interface SettingsSnapshotMeasurements {
+  batchCommitSize: number;
+  overScan: number;
+  avatarRefreshDays: number;
+  /** How many custom autolink entries are configured — a count, never their prefixes or URLs. */
+  customAutolinkCount: number;
+}
+
 export interface SettingsSnapshotProperties {
   dateFormat: 'relative' | 'absolute' | 'absolute-date' | 'system' | 'custom';
   avatarsEnabled: 'true' | 'false';
@@ -20,6 +28,7 @@ export interface SettingsSnapshotProperties {
   showRemoteBranches: 'true' | 'false';
   toolbarShowLabels: 'true' | 'false';
   toolbarShowRemoteButton: 'true' | 'false';
+  remoteAutolinksEnabled: 'true' | 'false';
   statusBarText: 'icon' | 'iconAndText';
   signatureColumnVisible?: 'true' | 'false';
 }
@@ -36,7 +45,7 @@ export interface TelemetryService extends vscode.Disposable {
   /** Once per session; no-ops on repeat calls. */
   sendSettingsSnapshot(
     snapshot: SettingsSnapshotProperties,
-    measurements: { batchCommitSize: number; overScan: number; avatarRefreshDays: number },
+    measurements: SettingsSnapshotMeasurements,
   ): void;
   /** Counted on tab CREATION only — a reveal of an existing graph sends nothing. */
   sendPanelOpened(trigger: PanelOpenedTrigger, openTabCount: TabCountBucket): void;
@@ -146,7 +155,7 @@ class ReporterTelemetryService implements TelemetryService {
 
   sendSettingsSnapshot(
     snapshot: SettingsSnapshotProperties,
-    measurements: { batchCommitSize: number; overScan: number; avatarRefreshDays: number },
+    measurements: SettingsSnapshotMeasurements,
   ): void {
     if (this.settingsSnapshotSent) return;
     this.settingsSnapshotSent = true;

@@ -11,7 +11,9 @@ import { rpcClient } from '../rpc/rpcClient';
 import { displayRefKey, mergeRefs } from '../utils/mergeRefs';
 import { RefLabel } from './RefLabel';
 import { HeadIcon } from './icons';
-import { parseExternalRefs } from '../utils/externalRefParser';
+import { findAutolinks, type AutolinkMatch } from '../utils/autolinks';
+import { useAutolinkRules } from '../stores/graphSelectors';
+import { AutolinkAnchor } from './AutolinkAnchor';
 import { DEFAULT_GRAPH_PALETTE, getColor, getLaneColorStyle } from '../utils/colorUtils';
 import { getReachabilityChecker } from '../utils/commitReachability';
 import { findHeadCommit } from '../utils/commitRefs';
@@ -129,14 +131,6 @@ function TooltipContent({ commit }: { commit: Commit }) {
       <ExternalLinksSection subject={commit.subject} />
     </div>
   );
-}
-
-function parseGitHubOwnerRepo(fetchUrl: string): { owner: string; repo: string } | null {
-  const sshMatch = fetchUrl.match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/i);
-  if (sshMatch) return { owner: sshMatch[1], repo: sshMatch[2] };
-  const httpsMatch = fetchUrl.match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/i);
-  if (httpsMatch) return { owner: httpsMatch[1], repo: httpsMatch[2] };
-  return null;
 }
 
 interface ReferencesSectionProps {
@@ -370,39 +364,35 @@ function ReferenceSubsection({
   );
 }
 
+/**
+ * The subject's autolinks as a list, from the same rules the row and the details
+ * panel render with — so the tooltip never offers a link the message itself
+ * would not show. One entry per distinct target.
+ */
 function ExternalLinksSection({ subject }: { subject: string }) {
-  const remotes = useGraphStore((s) => s.remotes);
+  const autolinkRules = useAutolinkRules();
 
-  const externalRefs = useMemo(() => {
-    const ownerRepo =
-      remotes
-        .map((remote) => parseGitHubOwnerRepo(remote.fetchUrl))
-        .find((candidate) => candidate !== null) ?? null;
-    return parseExternalRefs(subject, ownerRepo);
-  }, [subject, remotes]);
+  const links = useMemo(() => {
+    const linksByUrl = new Map<string, AutolinkMatch & { label: string }>();
+    for (const match of findAutolinks(subject, autolinkRules)) {
+      if (!linksByUrl.has(match.url)) {
+        linksByUrl.set(match.url, { ...match, label: subject.slice(match.start, match.end) });
+      }
+    }
+    return [...linksByUrl.values()];
+  }, [subject, autolinkRules]);
 
-  if (externalRefs.length === 0) return null;
+  if (links.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-1">
       <div className="font-semibold text-[var(--vscode-descriptionForeground)]">External Links</div>
       <div className="flex flex-wrap gap-1.5">
-        {externalRefs.map((ref) =>
-          ref.url ? (
-            <button
-              key={ref.label}
-              type="button"
-              className="text-[var(--vscode-textLink-foreground)] hover:underline cursor-pointer"
-              onClick={() => rpcClient.openExternal(ref.url!)}
-            >
-              {ref.label}
-            </button>
-          ) : (
-            <span key={ref.label} className="text-[var(--vscode-descriptionForeground)]">
-              {ref.label}
-            </span>
-          )
-        )}
+        {links.map((link) => (
+          <AutolinkAnchor key={link.url} url={link.url} source={link.source} surface="commitTooltip">
+            {link.label}
+          </AutolinkAnchor>
+        ))}
       </div>
     </div>
   );

@@ -1,3 +1,5 @@
+import type { CustomAutolink } from './autolinks.js';
+
 export interface RepoInfo {
   /** Absolute filesystem path to the repository root */
   path: string;
@@ -41,6 +43,10 @@ export interface UserSettings {
   toolbarShowLabels: boolean;
   /** Show the Remote (Manage Remotes) button in the toolbar. */
   toolbarShowRemoteButton: boolean;
+  /** `speedyGit.autolinks.custom`: user-defined `<prefix><number>` links, e.g. Jira keys. */
+  customAutolinks: CustomAutolink[];
+  /** `speedyGit.autolinks.remoteProvider.enabled`: link `#123` etc. to the GitHub/GitLab remote. */
+  remoteAutolinksEnabled: boolean;
 }
 
 /**
@@ -146,6 +152,8 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   worktreeFolderNameStyle: 'nested',
   toolbarShowLabels: true,
   toolbarShowRemoteButton: true,
+  customAutolinks: [],
+  remoteAutolinksEnabled: true,
 };
 
 /**
@@ -670,12 +678,6 @@ export interface WorktreeInfo {
  * - `detached`  → `git worktree add --detach <path> <ref>`
  */
 export type WorktreeBranchMode = 'existing' | 'new' | 'detached';
-
-export interface ExternalRef {
-  label: string;
-  url: string | null;
-  type: 'pr-or-issue' | 'jira';
-}
 
 export interface ContainingBranchesResult {
   branches: string[];

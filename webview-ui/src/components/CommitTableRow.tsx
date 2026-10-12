@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react';
 import type { Commit, CommitTableColumnId, TagMetadata, UserSettings, WorktreeInfo } from '@shared/types';
 import type { GraphTopology } from '../utils/graphTopology';
 import { useGraphStore } from '../stores/graphStore';
+import { useAutolinkRules } from '../stores/graphSelectors';
 import { formatAuthorIdentity } from '../utils/authorIdentity';
 import { GraphCell } from './GraphCell';
 import { CommitContextMenu } from './CommitContextMenu';
@@ -12,6 +13,7 @@ import { OverflowRefsBadge } from './OverflowRefsBadge';
 import { RefLabel } from './RefLabel';
 import { HeadIcon } from './icons';
 import { renderInlineCode } from '../utils/inlineCodeRenderer';
+import type { AutolinkRule } from '../utils/autolinks';
 import { mergeRefs, displayRefToRefInfo, displayRefKey, filterDisplayRefsBySettings } from '../utils/mergeRefs';
 import { HighlightedText } from './HighlightedText';
 import { EMPTY_SEARCH_TERMS, type SearchTerm } from '../utils/searchQuery';
@@ -133,6 +135,7 @@ export const CommitTableRow = memo(function CommitTableRow({
   const graphColumn = layout.columns.find((column) => column.id === 'graph');
   const worktreeByBranch = useGraphStore((s) => s.worktreeByBranch);
   const tagMetadata = useGraphStore((s) => s.tagMetadata);
+  const autolinkRules = useAutolinkRules();
   const detachedWorktrees = useGraphStore((s) => s.detachedWorktreesByHead.get(commit.hash) ?? EMPTY_WORKTREES);
 
   const node = topology.nodes.get(commit.hash);
@@ -209,6 +212,7 @@ export const CommitTableRow = memo(function CommitTableRow({
             isUncommitted,
             stashIndex,
             searchTerms,
+            autolinkRules,
             onNodeMouseEnter,
             onNodeMouseLeave,
           })}
@@ -264,6 +268,7 @@ function renderColumn({
   isUncommitted,
   stashIndex,
   searchTerms,
+  autolinkRules,
   onNodeMouseEnter,
   onNodeMouseLeave,
 }: {
@@ -290,6 +295,7 @@ function renderColumn({
   isUncommitted: boolean;
   stashIndex: number;
   searchTerms: readonly SearchTerm[];
+  autolinkRules: readonly AutolinkRule[];
   onNodeMouseEnter?: (hash: string, rect: DOMRect) => void;
   onNodeMouseLeave?: () => void;
 }) {
@@ -368,7 +374,7 @@ function renderColumn({
             style={isStash ? STASH_SUBJECT_STYLE : isUncommitted ? UNCOMMITTED_SUBJECT_STYLE : undefined}
             title={commit.subject}
           >
-            {renderInlineCode(commit.subject, searchTerms)}
+            {renderInlineCode(commit.subject, searchTerms, isUncommitted ? undefined : { rules: autolinkRules, surface: 'commitRow' })}
           </span>
         </div>
       );
