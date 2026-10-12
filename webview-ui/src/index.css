@@ -86,6 +86,26 @@
   96%, 100% { opacity: 0; box-shadow: none; }
 }
 
+/* The autolinks illustration: the references in a commit message turn into
+   links one after the other, the Jira key is clicked, and the ticket opens.
+   Underline and color are the link's resting state, so with no animation both
+   references read as links. All three share one duration. */
+@keyframes whats-new-autolink {
+  0%, 8% { color: var(--vscode-foreground); text-decoration-color: transparent; }
+  18%, 90% { color: var(--vscode-charts-blue); text-decoration-color: currentColor; }
+  100% { color: var(--vscode-foreground); text-decoration-color: transparent; }
+}
+@keyframes whats-new-autolink-click {
+  0%, 34% { opacity: 0; transform: scale(0.9); }
+  40% { opacity: 1; transform: scale(1); }
+  52%, 100% { opacity: 0; transform: scale(1.35); }
+}
+@keyframes whats-new-autolink-open {
+  0%, 46% { opacity: 0; transform: translateY(4px); }
+  54%, 86% { opacity: 1; transform: translateY(0); }
+  94%, 100% { opacity: 0; transform: translateY(0); }
+}
+
 @layer utilities {
   .animate-whats-new-countdown {
     transform-origin: left;
@@ -119,6 +139,15 @@
     }
     .animate-whats-new-nav-to {
       animation: whats-new-nav-to 5s ease-in-out infinite;
+    }
+    .animate-whats-new-autolink {
+      animation: whats-new-autolink 5s ease-in-out infinite;
+    }
+    .animate-whats-new-autolink-click {
+      animation: whats-new-autolink-click 5s ease-out infinite;
+    }
+    .animate-whats-new-autolink-open {
+      animation: whats-new-autolink-open 5s ease-in-out infinite;
     }
   }
   .animate-toast-in {

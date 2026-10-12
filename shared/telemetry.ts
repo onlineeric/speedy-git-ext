@@ -131,6 +131,11 @@ export const UI_SURFACES = [
   'columnHeader',
   'avatarSettings',
   'commitDetails',
+  // Where an autolink in a commit message was clicked (commitDetails above is the third)
+  'commitRow',
+  'commitTooltip',
+  // Autolinks section of the View settings dialog
+  'autolinkSettings',
 ] as const;
 
 export type UiSurface = (typeof UI_SURFACES)[number];
@@ -192,6 +197,10 @@ export const UI_ACTIONS = [
   'goToParent', 'goToChild',
   // Avatar settings section (View popover) + the Author-header shortcut to it
   'avatarAuthorizeClick', 'avatarRemoveTokenClick', 'avatarRefreshDaysChange', 'avatarSettingsShortcut', 'avatarClearCache',
+  // An autolink in a commit message was opened, by which kind of rule matched it
+  'openAutolinkCustom', 'openAutolinkGitHub', 'openAutolinkGitLab',
+  // Autolinks settings section (View settings dialog)
+  'customAutolinksSave', 'remoteAutolinksEnable', 'remoteAutolinksDisable',
 ] as const;
 
 export type UiAction = (typeof UI_ACTIONS)[number];

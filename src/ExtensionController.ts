@@ -7,6 +7,7 @@ import type { GitRepoDiscoveryService } from './services/GitRepoDiscoveryService
 import type { SettingsSnapshotProperties, TelemetryService } from './services/TelemetryService.js';
 import { PersistedUIStateStore } from './webview/PersistedUIStateStore.js';
 import { GitError } from '../shared/errors.js';
+import { normalizeCustomAutolinks } from '../shared/autolinks.js';
 import { PANEL_OPENED_TRIGGERS, toTabCountBucket, type PanelOpenedTrigger } from '../shared/telemetry.js';
 import {
   pickRepoTarget,
@@ -44,6 +45,8 @@ const WEBVIEW_SETTING_SECTIONS = [
   'speedyGit.worktree.folderNameStyle',
   'speedyGit.toolbar.showLabels',
   'speedyGit.toolbar.showRemoteButton',
+  'speedyGit.autolinks.custom',
+  'speedyGit.autolinks.remoteProvider.enabled',
 ];
 
 /**
@@ -167,6 +170,7 @@ export class ExtensionController {
       showRemoteBranches: settings.showRemoteBranches ? 'true' : 'false',
       toolbarShowLabels: settings.toolbarShowLabels ? 'true' : 'false',
       toolbarShowRemoteButton: settings.toolbarShowRemoteButton ? 'true' : 'false',
+      remoteAutolinksEnabled: settings.remoteAutolinksEnabled ? 'true' : 'false',
       statusBarText: this.readStatusBarText() === '$(zap)' ? 'icon' : 'iconAndText',
     };
     const signatureColumnVisible = this.readSignatureColumnVisible();
@@ -177,6 +181,7 @@ export class ExtensionController {
       batchCommitSize: settings.batchCommitSize,
       overScan: settings.overScan,
       avatarRefreshDays: settings.avatarRefreshDays,
+      customAutolinkCount: settings.customAutolinks.length,
     });
   }
 
@@ -505,6 +510,11 @@ export class ExtensionController {
       ),
       toolbarShowLabels: config.get<boolean>('toolbar.showLabels', DEFAULT_USER_SETTINGS.toolbarShowLabels),
       toolbarShowRemoteButton: config.get<boolean>('toolbar.showRemoteButton', DEFAULT_USER_SETTINGS.toolbarShowRemoteButton),
+      customAutolinks: normalizeCustomAutolinks(config.get<unknown>('autolinks.custom', [])),
+      remoteAutolinksEnabled: config.get<boolean>(
+        'autolinks.remoteProvider.enabled',
+        DEFAULT_USER_SETTINGS.remoteAutolinksEnabled,
+      ),
     };
   }
 

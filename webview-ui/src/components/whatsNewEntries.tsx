@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react';
 import { chooseUnseenWhatsNewEntry, type WhatsNewPayload } from '@shared/whatsNew';
+import { AutolinksIllustration } from './AutolinksIllustration';
 import { AutosquashIllustration } from './AutosquashIllustration';
 import { CommitNavigationIllustration } from './CommitNavigationIllustration';
 import { MultiTabIllustration } from './MultiTabIllustration';
+import autolinksRowScreenshot from '../../../resources/autolinks.png';
+import settingsAutolinksScreenshot from '../../../resources/settings-autolinks.png';
 import { BranchIcon, CloudIcon, GoToHeadIcon, NewTabIcon } from './icons';
 import { SubmoduleBadge } from './FileChangeShared';
 import { InlineRefBadge } from './InlineRefBadge';
@@ -13,12 +16,16 @@ import {
   ExternalLink,
   FeatureCard,
   FeatureGrid,
+  Screenshot,
+  ScreenshotPinLegend,
+  ScreenshotPinLegendItem,
   Step,
   StepFlow,
   ToolbarButtonSample,
   UiLabel,
   WhatsNewSection,
   whatsNewBodyTextClassName,
+  type ScreenshotPinSpec,
 } from './whatsNewBlocks';
 import {
   ADDED_COLOR,
@@ -36,6 +43,15 @@ import {
  */
 const calloutClassName = 'rounded border border-[var(--vscode-panel-border)] bg-[var(--vscode-textCodeBlock-background)] px-3 py-2';
 const bodyTextClassName = whatsNewBodyTextClassName;
+
+/** Where 5.19.0's pins sit on `settings-autolinks.png`, in percent; re-measure if the screenshot is retaken. */
+const AUTOLINKS_SETTINGS_PINS: readonly ScreenshotPinSpec[] = [
+  { label: '1', accent: SHOWCASE_BLUE_COLOR, x: 71.5, y: 4 },
+  { label: '2', accent: SHOWCASE_BLUE_COLOR, x: 33, y: 22.5 },
+  { label: '3', accent: SHOWCASE_GREEN_COLOR, x: 2.8, y: 42.7 },
+  { label: '4', accent: SHOWCASE_PURPLE_COLOR, x: 2.8, y: 77.3 },
+  { label: '5', accent: SHOWCASE_ORANGE_COLOR, x: 35.6, y: 77.3 },
+];
 
 const ADDED_LINE_STYLE = { color: ADDED_COLOR };
 const DELETED_LINE_STYLE = { color: DELETED_COLOR };
@@ -67,6 +83,66 @@ export interface WhatsNewEntry {
  * with nothing worth interrupting for needs no other opt-out.
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
+  {
+    version: '5.19.0',
+    headline: 'Custom keys (Jira, Linear, …) and issue numbers in commit messages are now links.',
+    illustration: <AutolinksIllustration />,
+    content: (
+      <div className="space-y-6">
+        <ContributorThanks login="jinho9265">
+          This release comes from your request in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/206">#206</ExternalLink>, to open
+          the Jira ticket a commit message mentions straight from the graph.
+        </ContributorThanks>
+
+        <WhatsNewSection title="What you get">
+          <Screenshot
+            src={autolinksRowScreenshot}
+            alt="A commit row whose message shows #123 and ABCD-3456 as links"
+            width={383}
+            height={41}
+            caption={
+              <>
+                Links appear in the commit list, the details panel and the commit tooltip. Click one to open it in
+                your browser; clicking a link in a row does not select the row.
+              </>
+            }
+          />
+        </WhatsNewSection>
+
+        <WhatsNewSection title="Set up your own keys in the AutoLinks tab">
+          <Screenshot
+            src={settingsAutolinksScreenshot}
+            alt="The Settings dialog open on its AutoLinks tab, with a custom autolink for MTN- filled in"
+            width={687}
+            height={529}
+            pins={AUTOLINKS_SETTINGS_PINS}
+          />
+          <ScreenshotPinLegend>
+            <ScreenshotPinLegendItem label="1" accent={SHOWCASE_BLUE_COLOR}>
+              Click <UiLabel>View</UiLabel> in the toolbar…
+            </ScreenshotPinLegendItem>
+            <ScreenshotPinLegendItem label="2" accent={SHOWCASE_BLUE_COLOR}>
+              …and open the <UiLabel>AutoLinks</UiLabel> tab.
+            </ScreenshotPinLegendItem>
+            <ScreenshotPinLegendItem label="3" accent={SHOWCASE_GREEN_COLOR}>
+              <UiLabel>GitHub and GitLab references</UiLabel> link <code>#123</code> and <code>!123</code> to the
+              repository’s issue, pull request or merge request. On by default.
+            </ScreenshotPinLegendItem>
+            <ScreenshotPinLegendItem label="4" accent={SHOWCASE_PURPLE_COLOR}>
+              <UiLabel>Add autolink</UiLabel>: a prefix like <code>ABCD-</code> and a URL with{' '}
+              <code>&lt;num&gt;</code> where the number goes. Same format as GitLens’s{' '}
+              <code>gitlens.autolinks</code>.
+            </ScreenshotPinLegendItem>
+            <ScreenshotPinLegendItem label="5" accent={SHOWCASE_ORANGE_COLOR}>
+              <UiLabel>Save autolinks</UiLabel>. An entry that is not valid is pointed out, and nothing is saved
+              until it is fixed.
+            </ScreenshotPinLegendItem>
+          </ScreenshotPinLegend>
+        </WhatsNewSection>
+      </div>
+    ),
+  },
   {
     version: '5.18.3',
     headline: 'Stashes now show the untracked files they hold.',

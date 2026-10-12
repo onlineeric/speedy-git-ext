@@ -30,6 +30,7 @@ export interface InitialDataPayload {
   errors: string[];
 }
 import type { GitError, GitErrorCode } from './errors.js';
+import type { CustomAutolink } from './autolinks.js';
 import type { FixupCommitArgsOptions } from './fixupCommit.js';
 import type { GitVersion } from './gitVersion.js';
 import type { UiTelemetryEvent } from './telemetry.js';
@@ -180,6 +181,12 @@ export type RequestMessage =
   /** Persist a `speedyGit.toolbar.*` boolean setting from the webview (toolbar right-click menu). */
   | { type: 'setToolbarSetting'; payload: { setting: ToolbarBooleanSetting; value: boolean } }
   | { type: 'setWorktreeFolderNameStyle'; payload: { style: WorktreeFolderNameStyle } }
+  /**
+   * Save the View settings dialog's custom autolinks list. Re-validated by the
+   * backend: an invalid list is refused with an error toast and nothing is written.
+   */
+  | { type: 'setCustomAutolinks'; payload: { autolinks: CustomAutolink[] } }
+  | { type: 'setRemoteAutolinksEnabled'; payload: { enabled: boolean } }
   | { type: 'getSubmodules'; payload: Record<string, never> }
   /** @deprecated since 041-submodule-selector — selector navigation uses switchRepo. Handler kept for legacy compatibility; will be removed in a follow-up. */
   | { type: 'openSubmodule'; payload: { submodulePath: string } }
@@ -342,7 +349,8 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   getCommitMessage: true, amendCommit: true,
   createFixupCommit: true, cancelCommitWait: true, getGitVersion: true,
   loadMoreCommits: true, locateHead: true, openSettings: true, switchRepo: true, displayRepo: true,
-  getSettings: true, setToolbarSetting: true, setWorktreeFolderNameStyle: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
+  getSettings: true, setToolbarSetting: true, setWorktreeFolderNameStyle: true,
+  setCustomAutolinks: true, setRemoteAutolinksEnabled: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
   getAvatarAuthState: true, requestGitHubAuth: true, removeGitHubAuth: true, setAvatarRefreshDays: true,
   clearAvatarCache: true,
   updateSubmodule: true, initSubmodule: true,

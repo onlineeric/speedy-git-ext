@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   DndContext,
@@ -28,7 +28,10 @@ import {
   setCommitTableColumnVisibility,
 } from '../utils/commitTableLayout';
 import { trackUiInteraction } from '../utils/telemetry';
+import { AutolinkSettingsSection } from './AutolinkSettingsSection';
 import { AvatarSettingsSection } from './AvatarSettingsSection';
+import { DialogTabs, type DialogTab } from './DialogTabs';
+import { dialogDragHandleProps, MovableDialogContent } from './MovableDialogContent';
 import {
   buttonSecondaryClassName,
   dialogContentClassName,
@@ -36,7 +39,7 @@ import {
   dialogOverlayClassName,
   dialogSectionLabelClassName,
 } from './dialogStyles';
-import { ColumnsIcon } from './icons';
+import { ColumnsIcon, LinkIcon } from './icons';
 import { ToolbarIconButton, RemoteButtonToggleItem, TOGGLE_BUTTON_TONES } from './ToolbarIconButton';
 
 /** Column show/hide telemetry actions per optional column (049-usage-telemetry). */
@@ -62,6 +65,10 @@ const COLUMN_WARNINGS: Partial<Record<CommitTableColumnId, string>> = {
     'Warning: signature checks run in the background and can use high CPU in large repositories. Keep this column hidden on slower machines.',
 };
 
+type SettingsTabId = 'view' | 'autolinks';
+
+const TAB_ICON_CLASS = 'h-3.5 w-3.5';
+
 export function ViewSettingsDialog() {
   // Open state lives in the store so the Author column header's gear can open
   // this same dialog.
@@ -69,6 +76,8 @@ export function ViewSettingsDialog() {
   const setOpen = useGraphStore((state) => state.setViewSettingsOpen);
   const commitTableLayout = useGraphStore((state) => state.commitTableLayout);
   const setCommitTableLayout = useGraphStore((state) => state.setCommitTableLayout);
+  // Kept here rather than in the content, so reopening returns to the last tab.
+  const [activeTabId, setActiveTabId] = useState<SettingsTabId>('view');
 
   const optionalColumnIds = useMemo(
     () => getOptionalCommitTableColumnIds(commitTableLayout),
@@ -120,6 +129,72 @@ export function ViewSettingsDialog() {
     rpcClient.persistUIState({ commitTableLayout: nextLayout });
   };
 
+  const viewTabContent = (
+    <>
+      <p className="mb-4 text-xs text-[var(--vscode-descriptionForeground)]">
+        Choose which columns appear in the commit list and how author avatars are loaded.
+      </p>
+
+      {/* Two columns so neither half grows tall enough to need scrolling.
+          Stacks on narrow panels, where side-by-side would be unreadable. */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <section className="min-w-0">
+          <div className={dialogSectionLabelClassName}>Columns</div>
+          <p className="mb-3 text-xs text-[var(--vscode-descriptionForeground)]">
+            Graph stays first and always visible. Drag optional columns to reorder them.
+          </p>
+
+          <div className="mb-2 flex items-center justify-between rounded border border-[var(--vscode-panel-border)] px-2 py-1.5 text-sm">
+            <span>{COLUMN_LABELS.graph}</span>
+            <span className="text-xs text-[var(--vscode-descriptionForeground)]">Pinned</span>
+          </div>
+
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={optionalColumnIds} strategy={verticalListSortingStrategy}>
+              <div className="space-y-2">
+                {optionalColumnIds.map((columnId) => (
+                  <SortableColumnRow
+                    key={columnId}
+                    columnId={columnId}
+                    label={COLUMN_LABELS[columnId]}
+                    warning={COLUMN_WARNINGS[columnId]}
+                    visible={commitTableLayout.columns[columnId].visible}
+                    onVisibilityChange={handleVisibilityChange}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+
+          <div className="mt-4 border-t border-[var(--vscode-panel-border)] pt-2">
+            <button
+              type="button"
+              onClick={handleResetWidths}
+              className={`${buttonSecondaryClassName} w-full text-xs`}
+              title="Restore all column widths to their factory defaults"
+            >
+              Reset column widths to defaults
+            </button>
+          </div>
+        </section>
+
+        <div className="min-w-0 md:border-l md:border-[var(--vscode-panel-border)] md:pl-6">
+          <AvatarSettingsSection />
+        </div>
+      </div>
+    </>
+  );
+
+  const tabs: DialogTab<SettingsTabId>[] = [
+    { id: 'view', label: 'View', icon: <ColumnsIcon className={TAB_ICON_CLASS} />, content: viewTabContent },
+    {
+      id: 'autolinks',
+      label: 'AutoLinks',
+      icon: <LinkIcon className={TAB_ICON_CLASS} />,
+      content: <AutolinkSettingsSection />,
+    },
+  ];
+
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
@@ -135,64 +210,19 @@ export function ViewSettingsDialog() {
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className={dialogOverlayClassName} />
-        <Dialog.Content
+        <MovableDialogContent
           className={`${dialogContentClassName} flex max-h-[85vh] flex-col`}
           style={dialogContentStyle}
+          aria-describedby={undefined}
         >
-          <Dialog.Title className="mb-1 text-base font-semibold text-[var(--vscode-foreground)]">
-            View settings
+          <Dialog.Title
+            {...dialogDragHandleProps}
+            className="mb-3 text-base font-semibold text-[var(--vscode-foreground)]"
+          >
+            Settings
           </Dialog.Title>
-          <Dialog.Description className="mb-4 text-xs text-[var(--vscode-descriptionForeground)]">
-            Choose which columns appear in the commit list and how author avatars are loaded.
-          </Dialog.Description>
 
-          {/* Two columns so neither half grows tall enough to need scrolling.
-              Stacks on narrow panels, where side-by-side would be unreadable. */}
-          <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto md:grid-cols-2">
-            <section className="min-w-0">
-              <div className={dialogSectionLabelClassName}>Columns</div>
-              <p className="mb-3 text-xs text-[var(--vscode-descriptionForeground)]">
-                Graph stays first and always visible. Drag optional columns to reorder them.
-              </p>
-
-              <div className="mb-2 flex items-center justify-between rounded border border-[var(--vscode-panel-border)] px-2 py-1.5 text-sm">
-                <span>{COLUMN_LABELS.graph}</span>
-                <span className="text-xs text-[var(--vscode-descriptionForeground)]">Pinned</span>
-              </div>
-
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={optionalColumnIds} strategy={verticalListSortingStrategy}>
-                  <div className="space-y-2">
-                    {optionalColumnIds.map((columnId) => (
-                      <SortableColumnRow
-                        key={columnId}
-                        columnId={columnId}
-                        label={COLUMN_LABELS[columnId]}
-                        warning={COLUMN_WARNINGS[columnId]}
-                        visible={commitTableLayout.columns[columnId].visible}
-                        onVisibilityChange={handleVisibilityChange}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
-
-              <div className="mt-4 border-t border-[var(--vscode-panel-border)] pt-2">
-                <button
-                  type="button"
-                  onClick={handleResetWidths}
-                  className={`${buttonSecondaryClassName} w-full text-xs`}
-                  title="Restore all column widths to their factory defaults"
-                >
-                  Reset column widths to defaults
-                </button>
-              </div>
-            </section>
-
-            <div className="min-w-0 md:border-l md:border-[var(--vscode-panel-border)] md:pl-6">
-              <AvatarSettingsSection />
-            </div>
-          </div>
+          <DialogTabs idPrefix="settings" tabs={tabs} activeTabId={activeTabId} onActiveTabChange={setActiveTabId} />
 
           <div className="mt-4 flex justify-end border-t border-[var(--vscode-panel-border)] pt-3">
             <Dialog.Close asChild>
@@ -201,7 +231,7 @@ export function ViewSettingsDialog() {
               </button>
             </Dialog.Close>
           </div>
-        </Dialog.Content>
+        </MovableDialogContent>
       </Dialog.Portal>
     </Dialog.Root>
   );

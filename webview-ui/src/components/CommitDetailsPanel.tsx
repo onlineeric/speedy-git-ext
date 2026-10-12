@@ -2,6 +2,7 @@ import { memo, useCallback, useMemo, useRef, useEffect, useState } from 'react';
 import type { CommitDetails, CompareResult, FileChange, DetailsPanelPosition, FileViewMode, CommitSignatureInfo, SlotValue } from '@shared/types';
 import { UNCOMMITTED_HASH } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
+import { useAutolinkRules } from '../stores/graphSelectors';
 import { rpcClient } from '../rpc/rpcClient';
 import { formatRelativeDate } from '../utils/formatDate';
 import { renderInlineCode } from '../utils/inlineCodeRenderer';
@@ -368,13 +369,14 @@ function PanelHeader({
   onClose: () => void;
   onTogglePosition: () => void;
 }) {
+  const autolinkRules = useAutolinkRules();
   return (
     <div className="flex items-center gap-2 border-b border-[var(--vscode-panel-border)] px-3 py-1.5 flex-shrink-0">
       <span className="font-mono text-xs text-[var(--vscode-textLink-foreground)]">
         {details.abbreviatedHash}
       </span>
       <span className="flex-1 truncate text-sm" title={details.subject}>
-        {renderInlineCode(details.subject)}
+        {renderInlineCode(details.subject, undefined, { rules: autolinkRules, surface: 'commitDetails' })}
       </span>
       <button
         onClick={onTogglePosition}
@@ -479,6 +481,7 @@ function FilesChangedSection({
 }
 
 function CommitMetadata({ details }: { details: CommitDetails }) {
+  const autolinkRules = useAutolinkRules();
   return (
     <div className="space-y-1 border-b border-[var(--vscode-panel-border)] px-3 py-2 text-xs">
       <MetadataRow label="Hash" value={details.hash} mono copyable />
@@ -497,7 +500,7 @@ function CommitMetadata({ details }: { details: CommitDetails }) {
       {details.body && (
         <div className="pt-1">
           <span className="whitespace-pre-wrap text-[var(--vscode-descriptionForeground)]">
-            {renderInlineCode(details.body)}
+            {renderInlineCode(details.body, undefined, { rules: autolinkRules, surface: 'commitDetails' })}
           </span>
         </div>
       )}

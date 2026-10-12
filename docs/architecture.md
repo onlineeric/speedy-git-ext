@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-10-01**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-10-12**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -74,10 +74,12 @@ src/
 │       ├── compareHandlers.ts    # compareRefs/cancelCompare/openCompareDiff (latest-wins by request id)
 │       ├── telemetryHandlers.ts  # Validates one-way webview telemetry against closed catalogs
 │       ├── avatarHandlers.ts      # Avatar auth state, GitHub authorize/remove-token, refreshDays setting, clear cache
+│       ├── autolinkHandlers.ts    # View dialog's Autolinks: re-validates + writes speedyGit.autolinks.* (defined scope);
+│                                 #   an invalid custom list is refused whole, nothing written
 │       ├── updateSpeedyGitSetting.ts # Writes one speedyGit.* setting; ExtensionController broadcasts the change.
 │                                 #   …InDefinedScope writes to Workspace when a workspace value already exists,
 │                                 #   so a Global write cannot be silently shadowed
-│       └── vscodeCommandHandlers.ts # settings, clipboard, openExternal, updatePersistedUIState, openNewGraphTab
+│       └── vscodeCommandHandlers.ts # settings, clipboard, openExternal (http/https only), updatePersistedUIState, openNewGraphTab
 ├── services/                     # All repo-bound; every method returns Result<T, GitError>
 │   ├── index.ts                  # Barrel export for all services
 │   ├── GitExecutor.ts            # Spawns git processes, 30s timeout — the only place git is invoked
@@ -177,6 +179,9 @@ components/
 ├── AuthorAvatar.tsx              # Gravatar/GitHub avatar with initials fallback + load-state cache
 ├── AuthorBadge.tsx               # Author chip/inline label wrapping AuthorAvatar
 └── icons/index.tsx               # All SVG icon components
+
+webview-ui/src/assets.d.ts        # `*.png` imports are `data:` URLs — vite.config.ts inlines every asset, since an
+                                  #   emitted `/assets/…` file cannot resolve in the webview (CSP: `img-src data:`)
 ```
 
 ### Toolbar, panels, widgets
@@ -196,8 +201,11 @@ components/
 │                                 #   debounced 300ms, everything else recomputes at once in a layout effect
 ├── CompareWidget.tsx             # Branch comparison
 ├── WorktreeWidget.tsx            # Worktree list + create/remove (046-git-worktrees)
-├── ViewSettingsDialog.tsx        # Centered View settings dialog: columns left, avatars right (Radix dialog + @dnd-kit sortable); open state lives in the store
+├── ViewSettingsDialog.tsx        # Movable "Settings" dialog with View (columns left, avatars right) and AutoLinks tabs (Radix dialog + @dnd-kit sortable); open state lives in the store
 ├── AvatarSettingsSection.tsx     # Avatars pane of the View dialog: GitHub allow/remove-token, refresh-days, clear cache
+├── AutolinkSettingsSection.tsx   # AutoLinks tab of the Settings dialog: Autolinks section (GitHub/GitLab toggle + detected repo), then a Custom autolinks section
+│                                 #   editor (validated on Save; nothing saved while any row is invalid)
+├── AutolinkAnchor.tsx            # One autolinked reference: opens via openExternal, swallows the row click, tracks by source
 ├── RepoSelector.tsx              # Multi-root repo picker (FilterableSingleSelectDropdown)
 ├── SubmoduleSelector.tsx         # Parent/submodule navigation picker
 ├── ToastContainer.tsx            # Transient success/error toasts driven by the store
@@ -243,6 +251,9 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ```
 ├── dialogStyles.ts               # Shared dialog width/resize, the primary/secondary/danger button variants (one shared
 │                                 #   base), the note/warning/error message boxes (one shared base) and the commit-message textarea
+├── MovableDialogContent.tsx      # Drop-in `Dialog.Content` the user can drag by a `dialogDragHandleProps` element (the title);
+│                                 #   pins to pixel position on first pointer-down so corner resize tracks the pointer
+├── DialogTabs.tsx                # VS Code-styled tabs inside a dialog; panels stay mounted and stacked so size is steady
 ├── ConfirmDialog.tsx             # Generic confirm (danger/warning variants) + CommandPreview; optional focusConfirm
 │                                 #   overrides Radix's default Cancel focus where proceeding is the expected answer
 ├── InputDialog.tsx               # Generic single-input dialog + FieldError
@@ -272,14 +283,17 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── RefBadgeLegend.tsx            # Standalone "Badge Legend" section; samples are real `RefLabel`s in lane-0 color
 │                                 #   so it can't drift from the graph. Needs no props — reused by the What's New dialog
 ├── WhatsNewDialog.tsx            # First-run release notes, poster layout (gradient hero + headline + optional
-│                                 #   illustration); close button counts down before enabling (Esc/outside held too)
+│                                 #   illustration); hero scrolls with the content, only the footer is pinned;
+│                                 #   close button counts down before enabling (Esc/outside held too)
 ├── whatsNewEntries.tsx           # Per-version release-note content. A patch with no entry inherits its series'
 │                                 #   notes (5.18.1 → 5.18.0) unless already seen; a series with no entry shows nothing
 ├── whatsNewBlocks.tsx            # Poster pieces entries compose: ContributorThanks, FeatureCard/Grid, Step/StepFlow,
-│                                 #   UiLabel, ToolbarButtonSample, WhatsNewSection, ExternalLink
+│                                 #   UiLabel, ToolbarButtonSample, WhatsNewSection, ExternalLink, Screenshot (+ numbered
+│                                 #   pins in percent) and ScreenshotPinLegend/Item. Screenshots live in `resources/`
 ├── AutosquashIllustration.tsx    # 5.16.0 hero: animated mini-graph of a fixup! commit folding into its target
 ├── MultiTabIllustration.tsx      # 5.17.0 hero: animated miniature of the New Tab button opening a second graph group
 ├── CommitNavigationIllustration.tsx # 5.18.0 hero: animated miniature of Go to parent commit landing on the parent row
+├── AutolinksIllustration.tsx     # 5.19.0 hero: animated miniature of a commit message's references turning into links
 └── HelpDialog.tsx                # "Help & Feedback": Badge Legend + GitHub Issues + docs/changelog/marketplace + version
 ```
 
@@ -302,7 +316,7 @@ stores/
 │                                 #   044-code-refactor replaced whole-store subscriptions with selectors
 │                                 #   rather than splitting the file
 └── graphSelectors.ts             # Derived reads shared by several components (useOperationInProgress,
-                                  #   useCurrentLocalBranch) — one selector each, so callers can't disagree.
+                                  #   useCurrentLocalBranch, useAutolinkRules) — one selector each, so callers can't disagree.
                                   #   isOwnOperationInProgress is the PURE half: THIS tab only, never a peer's
 
 rpc/rpcClient.ts                  # Singleton RPC client, webview↔extension via acquireVsCodeApi()
@@ -340,10 +354,16 @@ utils/
 ├── rowVisibility.ts              # Scroll-offset maths for revealing a row when the details panel resizes the viewport
 ├── commitVisibility.ts           # Visibility/filter predicates for the virtualized row list
 ├── compareSlot.ts                # Compare panel slot model (Base/Target, commit-ish parsing)
+├── dialogPosition.ts             # PURE: clamp a dragged dialog so its title stays reachable
 ├── compareDefaults.ts            # Default slot seeding
 ├── compareDispatch.ts            # Resolve compare request → backend RPC
 ├── compareMarker.ts              # Per-row "B"ase / "T"arget badge derivation
-├── externalRefParser.ts          # Parse typed commit-ish expressions (HEAD~3, origin/main^2, …)
+├── autolinks.ts                  # PURE: autolink rules (custom + GitHub/GitLab) and matching — the one source for row,
+│                                 #   details panel and tooltip; custom wins overlaps; nothing inside a URL; getAutolinkRules
+│                                 #   memoizes on input identity so row memos hold
+├── remoteAutolinkTarget.ts       # PURE: which repo a bare #123 means — github.com/gitlab.com only; sole remote, else
+│                                 #   upstream, else origin; never swaps in another remote; null = no links
+├── customAutolinkDraft.ts        # PURE: Settings dialog's custom-autolink draft rows, all-or-nothing save validation, dirty/same-list checks
 ├── resolveDefaultRemote.ts       # Default remote selection; resolvePublishedBranchRemote requires an existing, unambiguous branch destination
 ├── amendMessages.ts              # Post-amend force-push wording; translates git's `stale info` lease rejection
 ├── rebaseSquashMessages.ts       # Combined message per squash group — full messages, never subjects; a squashed
@@ -384,6 +404,7 @@ utils/
 │                                 #   qualified `<remote>/<name>`, and the rebase target. `undefined` when unknown
 ├── peerActivityNotice.ts         # PURE: whether to say "another Speedy Git view is running a Git operation",
 │                                 #   and in what words. A notice only — it gates no control
+├── tabNavigation.ts              # PURE: WAI-ARIA tabs keyboard pattern (arrows wrap, Home/End)
 ├── telemetry.ts                  # Fire-and-forget webview telemetry helpers
 ├── searchQuery.ts                # PURE: query → AND-ed terms; a `"quoted run"` is one literal term, an unterminated
 │                                 #   quote is literal from the quote on. Owns EMPTY_SEARCH_TERMS. `:` is reserved
@@ -405,7 +426,8 @@ utils/
 ├── stashMessage.ts               # Format stash entries for display
 ├── uncommittedUtils.ts           # Helpers for the uncommitted-node row
 ├── repoPath.ts                   # Repo path normalization
-└── inlineCodeRenderer.tsx        # Renders inline-code spans in commit messages; boxes search matches within each segment
+└── inlineCodeRenderer.tsx        # Renders inline-code spans in commit messages; boxes search matches within each segment;
+                                  #   links autolinks outside code; listMessageAutolinks gives the same links as data (tooltip)
 ```
 
 ---
@@ -418,6 +440,8 @@ shared/
 │                                 #   clamps (batch size, avatar refresh days), worktreeBasePathOf (the one settings fallback),
 │                                 #   the worktree folder-style enum + its UI labels, and ResolvedWorktreePaths
 ├── messages.ts                   # RequestMessage/ResponseMessage union types for RPC
+├── autolinks.ts                  # PURE: CustomAutolink (GitLens's gitlens.autolinks shape), normalize/validate, isHttpUrl —
+│                                 #   the dialog validates and the backend re-validates with the same rules
 ├── errors.ts                     # Result<T,E> monad, GitError class, GitErrorCode enum
 ├── gitRefValidation.ts           # git check-ref-format validator + tag/branch/remote wrappers — the same rules
 │                                 #   drive live dialog validation (frontend) and creation guards (backend)

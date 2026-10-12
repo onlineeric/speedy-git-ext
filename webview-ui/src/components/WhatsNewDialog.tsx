@@ -95,40 +95,45 @@ export function WhatsNewDialog({ version, lastShownVersion, countdownSeconds, op
           onPointerDownOutside={(event) => locked && event.preventDefault()}
           onInteractOutside={(event) => locked && event.preventDefault()}
         >
-          <header className="relative shrink-0 overflow-hidden px-7 pb-6 pt-6" style={heroStyle}>
-            {/* Soft glows behind the text; purely decorative. */}
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full blur-3xl"
-              style={{ background: tint(SHOWCASE_PURPLE_COLOR, 30) }}
-            />
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full blur-3xl"
-              style={{ background: tint(SHOWCASE_BLUE_COLOR, 18) }}
-            />
+          {/* The hero scrolls with the content: pinned, it would leave a short window
+              almost no room for a release's screenshots. Only the footer stays put, so
+              Close is always reachable. */}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <header className="relative overflow-hidden px-7 pb-6 pt-6" style={heroStyle}>
+              {/* Soft glows behind the text; purely decorative. */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full blur-3xl"
+                style={{ background: tint(SHOWCASE_PURPLE_COLOR, 30) }}
+              />
+              <span
+                aria-hidden
+                className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full blur-3xl"
+                style={{ background: tint(SHOWCASE_BLUE_COLOR, 18) }}
+              />
 
-            <div className="relative grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_17rem]">
-              <div>
-                {/* The version is the same shape every release and says little, so it
-                    is a small pill; the headline is the one line worth reading and
-                    gets the poster-sized type. */}
-                <Dialog.Title
-                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em]"
-                  style={versionPillStyle}
-                >
-                  <SparkleIcon className="h-3 w-3" />
-                  What’s new · v{entry.version}
-                </Dialog.Title>
-                <Dialog.Description className="mt-3 text-xl font-bold leading-tight tracking-tight text-[var(--vscode-foreground)]">
-                  {entry.headline}
-                </Dialog.Description>
+              <div className="relative grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_17rem]">
+                <div>
+                  {/* The version is the same shape every release and says little, so it
+                      is a small pill; the headline is the one line worth reading and
+                      gets the poster-sized type. */}
+                  <Dialog.Title
+                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em]"
+                    style={versionPillStyle}
+                  >
+                    <SparkleIcon className="h-3 w-3" />
+                    What’s new · v{entry.version}
+                  </Dialog.Title>
+                  <Dialog.Description className="mt-3 text-xl font-bold leading-tight tracking-tight text-[var(--vscode-foreground)]">
+                    {entry.headline}
+                  </Dialog.Description>
+                </div>
+                {entry.illustration}
               </div>
-              {entry.illustration}
-            </div>
-          </header>
+            </header>
 
-          <div className="flex-1 overflow-y-auto px-7 py-5">{entry.content}</div>
+            <div className="px-7 py-5">{entry.content}</div>
+          </div>
 
           <footer className="flex shrink-0 items-center justify-end border-t border-[var(--vscode-panel-border)] px-7 py-3">
             <button

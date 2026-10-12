@@ -245,3 +245,85 @@ export function Step({ label, title, accent, alternative = false, children }: St
     </li>
   );
 }
+
+interface ScreenshotProps {
+  /** An image import — a `data:` URL, since the webview build inlines every asset (`vite.config.ts`). */
+  src: string;
+  alt: string;
+  /** The image's pixel size: reserves its space before it decodes, and caps it at 1:1 so it is never upscaled blurry. */
+  width: number;
+  height: number;
+  caption?: ReactNode;
+  /** Markers drawn over the image; pair them with a `ScreenshotPinLegend` below. */
+  pins?: readonly ScreenshotPinSpec[];
+}
+
+export interface ScreenshotPinSpec {
+  label: string;
+  /** A `SHOWCASE_*` color, the same one its legend item uses. */
+  accent: string;
+  /** The pin's centre as a percentage of the image's width / height, so it stays on its control at any size. */
+  x: number;
+  y: number;
+}
+
+/**
+ * A real screenshot in a frame, optionally with numbered pins on the controls
+ * it shows. Pins are positioned in percent of the image, so they stay on their
+ * control as the dialog is resized.
+ */
+export function Screenshot({ src, alt, width, height, caption, pins = [] }: ScreenshotProps) {
+  return (
+    <figure className="m-0" style={{ maxWidth: width }}>
+      <div className="relative overflow-hidden rounded-lg border shadow-lg" style={{ borderColor: BORDER_COLOR }}>
+        <img src={src} alt={alt} width={width} height={height} className="block h-auto w-full" />
+        {pins.map((pin) => (
+          <ScreenshotPin
+            key={pin.label}
+            label={pin.label}
+            accent={pin.accent}
+            className="absolute -translate-x-1/2 -translate-y-1/2"
+            style={{ left: `${pin.x}%`, top: `${pin.y}%`, boxShadow: `0 0 0 3px ${tint(pin.accent, 35)}` }}
+          />
+        ))}
+      </div>
+      {caption && <figcaption className={`${whatsNewBodyTextClassName} mt-1.5`}>{caption}</figcaption>}
+    </figure>
+  );
+}
+
+function ScreenshotPin({
+  label,
+  accent,
+  className = '',
+  style,
+}: {
+  label: string;
+  accent: string;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  return (
+    <span
+      aria-hidden
+      className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-extrabold ${className}`}
+      style={{ background: accent, color: ON_ACCENT_COLOR, ...style }}
+    >
+      {label}
+    </span>
+  );
+}
+
+/** The key to a `Screenshot`'s pins; two columns, one in a narrow panel. */
+export function ScreenshotPinLegend({ children }: { children: ReactNode }) {
+  return <ol className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">{children}</ol>;
+}
+
+export function ScreenshotPinLegendItem({ label, accent, children }: { label: string; accent: string; children: ReactNode }) {
+  return (
+    <li className="flex items-start gap-2">
+      <ScreenshotPin label={label} accent={accent} />
+      <p className={whatsNewBodyTextClassName}>{children}</p>
+    </li>
+  );
+}

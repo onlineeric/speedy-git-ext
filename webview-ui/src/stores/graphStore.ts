@@ -63,6 +63,7 @@ import { joinRepoPath } from '../utils/repoPath';
 import { stripLocalBranchPrefix } from '../utils/worktreeDisplay';
 import { EMPTY_SEARCH_TERMS, type SearchTerm } from '../utils/searchQuery';
 import type { WhatsNewPayload } from '@shared/whatsNew';
+import { isSameCustomAutolinkList } from '@shared/autolinks';
 
 interface WorktreeLookups {
   worktreeByHead: Map<string, WorktreeInfo[]>;
@@ -407,6 +408,17 @@ function getUncommittedContext(state: GraphStore): UncommittedContext {
  * verification FR-015). Brand-new commits get verified; cached commits resolve
  * from the map with no extra git work, and the map can't grow unbounded.
  */
+/**
+ * Every settings broadcast re-sends the custom autolinks under a new identity.
+ * Keeping the old array while its content is unchanged lets every consumer —
+ * the autolink rules memo, the View settings editor — treat identity as change.
+ */
+function keepUnchangedCustomAutolinks(incoming: UserSettings, current: UserSettings): UserSettings {
+  return isSameCustomAutolinkList(current.customAutolinks, incoming.customAutolinks)
+    ? { ...incoming, customAutolinks: current.customAutolinks }
+    : incoming;
+}
+
 function retainByHash<T>(map: Record<string, T>, hashes: Set<string>): Record<string, T> {
   const next: Record<string, T> = {};
   for (const hash of Object.keys(map)) {
@@ -1049,11 +1061,12 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     }));
   },
   setIsLoadingRepo: (isLoadingRepo) => set({ isLoadingRepo }),
-  setUserSettings: (settings) => set((state) => (
-    state.loading
+  setUserSettings: (incoming) => set((state) => {
+    const settings = keepUnchangedCustomAutolinks(incoming, state.userSettings);
+    return state.loading
       ? { pendingUserSettings: settings }
-      : { userSettings: settings, pendingUserSettings: undefined, filters: { ...state.filters, maxCount: settings.batchCommitSize } }
-  )),
+      : { userSettings: settings, pendingUserSettings: undefined, filters: { ...state.filters, maxCount: settings.batchCommitSize } };
+  }),
   openSearch: () => set((state) => ({
     searchState: { ...state.searchState, isOpen: true },
     activeToggleWidget: 'search',

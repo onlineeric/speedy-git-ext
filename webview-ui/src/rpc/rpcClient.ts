@@ -1,4 +1,5 @@
 import type { RequestMessage, ResponseMessage } from '@shared/messages';
+import type { CustomAutolink } from '@shared/autolinks';
 import type { FixupCommitArgsOptions } from '@shared/fixupCommit';
 import type { RefExpectation } from '@shared/refRevalidation';
 import type { BranchCheckoutTarget, CherryPickOptions, CompareMode, GraphFilters, InteractiveRebaseConfig, RebaseRangeCommit, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting, WorktreeFolderNameStyle } from '@shared/types';
@@ -862,6 +863,14 @@ class RpcClient {
 
   setToolbarSetting(setting: ToolbarBooleanSetting, value: boolean) {
     this.send({ type: 'setToolbarSetting', payload: { setting, value } });
+  }
+
+  setCustomAutolinks(autolinks: CustomAutolink[]) {
+    this.send({ type: 'setCustomAutolinks', payload: { autolinks } });
+  }
+
+  setRemoteAutolinksEnabled(enabled: boolean) {
+    this.send({ type: 'setRemoteAutolinksEnabled', payload: { enabled } });
   }
 
   /** Save the Create Worktree dialog's folder-style choice as the default. */
