@@ -87,8 +87,9 @@ export function useFirstLaneBadgeStyle(): { laneColor: string; laneColorStyle: C
  * row, the details panel and the tooltip can each ask without breaking a memo.
  */
 export function useAutolinkRules(): readonly AutolinkRule[] {
-  const customAutolinks = useGraphStore((s) => s.userSettings.customAutolinks);
-  const remoteAutolinksEnabled = useGraphStore((s) => s.userSettings.remoteAutolinksEnabled);
-  const remotes = useGraphStore((s) => s.remotes);
-  return getAutolinkRules(customAutolinks, remoteAutolinksEnabled, remotes);
+  // Built inside the selector, so a refresh that re-sends an equal remote list
+  // yields the same cached array and no subscriber re-renders.
+  return useGraphStore((s) =>
+    getAutolinkRules(s.userSettings.customAutolinks, s.userSettings.remoteAutolinksEnabled, s.remotes),
+  );
 }

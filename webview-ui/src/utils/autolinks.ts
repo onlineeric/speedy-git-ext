@@ -146,32 +146,44 @@ let lastRulesInput: {
   customAutolinks: readonly CustomAutolink[];
   remoteAutolinksEnabled: boolean;
   remotes: readonly RemoteInfo[];
+  remoteTarget: RemoteAutolinkTarget | null;
   rules: readonly AutolinkRule[];
 } | undefined;
 
+function isSameRemoteTarget(a: RemoteAutolinkTarget | null, b: RemoteAutolinkTarget | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.provider === b.provider && a.webBaseUrl === b.webBaseUrl && a.repoPath === b.repoPath;
+}
+
 /**
- * {@link buildAutolinkRules} from the store's own values, memoized on their
- * identity. Every rendered row asks for the rules; answering with the same
- * array each time keeps `CommitTableRow`'s memo intact and compiles the
- * patterns once per settings or remote change rather than once per row.
+ * {@link buildAutolinkRules} from the store's own values. Every rendered row
+ * asks for the rules; answering with the same array each time keeps
+ * `CommitTableRow`'s memo intact. The store keeps the custom list's identity
+ * while its content is unchanged, but every refresh re-sends the remotes, so a
+ * new remote list is compared by the target it resolves to, and the rules are
+ * rebuilt only when what they link would differ.
  */
 export function getAutolinkRules(
   customAutolinks: readonly CustomAutolink[],
   remoteAutolinksEnabled: boolean,
   remotes: readonly RemoteInfo[],
 ): readonly AutolinkRule[] {
+  const last = lastRulesInput;
   if (
-    lastRulesInput
-    && lastRulesInput.customAutolinks === customAutolinks
-    && lastRulesInput.remoteAutolinksEnabled === remoteAutolinksEnabled
-    && lastRulesInput.remotes === remotes
+    last
+    && last.customAutolinks === customAutolinks
+    && last.remoteAutolinksEnabled === remoteAutolinksEnabled
+    && last.remotes === remotes
   ) {
-    return lastRulesInput.rules;
+    return last.rules;
   }
 
   const remoteTarget = remoteAutolinksEnabled ? resolveRemoteAutolinkTarget(remotes) : null;
-  const rules = buildAutolinkRules(customAutolinks, remoteTarget);
-  lastRulesInput = { customAutolinks, remoteAutolinksEnabled, remotes, rules };
+  const unchanged = last
+    && last.customAutolinks === customAutolinks
+    && isSameRemoteTarget(last.remoteTarget, remoteTarget);
+  const rules = unchanged ? last.rules : buildAutolinkRules(customAutolinks, remoteTarget);
+  lastRulesInput = { customAutolinks, remoteAutolinksEnabled, remotes, remoteTarget, rules };
   return rules;
 }
 

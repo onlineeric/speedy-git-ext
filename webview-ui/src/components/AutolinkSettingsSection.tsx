@@ -69,7 +69,7 @@ function RemoteAutolinksToggle() {
       <p className={`${hintClassName} mt-1`}>
         {target
           ? <>This repository: <span className="text-[var(--vscode-foreground)]">{new URL(target.webBaseUrl).host}/{target.repoPath}</span></>
-          : 'Not linked here: no remote on github.com or gitlab.com was found, so a link might point to the wrong place.'}
+          : 'Not linked here: the only remote, or else upstream, or else origin, must be on github.com or gitlab.com, so a link never points to the wrong place.'}
       </p>
     </div>
   );
@@ -82,7 +82,9 @@ function CustomAutolinksEditor() {
   const lastSaved = useRef<readonly CustomAutolink[]>(saved);
 
   // The list can also change from VS Code's settings, or echo back after Save.
-  // Follow it unless the user has edits here that it would overwrite.
+  // Follow it unless the user has edits here that it would overwrite. The store
+  // keeps the list's identity while its content is unchanged, so a change to
+  // any other setting never drops a just-added blank row or the shown errors.
   useEffect(() => {
     const previous = lastSaved.current;
     lastSaved.current = saved;

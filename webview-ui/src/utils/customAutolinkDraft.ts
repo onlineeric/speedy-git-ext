@@ -1,5 +1,6 @@
 import {
   hasCustomAutolinkErrors,
+  isSameCustomAutolinkList,
   trimCustomAutolink,
   validateCustomAutolinks,
   type CustomAutolink,
@@ -30,8 +31,13 @@ export function toDraftRows(entries: readonly CustomAutolink[]): CustomAutolinkD
 }
 
 /** A row the user added and never filled in; dropped on save rather than reported. */
-function isBlankRow({ entry }: CustomAutolinkDraftRow): boolean {
+function isBlankEntry(entry: CustomAutolink): boolean {
   return entry.prefix.trim().length === 0 && entry.url.trim().length === 0;
+}
+
+/** A list as saving would write it: blank entries dropped, the rest trimmed. */
+function toSavedForm(entries: readonly CustomAutolink[]): CustomAutolink[] {
+  return entries.filter((entry) => !isBlankEntry(entry)).map(trimCustomAutolink);
 }
 
 export type CustomAutolinkSaveResult =
@@ -45,7 +51,7 @@ export type CustomAutolinkSaveResult =
  * written at all, so the settings file never holds half of an edit.
  */
 export function prepareCustomAutolinksSave(rows: readonly CustomAutolinkDraftRow[]): CustomAutolinkSaveResult {
-  const filledRows = rows.filter((row) => !isBlankRow(row));
+  const filledRows = rows.filter((row) => !isBlankEntry(row.entry));
   const autolinks = filledRows.map((row) => trimCustomAutolink(row.entry));
   const rowErrors = validateCustomAutolinks(autolinks);
 
@@ -57,20 +63,11 @@ export function prepareCustomAutolinksSave(rows: readonly CustomAutolinkDraftRow
   return errors.size > 0 ? { ok: false, errors } : { ok: true, autolinks };
 }
 
-function sameAutolink(a: CustomAutolink, b: CustomAutolink): boolean {
-  return a.prefix === b.prefix
-    && a.url === b.url
-    && (a.ignoreCase ?? false) === (b.ignoreCase ?? false)
-    && (a.alphanumeric ?? false) === (b.alphanumeric ?? false);
-}
-
 /**
  * Whether the draft differs from what is saved, compared the way saving would
  * write it (trimmed, blank rows dropped). So typing a space, or adding a row and
  * leaving it empty, does not count as an unsaved change.
  */
 export function isDraftChanged(rows: readonly CustomAutolinkDraftRow[], saved: readonly CustomAutolink[]): boolean {
-  const draft = rows.filter((row) => !isBlankRow(row)).map((row) => trimCustomAutolink(row.entry));
-  return draft.length !== saved.length
-    || draft.some((entry, index) => !sameAutolink(entry, trimCustomAutolink(saved[index])));
+  return !isSameCustomAutolinkList(toSavedForm(rows.map((row) => row.entry)), toSavedForm(saved));
 }

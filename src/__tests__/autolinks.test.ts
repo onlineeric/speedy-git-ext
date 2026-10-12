@@ -38,6 +38,10 @@ describe('normalizeCustomAutolinks', () => {
     expect(normalizeCustomAutolinks([null, 'ABCD-', { prefix: 'A-' }, { prefix: 1, url: 'x' }, JIRA])).toEqual([JIRA]);
   });
 
+  it('trims both fields, so a hand-edited entry matches the way validation reads it', () => {
+    expect(normalizeCustomAutolinks([{ prefix: ' ABCD- ', url: ` ${JIRA.url} ` }])).toEqual([JIRA]);
+  });
+
   it('keeps a well-shaped but invalid entry so the editor can show it', () => {
     expect(normalizeCustomAutolinks([{ prefix: '', url: 'nope' }])).toEqual([{ prefix: '', url: 'nope' }]);
   });

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { AutolinkAnchor, type AutolinkSurface } from '../components/AutolinkAnchor';
 import { HighlightedText } from '../components/HighlightedText';
-import { splitAutolinkSegments, type AutolinkRule } from './autolinks';
+import { findAutolinks, splitAutolinkSegments, type AutolinkRule, type AutolinkSource } from './autolinks';
 import type { SearchTerm } from './searchQuery';
 
 const INLINE_CODE_CLASSES = 'font-mono rounded px-1 bg-[var(--vscode-textCodeBlock-background)]';
@@ -115,10 +115,9 @@ function renderLinkedText(
   terms: readonly SearchTerm[] | undefined,
   autolinks: AutolinkRenderOptions | undefined,
 ): ReactNode {
-  const segments = autolinks ? splitAutolinkSegments(text, autolinks.rules) : undefined;
-  if (!autolinks || !segments || (segments.length === 1 && !segments[0].link)) {
-    return renderHighlighted(text, terms);
-  }
+  if (!autolinks) return renderHighlighted(text, terms);
+  const segments = splitAutolinkSegments(text, autolinks.rules);
+  if (segments.length === 1 && !segments[0].link) return renderHighlighted(text, terms);
 
   return segments.map((segment, index) =>
     segment.link ? (
@@ -129,6 +128,32 @@ function renderLinkedText(
       <span key={index}>{renderHighlighted(segment.text, terms)}</span>
     )
   );
+}
+
+/** One link {@link renderInlineCode} would draw in a message, with the text it covers. */
+export interface MessageAutolink {
+  label: string;
+  url: string;
+  source: AutolinkSource;
+}
+
+/**
+ * The links {@link renderInlineCode} would draw for `text`, as data, in order —
+ * found over the same non-code segments, so a surface that lists a message's
+ * links (the commit tooltip) never offers one that the message, where code is
+ * never linked, does not show.
+ */
+export function listMessageAutolinks(text: string, rules: readonly AutolinkRule[]): MessageAutolink[] {
+  if (rules.length === 0) return [];
+  return parseInlineCode(text)
+    .filter((segment) => !segment.isCode)
+    .flatMap((segment) =>
+      findAutolinks(segment.text, rules).map(({ start, end, url, source }) => ({
+        label: segment.text.slice(start, end),
+        url,
+        source,
+      })),
+    );
 }
 
 /**

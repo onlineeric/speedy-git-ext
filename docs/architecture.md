@@ -354,7 +354,7 @@ utils/
 │                                 #   memoizes on input identity so row memos hold
 ├── remoteAutolinkTarget.ts       # PURE: which repo a bare #123 means — github.com/gitlab.com only; sole remote, else
 │                                 #   upstream, else origin; never swaps in another remote; null = no links
-├── customAutolinkDraft.ts        # PURE: View dialog's custom-autolink draft rows, all-or-nothing save validation, dirty check
+├── customAutolinkDraft.ts        # PURE: View dialog's custom-autolink draft rows, all-or-nothing save validation, dirty/same-list checks
 ├── resolveDefaultRemote.ts       # Default remote selection; resolvePublishedBranchRemote requires an existing, unambiguous branch destination
 ├── amendMessages.ts              # Post-amend force-push wording; translates git's `stale info` lease rejection
 ├── rebaseSquashMessages.ts       # Combined message per squash group — full messages, never subjects; a squashed
@@ -417,7 +417,7 @@ utils/
 ├── uncommittedUtils.ts           # Helpers for the uncommitted-node row
 ├── repoPath.ts                   # Repo path normalization
 └── inlineCodeRenderer.tsx        # Renders inline-code spans in commit messages; boxes search matches within each segment;
-                                  #   links autolinks outside code
+                                  #   links autolinks outside code; listMessageAutolinks gives the same links as data (tooltip)
 ```
 
 ---

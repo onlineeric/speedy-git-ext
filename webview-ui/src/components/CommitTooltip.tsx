@@ -11,9 +11,9 @@ import { rpcClient } from '../rpc/rpcClient';
 import { displayRefKey, mergeRefs } from '../utils/mergeRefs';
 import { RefLabel } from './RefLabel';
 import { HeadIcon } from './icons';
-import { findAutolinks, type AutolinkMatch } from '../utils/autolinks';
 import { useAutolinkRules } from '../stores/graphSelectors';
 import { AutolinkAnchor } from './AutolinkAnchor';
+import { listMessageAutolinks, type MessageAutolink } from '../utils/inlineCodeRenderer';
 import { DEFAULT_GRAPH_PALETTE, getColor, getLaneColorStyle } from '../utils/colorUtils';
 import { getReachabilityChecker } from '../utils/commitReachability';
 import { findHeadCommit } from '../utils/commitRefs';
@@ -373,11 +373,9 @@ function ExternalLinksSection({ subject }: { subject: string }) {
   const autolinkRules = useAutolinkRules();
 
   const links = useMemo(() => {
-    const linksByUrl = new Map<string, AutolinkMatch & { label: string }>();
-    for (const match of findAutolinks(subject, autolinkRules)) {
-      if (!linksByUrl.has(match.url)) {
-        linksByUrl.set(match.url, { ...match, label: subject.slice(match.start, match.end) });
-      }
+    const linksByUrl = new Map<string, MessageAutolink>();
+    for (const link of listMessageAutolinks(subject, autolinkRules)) {
+      if (!linksByUrl.has(link.url)) linksByUrl.set(link.url, link);
     }
     return [...linksByUrl.values()];
   }, [subject, autolinkRules]);

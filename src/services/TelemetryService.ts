@@ -12,7 +12,7 @@ import {
   type UiTelemetryEvent,
 } from '../../shared/telemetry.js';
 
-/** Closed property set for the once-per-session `settingsSnapshot` event. */
+/** Numeric measurements for the once-per-session `settingsSnapshot` event. */
 export interface SettingsSnapshotMeasurements {
   batchCommitSize: number;
   overScan: number;
@@ -21,6 +21,7 @@ export interface SettingsSnapshotMeasurements {
   customAutolinkCount: number;
 }
 
+/** Closed property set for the once-per-session `settingsSnapshot` event. */
 export interface SettingsSnapshotProperties {
   dateFormat: 'relative' | 'absolute' | 'absolute-date' | 'system' | 'custom';
   avatarsEnabled: 'true' | 'false';

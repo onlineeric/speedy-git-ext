@@ -2,7 +2,6 @@ import { GitError } from '../../../shared/errors.js';
 import {
   hasCustomAutolinkErrors,
   normalizeCustomAutolinks,
-  trimCustomAutolink,
   validateCustomAutolinks,
 } from '../../../shared/autolinks.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
@@ -22,7 +21,7 @@ export const autolinkHandlers = {
   setCustomAutolinks: async (message, context) => {
     // A webview message is never trusted: the dialog validated this list, but
     // the backend refuses an invalid one rather than writing it.
-    const autolinks = normalizeCustomAutolinks(message.payload.autolinks).map(trimCustomAutolink);
+    const autolinks = normalizeCustomAutolinks(message.payload.autolinks);
     if (validateCustomAutolinks(autolinks).some(hasCustomAutolinkErrors)) {
       postSettingError(context, 'Custom autolinks were not saved: an entry is invalid.');
       return;

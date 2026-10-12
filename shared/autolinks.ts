@@ -47,7 +47,9 @@ export function isHttpUrl(value: string): boolean {
  *
  * Shape only: an entry with string `prefix` and `url` survives even when it is
  * invalid, so the View settings editor shows it to be fixed rather than a save
- * silently deleting it. Rule building skips invalid entries on its own.
+ * silently deleting it. Rule building skips invalid entries on its own. Both
+ * fields are trimmed here, the one gate every settings read and write passes,
+ * so what validation judges is what the rules match.
  */
 export function normalizeCustomAutolinks(value: unknown): CustomAutolink[] {
   if (!Array.isArray(value)) return [];
@@ -58,7 +60,7 @@ export function normalizeCustomAutolinks(value: unknown): CustomAutolink[] {
     const { prefix, url, ignoreCase, alphanumeric } = item as Record<string, unknown>;
     if (typeof prefix !== 'string' || typeof url !== 'string') continue;
 
-    const entry: CustomAutolink = { prefix, url };
+    const entry: CustomAutolink = { prefix: prefix.trim(), url: url.trim() };
     if (ignoreCase === true) entry.ignoreCase = true;
     if (alphanumeric === true) entry.alphanumeric = true;
     entries.push(entry);
@@ -113,4 +115,16 @@ export function validateCustomAutolinks(entries: readonly CustomAutolink[]): Cus
 /** Trim both fields, keeping the options an entry already had. */
 export function trimCustomAutolink(entry: CustomAutolink): CustomAutolink {
   return { ...entry, prefix: entry.prefix.trim(), url: entry.url.trim() };
+}
+
+function isSameCustomAutolink(a: CustomAutolink, b: CustomAutolink): boolean {
+  return a.prefix === b.prefix
+    && a.url === b.url
+    && (a.ignoreCase ?? false) === (b.ignoreCase ?? false)
+    && (a.alphanumeric ?? false) === (b.alphanumeric ?? false);
+}
+
+/** Whether two lists hold the same entries in the same order, compared exactly as given. */
+export function isSameCustomAutolinkList(a: readonly CustomAutolink[], b: readonly CustomAutolink[]): boolean {
+  return a.length === b.length && a.every((entry, index) => isSameCustomAutolink(entry, b[index]));
 }

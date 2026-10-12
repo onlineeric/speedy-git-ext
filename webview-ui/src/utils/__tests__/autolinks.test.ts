@@ -153,6 +153,20 @@ describe('getAutolinkRules', () => {
     expect(getAutolinkRules(custom, true, remotes)).toBe(getAutolinkRules(custom, true, remotes));
   });
 
+  it('keeps the same array when an equal remote list arrives under a new identity', () => {
+    const custom = [JIRA];
+    const rules = getAutolinkRules(custom, true, remotes);
+    expect(getAutolinkRules(custom, true, remotes.map((remote) => ({ ...remote })))).toBe(rules);
+  });
+
+  it('rebuilds when what the rules link changes', () => {
+    const rules = getAutolinkRules([JIRA], true, remotes);
+    expect(getAutolinkRules([{ ...JIRA, prefix: 'XY-' }], true, remotes)).not.toBe(rules);
+    const fork = [{ ...remotes[0], fetchUrl: 'git@github.com:acme/other.git' }];
+    expect(findAutolinks('#1', getAutolinkRules([JIRA], true, fork)).map((match) => match.url))
+      .toEqual(['https://github.com/acme/other/issues/1']);
+  });
+
   it('adds no remote rules when the setting is off', () => {
     const rules = getAutolinkRules([], false, remotes);
     expect(findAutolinks('#1', rules)).toEqual([]);

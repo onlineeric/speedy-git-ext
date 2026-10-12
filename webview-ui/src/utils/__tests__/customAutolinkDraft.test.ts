@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { CustomAutolink } from '@shared/autolinks';
-import { createDraftRow, isDraftChanged, prepareCustomAutolinksSave, toDraftRows } from '../customAutolinkDraft';
+import {
+  createDraftRow,
+  isDraftChanged,
+  prepareCustomAutolinksSave,
+  toDraftRows,
+} from '../customAutolinkDraft';
 
 const JIRA: CustomAutolink = { prefix: 'ABCD-', url: 'https://jira.example.com/browse/ABCD-<num>' };
 
@@ -36,6 +41,14 @@ describe('isDraftChanged', () => {
   it('is false for the saved list and for whitespace-only or blank-row edits', () => {
     expect(isDraftChanged(toDraftRows([JIRA]), [JIRA])).toBe(false);
     expect(isDraftChanged([createDraftRow({ ...JIRA, prefix: 'ABCD- ' }), createDraftRow()], [JIRA])).toBe(false);
+  });
+
+  it('ignores a blank entry in the saved list too', () => {
+    expect(isDraftChanged(toDraftRows([JIRA]), [{ prefix: '', url: '' }, JIRA])).toBe(false);
+  });
+
+  it('is true for an edited option', () => {
+    expect(isDraftChanged(toDraftRows([JIRA]), [{ ...JIRA, ignoreCase: true }])).toBe(true);
   });
 
   it('is true for an edited, added or removed entry', () => {
