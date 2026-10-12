@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-10-12**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-10-13**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -75,10 +75,14 @@ src/
 │       ├── telemetryHandlers.ts  # Validates one-way webview telemetry against closed catalogs
 │       ├── avatarHandlers.ts      # Avatar auth state, GitHub authorize/remove-token, refreshDays setting, clear cache
 │       ├── autolinkHandlers.ts    # View dialog's Autolinks: re-validates + writes speedyGit.autolinks.* (defined scope);
-│                                 #   an invalid custom list is refused whole, nothing written
+│                                 #   an invalid custom list is refused whole, nothing written. The custom list
+│                                 #   answers with settingSaveResult (the dialog waits on it), not an error toast
+│       ├── settingWriteReplies.ts # How a settings handler reports a write: writeSettingWithReply (settingSaveResult for a
+│       │                             #   dialog that waits) or writeSettingOrToast (the standard error toast)
 │       ├── updateSpeedyGitSetting.ts # Writes one speedyGit.* setting; ExtensionController broadcasts the change.
 │                                 #   …InDefinedScope writes to Workspace when a workspace value already exists,
-│                                 #   so a Global write cannot be silently shadowed
+│                                 #   so a Global write cannot be silently shadowed. An unregistered-setting refusal
+│                                 #   becomes an actionable error + Reload Window offer
 │       └── vscodeCommandHandlers.ts # settings, clipboard, openExternal (http/https only), updatePersistedUIState, openNewGraphTab
 ├── services/                     # All repo-bound; every method returns Result<T, GitError>
 │   ├── index.ts                  # Barrel export for all services
@@ -147,7 +151,9 @@ src/
     ├── worktreePathSegments.ts   # PURE: ref → sanitized folder segments (per-segment allowlist, `.`/`..` dropped,
     │                             #   `/` and `\` both split); normalizePathForCompare and isInsideBaseDir now DELEGATE
     │                             #   to utils/repoIdentity.ts, so "same place?" has one implementation, not two
-    └── worktreeErrors.ts         # Map raw git worktree failures → friendly messages
+    ├── worktreeErrors.ts         # Map raw git worktree failures → friendly messages
+    └── settingsWriteErrors.ts    # PURE: recognise VS Code's "not a registered configuration" refusal — a setting
+                                  #   added by an update installed without a window reload; only a reload fixes it
 ```
 
 ---
@@ -201,10 +207,13 @@ webview-ui/src/assets.d.ts        # `*.png` imports are `data:` URLs — vite.co
 │                                 #   debounced 300ms, everything else recomputes at once in a layout effect
 ├── CompareWidget.tsx             # Branch comparison
 ├── WorktreeWidget.tsx            # Worktree list + create/remove (046-git-worktrees)
-├── ViewSettingsDialog.tsx        # Movable "Settings" dialog with View (columns left, avatars right) and AutoLinks tabs (Radix dialog + @dnd-kit sortable); open state lives in the store
+├── ViewSettingsDialog.tsx        # Movable "Settings" dialog with View (columns left, avatars right) and AutoLinks tabs (Radix dialog + @dnd-kit sortable); open state lives in the store.
+│                                 #   Each tab's content sits in a SettingDraftScope; unsaved handling is useUnsavedSettings
+├── SettingsDialogFooter.tsx      # Settings dialog footer: Close, or while a setting is unsaved "Unsaved changes: …" +
+│                                 #   Discard and Close / Save / Save and Close; flashes when a close is refused
 ├── AvatarSettingsSection.tsx     # Avatars pane of the View dialog: GitHub allow/remove-token, refresh-days, clear cache
 ├── AutolinkSettingsSection.tsx   # AutoLinks tab of the Settings dialog: Autolinks section (GitHub/GitLab toggle + detected repo), then a Custom autolinks section
-│                                 #   editor (validated on Save; nothing saved while any row is invalid)
+│                                 #   editor (useSettingDraft + useRegisterSettingDraft; saved from the dialog footer, nothing saved while any row is invalid)
 ├── AutolinkAnchor.tsx            # One autolinked reference: opens via openExternal, swallows the row click, tracks by source
 ├── RepoSelector.tsx              # Multi-root repo picker (FilterableSingleSelectDropdown)
 ├── SubmoduleSelector.tsx         # Parent/submodule navigation picker
@@ -253,7 +262,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 │                                 #   base), the note/warning/error message boxes (one shared base) and the commit-message textarea
 ├── MovableDialogContent.tsx      # Drop-in `Dialog.Content` the user can drag by a `dialogDragHandleProps` element (the title);
 │                                 #   pins to pixel position on first pointer-down so corner resize tracks the pointer
-├── DialogTabs.tsx                # VS Code-styled tabs inside a dialog; panels stay mounted and stacked so size is steady
+├── DialogTabs.tsx                # VS Code-styled tabs inside a dialog; panels stay mounted and stacked so size is steady; optional unsaved-changes dot
 ├── ConfirmDialog.tsx             # Generic confirm (danger/warning variants) + CommandPreview; optional focusConfirm
 │                                 #   overrides Radix's default Cancel focus where proceeding is the expected answer
 ├── InputDialog.tsx               # Generic single-input dialog + FieldError
@@ -329,6 +338,12 @@ hooks/
 ├── useCommitHookWait.ts          # idle → running → waitingOnHooks phase + timer for dialogs that write a commit
 ├── useGitVersion.ts              # Lazily requests the installed git version once per session (store: gitVersion)
 ├── useDialogTelemetry.ts         # One confirmed/cancelled outcome per dialog open cycle
+├── useSettingDraft.ts            # One Settings-dialog setting's draft: dirty check, discard, follows outside saved changes
+│                                 #   unless the user has edits it would overwrite
+├── useSettingDraftRegistry.tsx   # The dialog's draft registry, SettingDraftScope (one per tab, supplies tabId) and
+│                                 #   useRegisterSettingDraft (a setting reports { label, isDirty, save, discard })
+├── useUnsavedSettings.ts         # Settings dialog: footer Save / Save and Close / Discard and Close, refuses Esc and
+│                                 #   outside-click while anything is unsaved; a failed save stays open on its tab
 └── useCapturedRefExpectation.ts  # Holds where a dialog's target ref stood WHEN IT OPENED — capturing at confirm
                                   #   would defeat the check, since the tab auto-refreshes while a dialog is open
 
@@ -364,6 +379,8 @@ utils/
 ├── remoteAutolinkTarget.ts       # PURE: which repo a bare #123 means — github.com/gitlab.com only; sole remote, else
 │                                 #   upstream, else origin; never swaps in another remote; null = no links
 ├── customAutolinkDraft.ts        # PURE: Settings dialog's custom-autolink draft rows, all-or-nothing save validation, dirty/same-list checks
+├── settingDrafts.ts              # PURE: SettingDraft contract, unsaved/tab queries, save-all (each setting on its own;
+│                                 #   first failure in dialog order reported), the follow-saved-value rule
 ├── resolveDefaultRemote.ts       # Default remote selection; resolvePublishedBranchRemote requires an existing, unambiguous branch destination
 ├── amendMessages.ts              # Post-amend force-push wording; translates git's `stale info` lease rejection
 ├── rebaseSquashMessages.ts       # Combined message per squash group — full messages, never subjects; a squashed

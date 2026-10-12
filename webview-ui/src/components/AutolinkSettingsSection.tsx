@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { AUTOLINK_NUMBER_PLACEHOLDER, type CustomAutolink, type CustomAutolinkErrors } from '@shared/autolinks';
+import { useMemo, useState } from 'react';
+import { AUTOLINK_NUMBER_PLACEHOLDER, type CustomAutolinkErrors } from '@shared/autolinks';
+import { useSettingDraft } from '../hooks/useSettingDraft';
+import { useRegisterSettingDraft } from '../hooks/useSettingDraftRegistry';
 import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import {
@@ -9,6 +11,7 @@ import {
   toDraftRows,
   type CustomAutolinkDraftRow,
 } from '../utils/customAutolinkDraft';
+import type { SettingSaveOutcome } from '../utils/settingDrafts';
 import { resolveRemoteAutolinkTarget } from '../utils/remoteAutolinkTarget';
 import { trackUiInteraction } from '../utils/telemetry';
 import { buttonSecondaryClassName, dialogSectionLabelClassName } from './dialogStyles';
@@ -19,6 +22,8 @@ const inputClassName =
   'w-full rounded border bg-[var(--vscode-input-background)] px-1.5 py-1 text-xs text-[var(--vscode-input-foreground)] focus:border-[var(--vscode-focusBorder)] focus:outline-none';
 const validBorderClassName = 'border-[var(--vscode-input-border)]';
 const invalidBorderClassName = 'border-[var(--vscode-inputValidation-errorBorder)]';
+const NO_ERRORS: ReadonlyMap<number, CustomAutolinkErrors> = new Map();
+
 const hintClassName = 'text-[11px] leading-4 text-[var(--vscode-descriptionForeground)]';
 
 /**
@@ -80,25 +85,14 @@ function RemoteAutolinksToggle() {
 
 function CustomAutolinksEditor() {
   const saved = useGraphStore((state) => state.userSettings.customAutolinks);
-  const [rows, setRows] = useState<CustomAutolinkDraftRow[]>(() => toDraftRows(saved));
-  const [errors, setErrors] = useState<Map<number, CustomAutolinkErrors>>(() => new Map());
-  const lastSaved = useRef<readonly CustomAutolink[]>(saved);
-
-  // The list can also change from VS Code's settings, or echo back after Save.
-  // Follow it unless the user has edits here that it would overwrite. The store
-  // keeps the list's identity while its content is unchanged, so a change to
-  // any other setting never drops a just-added blank row or the shown errors.
-  useEffect(() => {
-    const previous = lastSaved.current;
-    lastSaved.current = saved;
-    if (previous === saved) return;
-    setRows((current) =>
-      isDraftChanged(current, previous) && isDraftChanged(current, saved) ? current : toDraftRows(saved),
-    );
-    setErrors(new Map());
-  }, [saved]);
-
-  const changed = isDraftChanged(rows, saved);
+  const { draft: rows, setDraft: setRows, isDirty, discard } = useSettingDraft(saved, toDraftRows, isDraftChanged);
+  // Errors are held with the saved list they were found against. A new saved
+  // list replaces the draft or is kept out by it; either way those errors
+  // described a list that is gone, so they stop showing.
+  const [errorState, setErrorState] = useState(() => ({ saved, errors: NO_ERRORS }));
+  const errors = errorState.saved === saved ? errorState.errors : NO_ERRORS;
+  const setErrors = (update: (current: ReadonlyMap<number, CustomAutolinkErrors>) => ReadonlyMap<number, CustomAutolinkErrors>) =>
+    setErrorState((current) => ({ saved, errors: update(current.saved === saved ? current.errors : NO_ERRORS) }));
 
   const updateRow = (id: number, field: 'prefix' | 'url', value: string) => {
     setRows((current) => current.map((row) => (row.id === id ? { ...row, entry: { ...row.entry, [field]: value } } : row)));
@@ -116,16 +110,27 @@ function CustomAutolinksEditor() {
     setRows((current) => current.filter((row) => row.id !== id));
   };
 
-  const handleSave = () => {
+  const save = async (): Promise<SettingSaveOutcome> => {
     const result = prepareCustomAutolinksSave(rows);
     if (!result.ok) {
-      setErrors(result.errors);
-      return;
+      setErrors(() => result.errors);
+      return { ok: false, reason: 'invalid' };
     }
-    setErrors(new Map());
+    setErrors(() => NO_ERRORS);
     trackUiInteraction('autolinkSettings', 'customAutolinksSave');
-    rpcClient.setCustomAutolinks(result.autolinks);
+    return rpcClient.setCustomAutolinks(result.autolinks);
   };
+
+  useRegisterSettingDraft({
+    id: 'customAutolinks',
+    label: 'Custom autolinks',
+    isDirty,
+    save,
+    discard: () => {
+      discard();
+      setErrors(() => NO_ERRORS);
+    },
+  });
 
   return (
     <div className="min-w-0">
@@ -149,25 +154,13 @@ function CustomAutolinksEditor() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setRows((current) => [...current, createDraftRow()])}
-          className={`${buttonSecondaryClassName} text-xs`}
-        >
-          Add autolink
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={!changed}
-          className={`${buttonSecondaryClassName} text-xs`}
-          title={changed ? 'Save these autolinks to your VS Code settings' : 'No changes to save'}
-        >
-          Save autolinks
-        </button>
-        {changed && <span className={hintClassName}>Unsaved changes</span>}
-      </div>
+      <button
+        type="button"
+        onClick={() => setRows((current) => [...current, createDraftRow()])}
+        className={`${buttonSecondaryClassName} text-xs`}
+      >
+        Add autolink
+      </button>
     </div>
   );
 }

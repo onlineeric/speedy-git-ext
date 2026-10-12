@@ -20,6 +20,14 @@
   50% { background-color: var(--vscode-editor-findMatchHighlightBackground); }
 }
 
+/* The Settings dialog refused to close because of unsaved changes: flash the
+   footer that says so. Same shape as head-flash, so it pulses out of and back
+   into the footer's own background. Not gated on reduced motion — it is the
+   only answer the click gets. */
+@keyframes unsaved-flash {
+  50% { background-color: var(--vscode-inputValidation-warningBackground); }
+}
+
 /* What's New dialog. The countdown bar runs regardless of motion preference —
    it carries information (how long until Close enables), not decoration. */
 @keyframes whats-new-countdown {
@@ -158,6 +166,9 @@
   }
   .animate-head-flash {
     animation: head-flash 0.5s ease-in-out 3;
+  }
+  .animate-unsaved-flash {
+    animation: unsaved-flash 0.4s ease-in-out 2;
   }
 }
 

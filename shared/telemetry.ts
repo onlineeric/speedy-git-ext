@@ -136,6 +136,8 @@ export const UI_SURFACES = [
   'commitTooltip',
   // Autolinks section of the View settings dialog
   'autolinkSettings',
+  // The Settings dialog's footer, shown while a setting has unsaved changes
+  'settingsDialog',
 ] as const;
 
 export type UiSurface = (typeof UI_SURFACES)[number];
@@ -201,6 +203,8 @@ export const UI_ACTIONS = [
   'openAutolinkCustom', 'openAutolinkGitHub', 'openAutolinkGitLab',
   // Autolinks settings section (View settings dialog)
   'customAutolinksSave', 'remoteAutolinksEnable', 'remoteAutolinksDisable',
+  // Settings dialog footer, with unsaved changes
+  'settingsSave', 'settingsSaveAndClose', 'settingsDiscardAndClose',
 ] as const;
 
 export type UiAction = (typeof UI_ACTIONS)[number];

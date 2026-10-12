@@ -28,6 +28,8 @@ import {
   setCommitTableColumnVisibility,
 } from '../utils/commitTableLayout';
 import { trackUiInteraction } from '../utils/telemetry';
+import { SettingDraftScope, useSettingDraftRegistry } from '../hooks/useSettingDraftRegistry';
+import { useUnsavedSettings } from '../hooks/useUnsavedSettings';
 import { AutolinkSettingsSection } from './AutolinkSettingsSection';
 import { AvatarSettingsSection } from './AvatarSettingsSection';
 import { DialogTabs, type DialogTab } from './DialogTabs';
@@ -40,6 +42,7 @@ import {
   dialogSectionLabelClassName,
 } from './dialogStyles';
 import { ColumnsIcon, LinkIcon } from './icons';
+import { SettingsDialogFooter } from './SettingsDialogFooter';
 import { ToolbarIconButton, RemoteButtonToggleItem, TOGGLE_BUTTON_TONES } from './ToolbarIconButton';
 
 /** Column show/hide telemetry actions per optional column (049-usage-telemetry). */
@@ -65,7 +68,12 @@ const COLUMN_WARNINGS: Partial<Record<CommitTableColumnId, string>> = {
     'Warning: signature checks run in the background and can use high CPU in large repositories. Keep this column hidden on slower machines.',
 };
 
-type SettingsTabId = 'view' | 'autolinks';
+const SETTINGS_TAB_IDS = ['view', 'autolinks'] as const;
+type SettingsTabId = (typeof SETTINGS_TAB_IDS)[number];
+
+function isSettingsTabId(tabId: string): tabId is SettingsTabId {
+  return (SETTINGS_TAB_IDS as readonly string[]).includes(tabId);
+}
 
 const TAB_ICON_CLASS = 'h-3.5 w-3.5';
 
@@ -78,6 +86,14 @@ export function ViewSettingsDialog() {
   const setCommitTableLayout = useGraphStore((state) => state.setCommitTableLayout);
   // Kept here rather than in the content, so reopening returns to the last tab.
   const [activeTabId, setActiveTabId] = useState<SettingsTabId>('view');
+  const { registry, drafts } = useSettingDraftRegistry();
+  const unsavedSettings = useUnsavedSettings({
+    drafts,
+    setOpen,
+    showTab: (tabId) => {
+      if (isSettingsTabId(tabId)) setActiveTabId(tabId);
+    },
+  });
 
   const optionalColumnIds = useMemo(
     () => getOptionalCommitTableColumnIds(commitTableLayout),
@@ -185,18 +201,30 @@ export function ViewSettingsDialog() {
     </>
   );
 
-  const tabs: DialogTab<SettingsTabId>[] = [
-    { id: 'view', label: 'View', icon: <ColumnsIcon className={TAB_ICON_CLASS} />, content: viewTabContent },
-    {
-      id: 'autolinks',
-      label: 'AutoLinks',
-      icon: <LinkIcon className={TAB_ICON_CLASS} />,
-      content: <AutolinkSettingsSection />,
-    },
-  ];
+  // Each tab's content sits in a SettingDraftScope, so a setting that holds a
+  // draft registers under its tab without knowing which one it is on.
+  const tabs: DialogTab<SettingsTabId>[] = (
+    [
+      { id: 'view', label: 'View', icon: <ColumnsIcon className={TAB_ICON_CLASS} />, content: viewTabContent },
+      {
+        id: 'autolinks',
+        label: 'AutoLinks',
+        icon: <LinkIcon className={TAB_ICON_CLASS} />,
+        content: <AutolinkSettingsSection />,
+      },
+    ] satisfies DialogTab<SettingsTabId>[]
+  ).map((tab) => ({
+    ...tab,
+    hasUnsavedChanges: unsavedSettings.unsavedTabs.has(tab.id),
+    content: (
+      <SettingDraftScope registry={registry} tabId={tab.id}>
+        {tab.content}
+      </SettingDraftScope>
+    ),
+  }));
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root open={open} onOpenChange={unsavedSettings.handleOpenChange}>
       <Dialog.Trigger asChild>
         <ToolbarIconButton
           label="View"
@@ -224,13 +252,15 @@ export function ViewSettingsDialog() {
 
           <DialogTabs idPrefix="settings" tabs={tabs} activeTabId={activeTabId} onActiveTabChange={setActiveTabId} />
 
-          <div className="mt-4 flex justify-end border-t border-[var(--vscode-panel-border)] pt-3">
-            <Dialog.Close asChild>
-              <button type="button" className={`${buttonSecondaryClassName} text-xs`}>
-                Close
-              </button>
-            </Dialog.Close>
-          </div>
+          <SettingsDialogFooter
+            unsavedLabels={unsavedSettings.unsavedLabels}
+            saving={unsavedSettings.saving}
+            error={unsavedSettings.error}
+            refusedCloseCount={unsavedSettings.refusedCloseCount}
+            onSave={unsavedSettings.save}
+            onSaveAndClose={unsavedSettings.saveAndClose}
+            onDiscardAndClose={unsavedSettings.discardAndClose}
+          />
         </MovableDialogContent>
       </Dialog.Portal>
     </Dialog.Root>

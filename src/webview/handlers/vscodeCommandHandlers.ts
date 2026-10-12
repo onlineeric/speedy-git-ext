@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import { GitError } from '../../../shared/errors.js';
 import { isHttpUrl } from '../../../shared/autolinks.js';
 import { normalizeWorktreeFolderNameStyle, WORKTREE_STYLE_LABELS } from '../../../shared/types.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
+import { writeSettingOrToast } from './settingWriteReplies.js';
 import { updateSpeedyGitSetting, updateSpeedyGitSettingInDefinedScope } from './updateSpeedyGitSetting.js';
 
 export const vscodeCommandHandlers = {
@@ -33,21 +33,13 @@ export const vscodeCommandHandlers = {
    */
   setWorktreeFolderNameStyle: async (message, context) => {
     const style = normalizeWorktreeFolderNameStyle(message.payload.style);
-    try {
-      await updateSpeedyGitSettingInDefinedScope('worktree.folderNameStyle', style);
+    const saved = await writeSettingOrToast(context, 'the default worktree folder style', () =>
+      updateSpeedyGitSettingInDefinedScope('worktree.folderNameStyle', style),
+    );
+    if (saved) {
       context.postMessage({
         type: 'success',
         payload: { message: `${WORKTREE_STYLE_LABELS[style]} saved as the default worktree folder style` },
-      });
-    } catch (error) {
-      context.postMessage({
-        type: 'error',
-        payload: {
-          error: new GitError(
-            `Could not save the default worktree folder style: ${(error as Error).message}`,
-            'UNKNOWN',
-          ),
-        },
       });
     }
   },

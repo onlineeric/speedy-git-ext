@@ -4,6 +4,14 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.19.1] - 2026-10-13
+
+### Changed
+- **The Settings dialog no longer loses unsaved custom autolinks.** Edits used to be dropped without a word when the dialog was closed before **Save autolinks**. Saving now happens at the bottom of the dialog: while a change is unsaved, the **Close** button becomes "Unsaved changes: Custom autolinks" with **Discard and Close**, **Save** and **Save and Close**, and a dot marks the tab that holds the change. Esc and clicking outside the dialog no longer close it while a change is unsaved; the footer flashes instead. If saving fails, the dialog stays open with the error and the edits are kept. If an entry has errors, it opens that tab and points them out.
+
+### Fixed
+- **Saving a new setting right after an update now says what to do.** When VS Code updates Speedy Git without reloading the window, it keeps the previous version's list of settings until the window reloads, and refuses to save any setting the update added. Saving custom autolinks the first time after updating to 5.19.0 failed with "speedyGit.autolinks.custom is not a registered configuration". The error now says the window needs a reload, and a notification offers a **Reload Window** button; after the reload, saving works.
+
 ## [5.19.0] - 2026-10-12
 
 ### Added
