@@ -118,8 +118,7 @@ function CustomAutolinksEditor() {
     }
     setErrors(() => NO_ERRORS);
     trackUiInteraction('autolinkSettings', 'customAutolinksSave');
-    const reply = await rpcClient.setCustomAutolinks(result.autolinks);
-    return reply.ok ? { ok: true } : { ok: false, reason: 'failed', message: reply.message };
+    return rpcClient.setCustomAutolinks(result.autolinks);
   };
 
   useRegisterSettingDraft({
@@ -155,15 +154,13 @@ function CustomAutolinksEditor() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setRows((current) => [...current, createDraftRow()])}
-          className={`${buttonSecondaryClassName} text-xs`}
-        >
-          Add autolink
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setRows((current) => [...current, createDraftRow()])}
+        className={`${buttonSecondaryClassName} text-xs`}
+      >
+        Add autolink
+      </button>
     </div>
   );
 }

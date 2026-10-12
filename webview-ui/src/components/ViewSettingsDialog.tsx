@@ -68,7 +68,12 @@ const COLUMN_WARNINGS: Partial<Record<CommitTableColumnId, string>> = {
     'Warning: signature checks run in the background and can use high CPU in large repositories. Keep this column hidden on slower machines.',
 };
 
-type SettingsTabId = 'view' | 'autolinks';
+const SETTINGS_TAB_IDS = ['view', 'autolinks'] as const;
+type SettingsTabId = (typeof SETTINGS_TAB_IDS)[number];
+
+function isSettingsTabId(tabId: string): tabId is SettingsTabId {
+  return (SETTINGS_TAB_IDS as readonly string[]).includes(tabId);
+}
 
 const TAB_ICON_CLASS = 'h-3.5 w-3.5';
 
@@ -86,8 +91,7 @@ export function ViewSettingsDialog() {
     drafts,
     setOpen,
     showTab: (tabId) => {
-      const tab = tabs.find((candidate) => candidate.id === tabId);
-      if (tab) setActiveTabId(tab.id);
+      if (isSettingsTabId(tabId)) setActiveTabId(tabId);
     },
   });
 

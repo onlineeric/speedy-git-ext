@@ -182,10 +182,10 @@ export type RequestMessage =
   | { type: 'setToolbarSetting'; payload: { setting: ToolbarBooleanSetting; value: boolean } }
   | { type: 'setWorktreeFolderNameStyle'; payload: { style: WorktreeFolderNameStyle } }
   /**
-   * Save the View settings dialog's custom autolinks list. Re-validated by the
-   * backend: an invalid list is refused with an error toast and nothing is written.
+   * Save the Settings dialog's custom autolinks list. Re-validated by the
+   * backend: an invalid list is refused and nothing is written. Answered by
+   * `settingSaveResult` with the same `requestId`, so the dialog can wait for the write.
    */
-  /** Answered by `settingSaveResult` with the same `requestId`, so the Settings dialog can wait for the write. */
   | { type: 'setCustomAutolinks'; payload: { autolinks: CustomAutolink[]; requestId: number } }
   | { type: 'setRemoteAutolinksEnabled'; payload: { enabled: boolean } }
   | { type: 'getSubmodules'; payload: Record<string, never> }

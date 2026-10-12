@@ -4,10 +4,11 @@ import { isUnregisteredSettingError, UNREGISTERED_SETTING_MESSAGE } from '../../
 /**
  * Write one `speedyGit.*` setting from a webview request.
  *
- * Handlers never answer these directly: the settings-change listener in
+ * The new value never comes back from here: the settings-change listener in
  * `ExtensionController` picks the write up and broadcasts fresh `settingsData`
- * to the webview. Centralized so the configuration section name and that
- * fire-and-forget contract are stated once rather than per handler.
+ * to the webview. Whether the write worked is reported by `settingWriteReplies`.
+ * Centralized so the configuration section name and that contract are stated
+ * once rather than per handler.
  */
 export function updateSpeedyGitSetting(key: string, value: unknown): Promise<void> {
   return writeSetting(vscode.workspace.getConfiguration('speedyGit'), key, value, vscode.ConfigurationTarget.Global);

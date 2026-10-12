@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   nextDraftOnSavedChange,
   saveUnsavedDrafts,
-  tabsWithUnsavedDrafts,
   unsavedDrafts,
   type SettingDraft,
   type SettingSaveOutcome,
@@ -13,10 +12,9 @@ function draft(id: string, tabId: string, isDirty: boolean, outcome: SettingSave
 }
 
 describe('unsaved drafts', () => {
-  it('lists only dirty drafts, and the tabs they are on', () => {
+  it('lists only dirty drafts', () => {
     const drafts = [draft('a', 'view', false), draft('b', 'autolinks', true), draft('c', 'autolinks', true)];
     expect(unsavedDrafts(drafts).map((entry) => entry.id)).toEqual(['b', 'c']);
-    expect([...tabsWithUnsavedDrafts(drafts)]).toEqual(['autolinks']);
   });
 });
 
@@ -40,6 +38,14 @@ describe('saveUnsavedDrafts', () => {
   it('carries the message of a failed write, for the dialog to show', async () => {
     const failed = draft('failed', 'autolinks', true, { ok: false, reason: 'failed', message: 'read-only' });
     expect(await saveUnsavedDrafts([failed])).toEqual({ ok: false, tabId: 'autolinks', message: 'read-only' });
+  });
+
+  it('reports a save that throws as a failed write rather than rejecting', async () => {
+    const throwing = draft('throwing', 'autolinks', true);
+    vi.mocked(throwing.save).mockRejectedValue(new Error('boom'));
+    const valid = draft('valid', 'view', true);
+    expect(await saveUnsavedDrafts([throwing, valid])).toEqual({ ok: false, tabId: 'autolinks', message: 'boom' });
+    expect(valid.save).toHaveBeenCalledTimes(1);
   });
 });
 

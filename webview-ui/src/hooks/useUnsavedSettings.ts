@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { saveUnsavedDrafts, tabsWithUnsavedDrafts, unsavedDrafts, type SettingDraft } from '../utils/settingDrafts';
+import { saveUnsavedDrafts, unsavedDrafts, type SettingDraft } from '../utils/settingDrafts';
 import { trackUiInteraction } from '../utils/telemetry';
 
 /**
@@ -66,7 +66,7 @@ export function useUnsavedSettings({
 
   return {
     unsavedLabels: unsaved.map((draft) => draft.label),
-    unsavedTabs: tabsWithUnsavedDrafts(drafts),
+    unsavedTabs: new Set(unsaved.map((draft) => draft.tabId)),
     saving,
     // An error belongs to an unsaved edit; once nothing is unsaved it has no subject.
     error: hasUnsaved ? error : null,

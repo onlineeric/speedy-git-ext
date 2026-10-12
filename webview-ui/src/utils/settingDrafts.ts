@@ -17,8 +17,6 @@ export type SettingSaveOutcome =
   /** The write itself failed; the dialog shows `message`. */
   | { ok: false; reason: 'failed'; message: string };
 
-/** The backend's answer to a settings write the dialog waits for. */
-export type SettingSaveReply = { ok: true } | { ok: false; message: string };
 
 export interface SettingDraft {
   /** Stable per setting, e.g. `customAutolinks`. */
@@ -38,10 +36,6 @@ export function unsavedDrafts(drafts: readonly SettingDraft[]): SettingDraft[] {
   return drafts.filter((draft) => draft.isDirty);
 }
 
-export function tabsWithUnsavedDrafts(drafts: readonly SettingDraft[]): ReadonlySet<string> {
-  return new Set(unsavedDrafts(drafts).map((draft) => draft.tabId));
-}
-
 export type SaveDraftsResult =
   | { ok: true }
   /** `message` is absent when the failure was invalid input, shown on the fields instead. */
@@ -54,13 +48,25 @@ export type SaveDraftsResult =
  */
 export async function saveUnsavedDrafts(drafts: readonly SettingDraft[]): Promise<SaveDraftsResult> {
   const pending = unsavedDrafts(drafts);
-  const outcomes = await Promise.all(pending.map((draft) => draft.save()));
+  const outcomes = await Promise.all(pending.map(saveSettledDraft));
   const failedIndex = outcomes.findIndex((outcome) => !outcome.ok);
   if (failedIndex === -1) return { ok: true };
 
   const failure = outcomes[failedIndex];
   const { tabId } = pending[failedIndex];
   return !failure.ok && failure.reason === 'failed' ? { ok: false, tabId, message: failure.message } : { ok: false, tabId };
+}
+
+/**
+ * A `save()` that throws is a failed write, not a rejected batch: otherwise the
+ * dialog would stay "Saving…" with every way out disabled.
+ */
+async function saveSettledDraft(draft: SettingDraft): Promise<SettingSaveOutcome> {
+  try {
+    return await draft.save();
+  } catch (error) {
+    return { ok: false, reason: 'failed', message: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 /**

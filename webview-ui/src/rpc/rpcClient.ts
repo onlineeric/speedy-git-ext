@@ -15,7 +15,7 @@ import {
 } from '../utils/headNavigation';
 import { findHeadCommitHash } from '../utils/commitRefs';
 import type { ResolvedWorktreePaths } from '../utils/worktreePathChoice';
-import type { SettingSaveReply } from '../utils/settingDrafts';
+import type { SettingSaveOutcome } from '../utils/settingDrafts';
 
 /**
  * The subset of the active filters that may reach git.
@@ -79,7 +79,7 @@ class RpcClient {
    */
   private pendingDialogAction: { resolve: () => void; reject: (error: string) => void } | null = null;
   /** Settings dialog saves awaiting their `settingSaveResult`, by request id. */
-  private pendingSettingSaves = new Map<number, (reply: SettingSaveReply) => void>();
+  private pendingSettingSaves = new Map<number, (outcome: SettingSaveOutcome) => void>();
 
   private messageHandler = (event: MessageEvent) => {
     const message = event.data as ResponseMessage;
@@ -114,7 +114,7 @@ class RpcClient {
       this.pendingWorktreeEnvFiles = null;
     }
     this.clearPendingDialogAction();
-    for (const resolve of this.pendingSettingSaves.values()) resolve({ ok: false, message: 'RPC client disposed' });
+    for (const resolve of this.pendingSettingSaves.values()) resolve({ ok: false, reason: 'failed', message: 'RPC client disposed' });
     this.pendingSettingSaves.clear();
   }
 
@@ -188,7 +188,7 @@ class RpcClient {
         const { requestId, error } = message.payload;
         const resolve = this.pendingSettingSaves.get(requestId);
         this.pendingSettingSaves.delete(requestId);
-        resolve?.(error === undefined ? { ok: true } : { ok: false, message: error });
+        resolve?.(error === undefined ? { ok: true } : { ok: false, reason: 'failed', message: error });
         break;
       }
       case 'peerActivity':
@@ -878,11 +878,20 @@ class RpcClient {
   }
 
   /** Resolves once the backend has written the setting, or with why it could not. */
-  setCustomAutolinks(autolinks: CustomAutolink[]): Promise<SettingSaveReply> {
+  setCustomAutolinks(autolinks: CustomAutolink[]): Promise<SettingSaveOutcome> {
+    return this.awaitSettingSave((requestId) => this.send({ type: 'setCustomAutolinks', payload: { autolinks, requestId } }));
+  }
+
+  /**
+   * Send a settings write the Settings dialog waits on, and resolve with its
+   * `settingSaveResult`. Every such write goes through here, so a new one is a
+   * one-line method.
+   */
+  private awaitSettingSave(send: (requestId: number) => void): Promise<SettingSaveOutcome> {
     const requestId = this.nextRequestId++;
     return new Promise((resolve) => {
       this.pendingSettingSaves.set(requestId, resolve);
-      this.send({ type: 'setCustomAutolinks', payload: { autolinks, requestId } });
+      send(requestId);
     });
   }
 

@@ -77,10 +77,12 @@ src/
 │       ├── autolinkHandlers.ts    # View dialog's Autolinks: re-validates + writes speedyGit.autolinks.* (defined scope);
 │                                 #   an invalid custom list is refused whole, nothing written. The custom list
 │                                 #   answers with settingSaveResult (the dialog waits on it), not an error toast
+│       ├── settingWriteReplies.ts # How a settings handler reports a write: writeSettingWithReply (settingSaveResult for a
+│       │                             #   dialog that waits) or writeSettingOrToast (the standard error toast)
 │       ├── updateSpeedyGitSetting.ts # Writes one speedyGit.* setting; ExtensionController broadcasts the change.
-│       │                             #   An unregistered-setting refusal becomes an actionable error + Reload Window offer.
 │                                 #   …InDefinedScope writes to Workspace when a workspace value already exists,
-│                                 #   so a Global write cannot be silently shadowed
+│                                 #   so a Global write cannot be silently shadowed. An unregistered-setting refusal
+│                                 #   becomes an actionable error + Reload Window offer
 │       └── vscodeCommandHandlers.ts # settings, clipboard, openExternal (http/https only), updatePersistedUIState, openNewGraphTab
 ├── services/                     # All repo-bound; every method returns Result<T, GitError>
 │   ├── index.ts                  # Barrel export for all services

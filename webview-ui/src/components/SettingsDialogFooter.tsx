@@ -33,43 +33,44 @@ export function SettingsDialogFooter({
           {error}
         </div>
       )}
-      <div className="relative flex flex-wrap items-center justify-end gap-2 rounded">
-        {/* Keyed so each refused close replays the flash, without remounting the buttons. */}
+      <div className="relative isolate flex flex-wrap items-center justify-end gap-2 rounded">
+        {/* Keyed so each refused close replays the flash, without remounting the buttons. Painted
+            behind the row (`isolate` + `-z-10`), so no child needs its own stacking. */}
         {refusedCloseCount > 0 && (
           <span
             key={refusedCloseCount}
             aria-hidden
-            className="animate-unsaved-flash pointer-events-none absolute -inset-1 rounded"
+            className="animate-unsaved-flash pointer-events-none absolute -inset-1 -z-10 rounded"
           />
         )}
         {hasUnsaved ? (
           <>
-            <span role="status" className="relative mr-auto min-w-0 text-xs" style={{ color: WARNING_COLOR }}>
+            <span role="status" className="mr-auto min-w-0 text-xs" style={{ color: WARNING_COLOR }}>
               Unsaved changes: {unsavedLabels.join(', ')}
             </span>
             <button
               type="button"
               onClick={onDiscardAndClose}
               disabled={saving}
-              className={`${buttonSecondaryClassName} relative text-xs`}
+              className={`${buttonSecondaryClassName} text-xs`}
             >
               Discard and Close
             </button>
-            <button type="button" onClick={onSave} disabled={saving} className={`${buttonSecondaryClassName} relative text-xs`}>
+            <button type="button" onClick={onSave} disabled={saving} className={`${buttonSecondaryClassName} text-xs`}>
               {saving ? 'Saving…' : 'Save'}
             </button>
             <button
               type="button"
               onClick={onSaveAndClose}
               disabled={saving}
-              className={`${buttonPrimaryClassName} relative text-xs`}
+              className={`${buttonPrimaryClassName} text-xs`}
             >
               Save and Close
             </button>
           </>
         ) : (
           <Dialog.Close asChild>
-            <button type="button" className={`${buttonSecondaryClassName} relative text-xs`}>
+            <button type="button" className={`${buttonSecondaryClassName} text-xs`}>
               Close
             </button>
           </Dialog.Close>

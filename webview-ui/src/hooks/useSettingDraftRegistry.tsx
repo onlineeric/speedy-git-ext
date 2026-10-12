@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { SettingDraft, SettingSaveOutcome } from '../utils/settingDrafts';
 
 interface SettingDraftRegistry {
@@ -75,7 +75,8 @@ export function useRegisterSettingDraft({
 }): void {
   const scope = useContext(SettingDraftScopeContext);
   const actions = useRef({ save, discard });
-  useEffect(() => {
+  // Layout effect: the ref is current before any click can reach the footer.
+  useLayoutEffect(() => {
     actions.current = { save, discard };
   });
 

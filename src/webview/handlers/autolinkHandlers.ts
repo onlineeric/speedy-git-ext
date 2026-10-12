@@ -1,11 +1,10 @@
-import { GitError } from '../../../shared/errors.js';
 import {
   hasCustomAutolinkErrors,
   normalizeCustomAutolinks,
   validateCustomAutolinks,
 } from '../../../shared/autolinks.js';
 import type { RequestHandlerMap } from '../WebviewMessageRouter.js';
-import type { WebviewRequestContext } from '../WebviewRequestContext.js';
+import { writeSettingOrToast, writeSettingWithReply } from './settingWriteReplies.js';
 import { updateSpeedyGitSettingInDefinedScope } from './updateSpeedyGitSetting.js';
 
 /**
@@ -29,27 +28,20 @@ export const autolinkHandlers = {
     // the backend refuses an invalid one rather than writing it.
     const autolinks = normalizeCustomAutolinks(message.payload.autolinks);
     if (validateCustomAutolinks(autolinks).some(hasCustomAutolinkErrors)) {
-      postSaveResult(context, requestId, 'Custom autolinks were not saved: an entry is invalid.');
+      context.postMessage({
+        type: 'settingSaveResult',
+        payload: { requestId, error: 'Custom autolinks were not saved: an entry is invalid.' },
+      });
       return;
     }
-    try {
-      await updateSpeedyGitSettingInDefinedScope('autolinks.custom', autolinks);
-      postSaveResult(context, requestId);
-    } catch (error) {
-      postSaveResult(context, requestId, `Could not save custom autolinks: ${(error as Error).message}`);
-    }
+    await writeSettingWithReply(context, requestId, 'custom autolinks', () =>
+      updateSpeedyGitSettingInDefinedScope('autolinks.custom', autolinks),
+    );
   },
 
   setRemoteAutolinksEnabled: async (message, context) => {
-    try {
-      await updateSpeedyGitSettingInDefinedScope('autolinks.remoteProvider.enabled', message.payload.enabled === true);
-    } catch (error) {
-      const text = `Could not save the GitHub/GitLab autolinks setting: ${(error as Error).message}`;
-      context.postMessage({ type: 'error', payload: { error: new GitError(text, 'UNKNOWN') } });
-    }
+    await writeSettingOrToast(context, 'the GitHub/GitLab autolinks setting', () =>
+      updateSpeedyGitSettingInDefinedScope('autolinks.remoteProvider.enabled', message.payload.enabled === true),
+    );
   },
 } satisfies Pick<RequestHandlerMap, 'setCustomAutolinks' | 'setRemoteAutolinksEnabled'>;
-
-function postSaveResult(context: WebviewRequestContext, requestId: number, error?: string): void {
-  context.postMessage({ type: 'settingSaveResult', payload: error === undefined ? { requestId } : { requestId, error } });
-}
