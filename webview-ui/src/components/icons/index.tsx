@@ -364,6 +364,20 @@ export function ColumnsIcon({ className }: IconProps) {
   );
 }
 
+/** Chain link — 12×12, inherits text color via currentColor */
+export function LinkIcon({ className }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path
+        d="M 5 7 a 2 2 0 0 0 2.83 0 l 1.6 -1.6 a 2 2 0 0 0 -2.83 -2.83 l -0.6 0.6 M 7 5 a 2 2 0 0 0 -2.83 0 l -1.6 1.6 a 2 2 0 0 0 2.83 2.83 l 0.6 -0.6"
+        stroke="currentColor"
+        strokeWidth={1.2}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 /** Up arrow (stage) — 12×12, inherits text color via currentColor */
 export function StageIcon({ className }: IconProps) {
   return (

@@ -22,22 +22,25 @@ const invalidBorderClassName = 'border-[var(--vscode-inputValidation-errorBorder
 const hintClassName = 'text-[11px] leading-4 text-[var(--vscode-descriptionForeground)]';
 
 /**
- * Autolinks section of the View settings dialog: the GitHub/GitLab switch and
- * the custom autolinks editor. Both are VS Code settings
+ * The AutoLinks tab of the Settings dialog: the GitHub/GitLab switch, then the
+ * custom autolinks editor as its own section below. Both are VS Code settings
  * (`speedyGit.autolinks.*`); this edits them, so the two stay one setting.
  */
 export function AutolinkSettingsSection() {
   return (
-    <section>
-      <div className={dialogSectionLabelClassName}>Autolinks</div>
-      <p className="mb-3 text-xs text-[var(--vscode-descriptionForeground)]">
-        Turn references in commit messages into links, in the commit list, the details panel and the tooltip.
-      </p>
-      <div className="grid gap-6 md:grid-cols-2">
+    <div className="space-y-4">
+      <section>
+        <div className={dialogSectionLabelClassName}>Autolinks</div>
+        <p className="mb-3 text-xs text-[var(--vscode-descriptionForeground)]">
+          Turn references in commit messages into links, in the commit list, the details panel and the tooltip.
+        </p>
         <RemoteAutolinksToggle />
+      </section>
+      <section className="border-t border-[var(--vscode-panel-border)] pt-4">
+        <div className={dialogSectionLabelClassName}>Custom autolinks</div>
         <CustomAutolinksEditor />
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }
 
@@ -126,8 +129,7 @@ function CustomAutolinksEditor() {
 
   return (
     <div className="min-w-0">
-      <div className="text-sm">Custom autolinks</div>
-      <p className={`${hintClassName} mt-1 mb-2`}>
+      <p className={`${hintClassName} mb-2`}>
         For trackers such as Jira. Prefix <code>ABCD-</code> with URL{' '}
         <code>https://jira.example.com/browse/ABCD-{AUTOLINK_NUMBER_PLACEHOLDER}</code> links{' '}
         <code>ABCD-123</code>; <code>{AUTOLINK_NUMBER_PLACEHOLDER}</code> is where the number goes.

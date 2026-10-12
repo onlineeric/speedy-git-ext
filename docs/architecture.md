@@ -198,9 +198,9 @@ components/
 │                                 #   debounced 300ms, everything else recomputes at once in a layout effect
 ├── CompareWidget.tsx             # Branch comparison
 ├── WorktreeWidget.tsx            # Worktree list + create/remove (046-git-worktrees)
-├── ViewSettingsDialog.tsx        # Centered View settings dialog: columns left, avatars right, autolinks below both (Radix dialog + @dnd-kit sortable); open state lives in the store
+├── ViewSettingsDialog.tsx        # Movable "Settings" dialog with View (columns left, avatars right) and AutoLinks tabs (Radix dialog + @dnd-kit sortable); open state lives in the store
 ├── AvatarSettingsSection.tsx     # Avatars pane of the View dialog: GitHub allow/remove-token, refresh-days, clear cache
-├── AutolinkSettingsSection.tsx   # Autolinks pane of the View dialog: GitHub/GitLab toggle + detected repo, custom autolinks
+├── AutolinkSettingsSection.tsx   # AutoLinks tab of the Settings dialog: Autolinks section (GitHub/GitLab toggle + detected repo), then a Custom autolinks section
 │                                 #   editor (validated on Save; nothing saved while any row is invalid)
 ├── AutolinkAnchor.tsx            # One autolinked reference: opens via openExternal, swallows the row click, tracks by source
 ├── RepoSelector.tsx              # Multi-root repo picker (FilterableSingleSelectDropdown)
@@ -248,6 +248,9 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ```
 ├── dialogStyles.ts               # Shared dialog width/resize, the primary/secondary/danger button variants (one shared
 │                                 #   base), the note/warning/error message boxes (one shared base) and the commit-message textarea
+├── MovableDialogContent.tsx      # Drop-in `Dialog.Content` the user can drag by a `dialogDragHandleProps` element (the title);
+│                                 #   pins to pixel position on first pointer-down so corner resize tracks the pointer
+├── DialogTabs.tsx                # VS Code-styled tabs inside a dialog; panels stay mounted and stacked so size is steady
 ├── ConfirmDialog.tsx             # Generic confirm (danger/warning variants) + CommandPreview; optional focusConfirm
 │                                 #   overrides Radix's default Cancel focus where proceeding is the expected answer
 ├── InputDialog.tsx               # Generic single-input dialog + FieldError
@@ -346,6 +349,7 @@ utils/
 ├── rowVisibility.ts              # Scroll-offset maths for revealing a row when the details panel resizes the viewport
 ├── commitVisibility.ts           # Visibility/filter predicates for the virtualized row list
 ├── compareSlot.ts                # Compare panel slot model (Base/Target, commit-ish parsing)
+├── dialogPosition.ts             # PURE: clamp a dragged dialog so its title stays reachable
 ├── compareDefaults.ts            # Default slot seeding
 ├── compareDispatch.ts            # Resolve compare request → backend RPC
 ├── compareMarker.ts              # Per-row "B"ase / "T"arget badge derivation
@@ -354,7 +358,7 @@ utils/
 │                                 #   memoizes on input identity so row memos hold
 ├── remoteAutolinkTarget.ts       # PURE: which repo a bare #123 means — github.com/gitlab.com only; sole remote, else
 │                                 #   upstream, else origin; never swaps in another remote; null = no links
-├── customAutolinkDraft.ts        # PURE: View dialog's custom-autolink draft rows, all-or-nothing save validation, dirty/same-list checks
+├── customAutolinkDraft.ts        # PURE: Settings dialog's custom-autolink draft rows, all-or-nothing save validation, dirty/same-list checks
 ├── resolveDefaultRemote.ts       # Default remote selection; resolvePublishedBranchRemote requires an existing, unambiguous branch destination
 ├── amendMessages.ts              # Post-amend force-push wording; translates git's `stale info` lease rejection
 ├── rebaseSquashMessages.ts       # Combined message per squash group — full messages, never subjects; a squashed
@@ -395,6 +399,7 @@ utils/
 │                                 #   qualified `<remote>/<name>`, and the rebase target. `undefined` when unknown
 ├── peerActivityNotice.ts         # PURE: whether to say "another Speedy Git view is running a Git operation",
 │                                 #   and in what words. A notice only — it gates no control
+├── tabNavigation.ts              # PURE: WAI-ARIA tabs keyboard pattern (arrows wrap, Home/End)
 ├── telemetry.ts                  # Fire-and-forget webview telemetry helpers
 ├── searchQuery.ts                # PURE: query → AND-ed terms; a `"quoted run"` is one literal term, an unterminated
 │                                 #   quote is literal from the quote on. Owns EMPTY_SEARCH_TERMS. `:` is reserved
