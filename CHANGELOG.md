@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.19.1] - 2026-10-13
+
+### Fixed
+- **Saving a new setting right after an update now says what to do.** When VS Code updates Speedy Git without reloading the window, it keeps the previous version's list of settings until the window reloads, and refuses to save any setting the update added. Saving custom autolinks the first time after updating to 5.19.0 failed with "speedyGit.autolinks.custom is not a registered configuration". The error now says the window needs a reload, and a notification offers a **Reload Window** button; after the reload, saving works.
+
 ## [5.19.0] - 2026-10-12
 
 ### Added

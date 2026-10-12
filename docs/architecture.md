@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-10-12**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-10-13**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -77,6 +77,7 @@ src/
 │       ├── autolinkHandlers.ts    # View dialog's Autolinks: re-validates + writes speedyGit.autolinks.* (defined scope);
 │                                 #   an invalid custom list is refused whole, nothing written
 │       ├── updateSpeedyGitSetting.ts # Writes one speedyGit.* setting; ExtensionController broadcasts the change.
+│       │                             #   An unregistered-setting refusal becomes an actionable error + Reload Window offer.
 │                                 #   …InDefinedScope writes to Workspace when a workspace value already exists,
 │                                 #   so a Global write cannot be silently shadowed
 │       └── vscodeCommandHandlers.ts # settings, clipboard, openExternal (http/https only), updatePersistedUIState, openNewGraphTab
@@ -147,7 +148,9 @@ src/
     ├── worktreePathSegments.ts   # PURE: ref → sanitized folder segments (per-segment allowlist, `.`/`..` dropped,
     │                             #   `/` and `\` both split); normalizePathForCompare and isInsideBaseDir now DELEGATE
     │                             #   to utils/repoIdentity.ts, so "same place?" has one implementation, not two
-    └── worktreeErrors.ts         # Map raw git worktree failures → friendly messages
+    ├── worktreeErrors.ts         # Map raw git worktree failures → friendly messages
+    └── settingsWriteErrors.ts    # PURE: recognise VS Code's "not a registered configuration" refusal — a setting
+                                  #   added by an update installed without a window reload; only a reload fixes it
 ```
 
 ---
