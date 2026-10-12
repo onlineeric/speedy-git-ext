@@ -185,7 +185,8 @@ export type RequestMessage =
    * Save the View settings dialog's custom autolinks list. Re-validated by the
    * backend: an invalid list is refused with an error toast and nothing is written.
    */
-  | { type: 'setCustomAutolinks'; payload: { autolinks: CustomAutolink[] } }
+  /** Answered by `settingSaveResult` with the same `requestId`, so the Settings dialog can wait for the write. */
+  | { type: 'setCustomAutolinks'; payload: { autolinks: CustomAutolink[]; requestId: number } }
   | { type: 'setRemoteAutolinksEnabled'; payload: { enabled: boolean } }
   | { type: 'getSubmodules'; payload: Record<string, never> }
   /** @deprecated since 041-submodule-selector — selector navigation uses switchRepo. Handler kept for legacy compatibility; will be removed in a follow-up. */
@@ -291,6 +292,11 @@ export type ResponseMessage =
   | { type: 'deleteBranchNeedsForce'; payload: { name: string; deleteRemote?: { remote: string; name: string } } }
   | { type: 'checkoutPullFailed'; payload: { branch: string; error: { message: string; code: GitErrorCode } } }
   | { type: 'settingsData'; payload: { settings: UserSettings } }
+  /**
+   * The outcome of a Settings dialog save. `error` is set only on failure. The
+   * new value itself still arrives as `settingsData`, like every settings write.
+   */
+  | { type: 'settingSaveResult'; payload: { requestId: number; error?: string } }
   | { type: 'submodulesData'; payload: { submodules: Submodule[]; stack: SubmoduleNavEntry[] } }
   | { type: 'submoduleOperationResult'; payload: { success: boolean; error?: string } }
   | {
@@ -377,7 +383,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commitPushedResult: true, commitParents: true, commitMessage: true,
   commitsAppended: true, prefetchError: true, headLocation: true, headLocationFailed: true, repoList: true,
   checkoutNeedsStash: true, branchCheckoutFinished: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
-  settingsData: true, submodulesData: true, submoduleOperationResult: true,
+  settingsData: true, settingSaveResult: true, submodulesData: true, submoduleOperationResult: true,
   pushResult: true, avatarUrls: true, avatarAuthState: true, avatarCacheCleared: true, tagMetadata: true, worktreeList: true, worktreePathResolved: true, worktreeEnvFiles: true, containingBranches: true,
   persistedUIState: true, authorList: true, uncommittedChanges: true, conflictState: true,
   whatsNew: true,

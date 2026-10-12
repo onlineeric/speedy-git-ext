@@ -15,6 +15,7 @@ import {
 } from '../utils/headNavigation';
 import { findHeadCommitHash } from '../utils/commitRefs';
 import type { ResolvedWorktreePaths } from '../utils/worktreePathChoice';
+import type { SettingSaveReply } from '../utils/settingDrafts';
 
 /**
  * The subset of the active filters that may reach git.
@@ -77,6 +78,8 @@ class RpcClient {
    * store update. See `awaitNextDialogAction()`.
    */
   private pendingDialogAction: { resolve: () => void; reject: (error: string) => void } | null = null;
+  /** Settings dialog saves awaiting their `settingSaveResult`, by request id. */
+  private pendingSettingSaves = new Map<number, (reply: SettingSaveReply) => void>();
 
   private messageHandler = (event: MessageEvent) => {
     const message = event.data as ResponseMessage;
@@ -111,6 +114,8 @@ class RpcClient {
       this.pendingWorktreeEnvFiles = null;
     }
     this.clearPendingDialogAction();
+    for (const resolve of this.pendingSettingSaves.values()) resolve({ ok: false, message: 'RPC client disposed' });
+    this.pendingSettingSaves.clear();
   }
 
   private handleMessage(message: ResponseMessage) {
@@ -179,6 +184,13 @@ class RpcClient {
       case 'settingsData':
         store.setUserSettings(message.payload.settings);
         break;
+      case 'settingSaveResult': {
+        const { requestId, error } = message.payload;
+        const resolve = this.pendingSettingSaves.get(requestId);
+        this.pendingSettingSaves.delete(requestId);
+        resolve?.(error === undefined ? { ok: true } : { ok: false, message: error });
+        break;
+      }
       case 'peerActivity':
         store.setPeerOperationInProgress(message.payload.busy);
         break;
@@ -865,8 +877,13 @@ class RpcClient {
     this.send({ type: 'setToolbarSetting', payload: { setting, value } });
   }
 
-  setCustomAutolinks(autolinks: CustomAutolink[]) {
-    this.send({ type: 'setCustomAutolinks', payload: { autolinks } });
+  /** Resolves once the backend has written the setting, or with why it could not. */
+  setCustomAutolinks(autolinks: CustomAutolink[]): Promise<SettingSaveReply> {
+    const requestId = this.nextRequestId++;
+    return new Promise((resolve) => {
+      this.pendingSettingSaves.set(requestId, resolve);
+      this.send({ type: 'setCustomAutolinks', payload: { autolinks, requestId } });
+    });
   }
 
   setRemoteAutolinksEnabled(enabled: boolean) {

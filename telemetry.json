@@ -58,12 +58,12 @@
       "surface": {
         "classification": "SystemMetaData",
         "purpose": "FeatureInsight",
-        "comment": "UI surface id from the closed catalog (e.g. commitMenu, toolbar, branchBadge, commitDetails, commitRow, commitTooltip, autolinkSettings)."
+        "comment": "UI surface id from the closed catalog (e.g. commitMenu, toolbar, branchBadge, commitDetails, commitRow, commitTooltip, autolinkSettings, settingsDialog)."
       },
       "action": {
         "classification": "SystemMetaData",
         "purpose": "FeatureInsight",
-        "comment": "Action id from the closed catalog (e.g. cherryPick, copyHash, checkoutDoubleClick, moreActions, moreOptions, goToParent, goToChild, openAutolinkCustom, openAutolinkGitHub, openAutolinkGitLab)."
+        "comment": "Action id from the closed catalog (e.g. cherryPick, copyHash, checkoutDoubleClick, moreActions, moreOptions, goToParent, goToChild, openAutolinkCustom, openAutolinkGitHub, openAutolinkGitLab, settingsSave, settingsSaveAndClose, settingsDiscardAndClose)."
       }
     },
     "dialogOutcome": {

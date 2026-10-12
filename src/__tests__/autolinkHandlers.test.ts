@@ -24,21 +24,38 @@ describe('autolinkHandlers', () => {
   it('writes a valid list, trimmed', async () => {
     const { context, postMessage } = makeContext();
     await autolinkHandlers.setCustomAutolinks(
-      { type: 'setCustomAutolinks', payload: { autolinks: [{ prefix: ' ABCD- ', url: JIRA.url }] } },
+      { type: 'setCustomAutolinks', payload: { autolinks: [{ prefix: ' ABCD- ', url: JIRA.url }], requestId: 7 } },
       context,
     );
     expect(updateSetting).toHaveBeenCalledWith('autolinks.custom', [JIRA]);
-    expect(postMessage).not.toHaveBeenCalled();
+    expect(postMessage).toHaveBeenCalledWith({ type: 'settingSaveResult', payload: { requestId: 7 } });
   });
 
   it('refuses an invalid list and writes nothing', async () => {
     const { context, postMessage } = makeContext();
     await autolinkHandlers.setCustomAutolinks(
-      { type: 'setCustomAutolinks', payload: { autolinks: [JIRA, { prefix: 'X-', url: 'command:run?<num>' }] } },
+      { type: 'setCustomAutolinks', payload: { autolinks: [JIRA, { prefix: 'X-', url: 'command:run?<num>' }], requestId: 8 } },
       context,
     );
     expect(updateSetting).not.toHaveBeenCalled();
-    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }));
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'settingSaveResult',
+      payload: { requestId: 8, error: expect.stringContaining('an entry is invalid') },
+    });
+  });
+
+  it('answers a failed custom autolinks write to the dialog, not with a toast', async () => {
+    updateSetting.mockRejectedValue(new Error('read-only settings'));
+    const { context, postMessage } = makeContext();
+    await autolinkHandlers.setCustomAutolinks(
+      { type: 'setCustomAutolinks', payload: { autolinks: [JIRA], requestId: 9 } },
+      context,
+    );
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'settingSaveResult',
+      payload: { requestId: 9, error: 'Could not save custom autolinks: read-only settings' },
+    });
   });
 
   it('reports a failed write as an error toast', async () => {

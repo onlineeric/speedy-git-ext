@@ -1,11 +1,14 @@
 import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { nextTabIndex } from '../utils/tabNavigation';
+import { WARNING_COLOR } from '../utils/themeColors';
 
 export interface DialogTab<TabId extends string> {
   id: TabId;
   label: string;
   icon: ReactNode;
   content: ReactNode;
+  /** Marks the tab with a dot, so unsaved edits are visible from the other tabs. */
+  hasUnsavedChanges?: boolean;
 }
 
 /**
@@ -70,6 +73,15 @@ export function DialogTabs<TabId extends string>({
             >
               {tab.icon}
               {tab.label}
+              {tab.hasUnsavedChanges && (
+                <span
+                  role="img"
+                  aria-label="unsaved changes"
+                  title="Unsaved changes"
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: WARNING_COLOR }}
+                />
+              )}
             </button>
           );
         })}
