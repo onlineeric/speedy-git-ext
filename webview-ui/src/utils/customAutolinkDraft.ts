@@ -1,6 +1,7 @@
 import {
   hasCustomAutolinkErrors,
   isSameCustomAutolinkList,
+  REPEATED_PREFIX_ERROR,
   trimCustomAutolink,
   validateCustomAutolinks,
   type CustomAutolink,
@@ -12,8 +13,8 @@ import {
  *
  * Rows carry a stable id so React keeps each input's focus while rows above it
  * are added or removed. An entry keeps the options it arrived with
- * (`ignoreCase`, `alphanumeric` — settings.json-only), so editing a row in the
- * dialog never silently drops them.
+ * (`alphanumeric` is settings.json-only), so editing a row in the dialog never
+ * silently drops them.
  */
 export interface CustomAutolinkDraftRow {
   id: number;
@@ -28,6 +29,34 @@ export function createDraftRow(entry: CustomAutolink = { prefix: '', url: '' }):
 
 export function toDraftRows(entries: readonly CustomAutolink[]): CustomAutolinkDraftRow[] {
   return entries.map((entry) => createDraftRow(entry));
+}
+
+/**
+ * The entry with its "Ignore case" box set. Ignoring case is the default, so a
+ * checked box leaves the field out, and the settings file holds
+ * `"ignoreCase": false` only for an entry that opted out.
+ */
+export function withIgnoreCase(entry: CustomAutolink, ignoreCase: boolean): CustomAutolink {
+  const { ignoreCase: _previous, ...rest } = entry;
+  return ignoreCase ? rest : { ...rest, ignoreCase: false };
+}
+
+/**
+ * The errors still true after a row's "Ignore case" box changes. A row's own
+ * checks do not depend on letter case, but whether a prefix repeats an earlier
+ * one does, on that row and on any row below it — so only repeat messages are
+ * dropped, on every row, and the next Save re-checks them.
+ */
+export function withoutRepeatErrors(
+  errors: ReadonlyMap<number, CustomAutolinkErrors>,
+): ReadonlyMap<number, CustomAutolinkErrors> {
+  let next: Map<number, CustomAutolinkErrors> | undefined;
+  for (const [id, rowErrors] of errors) {
+    if (rowErrors.prefix !== REPEATED_PREFIX_ERROR) continue;
+    next ??= new Map(errors);
+    next.set(id, { ...rowErrors, prefix: undefined });
+  }
+  return next ?? errors;
 }
 
 /** A row the user added and never filled in; dropped on save rather than reported. */

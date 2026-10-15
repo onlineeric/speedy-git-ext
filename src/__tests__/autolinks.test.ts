@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  customAutolinkIgnoresCase,
   isHttpUrl,
   normalizeCustomAutolinks,
   parseAutolinkPrefix,
@@ -29,10 +30,11 @@ describe('normalizeCustomAutolinks', () => {
     expect(normalizeCustomAutolinks({ prefix: 'A-' })).toEqual([]);
   });
 
-  it('keeps well-shaped entries and only true options', () => {
+  it('keeps well-shaped entries and only non-default options', () => {
     expect(normalizeCustomAutolinks([
       { ...JIRA, ignoreCase: true, alphanumeric: 'yes', title: 'ignored' },
-    ])).toEqual([{ ...JIRA, ignoreCase: true }]);
+      { ...JIRA, ignoreCase: false, alphanumeric: true },
+    ])).toEqual([JIRA, { ...JIRA, ignoreCase: false, alphanumeric: true }]);
   });
 
   it('drops entries without string prefix and url', () => {
@@ -117,5 +119,35 @@ describe('validateCustomAutolinks', () => {
   it('keeps "Jira" and "Jira " apart', () => {
     const errors = validateCustomAutolinks([{ ...JIRA, prefix: 'Jira' }, { ...JIRA, prefix: '"Jira "' }]);
     expect(errors).toEqual([{}, {}]);
+  });
+});
+
+describe('customAutolinkIgnoresCase', () => {
+  it('ignores case unless the entry opts out', () => {
+    expect(customAutolinkIgnoresCase(JIRA)).toBe(true);
+    expect(customAutolinkIgnoresCase({ ...JIRA, ignoreCase: true })).toBe(true);
+    expect(customAutolinkIgnoresCase({ ...JIRA, ignoreCase: false })).toBe(false);
+  });
+});
+
+describe('validateCustomAutolinks repeats by letter case', () => {
+  const caseSensitive = (prefix: string) => ({ ...JIRA, prefix, ignoreCase: false });
+
+  it('reports any casing of a prefix after one that ignores case', () => {
+    expect(validateCustomAutolinks([JIRA, { ...JIRA, prefix: 'abcd-' }])[1].prefix).toBeDefined();
+    expect(validateCustomAutolinks([JIRA, caseSensitive('Abcd-')])[1].prefix).toBeDefined();
+  });
+
+  it('allows other casings after a case-sensitive prefix, which still link something', () => {
+    expect(validateCustomAutolinks([caseSensitive('ABCD-'), caseSensitive('abcd-')])[1]).toEqual({});
+    expect(validateCustomAutolinks([caseSensitive('ABCD-'), { ...JIRA, prefix: 'abcd-' }])[1]).toEqual({});
+  });
+
+  it('still reports the exact same case-sensitive prefix', () => {
+    expect(validateCustomAutolinks([caseSensitive('ABCD-'), caseSensitive('ABCD-')])[1].prefix).toBeDefined();
+  });
+
+  it('allows a case-insensitive entry after a case-sensitive one in any casing, since both link other casings', () => {
+    expect(validateCustomAutolinks([caseSensitive('ABCD-'), JIRA])[1]).toEqual({});
   });
 });

@@ -1,5 +1,6 @@
 import {
   AUTOLINK_NUMBER_PLACEHOLDER,
+  customAutolinkIgnoresCase,
   hasCustomAutolinkErrors,
   parseAutolinkPrefix,
   validateCustomAutolinks,
@@ -63,6 +64,8 @@ const ISSUE_NUMBER = '([1-9]\\d*)';
  * entity) and not another `#`/`!` or `/` (`##1`, `a/#1`).
  */
 const REFERENCE_START = `(?<![${WORD_CHARS}&#!/])`;
+/** Before an `owner/repo#N` reference, additionally not `.`, `/` or `-`, so it never starts mid-path. */
+const PATH_REFERENCE_START = `(?<![${WORD_CHARS}./-])`;
 
 /** A URL already in the message; nothing inside one is linked a second time. */
 const URL_IN_TEXT = /https?:\/\/[^\s<>"'`]+/gu;
@@ -74,7 +77,7 @@ function escapeForPattern(text: string): string {
 
 function customRule(entry: CustomAutolink): AutolinkRule {
   const id = entry.alphanumeric ? '([A-Za-z0-9]+)' : '(\\d+)';
-  const flags = entry.ignoreCase ? 'giu' : 'gu';
+  const flags = customAutolinkIgnoresCase(entry) ? 'giu' : 'gu';
   return {
     source: 'custom',
     pattern: new RegExp(`${WORD_START}${escapeForPattern(parseAutolinkPrefix(entry.prefix).text)}${id}${WORD_END}`, flags),
@@ -90,7 +93,7 @@ function githubRules({ webBaseUrl, repoPath }: RemoteAutolinkTarget): AutolinkRu
     {
       source: 'github',
       pattern: new RegExp(
-        `(?<![${WORD_CHARS}./-])([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?/[A-Za-z0-9._-]+)#${ISSUE_NUMBER}${WORD_END}`,
+        `${PATH_REFERENCE_START}([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?/[A-Za-z0-9._-]+)#${ISSUE_NUMBER}${WORD_END}`,
         'gu',
       ),
       toUrl: (match) => issueUrl(match[1], match[2]),
@@ -117,7 +120,7 @@ function gitlabRules({ webBaseUrl, repoPath }: RemoteAutolinkTarget): AutolinkRu
     {
       source: 'gitlab',
       pattern: new RegExp(
-        `(?<![${WORD_CHARS}./-])([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)([#!])${ISSUE_NUMBER}${WORD_END}`,
+        `${PATH_REFERENCE_START}([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)([#!])${ISSUE_NUMBER}${WORD_END}`,
         'gu',
       ),
       toUrl: (match) => referenceUrl(match[1], match[2], match[3]),

@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { CustomAutolink } from '@shared/autolinks';
+import { REPEATED_PREFIX_ERROR, type CustomAutolink } from '@shared/autolinks';
 import {
   createDraftRow,
   isDraftChanged,
   prepareCustomAutolinksSave,
   toDraftRows,
+  withIgnoreCase,
+  withoutRepeatErrors,
 } from '../customAutolinkDraft';
 
 const JIRA: CustomAutolink = { prefix: 'ABCD-', url: 'https://jira.example.com/browse/ABCD-<num>' };
@@ -15,9 +17,9 @@ describe('prepareCustomAutolinksSave', () => {
     expect(prepareCustomAutolinksSave(rows)).toEqual({ ok: true, autolinks: [JIRA] });
   });
 
-  it('keeps the settings.json-only options of an edited entry', () => {
-    const rows = toDraftRows([{ ...JIRA, ignoreCase: true }]);
-    expect(prepareCustomAutolinksSave(rows)).toEqual({ ok: true, autolinks: [{ ...JIRA, ignoreCase: true }] });
+  it('keeps the options of an edited entry', () => {
+    const entry = { ...JIRA, ignoreCase: false, alphanumeric: true };
+    expect(prepareCustomAutolinksSave(toDraftRows([entry]))).toEqual({ ok: true, autolinks: [entry] });
   });
 
   it('refuses the whole save and keys errors by row id when any row is invalid', () => {
@@ -48,7 +50,11 @@ describe('isDraftChanged', () => {
   });
 
   it('is true for an edited option', () => {
-    expect(isDraftChanged(toDraftRows([JIRA]), [{ ...JIRA, ignoreCase: true }])).toBe(true);
+    expect(isDraftChanged(toDraftRows([JIRA]), [{ ...JIRA, ignoreCase: false }])).toBe(true);
+  });
+
+  it('treats an explicit ignoreCase: true as the default', () => {
+    expect(isDraftChanged(toDraftRows([JIRA]), [{ ...JIRA, ignoreCase: true }])).toBe(false);
   });
 
   it('is true for an edited, added or removed entry', () => {
@@ -60,5 +66,27 @@ describe('isDraftChanged', () => {
   it('gives every row a distinct id', () => {
     const [a, b] = toDraftRows([JIRA, JIRA]);
     expect(a.id).not.toBe(b.id);
+  });
+});
+
+describe('withIgnoreCase', () => {
+  it('leaves the field out when checked, since ignoring case is the default', () => {
+    expect(withIgnoreCase({ ...JIRA, ignoreCase: false }, true)).toEqual(JIRA);
+  });
+
+  it('writes ignoreCase: false when unchecked, keeping other options', () => {
+    expect(withIgnoreCase({ ...JIRA, alphanumeric: true }, false)).toEqual({ ...JIRA, alphanumeric: true, ignoreCase: false });
+  });
+});
+
+describe('withoutRepeatErrors', () => {
+  it('drops repeat messages on every row, since a case change can clear one below it', () => {
+    const errors = new Map([[2, { prefix: REPEATED_PREFIX_ERROR, url: 'bad url' }]]);
+    expect(withoutRepeatErrors(errors).get(2)).toEqual({ prefix: undefined, url: 'bad url' });
+  });
+
+  it("keeps a row's own prefix and URL errors, which letter case does not change", () => {
+    const errors = new Map([[1, { prefix: 'quotes', url: 'bad url' }]]);
+    expect(withoutRepeatErrors(errors)).toBe(errors);
   });
 });

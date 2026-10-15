@@ -2,7 +2,7 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "5.19.2",
+  "version": "5.19.3",
   "publisher": "onlineeric",
   "license": "MIT",
   "repository": {
@@ -243,8 +243,8 @@
               },
               "ignoreCase": {
                 "type": "boolean",
-                "default": false,
-                "markdownDescription": "Match the prefix in any letter case."
+                "default": true,
+                "markdownDescription": "Match the prefix in any letter case, so `Jira-` also links `JIRA-123`. On unless set to `false`."
               },
               "alphanumeric": {
                 "type": "boolean",
