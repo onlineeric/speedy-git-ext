@@ -260,15 +260,16 @@ export class ExtensionController {
    * Fill a group a graph's split just emptied, seeded like any other new tab:
    * the origin graph's TOP-LEVEL repo, normal defaults, nothing else copied.
    *
-   * The group is re-read a tick later because a tab DRAGGED into a brand-new
-   * group also opens that group empty, and arrives in it immediately after —
-   * that group must keep the dragged tab rather than gain a graph. Nothing is
-   * reported when there is no repository: this was never an explicit request,
-   * so it must not raise an error message.
+   * A group VS Code announces empty and fills afterwards (modal Settings, a
+   * dragged tab) must keep its editor, so the group is re-read only after one
+   * workbench round trip ({@link workbenchCaughtUp}). A real split of a webview
+   * stays empty and is filled. Nothing is reported when there is no repository:
+   * this was never an explicit request, so it must not raise an error message.
    */
   private async fillSplitGroup(group: vscode.TabGroup): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    if (group.tabs.length > 0) return;
+    await workbenchCaughtUp();
+    // Closed meanwhile (a modal dismissed at once), or something landed in it: not a split.
+    if (!vscode.window.tabGroups.all.includes(group) || group.tabs.length > 0) return;
 
     const repoPath = this.mostRecentlyActiveTab()?.topLevelRepoPath ?? this.savedDefaultRepo();
     if (!repoPath) return;
@@ -559,6 +560,24 @@ function snapshotGroup(group: vscode.TabGroup): EditorGroupSnapshot {
     activeWebviewViewType:
       activeInput instanceof vscode.TabInputWebview ? activeInput.viewType : null,
   };
+}
+
+/**
+ * Resolves once every tab change the workbench sent before this call has been applied.
+ *
+ * VS Code announces a new group before putting anything in it: the modal Settings editor
+ * (`workbench.editor.useModal`, 1.141+) and a tab dragged into a new group both arrive as
+ * "group opened, empty" followed by a separate "tab opened". The two are sent in one
+ * workbench task and the extension-host channel is ordered, so a reply to any request we
+ * send now arrives after the tab. A timer is NOT a substitute: it loses exactly when the
+ * machine is busy, which is how a Settings click turned into a new graph (v5.19.2).
+ */
+async function workbenchCaughtUp(): Promise<void> {
+  // Only the ordering matters; a failure leaves the group to be read as it stands.
+  await vscode.commands.getCommands().then(
+    () => undefined,
+    () => undefined,
+  );
 }
 
 function isHexColor(value: string): boolean {

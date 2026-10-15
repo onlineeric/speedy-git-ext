@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isHttpUrl,
   normalizeCustomAutolinks,
+  parseAutolinkPrefix,
   validateCustomAutolink,
   validateCustomAutolinks,
 } from '../../shared/autolinks.js';
@@ -52,9 +53,20 @@ describe('validateCustomAutolink', () => {
     expect(validateCustomAutolink(JIRA)).toEqual({});
   });
 
-  it('requires a prefix without spaces', () => {
+  it('requires a prefix, and quotes around one with spaces', () => {
     expect(validateCustomAutolink({ ...JIRA, prefix: '  ' }).prefix).toBeDefined();
-    expect(validateCustomAutolink({ ...JIRA, prefix: 'AB CD-' }).prefix).toBeDefined();
+    expect(validateCustomAutolink({ ...JIRA, prefix: 'AB CD-' }).prefix).toContain('double quotes');
+  });
+
+  it('accepts a quoted prefix with spaces', () => {
+    expect(validateCustomAutolink({ ...JIRA, prefix: '"Jira "' }).prefix).toBeUndefined();
+    expect(validateCustomAutolink({ ...JIRA, prefix: '"Jira Ticket "' }).prefix).toBeUndefined();
+  });
+
+  it('rejects a quoted prefix with nothing in it, or with tabs or newlines', () => {
+    expect(validateCustomAutolink({ ...JIRA, prefix: '""' }).prefix).toBeDefined();
+    expect(validateCustomAutolink({ ...JIRA, prefix: '"   "' }).prefix).toBeDefined();
+    expect(validateCustomAutolink({ ...JIRA, prefix: '"Jira\t"' }).prefix).toBeDefined();
   });
 
   it('requires a URL containing <num>', () => {
@@ -68,10 +80,42 @@ describe('validateCustomAutolink', () => {
   });
 });
 
+describe('parseAutolinkPrefix', () => {
+  it('leaves an unquoted prefix as typed, trimmed', () => {
+    expect(parseAutolinkPrefix(' ABCD- ')).toEqual({ text: 'ABCD-', quoted: false });
+  });
+
+  it('keeps the spaces inside quotes', () => {
+    expect(parseAutolinkPrefix('"Jira "')).toEqual({ text: 'Jira ', quoted: true });
+    expect(parseAutolinkPrefix('  " Jira "  ')).toEqual({ text: ' Jira ', quoted: true });
+  });
+
+  it('reads \\" as a literal quote inside quotes', () => {
+    expect(parseAutolinkPrefix('"say \\"hi\\" "')).toEqual({ text: 'say "hi" ', quoted: true });
+    expect(parseAutolinkPrefix('"\\""')).toEqual({ text: '"', quoted: true });
+  });
+
+  it('treats an unpaired or escaped closing quote as part of an unquoted prefix', () => {
+    expect(parseAutolinkPrefix('"')).toEqual({ text: '"', quoted: false });
+    expect(parseAutolinkPrefix('"Jira')).toEqual({ text: '"Jira', quoted: false });
+    expect(parseAutolinkPrefix('"Jira\\"')).toEqual({ text: '"Jira\\"', quoted: false });
+  });
+});
+
 describe('validateCustomAutolinks', () => {
   it('reports a repeated prefix on the repeat, not the first', () => {
     const errors = validateCustomAutolinks([JIRA, { ...JIRA, prefix: ' ABCD- ' }]);
     expect(errors[0]).toEqual({});
     expect(errors[1].prefix).toBeDefined();
+  });
+
+  it('compares prefixes by what they match, quotes removed', () => {
+    const errors = validateCustomAutolinks([JIRA, { ...JIRA, prefix: '"ABCD-"' }]);
+    expect(errors[1].prefix).toBeDefined();
+  });
+
+  it('keeps "Jira" and "Jira " apart', () => {
+    const errors = validateCustomAutolinks([{ ...JIRA, prefix: 'Jira' }, { ...JIRA, prefix: '"Jira "' }]);
+    expect(errors).toEqual([{}, {}]);
   });
 });

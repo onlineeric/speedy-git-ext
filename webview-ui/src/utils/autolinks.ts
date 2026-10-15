@@ -1,6 +1,7 @@
 import {
   AUTOLINK_NUMBER_PLACEHOLDER,
   hasCustomAutolinkErrors,
+  parseAutolinkPrefix,
   validateCustomAutolinks,
   type CustomAutolink,
 } from '@shared/autolinks';
@@ -44,17 +45,24 @@ export interface AutolinkSegment {
 
 export const EMPTY_AUTOLINK_RULES: readonly AutolinkRule[] = Object.freeze([]);
 
-/** Not preceded by a letter, digit or underscore: `ABCD-1` links, `XABCD-1` does not. */
-const WORD_START = '(?<![\\p{L}\\p{N}_])';
+/**
+ * The characters that make a reference part of a longer word: ASCII letters,
+ * digits and underscore, as the providers' own pages treat them. Deliberately
+ * not `\p{L}`: CJK text has no spaces, so `ABCD-123修复` must still link, as
+ * must a reference followed by an emoji or an accented letter.
+ */
+const WORD_CHARS = 'A-Za-z0-9_';
+/** Not preceded by a word character: `ABCD-1` links, `XABCD-1` does not. */
+const WORD_START = `(?<![${WORD_CHARS}])`;
 /** Not followed by one either: `#12` links, `#12abc` does not. */
-const WORD_END = '(?![\\p{L}\\p{N}_])';
+const WORD_END = `(?![${WORD_CHARS}])`;
 /** An issue number as the providers write it — no `#0`, no leading zeros. */
 const ISSUE_NUMBER = '([1-9]\\d*)';
 /**
  * Before a bare `#`/`!` reference, additionally not `&` (`&#123;` is an HTML
  * entity) and not another `#`/`!` or `/` (`##1`, `a/#1`).
  */
-const REFERENCE_START = '(?<![\\p{L}\\p{N}_&#!/])';
+const REFERENCE_START = `(?<![${WORD_CHARS}&#!/])`;
 
 /** A URL already in the message; nothing inside one is linked a second time. */
 const URL_IN_TEXT = /https?:\/\/[^\s<>"'`]+/gu;
@@ -69,7 +77,7 @@ function customRule(entry: CustomAutolink): AutolinkRule {
   const flags = entry.ignoreCase ? 'giu' : 'gu';
   return {
     source: 'custom',
-    pattern: new RegExp(`${WORD_START}${escapeForPattern(entry.prefix)}${id}${WORD_END}`, flags),
+    pattern: new RegExp(`${WORD_START}${escapeForPattern(parseAutolinkPrefix(entry.prefix).text)}${id}${WORD_END}`, flags),
     toUrl: (match) => entry.url.split(AUTOLINK_NUMBER_PLACEHOLDER).join(match[1]),
   };
 }
@@ -82,7 +90,7 @@ function githubRules({ webBaseUrl, repoPath }: RemoteAutolinkTarget): AutolinkRu
     {
       source: 'github',
       pattern: new RegExp(
-        `(?<![\\p{L}\\p{N}_./-])([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?/[A-Za-z0-9._-]+)#${ISSUE_NUMBER}${WORD_END}`,
+        `(?<![${WORD_CHARS}./-])([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?/[A-Za-z0-9._-]+)#${ISSUE_NUMBER}${WORD_END}`,
         'gu',
       ),
       toUrl: (match) => issueUrl(match[1], match[2]),
@@ -109,7 +117,7 @@ function gitlabRules({ webBaseUrl, repoPath }: RemoteAutolinkTarget): AutolinkRu
     {
       source: 'gitlab',
       pattern: new RegExp(
-        `(?<![\\p{L}\\p{N}_./-])([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)([#!])${ISSUE_NUMBER}${WORD_END}`,
+        `(?<![${WORD_CHARS}./-])([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)([#!])${ISSUE_NUMBER}${WORD_END}`,
         'gu',
       ),
       toUrl: (match) => referenceUrl(match[1], match[2], match[3]),

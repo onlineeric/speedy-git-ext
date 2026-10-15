@@ -59,6 +59,29 @@ describe('custom autolinks', () => {
     expect(links('T.(4 TX(4', [rule], null)).toEqual([['T.(4', 'https://t.example/4']]);
   });
 
+  it('matches a quoted prefix with its space, and only with it', () => {
+    const rule = { prefix: '"Jira "', url: 'https://jira.example.com/browse/<num>' };
+    expect(links('fix Jira 123 and Jira123 and Jira  4', [rule], null)).toEqual([
+      ['Jira 123', 'https://jira.example.com/browse/123'],
+    ]);
+  });
+
+  it('matches a literal quote written as \\" inside quotes', () => {
+    const rule = { prefix: '"\\"T "', url: 'https://t.example/<num>' };
+    expect(links('see "T 7', [rule], null)).toEqual([['"T 7', 'https://t.example/7']]);
+  });
+
+  it('links a reference that touches CJK text, an emoji or an accented letter', () => {
+    const url = 'https://jira.example.com/browse/ABCD-';
+    expect(links('修复ABCD-1登录', [JIRA], null)).toEqual([['ABCD-1', `${url}1`]]);
+    expect(links('ABCD-2🎉', [JIRA], null)).toEqual([['ABCD-2', `${url}2`]]);
+    expect(links('ABCD-3é', [JIRA], null)).toEqual([['ABCD-3', `${url}3`]]);
+  });
+
+  it('still refuses a reference inside an ASCII word', () => {
+    expect(links('XABCD-1 ABCD-1x ABCD-1_y _ABCD-1', [JIRA], null)).toEqual([]);
+  });
+
   it('skips invalid entries instead of linking them', () => {
     expect(buildAutolinkRules([{ prefix: 'ABCD-', url: 'command:x<num>' }], null)).toBe(EMPTY_AUTOLINK_RULES);
   });
