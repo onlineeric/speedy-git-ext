@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - **Custom autolink prefixes can contain a space.** A prefix such as `Jira ` (matching `Jira 123`) was impossible because prefixes are trimmed and spaces were rejected. Wrap it in double quotes, `"Jira "`, and the text inside is matched exactly, spaces included; write `\"` for a literal double quote inside the quotes. Prefixes without quotes behave as before. An unquoted prefix that has a space now says to use quotes, and two prefixes that match the same text (`ABCD-` and `"ABCD-"`) are reported as a repeat. The Autolinks tab and the `speedyGit.autolinks.custom` setting description show both examples.
 
+### Fixed
+- **Autolinks now work next to CJK text and other non-ASCII characters.** A reference touching a Chinese, Japanese or Korean character, such as `ABCD-123修复登录` or `#45已合并`, was not linked, because every Unicode letter counted as part of the reference's word. Only ASCII letters, digits and `_` do now, so those link, and so does a reference followed by an emoji or an accented letter. `ABCD-123abc`, `XABCD-123` and `#12_x` are still left alone.
+
 ## [5.19.2] - 2026-10-15
 
 ### Fixed
