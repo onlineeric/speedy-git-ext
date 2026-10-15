@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { CustomAutolink } from '@shared/autolinks';
+import { REPEATED_PREFIX_ERROR, type CustomAutolink } from '@shared/autolinks';
 import {
   createDraftRow,
   isDraftChanged,
   prepareCustomAutolinksSave,
   toDraftRows,
   withIgnoreCase,
+  withoutRepeatErrors,
 } from '../customAutolinkDraft';
 
 const JIRA: CustomAutolink = { prefix: 'ABCD-', url: 'https://jira.example.com/browse/ABCD-<num>' };
@@ -75,5 +76,17 @@ describe('withIgnoreCase', () => {
 
   it('writes ignoreCase: false when unchecked, keeping other options', () => {
     expect(withIgnoreCase({ ...JIRA, alphanumeric: true }, false)).toEqual({ ...JIRA, alphanumeric: true, ignoreCase: false });
+  });
+});
+
+describe('withoutRepeatErrors', () => {
+  it('drops repeat messages on every row, since a case change can clear one below it', () => {
+    const errors = new Map([[2, { prefix: REPEATED_PREFIX_ERROR, url: 'bad url' }]]);
+    expect(withoutRepeatErrors(errors).get(2)).toEqual({ prefix: undefined, url: 'bad url' });
+  });
+
+  it("keeps a row's own prefix and URL errors, which letter case does not change", () => {
+    const errors = new Map([[1, { prefix: 'quotes', url: 'bad url' }]]);
+    expect(withoutRepeatErrors(errors)).toBe(errors);
   });
 });

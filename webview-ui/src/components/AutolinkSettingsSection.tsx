@@ -1,5 +1,10 @@
 import { useMemo, useState } from 'react';
-import { AUTOLINK_NUMBER_PLACEHOLDER, customAutolinkIgnoresCase, type CustomAutolinkErrors } from '@shared/autolinks';
+import {
+  AUTOLINK_NUMBER_PLACEHOLDER,
+  customAutolinkIgnoresCase,
+  type CustomAutolink,
+  type CustomAutolinkErrors,
+} from '@shared/autolinks';
 import { useSettingDraft } from '../hooks/useSettingDraft';
 import { useRegisterSettingDraft } from '../hooks/useSettingDraftRegistry';
 import { rpcClient } from '../rpc/rpcClient';
@@ -10,6 +15,7 @@ import {
   prepareCustomAutolinksSave,
   toDraftRows,
   withIgnoreCase,
+  withoutRepeatErrors,
   type CustomAutolinkDraftRow,
 } from '../utils/customAutolinkDraft';
 import type { SettingSaveOutcome } from '../utils/settingDrafts';
@@ -95,8 +101,12 @@ function CustomAutolinksEditor() {
   const setErrors = (update: (current: ReadonlyMap<number, CustomAutolinkErrors>) => ReadonlyMap<number, CustomAutolinkErrors>) =>
     setErrorState((current) => ({ saved, errors: update(current.saved === saved ? current.errors : NO_ERRORS) }));
 
+  const updateRowEntry = (id: number, update: (entry: CustomAutolink) => CustomAutolink) => {
+    setRows((current) => current.map((row) => (row.id === id ? { ...row, entry: update(row.entry) } : row)));
+  };
+
   const updateRow = (id: number, field: 'prefix' | 'url', value: string) => {
-    setRows((current) => current.map((row) => (row.id === id ? { ...row, entry: { ...row.entry, [field]: value } } : row)));
+    updateRowEntry(id, (entry) => ({ ...entry, [field]: value }));
     // The message described the old text; the next Save re-checks it.
     setErrors((current) => {
       const rowErrors = current.get(id);
@@ -108,15 +118,9 @@ function CustomAutolinksEditor() {
   };
 
   const setRowIgnoreCase = (id: number, ignoreCase: boolean) => {
-    setRows((current) => current.map((row) => (row.id === id ? { ...row, entry: withIgnoreCase(row.entry, ignoreCase) } : row)));
-    // A case change can make or clear a repeated prefix; the next Save re-checks it.
-    setErrors((current) => {
-      const rowErrors = current.get(id);
-      if (!rowErrors?.prefix) return current;
-      const next = new Map(current);
-      next.set(id, { ...rowErrors, prefix: undefined });
-      return next;
-    });
+    updateRowEntry(id, (entry) => withIgnoreCase(entry, ignoreCase));
+    // A case change can make or clear a repeated prefix on this row or any below it.
+    setErrors(withoutRepeatErrors);
   };
 
   const removeRow = (id: number) => {

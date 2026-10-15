@@ -144,6 +144,10 @@ describe('validateCustomAutolinks repeats by letter case', () => {
   });
 
   it('still reports the exact same case-sensitive prefix', () => {
-    expect(validateCustomAutolinks([caseSensitive('ABCD-'), JIRA])[1].prefix).toBeDefined();
+    expect(validateCustomAutolinks([caseSensitive('ABCD-'), caseSensitive('ABCD-')])[1].prefix).toBeDefined();
+  });
+
+  it('allows a case-insensitive entry after a case-sensitive one in any casing, since both link other casings', () => {
+    expect(validateCustomAutolinks([caseSensitive('ABCD-'), JIRA])[1]).toEqual({});
   });
 });

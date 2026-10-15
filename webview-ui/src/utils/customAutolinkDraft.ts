@@ -1,6 +1,7 @@
 import {
   hasCustomAutolinkErrors,
   isSameCustomAutolinkList,
+  REPEATED_PREFIX_ERROR,
   trimCustomAutolink,
   validateCustomAutolinks,
   type CustomAutolink,
@@ -38,6 +39,24 @@ export function toDraftRows(entries: readonly CustomAutolink[]): CustomAutolinkD
 export function withIgnoreCase(entry: CustomAutolink, ignoreCase: boolean): CustomAutolink {
   const { ignoreCase: _previous, ...rest } = entry;
   return ignoreCase ? rest : { ...rest, ignoreCase: false };
+}
+
+/**
+ * The errors still true after a row's "Ignore case" box changes. A row's own
+ * checks do not depend on letter case, but whether a prefix repeats an earlier
+ * one does, on that row and on any row below it — so only repeat messages are
+ * dropped, on every row, and the next Save re-checks them.
+ */
+export function withoutRepeatErrors(
+  errors: ReadonlyMap<number, CustomAutolinkErrors>,
+): ReadonlyMap<number, CustomAutolinkErrors> {
+  let next: Map<number, CustomAutolinkErrors> | undefined;
+  for (const [id, rowErrors] of errors) {
+    if (rowErrors.prefix !== REPEATED_PREFIX_ERROR) continue;
+    next ??= new Map(errors);
+    next.set(id, { ...rowErrors, prefix: undefined });
+  }
+  return next ?? errors;
 }
 
 /** A row the user added and never filled in; dropped on save rather than reported. */

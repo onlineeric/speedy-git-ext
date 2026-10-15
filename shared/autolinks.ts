@@ -79,6 +79,9 @@ export interface CustomAutolinkErrors {
   url?: string;
 }
 
+/** The message on a prefix an earlier entry already matches — the one list-level check. */
+export const REPEATED_PREFIX_ERROR = 'This prefix is already used above';
+
 /** True for an absolute `http:` or `https:` URL — the only kind a commit message may open. */
 export function isHttpUrl(value: string): boolean {
   try {
@@ -152,10 +155,11 @@ export function hasCustomAutolinkErrors(errors: CustomAutolinkErrors): boolean {
 /**
  * Validate a whole list, index-aligned with the input. A prefix that an earlier
  * entry already matches is reported on the repeat: the first one is the one
- * that links, so the repeat would never link anything. That covers the same
- * text, and any casing of it after an entry that ignores case (`Jira-` then
- * `JIRA-`); a case-insensitive repeat of a case-sensitive prefix still links
- * the other casings, so it is not a repeat.
+ * that links, so the repeat would never link anything. That covers any casing
+ * of a prefix after an entry that ignores case (`Jira-` then `JIRA-`), and the
+ * same text after a case-sensitive entry when the repeat is case-sensitive too.
+ * A case-insensitive repeat of a case-sensitive prefix still links the other
+ * casings, whichever casing it is written in, so it is not a repeat.
  */
 export function validateCustomAutolinks(entries: readonly CustomAutolink[]): CustomAutolinkErrors[] {
   const exactPrefixes = new Set<string>();
@@ -165,11 +169,11 @@ export function validateCustomAutolinks(entries: readonly CustomAutolink[]): Cus
     const prefix = parseAutolinkPrefix(entry.prefix).text;
     if (!errors.prefix) {
       const lowerPrefix = prefix.toLowerCase();
-      if (exactPrefixes.has(prefix) || anyCasePrefixes.has(lowerPrefix)) {
-        errors.prefix = 'This prefix is already used above';
-      }
+      const ignoresCase = customAutolinkIgnoresCase(entry);
+      const isRepeat = anyCasePrefixes.has(lowerPrefix) || (!ignoresCase && exactPrefixes.has(prefix));
+      if (isRepeat) errors.prefix = REPEATED_PREFIX_ERROR;
       exactPrefixes.add(prefix);
-      if (customAutolinkIgnoresCase(entry)) anyCasePrefixes.add(lowerPrefix);
+      if (ignoresCase) anyCasePrefixes.add(lowerPrefix);
     }
     return errors;
   });
