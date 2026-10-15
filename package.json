@@ -235,7 +235,7 @@
             "properties": {
               "prefix": {
                 "type": "string",
-                "markdownDescription": "Text that comes before the number, e.g. `ABCD-`."
+                "markdownDescription": "Text that comes before the number, e.g. `ABCD-`. A prefix with a space goes in double quotes: `\"Jira \"` links `Jira 123`. Inside the quotes, `\\\"` is a literal double quote."
               },
               "url": {
                 "type": "string",

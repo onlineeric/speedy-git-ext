@@ -16,7 +16,10 @@
 export const AUTOLINK_NUMBER_PLACEHOLDER = '<num>';
 
 export interface CustomAutolink {
-  /** Literal text that precedes the number, e.g. `ABCD-`. */
+  /**
+   * Literal text that precedes the number, e.g. `ABCD-`. Wrapped in double
+   * quotes (`"Jira "`) it may contain spaces; see {@link parseAutolinkPrefix}.
+   */
   prefix: string;
   /** URL template containing {@link AUTOLINK_NUMBER_PLACEHOLDER}. */
   url: string;
@@ -24,6 +27,40 @@ export interface CustomAutolink {
   ignoreCase?: boolean;
   /** Match letters and digits after the prefix, not just digits. */
   alphanumeric?: boolean;
+}
+
+/** What a prefix means once its optional quotes are read. */
+export interface ParsedAutolinkPrefix {
+  /** The literal text to match: quotes removed, `\"` turned into `"`. */
+  text: string;
+  /** Whether the prefix was written inside double quotes. */
+  quoted: boolean;
+}
+
+const PREFIX_QUOTE = '"';
+const ESCAPED_PREFIX_QUOTE = '\\"';
+
+/**
+ * Read a prefix as the user wrote it. A prefix is trimmed, so a space that
+ * should count has to sit inside double quotes: `"Jira "` matches `Jira 123`.
+ * Inside the quotes everything is literal except `\"`, which is a double quote.
+ *
+ * Quoting needs both quotes, and the closing one must not be escaped; anything
+ * else (`"`, `"abc`, `"abc\"`) is an ordinary unquoted prefix, quote characters
+ * included, so a prefix that merely contains a `"` keeps matching it.
+ *
+ * The one place quoting is decoded: validation, the duplicate check and rule
+ * building all read the prefix through here, so they cannot disagree on it.
+ */
+export function parseAutolinkPrefix(prefix: string): ParsedAutolinkPrefix {
+  const text = prefix.trim();
+  const isQuoted = text.length >= 2
+    && text.startsWith(PREFIX_QUOTE)
+    && text.endsWith(PREFIX_QUOTE)
+    && !text.endsWith(ESCAPED_PREFIX_QUOTE);
+  if (!isQuoted) return { text, quoted: false };
+
+  return { text: text.slice(1, -1).split(ESCAPED_PREFIX_QUOTE).join(PREFIX_QUOTE), quoted: true };
 }
 
 /** Per-field validation messages for one entry; an empty object means valid. */
@@ -71,13 +108,19 @@ export function normalizeCustomAutolinks(value: unknown): CustomAutolink[] {
 /** Validate one entry in isolation (duplicates are a list-level check). */
 export function validateCustomAutolink(entry: CustomAutolink): CustomAutolinkErrors {
   const errors: CustomAutolinkErrors = {};
-  const prefix = entry.prefix.trim();
+  const prefix = parseAutolinkPrefix(entry.prefix);
   const url = entry.url.trim();
 
-  if (prefix.length === 0) {
+  if (prefix.quoted) {
+    if (prefix.text.trim().length === 0) {
+      errors.prefix = 'Enter text between the quotes, like "Jira "';
+    } else if (/[^\S ]/.test(prefix.text)) {
+      errors.prefix = 'Only plain spaces are allowed inside the quotes';
+    }
+  } else if (prefix.text.length === 0) {
     errors.prefix = 'Enter a prefix, like ABCD-';
-  } else if (/\s/.test(prefix)) {
-    errors.prefix = 'A prefix cannot contain spaces';
+  } else if (/\s/.test(prefix.text)) {
+    errors.prefix = 'A prefix with spaces must be in double quotes, like "Jira "';
   }
 
   if (url.length === 0) {
@@ -103,7 +146,7 @@ export function validateCustomAutolinks(entries: readonly CustomAutolink[]): Cus
   const seenPrefixes = new Set<string>();
   return entries.map((entry) => {
     const errors = validateCustomAutolink(entry);
-    const prefix = entry.prefix.trim();
+    const prefix = parseAutolinkPrefix(entry.prefix).text;
     if (!errors.prefix) {
       if (seenPrefixes.has(prefix)) errors.prefix = 'This prefix is already used above';
       seenPrefixes.add(prefix);

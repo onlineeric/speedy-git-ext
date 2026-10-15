@@ -134,10 +134,15 @@ function CustomAutolinksEditor() {
 
   return (
     <div className="min-w-0">
+      <p className={`${hintClassName} mb-1`}>
+        For trackers such as Jira. Prefix <code>Jira-</code> with URL{' '}
+        <code>https://jira.example.com/browse/Jira-{AUTOLINK_NUMBER_PLACEHOLDER}</code> links{' '}
+        <code>Jira-123</code>; <code>{AUTOLINK_NUMBER_PLACEHOLDER}</code> is where the number goes.
+      </p>
       <p className={`${hintClassName} mb-2`}>
-        For trackers such as Jira. Prefix <code>ABCD-</code> with URL{' '}
-        <code>https://jira.example.com/browse/ABCD-{AUTOLINK_NUMBER_PLACEHOLDER}</code> links{' '}
-        <code>ABCD-123</code>; <code>{AUTOLINK_NUMBER_PLACEHOLDER}</code> is where the number goes.
+        A prefix with a space goes in double quotes: <code>"Jira "</code> with URL{' '}
+        <code>https://jira.example.com/browse/{AUTOLINK_NUMBER_PLACEHOLDER}</code> links <code>Jira 123</code>.
+        Spaces outside the quotes are ignored; write <code>\"</code> for a double quote inside them.
       </p>
 
       {rows.length > 0 && (
@@ -181,7 +186,7 @@ function CustomAutolinkRow({
 
   return (
     <div className="flex items-start gap-1.5">
-      <div className="w-24 shrink-0">
+      <div className="w-28 shrink-0">
         <input
           type="text"
           value={row.entry.prefix}

@@ -59,6 +59,18 @@ describe('custom autolinks', () => {
     expect(links('T.(4 TX(4', [rule], null)).toEqual([['T.(4', 'https://t.example/4']]);
   });
 
+  it('matches a quoted prefix with its space, and only with it', () => {
+    const rule = { prefix: '"Jira "', url: 'https://jira.example.com/browse/<num>' };
+    expect(links('fix Jira 123 and Jira123 and Jira  4', [rule], null)).toEqual([
+      ['Jira 123', 'https://jira.example.com/browse/123'],
+    ]);
+  });
+
+  it('matches a literal quote written as \\" inside quotes', () => {
+    const rule = { prefix: '"\\"T "', url: 'https://t.example/<num>' };
+    expect(links('see "T 7', [rule], null)).toEqual([['"T 7', 'https://t.example/7']]);
+  });
+
   it('skips invalid entries instead of linking them', () => {
     expect(buildAutolinkRules([{ prefix: 'ABCD-', url: 'command:x<num>' }], null)).toBe(EMPTY_AUTOLINK_RULES);
   });

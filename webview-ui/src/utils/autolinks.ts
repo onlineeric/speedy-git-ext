@@ -1,6 +1,7 @@
 import {
   AUTOLINK_NUMBER_PLACEHOLDER,
   hasCustomAutolinkErrors,
+  parseAutolinkPrefix,
   validateCustomAutolinks,
   type CustomAutolink,
 } from '@shared/autolinks';
@@ -69,7 +70,7 @@ function customRule(entry: CustomAutolink): AutolinkRule {
   const flags = entry.ignoreCase ? 'giu' : 'gu';
   return {
     source: 'custom',
-    pattern: new RegExp(`${WORD_START}${escapeForPattern(entry.prefix)}${id}${WORD_END}`, flags),
+    pattern: new RegExp(`${WORD_START}${escapeForPattern(parseAutolinkPrefix(entry.prefix).text)}${id}${WORD_END}`, flags),
     toUrl: (match) => entry.url.split(AUTOLINK_NUMBER_PLACEHOLDER).join(match[1]),
   };
 }

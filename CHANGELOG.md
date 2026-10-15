@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- **Custom autolink prefixes can contain a space.** A prefix such as `Jira ` (matching `Jira 123`) was impossible because prefixes are trimmed and spaces were rejected. Wrap it in double quotes, `"Jira "`, and the text inside is matched exactly, spaces included; write `\"` for a literal double quote inside the quotes. Prefixes without quotes behave as before. An unquoted prefix that has a space now says to use quotes, and two prefixes that match the same text (`ABCD-` and `"ABCD-"`) are reported as a repeat. The Autolinks tab and the `speedyGit.autolinks.custom` setting description show both examples.
+
 ## [5.19.2] - 2026-10-15
 
 ### Fixed
