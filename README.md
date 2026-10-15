@@ -27,25 +27,6 @@ A performance-first Git graph, history viewer, history-editing tool, and worktre
 Create, open, reveal, and remove Git worktrees so different AI agents or editor sessions can work on different branches at the same time without switching your main checkout.
 ![Speedy Git Worktrees screenshot](./resources/047-worktrees.png)
 
-### GPG and SSH signing verification
-Verify signed commits on demand with a dedicated Signature column, clear trust states, and bundled help for local signing setup.
-
-### Compare Refs — A vs B, Anything to Anything (new in v4)
-
-![Speedy Git Compare screenshot](./resources/042-compare.png)
-
-Stop dropping into the terminal to figure out what changed between two points in history. Speedy Git now ships a first-class **Compare** panel right next to Filter and Search.
-
-- **Pick any two commit-ish references** in seconds — commit hashes, local branches, remote branches, tags, `HEAD`, your **Working Tree**, or typed expressions like `HEAD~3` and `origin/main^2`. One searchable combobox handles every input type, with recently-used items at the top.
-- **Two-click compare from the graph** — right-click a commit, branch, or tag → **Set as Compare Base**, then right-click another → **Compare with Base**. The diff opens in the Commit Details panel you already use.
-- **Multi-select and compare a range** — Ctrl/Cmd+click two or more commits, right-click → **Compare these commits**. Base = oldest, Target = newest, runs immediately.
-- **PR-style three-dot diff by default** for branch-vs-branch and tag-vs-tag — see exactly "what Target adds since branching off Base," matching GitHub's "Files changed" tab. Smart fallback to two-dot when slots are commit hashes or when there's no common ancestor.
-- **Compare your uncommitted work** against any ref — pick `Working Tree` in one slot and `HEAD`, `origin/main`, or a tag in the other. Auto-refreshes as you edit files on disk.
-- **B / T badges on the graph** light up the moment you fill a slot — no waiting for a comparison to finish to see where your endpoints are.
-- **Live, lazy-resolving slots** — branches and tags resolve to the current tip at Compare time, so a fetch or auto-refresh between picking and clicking is reflected in the result.
-- **Cancel any in-flight compare** mid-run; swap (⇄) Base and Target with one click; **Reset** clears everything in a single action.
-- **Pending-state toolbar button** turns light yellow when slots are filled but the panel is closed, so you never lose your place.
-
 ## Core Feature Summary
 >Right-click menu — there are even more features in other menus and panels!  
 >
