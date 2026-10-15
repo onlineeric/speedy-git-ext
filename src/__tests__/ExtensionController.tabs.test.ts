@@ -488,29 +488,17 @@ describe('splitting a graph editor', () => {
     expect(tabState.created).toHaveLength(1);
   });
 
-  it('leaves a new group alone once a dragged tab has landed in it', async () => {
+  it('leaves a new group alone once its editor lands, even after a tick', async () => {
     const { controller } = createController();
     await graphFocusedInGroupOne(controller);
 
+    // A dragged tab or the modal Settings editor: the group is announced empty, its tab follows.
     const opened = { viewColumn: 2, tabs: [] as Array<{ input?: unknown }> };
     editor.fireGroupsOpened([opened]);
-    opened.tabs.push({ input: { uri: '/repos/a/file.ts' } });
-    await workbenchAnswers();
-
-    expect(tabState.created).toHaveLength(1);
-  });
-
-  it('leaves a group alone when its editor arrives after a tick but before the workbench answers', async () => {
-    const { controller } = createController();
-    await graphFocusedInGroupOne(controller);
-
-    // The modal Settings editor: the group is announced empty, its tab follows.
-    const modal = { viewColumn: 2, tabs: [] as Array<{ input?: unknown }> };
-    editor.fireGroupsOpened([modal]);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(tabState.created).toHaveLength(1);
 
-    modal.tabs.push({ input: { uri: 'settings' } });
+    opened.tabs.push({ input: { uri: '/repos/a/file.ts' } });
     await workbenchAnswers();
 
     expect(tabState.created).toHaveLength(1);

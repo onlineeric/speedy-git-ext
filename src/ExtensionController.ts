@@ -260,12 +260,9 @@ export class ExtensionController {
    * Fill a group a graph's split just emptied, seeded like any other new tab:
    * the origin graph's TOP-LEVEL repo, normal defaults, nothing else copied.
    *
-   * VS Code announces a new group empty and puts its editor in afterwards: the
-   * modal Settings editor (`workbench.editor.useModal`, 1.141+) and a tab
-   * DRAGGED into a brand-new group both arrive that way. Those groups must keep
-   * their editor rather than gain a graph, so the group is re-read only after
-   * one workbench round trip ({@link workbenchCaughtUp}) — never after a timer,
-   * which loses exactly when the machine is busy. A real split of a webview
+   * A group VS Code announces empty and fills afterwards (modal Settings, a
+   * dragged tab) must keep its editor, so the group is re-read only after one
+   * workbench round trip ({@link workbenchCaughtUp}). A real split of a webview
    * stays empty and is filled. Nothing is reported when there is no repository:
    * this was never an explicit request, so it must not raise an error message.
    */
