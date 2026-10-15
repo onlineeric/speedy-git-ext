@@ -13,19 +13,31 @@ A performance-first Git graph, history viewer, history-editing tool, and worktre
 | What you get | How it works |
 |---|---|
 | **Instant graph rendering** | Virtual scrolling + batch prefetch keeps large repos responsive — no loading spinners, no lag |
-| **Real Git operations** | Merge, rebase, cherry-pick, revert, reset, drop commit, push, pull, fetch — all from context menus with live command preview |
+| **Real Git operations** | Merge, rebase, cherry-pick, revert, reset, amend, fixup, drop commit, push, pull, fetch — all from context menus with live command preview |
 | **Compare anything to anything** | Two-click A vs B diff for any commit, branch, tag, or your working tree — with PR-style three-dot mode |
-| **Search and filter** | Quickly find commits by message, hash, or author, then narrow history with branch, author, and date filters |
+| **Search and filter** | Multi-term search across messages, hashes, authors, emails, branches, and tags, then narrow history with branch, author, and date filters |
+| **Multiple graph tabs** | Open as many graphs as you like, each with its own repository, filters, search, and scroll position |
 | **Worktrees** | Run AI coding sessions on different branches at the same time without constantly switching your main checkout |
-| **Clean, scannable UI** | Color-coded branch lanes, merged local/remote labels, avatars, and clear HEAD indicators |
-| **History editing workflow** | Interactive rebase with drag-and-drop reordering (pick, squash, fixup, reword, drop) |
+| **Clean, scannable UI** | Color-coded branch lanes, icon-based local/remote badges, avatars, clickable issue links, and full VS Code theme support |
+| **History editing workflow** | Interactive rebase with drag-and-drop reordering (pick, squash, fixup, reword, drop) and autosquash |
 | **Works in VS Code and Cursor** | Published on both VS Code Marketplace and Open VSX |
 
 ## What's New in v5
 
+### Autolinks for issues, PRs, and tickets
+`#123`, `GH-123`, `!123` and `owner/repo#123` link to GitHub or GitLab automatically, and you can add your own rules — such as Jira keys like `ABCD-123` — in the **Autolinks** settings tab (GitLens's `gitlens.autolinks` format, so an existing list can be copied in). Links appear in the Message column, the details panel, and the commit tooltip.
+
+![Speedy Git autolinks in a commit row](./resources/autolinks.png)
+
 ### Worktrees for multi-session AI coding
-Create, open, reveal, and remove Git worktrees so different AI agents or editor sessions can work on different branches at the same time without switching your main checkout.
+Create, open, reveal, and remove Git worktrees so different AI agents or editor sessions can work on different branches at the same time without switching your main checkout. Choose a nested (`feat/branch1`) or flattened (`feat-branch1`) folder, and optionally copy `.env` files into the new worktree.
 ![Speedy Git Worktrees screenshot](./resources/047-worktrees.png)
+
+### Faster navigation
+- **Double-click a branch badge** to check it out — remote badges create a tracking branch or offer to pull.
+- **Go to HEAD** jumps straight to the checked-out commit, loading more history if needed.
+- **Go to parent / child commit** from the details panel, including each parent of a merge.
+- **Smarter search** — space-separated terms are AND-ed, `"quoted text"` matches literally, and the matching text is boxed inside each row.
 
 ## Core Feature Summary
 >Right-click menu — there are even more features in other menus and panels!  
@@ -33,11 +45,13 @@ Create, open, reveal, and remove Git worktrees so different AI agents or editor 
 >![Speedy Git Right-click menu screenshot](./resources/right-click-menu.png)
 
 - Fast commit graph and history browsing with virtual scrolling, color-coded branch lanes, table-style rows, resizable columns, avatars, and clear HEAD/ref labels.
-- Powerful search and filtering by commit message, hash, author, branch, and date, with match navigation for large histories.
-- Commit details with resizable bottom/right layout, file tree/list views, per-file stats, and inline diffs.
-- Branch, tag, stash, remote, submodule, and multi-repo workflows from one panel, including fetch, pull, push, checkout, merge, and remote management.
-- History editing tools for interactive rebase, cherry-pick, revert, reset, and drop commit, with conflict-aware continue/abort flows.
-- Live Git command previews in major dialogs, plus personalization for graph colors, date format, ref visibility, avatars, and persisted panel layout.
+- Powerful search across messages, hashes, authors, emails, branches, and tags, plus filtering by branch, author, and date, with match navigation for large histories.
+- Compare any two refs (commits, branches, tags, `HEAD~3`, or your working tree) with PR-style three-dot diffs.
+- Commit details with resizable bottom/right layout, file tree/list views, per-file stats, parent/child navigation, and inline diffs — including stashed untracked files and submodule pointer changes.
+- Branch, tag, stash, remote, submodule, worktree, and multi-repo workflows from one panel, including fetch, pull, push, checkout, merge, and remote management.
+- History editing tools for interactive rebase, amend, fixup, cherry-pick, revert, reset, and drop commit, with conflict-aware continue/abort flows.
+- On-demand GPG and SSH commit signature verification in a dedicated Signature column.
+- Live Git command previews in major dialogs, plus personalization for graph colors, date format, ref visibility, avatars, autolinks, toolbar labels, and persisted panel layout.
 
 ## How Speedy Git Compares
 
@@ -50,14 +64,15 @@ Create, open, reveal, and remove Git worktrees so different AI agents or editor 
 | Commit signature verification | On-demand GPG and SSH verification | Varies | Rare |
 | Live command preview | Every dialog shows the exact git command | Rare | No |
 | UI clarity | Merged branch labels, color-coded lanes, avatars | Feature-dense, complex UI | Basic |
-| Repo support | Multi-repo switching, submodule navigation, worktree visibility | Varies | Rare |
-| Startup overhead | Lightweight, single-panel | Extension suite, multiple views | Lightweight |
+| Repo support | Multi-repo switching, multiple graph tabs, submodule navigation, worktree visibility | Varies | Rare |
+| Startup overhead | Lightweight, focused graph tabs | Extension suite, multiple views | Lightweight |
 
 ## Quick Start
 
 1. Install **Speedy Git** from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=onlineeric.speedy-git-ext) or [Open VSX](https://open-vsx.org/extension/onlineeric/speedy-git-ext).
 2. Open any Git repository in VS Code or Cursor.
-3. Launch Speedy Git from the Source Control panel icon, the status bar button, or press `Ctrl+Shift+G` (`Cmd+Shift+G` on Mac).
+3. Launch Speedy Git from the Source Control panel icon, the status bar button, or press `Ctrl+Shift+G` (`Cmd+Shift+G` on Mac). This returns to the graph you were last in; the Source Control icon opens a graph for that specific repository.
+4. Use **New Tab** in the toolbar for another graph, and the **Help** button for links, feedback, and the badge legend.
 
 Open Speedy Git from the Source Control panel:
 ![Speedy Git Icon](resources/source-control-screenshot.png)
