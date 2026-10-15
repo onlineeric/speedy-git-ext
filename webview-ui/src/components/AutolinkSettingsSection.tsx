@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AUTOLINK_NUMBER_PLACEHOLDER, type CustomAutolinkErrors } from '@shared/autolinks';
+import { AUTOLINK_NUMBER_PLACEHOLDER, customAutolinkIgnoresCase, type CustomAutolinkErrors } from '@shared/autolinks';
 import { useSettingDraft } from '../hooks/useSettingDraft';
 import { useRegisterSettingDraft } from '../hooks/useSettingDraftRegistry';
 import { rpcClient } from '../rpc/rpcClient';
@@ -9,6 +9,7 @@ import {
   isDraftChanged,
   prepareCustomAutolinksSave,
   toDraftRows,
+  withIgnoreCase,
   type CustomAutolinkDraftRow,
 } from '../utils/customAutolinkDraft';
 import type { SettingSaveOutcome } from '../utils/settingDrafts';
@@ -106,6 +107,18 @@ function CustomAutolinksEditor() {
     });
   };
 
+  const setRowIgnoreCase = (id: number, ignoreCase: boolean) => {
+    setRows((current) => current.map((row) => (row.id === id ? { ...row, entry: withIgnoreCase(row.entry, ignoreCase) } : row)));
+    // A case change can make or clear a repeated prefix; the next Save re-checks it.
+    setErrors((current) => {
+      const rowErrors = current.get(id);
+      if (!rowErrors?.prefix) return current;
+      const next = new Map(current);
+      next.set(id, { ...rowErrors, prefix: undefined });
+      return next;
+    });
+  };
+
   const removeRow = (id: number) => {
     setRows((current) => current.filter((row) => row.id !== id));
   };
@@ -144,6 +157,10 @@ function CustomAutolinksEditor() {
         <code>https://jira.example.com/browse/{AUTOLINK_NUMBER_PLACEHOLDER}</code> links <code>Jira 123</code>.
         Spaces outside the quotes are ignored; write <code>\"</code> for a double quote inside them.
       </p>
+      <p className={`${hintClassName} mb-2`}>
+        With <strong>Ignore case</strong> checked, <code>Jira-</code> also links <code>JIRA-123</code> and{' '}
+        <code>jira-123</code>.
+      </p>
 
       {rows.length > 0 && (
         <div className="mb-2 space-y-2">
@@ -153,6 +170,7 @@ function CustomAutolinksEditor() {
               row={row}
               errors={errors.get(row.id)}
               onChange={updateRow}
+              onIgnoreCaseChange={setRowIgnoreCase}
               onRemove={removeRow}
             />
           ))}
@@ -174,11 +192,13 @@ function CustomAutolinkRow({
   row,
   errors,
   onChange,
+  onIgnoreCaseChange,
   onRemove,
 }: {
   row: CustomAutolinkDraftRow;
   errors: CustomAutolinkErrors | undefined;
   onChange: (id: number, field: 'prefix' | 'url', value: string) => void;
+  onIgnoreCaseChange: (id: number, ignoreCase: boolean) => void;
   onRemove: (id: number) => void;
 }) {
   const prefixErrorId = `autolink-${row.id}-prefix-error`;
@@ -212,6 +232,16 @@ function CustomAutolinkRow({
         />
         <FieldError id={urlErrorId} message={errors?.url} />
       </div>
+      {/* Input height, so the box lines up with the text fields beside it. */}
+      <label className="flex h-[26px] shrink-0 items-center gap-1 whitespace-nowrap text-xs" title="Match the prefix in any letter case">
+        <input
+          type="checkbox"
+          checked={customAutolinkIgnoresCase(row.entry)}
+          onChange={(event) => onIgnoreCaseChange(row.id, event.target.checked)}
+          className="h-3.5 w-3.5"
+        />
+        <span>Ignore case</span>
+      </label>
       <button
         type="button"
         onClick={() => onRemove(row.id)}

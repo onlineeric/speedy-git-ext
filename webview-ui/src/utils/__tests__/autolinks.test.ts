@@ -40,11 +40,11 @@ describe('custom autolinks', () => {
     expect(links('XABCD-1 ABCD-1x ABCD-', [JIRA], null)).toEqual([]);
   });
 
-  it('is case-sensitive unless ignoreCase is set', () => {
-    expect(links('abcd-5', [JIRA], null)).toEqual([]);
-    expect(links('abcd-5', [{ ...JIRA, ignoreCase: true }], null)).toEqual([
+  it('ignores case unless ignoreCase is false', () => {
+    expect(links('abcd-5', [JIRA], null)).toEqual([
       ['abcd-5', 'https://jira.example.com/browse/ABCD-5'],
     ]);
+    expect(links('abcd-5', [{ ...JIRA, ignoreCase: false }], null)).toEqual([]);
   });
 
   it('matches letters after the prefix only when alphanumeric is set', () => {

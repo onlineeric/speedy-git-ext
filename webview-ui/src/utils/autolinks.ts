@@ -1,5 +1,6 @@
 import {
   AUTOLINK_NUMBER_PLACEHOLDER,
+  customAutolinkIgnoresCase,
   hasCustomAutolinkErrors,
   parseAutolinkPrefix,
   validateCustomAutolinks,
@@ -74,7 +75,7 @@ function escapeForPattern(text: string): string {
 
 function customRule(entry: CustomAutolink): AutolinkRule {
   const id = entry.alphanumeric ? '([A-Za-z0-9]+)' : '(\\d+)';
-  const flags = entry.ignoreCase ? 'giu' : 'gu';
+  const flags = customAutolinkIgnoresCase(entry) ? 'giu' : 'gu';
   return {
     source: 'custom',
     pattern: new RegExp(`${WORD_START}${escapeForPattern(parseAutolinkPrefix(entry.prefix).text)}${id}${WORD_END}`, flags),

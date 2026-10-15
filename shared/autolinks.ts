@@ -4,7 +4,9 @@
  * Each entry turns `<prefix><number>` in a commit message into a link, the way
  * GitLens's `gitlens.autolinks` does. The entry shape is deliberately GitLens's
  * own (`prefix`, `url` with a `<num>` placeholder, optional `ignoreCase` and
- * `alphanumeric`), so a GitLens user can paste their array in unchanged.
+ * `alphanumeric`), so a GitLens user can paste their array in unchanged. One
+ * default differs: a prefix matches in any letter case unless `ignoreCase` is
+ * `false`, because people type a ticket key as `jira-12` as often as `JIRA-12`.
  *
  * Shared because both sides read it: the backend normalizes what the settings
  * file holds and re-validates what the webview asks to save, and the webview
@@ -23,10 +25,18 @@ export interface CustomAutolink {
   prefix: string;
   /** URL template containing {@link AUTOLINK_NUMBER_PLACEHOLDER}. */
   url: string;
-  /** Match the prefix in any letter case. */
+  /**
+   * Match the prefix in any letter case. Absent means `true`; read it through
+   * {@link customAutolinkIgnoresCase}, never as a plain truthiness check.
+   */
   ignoreCase?: boolean;
   /** Match letters and digits after the prefix, not just digits. */
   alphanumeric?: boolean;
+}
+
+/** Whether an entry's prefix matches in any letter case — the default unless `ignoreCase` is `false`. */
+export function customAutolinkIgnoresCase(entry: CustomAutolink): boolean {
+  return entry.ignoreCase !== false;
 }
 
 /** What a prefix means once its optional quotes are read. */
@@ -98,7 +108,8 @@ export function normalizeCustomAutolinks(value: unknown): CustomAutolink[] {
     if (typeof prefix !== 'string' || typeof url !== 'string') continue;
 
     const entry: CustomAutolink = { prefix: prefix.trim(), url: url.trim() };
-    if (ignoreCase === true) entry.ignoreCase = true;
+    // Only the non-default value is kept, so `true` and absent are one form.
+    if (ignoreCase === false) entry.ignoreCase = false;
     if (alphanumeric === true) entry.alphanumeric = true;
     entries.push(entry);
   }
@@ -139,17 +150,26 @@ export function hasCustomAutolinkErrors(errors: CustomAutolinkErrors): boolean {
 }
 
 /**
- * Validate a whole list, index-aligned with the input. A prefix repeated later
- * in the list is reported on the repeat: the first one is the one that links.
+ * Validate a whole list, index-aligned with the input. A prefix that an earlier
+ * entry already matches is reported on the repeat: the first one is the one
+ * that links, so the repeat would never link anything. That covers the same
+ * text, and any casing of it after an entry that ignores case (`Jira-` then
+ * `JIRA-`); a case-insensitive repeat of a case-sensitive prefix still links
+ * the other casings, so it is not a repeat.
  */
 export function validateCustomAutolinks(entries: readonly CustomAutolink[]): CustomAutolinkErrors[] {
-  const seenPrefixes = new Set<string>();
+  const exactPrefixes = new Set<string>();
+  const anyCasePrefixes = new Set<string>();
   return entries.map((entry) => {
     const errors = validateCustomAutolink(entry);
     const prefix = parseAutolinkPrefix(entry.prefix).text;
     if (!errors.prefix) {
-      if (seenPrefixes.has(prefix)) errors.prefix = 'This prefix is already used above';
-      seenPrefixes.add(prefix);
+      const lowerPrefix = prefix.toLowerCase();
+      if (exactPrefixes.has(prefix) || anyCasePrefixes.has(lowerPrefix)) {
+        errors.prefix = 'This prefix is already used above';
+      }
+      exactPrefixes.add(prefix);
+      if (customAutolinkIgnoresCase(entry)) anyCasePrefixes.add(lowerPrefix);
     }
     return errors;
   });
@@ -163,7 +183,7 @@ export function trimCustomAutolink(entry: CustomAutolink): CustomAutolink {
 function isSameCustomAutolink(a: CustomAutolink, b: CustomAutolink): boolean {
   return a.prefix === b.prefix
     && a.url === b.url
-    && (a.ignoreCase ?? false) === (b.ignoreCase ?? false)
+    && customAutolinkIgnoresCase(a) === customAutolinkIgnoresCase(b)
     && (a.alphanumeric ?? false) === (b.alphanumeric ?? false);
 }
 
