@@ -152,6 +152,19 @@ const editor = vi.hoisted(() => {
   };
 });
 
+/**
+ * The workbench's answer to `commands.getCommands()` — the round trip the split
+ * fill waits on. Each test decides when "the workbench has caught up".
+ */
+const workbench = vi.hoisted(() => {
+  const pending: Array<() => void> = [];
+  return {
+    reset() { pending.length = 0; },
+    request: () => new Promise<string[]>((resolve) => pending.push(() => resolve([]))),
+    answer() { pending.splice(0).forEach((resolve) => resolve()); },
+  };
+});
+
 vi.mock('vscode', () => ({
   StatusBarAlignment: { Left: 1, Right: 2 },
   ViewColumn: { One: 1, Two: 2, Active: -1 },
@@ -164,6 +177,7 @@ vi.mock('vscode', () => ({
     showErrorMessage: vi.fn(),
     tabGroups: editor.api,
   },
+  commands: { getCommands: vi.fn(() => workbench.request()) },
   TabInputWebview: class {
     constructor(public readonly viewType: string) {}
   },
@@ -196,6 +210,7 @@ beforeEach(() => {
   tabState.activeRepoPath = '/repos/a';
   tabState.repoListListener = undefined;
   editor.reset();
+  workbench.reset();
   vi.mocked(vscodeStub.window.showInformationMessage).mockClear();
 });
 
@@ -442,11 +457,18 @@ describe('splitting a graph editor', () => {
     editor.focus({ viewColumn: 1, tabs: [tab], activeTab: tab });
   }
 
+  /** Let the workbench answer and every continuation waiting on it run. */
+  async function workbenchAnswers() {
+    workbench.answer();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
   it('fills the empty group the split leaves with another graph on the same repo', async () => {
     const { controller, telemetry } = createController();
     await graphFocusedInGroupOne(controller);
 
     editor.fireGroupsOpened([{ viewColumn: 2, tabs: [] }]);
+    workbench.answer();
     await vi.waitFor(() => expect(tabState.created).toHaveLength(2));
 
     expect(tabState.created[1].initialRepoPath).toBe('/repos/a');
@@ -461,7 +483,7 @@ describe('splitting a graph editor', () => {
     editor.focus({ viewColumn: 1, tabs: [file], activeTab: file });
 
     editor.fireGroupsOpened([{ viewColumn: 2, tabs: [file] }]);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await workbenchAnswers();
 
     expect(tabState.created).toHaveLength(1);
   });
@@ -473,7 +495,47 @@ describe('splitting a graph editor', () => {
     const opened = { viewColumn: 2, tabs: [] as Array<{ input?: unknown }> };
     editor.fireGroupsOpened([opened]);
     opened.tabs.push({ input: { uri: '/repos/a/file.ts' } });
+    await workbenchAnswers();
+
+    expect(tabState.created).toHaveLength(1);
+  });
+
+  it('leaves a group alone when its editor arrives after a tick but before the workbench answers', async () => {
+    const { controller } = createController();
+    await graphFocusedInGroupOne(controller);
+
+    // The modal Settings editor: the group is announced empty, its tab follows.
+    const modal = { viewColumn: 2, tabs: [] as Array<{ input?: unknown }> };
+    editor.fireGroupsOpened([modal]);
     await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(tabState.created).toHaveLength(1);
+
+    modal.tabs.push({ input: { uri: 'settings' } });
+    await workbenchAnswers();
+
+    expect(tabState.created).toHaveLength(1);
+  });
+
+  it('still fills a split when the group is empty once the workbench answers', async () => {
+    const { controller } = createController();
+    await graphFocusedInGroupOne(controller);
+
+    editor.fireGroupsOpened([{ viewColumn: 2, tabs: [] }]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(tabState.created).toHaveLength(1);
+
+    workbench.answer();
+    await vi.waitFor(() => expect(tabState.created).toHaveLength(2));
+  });
+
+  it('does not fill a group that closed before the workbench answered', async () => {
+    const { controller } = createController();
+    await graphFocusedInGroupOne(controller);
+
+    const opened = { viewColumn: 2, tabs: [] as Array<{ input?: unknown }> };
+    editor.fireGroupsOpened([opened]);
+    editor.state.all = editor.state.all.filter((group) => group !== opened);
+    await workbenchAnswers();
 
     expect(tabState.created).toHaveLength(1);
   });

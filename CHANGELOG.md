@@ -4,6 +4,11 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.19.2] - 2026-10-15
+
+### Fixed
+- **Settings no longer opens another graph instead.** VS Code 1.141 opens Settings in a pop-up (modal) editor. Speedy Git took that pop-up for a split of the graph editor, which it answers by opening another graph, so clicking **Settings** in the toolbar could show a new graph on top of Settings. The same applied to the date-format gear, `Ctrl+,` and Keyboard Shortcuts while a graph was focused. It happened mostly when the computer was busy, so it came and went. Speedy Git now waits until VS Code has finished opening the pop-up before deciding, so only a real split opens a new graph.
+
 ## [5.19.1] - 2026-10-13
 
 ### Changed
