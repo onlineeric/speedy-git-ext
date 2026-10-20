@@ -9,8 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - **Always show badged commits.** A new checkbox in the Filter panel, under **Message**. When the graph is filtered by **Authors** or **Message**, commits that fail the filter but show a branch, tag or HEAD badge stay in the graph, so the tip of `main` is still there to right-click and **Create Branch Here...** while you look only at your own commits. Those commits are dimmed, badges included, so your own commits stand out; choose how much with the **Opacity** toggle (**60%** or **40%**) that appears next to the checkbox while it is ticked. Graph lines stay at full strength so they still join the rows around them. Only badges the graph actually shows count: a tag only while **Show tags** is on, a remote-only branch only while remote branches are shown. Stashes are not brought back: a stash on a commit shown only for its badge stays hidden. **Branches** and **Dates** filters are unaffected. Off by default (opacity 40%); both settings are remembered across reloads and new graph tabs, and **Reset All** does not change it.
 
+- **Me button in the Filter panel.** Next to the **Authors** dropdown, **Me** adds your own commits to the author filter in one click, with no typing; click it again to remove them. "You" is the repository's `git config user.email`. The button is highlighted while you are in the filter, and disabled with a hint when `user.email` is not set. Commits you made under another email are not included; add that address from the dropdown.
+
 ### Credits — Always show badged commits (#208)
-- Thanks to [@tbuyukliev](https://github.com/tbuyukliev) for requesting a way to keep branch tips visible while filtering to your own commits in [#208](https://github.com/onlineeric/speedy-git-ext/issues/208)!
+- Thanks to [@tbuyukliev](https://github.com/tbuyukliev) for requesting a way to keep branch tips visible while filtering to your own commits, and a quick way to select yourself, in [#208](https://github.com/onlineeric/speedy-git-ext/issues/208)!
 
 ## [5.19.3] - 2026-10-15
 

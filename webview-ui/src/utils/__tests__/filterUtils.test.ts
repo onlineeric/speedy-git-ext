@@ -3,6 +3,7 @@ import type { Branch } from '@shared/types';
 import {
   combineBranchRefs,
   toDisplayRef,
+  toggleAuthorFilterEmail,
   type BranchBadge,
 } from '../filterUtils';
 
@@ -114,5 +115,17 @@ describe('toDisplayRef', () => {
       remoteNames: ['origin/feat'],
     };
     expect(toDisplayRef(badge)).toEqual({ type: 'remote-branch', remoteName: 'origin/feat' });
+  });
+});
+
+describe('toggleAuthorFilterEmail', () => {
+  it('adds an email to an empty or missing filter', () => {
+    expect(toggleAuthorFilterEmail(undefined, 'me@x')).toEqual(['me@x']);
+    expect(toggleAuthorFilterEmail(['a@x'], 'me@x')).toEqual(['a@x', 'me@x']);
+  });
+
+  it('removes an email already in the filter, and clears the filter when it was the last', () => {
+    expect(toggleAuthorFilterEmail(['a@x', 'me@x'], 'me@x')).toEqual(['a@x']);
+    expect(toggleAuthorFilterEmail(['me@x'], 'me@x')).toBeUndefined();
   });
 });

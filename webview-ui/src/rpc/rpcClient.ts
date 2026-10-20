@@ -427,7 +427,7 @@ class RpcClient {
         store.hydratePersistedUIState(message.payload.uiState);
         break;
       case 'authorList':
-        store.setAuthorList(message.payload.authors);
+        store.setAuthorList(message.payload.authors, message.payload.currentUserEmail);
         store.setAuthorListLoading(false);
         break;
       case 'uncommittedChanges':

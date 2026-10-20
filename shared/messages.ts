@@ -319,7 +319,7 @@ export type ResponseMessage =
    * series' entry and stays silent when there is none or it equals `lastShownVersion`.
    */
   | { type: 'whatsNew'; payload: WhatsNewPayload }
-  | { type: 'authorList'; payload: { authors: Author[] } }
+  | { type: 'authorList'; payload: { authors: Author[]; /** `git config user.email`, for the Filter panel's "Me" button. */ currentUserEmail: string | null } }
   | { type: 'uncommittedChanges'; payload: UncommittedSummary }
   | { type: 'conflictState'; payload: ConflictState }
   | { type: 'initialData'; payload: InitialDataPayload }

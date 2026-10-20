@@ -93,13 +93,15 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
         <ContributorThanks login="tbuyukliev">
           This release comes from your request in{' '}
           <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/208">#208</ExternalLink>, to keep
-          the tip of <code>main</code> in reach while the graph shows only your commits.
+          the tip of <code>main</code> in reach while the graph shows only your commits, and to pick yourself
+          without typing.
         </ContributorThanks>
 
         <WhatsNewSection title="Branch from main without clearing the filter">
           <StepFlow>
-            <Step label="1" title="Filter" accent={SHOWCASE_BLUE_COLOR}>
-              Open <UiLabel>Filter</UiLabel> and pick yourself under <UiLabel>Authors</UiLabel>.
+            <Step label="1" title="Filter to you" accent={SHOWCASE_BLUE_COLOR}>
+              Open <UiLabel>Filter</UiLabel> and click the new <UiLabel>Me</UiLabel> button next to{' '}
+              <UiLabel>Authors</UiLabel>: your commits, no typing. It uses your <code>git config user.email</code>.
             </Step>
             <Step label="2" title="Keep the badges" accent={SHOWCASE_PURPLE_COLOR}>
               Tick <UiLabel>Always show badged commits</UiLabel>. Commits by others that carry a branch, tag or

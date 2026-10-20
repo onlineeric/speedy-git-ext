@@ -364,7 +364,9 @@ interface GraphStore {
   setSearchMatches: (matchIndices: number[], terms: readonly SearchTerm[]) => void;
   nextMatch: () => void;
   prevMatch: () => void;
-  setAuthorList: (authors: Author[]) => void;
+  /** `git config user.email` of the displayed repo; arrives with `authorList`. */
+  currentUserEmail: string | null;
+  setAuthorList: (authors: Author[], currentUserEmail: string | null) => void;
   setAuthorListLoading: (loading: boolean) => void;
   setUncommittedChanges: (payload: UncommittedSummary) => void;
   setConflictState: (state: ConflictState) => void;
@@ -527,6 +529,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   hoveredCommitHash: null,
   tooltipAnchorRect: null,
   authorList: [],
+  currentUserEmail: null,
   authorListLoading: false,
   worktreeList: [],
   worktreeListLoading: false,
@@ -948,6 +951,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
             displayedRepoPath: activeRepoPath,
             submodules: [],
             authorList: [],
+            currentUserEmail: null,
             authorListLoading: false,
             remotes: [],
             stashes: [],
@@ -997,6 +1001,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       commitDetails: undefined,
       detailsPanelOpen: false,
       authorList: [],
+      currentUserEmail: null,
       authorListLoading: false,
       remotes: [],
       stashes: [],
@@ -1048,6 +1053,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       commitDetails: undefined,
       detailsPanelOpen: false,
       authorList: [],
+      currentUserEmail: null,
       authorListLoading: false,
       remotes: [],
       stashes: [],
@@ -1197,7 +1203,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedCommits: [],
     };
   }),
-  setAuthorList: (authors) => set({ authorList: authors }),
+  setAuthorList: (authors, currentUserEmail) => set({ authorList: authors, currentUserEmail }),
   setAuthorListLoading: (authorListLoading) => set({ authorListLoading }),
   setUncommittedChanges: (payload) => {
     const hasChanges = payload.stagedCount + payload.unstagedCount + payload.untrackedCount > 0;

@@ -291,6 +291,20 @@ export class GitLogService {
     return ok(authors);
   }
 
+  /**
+   * The email commits in this repository are authored as (`git config user.email`,
+   * local config first). Unset is not an error — it answers `null` — since this
+   * only drives the Filter panel's "Me" shortcut.
+   */
+  async getCurrentUserEmail(): Promise<Result<string | null>> {
+    const result = await this.executor.execute({
+      args: ['config', '--get', 'user.email'],
+      cwd: this.workspacePath,
+    });
+    if (!result.success) return ok(null);
+    return ok(result.value.stdout.trim() || null);
+  }
+
   async getBranches(): Promise<Result<Branch[]>> {
     this.log.info('Fetching branches');
     // Use null byte separators for reliable parsing

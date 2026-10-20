@@ -87,7 +87,7 @@ src/
 ├── services/                     # All repo-bound; every method returns Result<T, GitError>
 │   ├── index.ts                  # Barrel export for all services
 │   ├── GitExecutor.ts            # Spawns git processes, 30s timeout — the only place git is invoked
-│   ├── GitLogService.ts          # Parses git log (null-byte format), branches, branches-containing-a-commit. Default 500 commits.
+│   ├── GitLogService.ts          # Parses git log (null-byte format), branches, branches-containing-a-commit, authors + `user.email` (Filter "Me"). Default 500 commits.
 │   │                             #   Also walks stash base commits, so a stash survives its branch moving
 │   ├── GitDiffService.ts         # Commit details (+ parent subjects), file changes, file content at revision; submodule (gitlink) pointers
 │   ├── GitBranchService.ts       # Checkout, create, rename, delete, fast-forward branches; merge any commit-ish + merge state/continue/abort
@@ -434,7 +434,7 @@ utils/
 │                                 #   and every ref badge the row actually renders. Never matches the uncommitted row
 ├── searchHighlight.ts            # PURE: substring/prefix highlight segments (overlapping and adjacent matches merge
 │                                 #   into one box) + `refSearchMatchKind` — label match, hidden match, or none
-├── filterUtils.ts                # Author/date filter logic
+├── filterUtils.ts                # Author/date filter logic; `toggleAuthorFilterEmail` shared by the Authors dropdown and the "Me" button
 ├── refStyle.ts                   # Per-ref-kind badge styling
 ├── refBadgeContent.ts            # What a ref badge shows: label, lead icons (fork = local, cloud = remote;
 │                                 #   merged = both), remote count on the cloud, and the title tooltip

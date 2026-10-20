@@ -174,7 +174,10 @@ describe('WebviewMessageRouter operation telemetry middleware', () => {
 
   it('sends nothing for untracked request types', async () => {
     const { router, sendOperation } = createTrackedTestSetup({
-      gitLogService: { getAuthors: vi.fn().mockResolvedValue({ success: true, value: [] }) },
+      gitLogService: {
+        getAuthors: vi.fn().mockResolvedValue({ success: true, value: [] }),
+        getCurrentUserEmail: vi.fn().mockResolvedValue({ success: true, value: null }),
+      },
     });
 
     await router.dispatch({ type: 'getAuthors', payload: {} });
@@ -218,7 +221,7 @@ describe('WebviewMessageRouter', () => {
       value: [{ name: 'Alice', email: 'a@example.com' }],
     });
     const services = new GitServiceRegistry({
-      gitLogService: { getAuthors: oldGetAuthors },
+      gitLogService: { getAuthors: oldGetAuthors, getCurrentUserEmail: vi.fn() },
     } as never);
     const postMessage = vi.fn();
     const router = new WebviewMessageRouter(
@@ -227,7 +230,10 @@ describe('WebviewMessageRouter', () => {
     );
 
     services.update({
-      gitLogService: { getAuthors: newGetAuthors },
+      gitLogService: {
+        getAuthors: newGetAuthors,
+        getCurrentUserEmail: vi.fn().mockResolvedValue({ success: true, value: 'me@example.com' }),
+      },
     } as never);
 
     await router.dispatch({ type: 'getAuthors', payload: {} });
@@ -236,7 +242,7 @@ describe('WebviewMessageRouter', () => {
     expect(newGetAuthors).toHaveBeenCalledTimes(1);
     expect(postMessage).toHaveBeenCalledWith({
       type: 'authorList',
-      payload: { authors: [{ name: 'Alice', email: 'a@example.com' }] },
+      payload: { authors: [{ name: 'Alice', email: 'a@example.com' }], currentUserEmail: 'me@example.com' },
     });
   });
 

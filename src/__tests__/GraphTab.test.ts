@@ -272,7 +272,7 @@ describe('WebviewMessageRouter', () => {
     const oldGetAuthors = vi.fn().mockResolvedValue({ success: true, value: [] });
     const newGetAuthors = vi.fn().mockResolvedValue({ success: true, value: [{ name: 'Alice', email: 'a@example.com' }] });
     const services = new GitServiceRegistry({
-      gitLogService: { getAuthors: oldGetAuthors },
+      gitLogService: { getAuthors: oldGetAuthors, getCurrentUserEmail: vi.fn() },
     } as never);
     const postMessage = vi.fn();
     const router = new WebviewMessageRouter(
@@ -281,7 +281,10 @@ describe('WebviewMessageRouter', () => {
     );
 
     services.update({
-      gitLogService: { getAuthors: newGetAuthors },
+      gitLogService: {
+        getAuthors: newGetAuthors,
+        getCurrentUserEmail: vi.fn().mockResolvedValue({ success: true, value: null }),
+      },
     } as never);
 
     await router.dispatch({ type: 'getAuthors', payload: {} });
@@ -290,7 +293,7 @@ describe('WebviewMessageRouter', () => {
     expect(newGetAuthors).toHaveBeenCalledTimes(1);
     expect(postMessage).toHaveBeenCalledWith({
       type: 'authorList',
-      payload: { authors: [{ name: 'Alice', email: 'a@example.com' }] },
+      payload: { authors: [{ name: 'Alice', email: 'a@example.com' }], currentUserEmail: null },
     });
   });
 });

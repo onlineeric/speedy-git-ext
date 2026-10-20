@@ -342,4 +342,23 @@ describe('GitLogService.getContainingBranches', () => {
 
     expect(result.success).toBe(false);
   });
+
+  it('reads the current user email from git config', async () => {
+    const service = new GitLogService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockResolvedValue({ success: true, value: { stdout: 'me@example.com\n', stderr: '' } });
+
+    const result = await service.getCurrentUserEmail();
+
+    expect(result).toEqual({ success: true, value: 'me@example.com' });
+    expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({ args: ['config', '--get', 'user.email'] }));
+  });
+
+  it('answers null, not an error, when user.email is unset', async () => {
+    const service = new GitLogService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute')
+      .mockResolvedValue({ success: false, error: { message: 'exit 1', code: 'UNKNOWN' } as never });
+
+    expect(await service.getCurrentUserEmail()).toEqual({ success: true, value: null });
+  });
 });
