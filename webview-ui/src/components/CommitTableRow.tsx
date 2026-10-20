@@ -101,6 +101,11 @@ interface CommitTableRowProps {
   searchTerms?: readonly SearchTerm[];
   /** Briefly pulses the row background after a "Go to HEAD" navigation. */
   isFlashing?: boolean;
+  /**
+   * The row fails the Author / Message filter and is shown only because it carries a
+   * badge ("Always show badged commits"). Its text is dimmed; the graph and badges are not.
+   */
+  isBadgeKept?: boolean;
   onClick: (event: React.MouseEvent) => void;
   onNodeMouseEnter?: (hash: string, rect: DOMRect) => void;
   onNodeMouseLeave?: () => void;
@@ -122,6 +127,7 @@ export const CommitTableRow = memo(function CommitTableRow({
   isCurrentSearchMatch = false,
   searchTerms = EMPTY_SEARCH_TERMS,
   isFlashing = false,
+  isBadgeKept = false,
   onClick,
   onNodeMouseEnter,
   onNodeMouseLeave,
@@ -213,6 +219,7 @@ export const CommitTableRow = memo(function CommitTableRow({
             stashIndex,
             searchTerms,
             autolinkRules,
+            isBadgeKept,
             onNodeMouseEnter,
             onNodeMouseLeave,
           })}
@@ -269,6 +276,7 @@ function renderColumn({
   stashIndex,
   searchTerms,
   autolinkRules,
+  isBadgeKept,
   onNodeMouseEnter,
   onNodeMouseLeave,
 }: {
@@ -296,9 +304,12 @@ function renderColumn({
   stashIndex: number;
   searchTerms: readonly SearchTerm[];
   autolinkRules: readonly AutolinkRule[];
+  isBadgeKept: boolean;
   onNodeMouseEnter?: (hash: string, rect: DOMRect) => void;
   onNodeMouseLeave?: () => void;
 }) {
+  // Badge-kept rows dim their text; the graph lane and the badges stay at full strength.
+  const dimClass = isBadgeKept ? ' opacity-60' : '';
   switch (columnId) {
     case 'graph':
       return (
@@ -319,7 +330,7 @@ function renderColumn({
       );
     case 'hash':
       return (
-        <div className="flex h-full items-center">
+        <div className={`flex h-full items-center${dimClass}`}>
           <span
             className="truncate font-mono text-xs text-[var(--vscode-textLink-foreground)]"
             title={commit.hash}
@@ -370,7 +381,7 @@ function renderColumn({
             </div>
           )}
           <span
-            className={`truncate text-sm ${isStash || isUncommitted ? 'italic' : ''}`}
+            className={`truncate text-sm ${isStash || isUncommitted ? 'italic' : ''}${dimClass}`}
             style={isStash ? STASH_SUBJECT_STYLE : isUncommitted ? UNCOMMITTED_SUBJECT_STYLE : undefined}
             title={commit.subject}
           >
@@ -380,7 +391,7 @@ function renderColumn({
       );
     case 'author': {
       const authorContent = (
-        <div className="flex h-full items-center gap-2 overflow-hidden">
+        <div className={`flex h-full items-center gap-2 overflow-hidden${dimClass}`}>
           {avatarsEnabled && commit.author && !isUncommitted ? (
             <AuthorAvatar author={commit.author} email={commit.authorEmail} />
           ) : null}
@@ -402,7 +413,7 @@ function renderColumn({
     case 'date':
       return (
         <DateContextMenu authorDate={commit.authorDate}>
-          <div className="flex h-full items-center">
+          <div className={`flex h-full items-center${dimClass}`}>
             <span className="truncate text-xs text-[var(--vscode-descriptionForeground)]">
               {dateFormatter(commit.authorDate)}
             </span>
@@ -412,7 +423,9 @@ function renderColumn({
     case 'signature':
       // Uncommitted/stash rows have no commit object to verify.
       if (isUncommitted || isStash) return null;
-      return <SignatureColumnCell hash={commit.hash} />;
+      return isBadgeKept
+        ? <div className="h-full opacity-60"><SignatureColumnCell hash={commit.hash} /></div>
+        : <SignatureColumnCell hash={commit.hash} />;
     default:
       return null;
   }

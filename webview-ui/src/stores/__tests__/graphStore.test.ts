@@ -444,3 +444,82 @@ describe('graphStore — branch checkout dialog lifetime', () => {
     expect(useGraphStore.getState().checkoutWorktree).toBeNull();
   });
 });
+
+describe('graphStore — always show badged commits', () => {
+  const foreignTagged = (hash: string): Commit => ({
+    ...makeCommit(hash),
+    authorEmail: 'other@example.com',
+    refs: [{ name: 'v1.0', type: 'tag' }],
+  });
+
+  beforeEach(() => {
+    useGraphStore.setState({
+      loading: false,
+      pendingUserSettings: undefined,
+      alwaysShowBadgedCommits: false,
+      filters: { maxCount: 500 },
+      userSettings: { ...useGraphStore.getState().userSettings, showTags: true, showRemoteBranches: true },
+    });
+    useGraphStore.getState().setCommits([makeCommit('mine000'), foreignTagged('tagged0')]);
+  });
+
+  const filterToMine = () => {
+    useGraphStore.getState().setFilters({ authors: ['test@example.com'] });
+    useGraphStore.getState().recomputeVisibility();
+  };
+
+  it('keeps a badged foreign commit visible (and dimmed) once the option is on', () => {
+    filterToMine();
+    expect(useGraphStore.getState().mergedCommits.map((c) => c.hash)).toEqual(['mine000']);
+
+    useGraphStore.getState().setAlwaysShowBadgedCommits(true);
+
+    const state = useGraphStore.getState();
+    expect(state.mergedCommits.map((c) => c.hash)).toEqual(['mine000', 'tagged0']);
+    expect(state.badgeKeptCommitHashes).toEqual(new Set(['tagged0']));
+    expect(state.hiddenCommitHashes).toEqual(new Set());
+  });
+
+  it('does not recompute when no Author or Message filter is active', () => {
+    const { mergedCommits, topology } = useGraphStore.getState();
+
+    useGraphStore.getState().setAlwaysShowBadgedCommits(true);
+
+    const state = useGraphStore.getState();
+    expect(state.alwaysShowBadgedCommits).toBe(true);
+    expect(state.mergedCommits).toBe(mergedCommits);
+    expect(state.topology).toBe(topology);
+  });
+
+  it('recomputes when Show tags changes while the option is on', () => {
+    filterToMine();
+    useGraphStore.getState().setAlwaysShowBadgedCommits(true);
+
+    useGraphStore.getState().setUserSettings({ ...useGraphStore.getState().userSettings, showTags: false });
+
+    const state = useGraphStore.getState();
+    expect(state.mergedCommits.map((c) => c.hash)).toEqual(['mine000']);
+    expect(state.badgeKeptCommitHashes).toEqual(new Set());
+  });
+
+  it('does not recompute on a Show tags change while the option is off', () => {
+    filterToMine();
+    const { mergedCommits } = useGraphStore.getState();
+
+    useGraphStore.getState().setUserSettings({ ...useGraphStore.getState().userSettings, showTags: false });
+
+    expect(useGraphStore.getState().mergedCommits).toBe(mergedCommits);
+  });
+
+  it('applies a hydrated value to commits that are already loaded', () => {
+    filterToMine();
+
+    useGraphStore.getState().hydratePersistedUIState({
+      ...useGraphStore.getState(),
+      version: 1,
+      alwaysShowBadgedCommits: true,
+    });
+
+    expect(useGraphStore.getState().badgeKeptCommitHashes).toEqual(new Set(['tagged0']));
+  });
+});

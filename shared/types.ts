@@ -695,6 +695,8 @@ export interface PersistedUIState {
    * hydration payload so the webview receives it alongside global UI state.
    */
   commitTableLayout: CommitTableLayout;
+  /** Filter panel: keep commits that show a badge visible under the Author / Message filters. */
+  alwaysShowBadgedCommits: boolean;
 }
 
 export const DEFAULT_PERSISTED_UI_STATE: PersistedUIState = {
@@ -704,6 +706,7 @@ export const DEFAULT_PERSISTED_UI_STATE: PersistedUIState = {
   bottomPanelHeight: 280,
   rightPanelWidth: 400,
   commitTableLayout: createDefaultCommitTableLayout(),
+  alwaysShowBadgedCommits: false,
 };
 
 export type RebaseState = 'idle' | 'in-progress';

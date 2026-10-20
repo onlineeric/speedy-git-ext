@@ -4,6 +4,14 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.20.0] - 2026-10-20
+
+### Added
+- **Always show badged commits.** A new checkbox in the Filter panel, under **Message**. When the graph is filtered by **Authors** or **Message**, commits that fail the filter but show a branch, tag or HEAD badge stay in the graph, so the tip of `main` is still there to right-click and **Create Branch Here...** while you look only at your own commits. Those commits are drawn with dimmed text; their badges and graph lines stay at full strength. Only badges the graph actually shows count: a tag only while **Show tags** is on, a remote-only branch only while remote branches are shown. **Branches** and **Dates** filters are unaffected. Off by default; the setting is remembered across reloads and new graph tabs, and **Reset All** does not change it.
+
+### Credits — Always show badged commits (#208)
+- Thanks to [@tbuyukliev](https://github.com/tbuyukliev) for requesting a way to keep branch tips visible while filtering to your own commits in [#208](https://github.com/onlineeric/speedy-git-ext/issues/208)!
+
 ## [5.19.3] - 2026-10-15
 
 ### Added

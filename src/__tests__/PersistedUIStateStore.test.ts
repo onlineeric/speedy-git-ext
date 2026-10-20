@@ -137,6 +137,51 @@ describe('PersistedUIStateStore', () => {
   });
 });
 
+describe('PersistedUIStateStore alwaysShowBadgedCommits', () => {
+  it('defaults to false when the field is missing from state saved before it existed', () => {
+    const { alwaysShowBadgedCommits: _omitted, ...legacy } = DEFAULT_PERSISTED_UI_STATE;
+    void _omitted;
+    const { store } = createStore({
+      'speedyGit.uiState': { ...legacy, detailsPanelPosition: 'right', bottomPanelHeight: 333 },
+    });
+
+    const state = store.loadPersistedUIState();
+
+    expect(state.alwaysShowBadgedCommits).toBe(false);
+    expect(state.detailsPanelPosition).toBe('right');
+    expect(state.bottomPanelHeight).toBe(333);
+  });
+
+  it('falls back to false for a non-boolean value', () => {
+    const { store } = createStore({
+      'speedyGit.uiState': { ...DEFAULT_PERSISTED_UI_STATE, alwaysShowBadgedCommits: 'yes' },
+    });
+
+    expect(store.loadPersistedUIState().alwaysShowBadgedCommits).toBe(false);
+  });
+
+  it('round-trips true', () => {
+    const globalState: Record<string, unknown> = {};
+    createStore(globalState).store.savePersistedUIState({ alwaysShowBadgedCommits: true });
+
+    expect(createStore(globalState).store.loadPersistedUIState().alwaysShowBadgedCommits).toBe(true);
+  });
+
+  it('ignores a non-boolean save and leaves other fields untouched', () => {
+    const { store, extensionContext } = createStore({
+      'speedyGit.uiState': { ...DEFAULT_PERSISTED_UI_STATE, detailsPanelPosition: 'right' },
+    });
+
+    store.savePersistedUIState({ alwaysShowBadgedCommits: 'yes' as never });
+    expect(extensionContext.globalState.update).not.toHaveBeenCalled();
+
+    store.savePersistedUIState({ alwaysShowBadgedCommits: true });
+    const state = store.loadPersistedUIState();
+    expect(state.alwaysShowBadgedCommits).toBe(true);
+    expect(state.detailsPanelPosition).toBe('right');
+  });
+});
+
 describe('PersistedUIStateStore across multiple graph tabs', () => {
   /** Two stores over one shared memento — the same shape as two tabs in one window. */
   function createTwoTabs() {

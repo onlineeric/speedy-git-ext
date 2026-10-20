@@ -194,6 +194,10 @@ export class PersistedUIStateStore {
         typeof raw.rightPanelWidth === 'number' && isFinite(raw.rightPanelWidth) && raw.rightPanelWidth >= MIN_PANEL_SIZE
           ? raw.rightPanelWidth
           : defaults.rightPanelWidth,
+      alwaysShowBadgedCommits:
+        typeof raw.alwaysShowBadgedCommits === 'boolean'
+          ? raw.alwaysShowBadgedCommits
+          : defaults.alwaysShowBadgedCommits,
       commitTableLayout: cloneCommitTableLayout(this.loadRepoTableLayout()),
     };
     return this.uiStateCache;
@@ -247,6 +251,9 @@ export class PersistedUIStateStore {
       ...(typeof partial.rightPanelWidth === 'number' && isFinite(partial.rightPanelWidth)
         ? { rightPanelWidth: Math.max(MIN_PANEL_SIZE, partial.rightPanelWidth) }
         : partial.rightPanelWidth !== undefined ? { rightPanelWidth: defaults.rightPanelWidth } : {}),
+      ...(typeof partial.alwaysShowBadgedCommits === 'boolean'
+        ? { alwaysShowBadgedCommits: partial.alwaysShowBadgedCommits }
+        : {}),
     };
 
     if (Object.keys(globalValidated).length > 0) {

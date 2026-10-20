@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { mergeRefs } from '../mergeRefs';
-import type { RefInfo } from '@shared/types';
+import { isBadgedCommit, mergeRefs } from '../mergeRefs';
+import type { Commit, RefInfo } from '@shared/types';
 
 describe('mergeRefs', () => {
   it('returns isHead=false and empty displayRefs for empty array', () => {
@@ -139,5 +139,34 @@ describe('mergeRefs', () => {
       { type: 'merged-branch', localName: 'dev', remoteNames: ['origin/dev'] },
       { type: 'remote-branch', remoteName: 'origin/staging' },
     ]);
+  });
+});
+
+describe('isBadgedCommit', () => {
+  const all = { showTags: true, showRemoteBranches: true };
+  const withRefs = (refs: RefInfo[]): Commit => ({
+    hash: 'h', abbreviatedHash: 'h', parents: [], author: 'A', authorEmail: 'a@x', authorDate: 0, subject: '', refs,
+  });
+
+  it('is false for a commit without refs', () => {
+    expect(isBadgedCommit(withRefs([]), all)).toBe(false);
+  });
+
+  it('is true for HEAD, attached or detached', () => {
+    expect(isBadgedCommit(withRefs([{ name: 'HEAD', type: 'head' }]), all)).toBe(true);
+    expect(isBadgedCommit(withRefs([{ name: 'main', type: 'head' }]), { showTags: false, showRemoteBranches: false })).toBe(true);
+  });
+
+  it('follows the View settings for tags and remote-only branches', () => {
+    const tag = withRefs([{ name: 'v1', type: 'tag' }]);
+    const remote = withRefs([{ name: 'feat', type: 'remote', remote: 'origin' }]);
+    expect(isBadgedCommit(tag, all)).toBe(true);
+    expect(isBadgedCommit(tag, { showTags: false, showRemoteBranches: true })).toBe(false);
+    expect(isBadgedCommit(remote, all)).toBe(true);
+    expect(isBadgedCommit(remote, { showTags: true, showRemoteBranches: false })).toBe(false);
+  });
+
+  it('does not count a stash badge', () => {
+    expect(isBadgedCommit(withRefs([{ name: 'stash@{0}', type: 'stash' }]), all)).toBe(false);
   });
 });

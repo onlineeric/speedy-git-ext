@@ -53,7 +53,7 @@ import { slotsEqual } from '../utils/compareSlot';
 import type { InitialDataPayload } from '@shared/messages';
 import type { GitVersion } from '@shared/gitVersion';
 import { type GraphTopology } from '../utils/graphTopology';
-import { computeHiddenCommitHashes } from '../utils/commitVisibility';
+import { computeCommitVisibility, hasClientSideVisibilityFilter, type VisibilityOptions } from '../utils/commitVisibility';
 import { computeMergedTopology, type UncommittedContext } from '../utils/mergedCommits';
 import { findHeadCommitHash } from '../utils/commitRefs';
 import type { CommitNavigationTarget } from '../utils/headNavigation';
@@ -259,6 +259,11 @@ interface GraphStore {
   uncommittedCounts: { stagedCount: number; unstagedCount: number; untrackedCount: number };
   hasUncommittedChanges: boolean;
   hiddenCommitHashes: Set<string>;
+  /** Commits that fail the Author / Message filters but stay visible (dimmed) because they show a badge. */
+  badgeKeptCommitHashes: Set<string>;
+  /** Persisted preference: keep badged commits visible under the Author / Message filters. */
+  alwaysShowBadgedCommits: boolean;
+  setAlwaysShowBadgedCommits: (value: boolean) => void;
   isRefreshing: boolean;
   consecutiveEmptyBatches: number;
   filteredOutCount: number;
@@ -401,6 +406,13 @@ function getUncommittedContext(state: GraphStore): UncommittedContext {
   return { hasUncommittedChanges: state.hasUncommittedChanges, counts: state.uncommittedCounts, branches: state.branches };
 }
 
+function visibilityOptionsOf(state: GraphStore, userSettings: UserSettings = state.userSettings): VisibilityOptions {
+  return {
+    alwaysShowBadgedCommits: state.alwaysShowBadgedCommits,
+    badgeSettings: { showTags: userSettings.showTags, showRemoteBranches: userSettings.showRemoteBranches },
+  };
+}
+
 /**
  * Keep only the per-commit-hash map entries whose commit is still loaded.
  * Signature presence/verdicts are immutable per hash, so a refresh retains cached
@@ -527,6 +539,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   hasUncommittedChanges: false,
   isRefreshing: false,
   hiddenCommitHashes: new Set<string>(),
+  badgeKeptCommitHashes: new Set<string>(),
+  alwaysShowBadgedCommits: DEFAULT_PERSISTED_UI_STATE.alwaysShowBadgedCommits,
   consecutiveEmptyBatches: 0,
   filteredOutCount: 0,
   showGapIndicator: false,
@@ -562,13 +576,24 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   updateCommitTableLayout: (updater) => set((state) => ({
     commitTableLayout: cloneCommitTableLayout(updater(state.commitTableLayout)),
   })),
-  hydratePersistedUIState: (state) => set({
-    detailsPanelPosition: state.detailsPanelPosition,
-    fileViewMode: state.fileViewMode,
-    bottomPanelHeight: state.bottomPanelHeight,
-    rightPanelWidth: state.rightPanelWidth,
-    commitTableLayout: cloneCommitTableLayout(state.commitTableLayout),
-  }),
+  hydratePersistedUIState: (state) => {
+    set({
+      detailsPanelPosition: state.detailsPanelPosition,
+      fileViewMode: state.fileViewMode,
+      bottomPanelHeight: state.bottomPanelHeight,
+      rightPanelWidth: state.rightPanelWidth,
+      commitTableLayout: cloneCommitTableLayout(state.commitTableLayout),
+    });
+    // Hydration can arrive after commits, so the option may need to re-filter what is loaded.
+    get().setAlwaysShowBadgedCommits(state.alwaysShowBadgedCommits);
+  },
+  setAlwaysShowBadgedCommits: (alwaysShowBadgedCommits) => {
+    const state = get();
+    if (state.alwaysShowBadgedCommits === alwaysShowBadgedCommits) return;
+    set({ alwaysShowBadgedCommits });
+    // With no Author / Message filter both visibility sets are empty either way.
+    if (hasClientSideVisibilityFilter(state.filters)) get().recomputeVisibility();
+  },
   // Merge, never replace: the background refresh queue posts avatars in small
   // batches as they resolve, and each batch must leave earlier ones in place.
   setGitHubAvatarUrls: (urls) => set((state) => ({
@@ -582,7 +607,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setTagMetadata: (tagMetadata) => set({ tagMetadata }),
   setCommits: (commits) => {
     const filters = get().filters;
-    const hiddenCommitHashes = computeHiddenCommitHashes(commits, filters);
+    const { hiddenCommitHashes, badgeKeptCommitHashes } = computeCommitVisibility(commits, filters, visibilityOptionsOf(get()));
     const { mergedCommits, topology } = computeMergedTopology(commits, get().stashes, filters, hiddenCommitHashes, getUncommittedContext(get()));
     const selectedCommit = get().selectedCommit;
     const selectedCommitIndex = selectedCommit
@@ -599,6 +624,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       mergedCommits,
       topology,
       hiddenCommitHashes,
+      badgeKeptCommitHashes,
       selectedCommit: selectedCommitIndex >= 0 ? selectedCommit : undefined,
       selectedCommitIndex,
       selectedCommits: prevSelectedCommits.filter((h) => newHashSet.has(h)),
@@ -626,7 +652,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   appendCommits: (newCommits, totalLoadedWithoutFilter) => {
     const { commits, stashes, filters, totalLoadedWithoutFilter: existingTotal, selectedCommit } = get();
     const allCommits = [...commits, ...newCommits];
-    const hiddenCommitHashes = computeHiddenCommitHashes(allCommits, filters);
+    const { hiddenCommitHashes, badgeKeptCommitHashes } = computeCommitVisibility(allCommits, filters, visibilityOptionsOf(get()));
     const { mergedCommits, topology } = computeMergedTopology(allCommits, stashes, filters, hiddenCommitHashes, getUncommittedContext(get()));
     const hasFilter = !!(filters.branches?.length || filters.afterDate || filters.beforeDate);
     const selectedCommitIndex = selectedCommit
@@ -657,6 +683,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       mergedCommits,
       topology,
       hiddenCommitHashes,
+      badgeKeptCommitHashes,
       selectedCommitIndex,
       lastBatchStartIndex: commits.length,
       consecutiveEmptyBatches,
@@ -1061,12 +1088,21 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     }));
   },
   setIsLoadingRepo: (isLoadingRepo) => set({ isLoadingRepo }),
-  setUserSettings: (incoming) => set((state) => {
+  setUserSettings: (incoming) => {
+    const state = get();
     const settings = keepUnchangedCustomAutolinks(incoming, state.userSettings);
-    return state.loading
-      ? { pendingUserSettings: settings }
-      : { userSettings: settings, pendingUserSettings: undefined, filters: { ...state.filters, maxCount: settings.batchCommitSize } };
-  }),
+    if (state.loading) {
+      // The pending settings are applied by setInitialData, which recomputes visibility itself.
+      set({ pendingUserSettings: settings });
+      return;
+    }
+    set({ userSettings: settings, pendingUserSettings: undefined, filters: { ...state.filters, maxCount: settings.batchCommitSize } });
+    const badgeSettingsChanged = settings.showTags !== state.userSettings.showTags
+      || settings.showRemoteBranches !== state.userSettings.showRemoteBranches;
+    if (badgeSettingsChanged && state.alwaysShowBadgedCommits && hasClientSideVisibilityFilter(state.filters)) {
+      get().recomputeVisibility();
+    }
+  },
   openSearch: () => set((state) => ({
     searchState: { ...state.searchState, isOpen: true },
     activeToggleWidget: 'search',
@@ -1161,7 +1197,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const counts = { stagedCount: payload.stagedCount, unstagedCount: payload.unstagedCount, untrackedCount: payload.untrackedCount };
     const allFiles = [...payload.stagedFiles, ...payload.unstagedFiles, ...payload.conflictFiles];
     const { commits, stashes, filters, branches } = get();
-    const hiddenCommitHashes = computeHiddenCommitHashes(commits, filters);
+    const { hiddenCommitHashes, badgeKeptCommitHashes } = computeCommitVisibility(commits, filters, visibilityOptionsOf(get()));
     const uncommitted: UncommittedContext = { hasUncommittedChanges: hasChanges, counts, branches };
     const { mergedCommits, topology } = computeMergedTopology(commits, stashes, filters, hiddenCommitHashes, uncommitted);
     const selectedCommit = get().selectedCommit;
@@ -1178,6 +1214,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       mergedCommits,
       topology,
       hiddenCommitHashes,
+      badgeKeptCommitHashes,
       selectedCommitIndex,
     });
     // Auto-refresh details panel from the already-received data (avoids a redundant backend round-trip)
@@ -1214,7 +1251,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setWhatsNew: (payload) => set({ whatsNew: payload }),
   recomputeVisibility: () => {
     const { commits, stashes, filters } = get();
-    const hiddenCommitHashes = computeHiddenCommitHashes(commits, filters);
+    const { hiddenCommitHashes, badgeKeptCommitHashes } = computeCommitVisibility(commits, filters, visibilityOptionsOf(get()));
     const { mergedCommits, topology } = computeMergedTopology(commits, stashes, filters, hiddenCommitHashes, getUncommittedContext(get()));
     const selectedCommit = get().selectedCommit;
     const selectedCommitIndex = selectedCommit
@@ -1222,6 +1259,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       : -1;
     set({
       hiddenCommitHashes,
+      badgeKeptCommitHashes,
       mergedCommits,
       topology,
       selectedCommitIndex,
@@ -1278,7 +1316,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     };
 
     // Compute hidden hashes, merged commits, and topology in one pass
-    const hiddenCommitHashes = computeHiddenCommitHashes(commits, filters);
+    const { hiddenCommitHashes, badgeKeptCommitHashes } = computeCommitVisibility(
+      commits,
+      filters,
+      visibilityOptionsOf(state, state.pendingUserSettings ?? state.userSettings),
+    );
     const uncommitted: UncommittedContext = { hasUncommittedChanges: hasChanges, counts, branches: payload.branches };
     // `perf topology` telemetry (US5): wrap the existing computation for the
     // initial load only; the one-shot flag keeps refreshes/re-renders free.
@@ -1329,6 +1371,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       mergedCommits,
       topology,
       hiddenCommitHashes,
+      badgeKeptCommitHashes,
       hasMore: payload.hasMore,
       loading: false,
       ...(state.pendingUserSettings

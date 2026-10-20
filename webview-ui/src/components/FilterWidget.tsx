@@ -52,6 +52,8 @@ export function FilterWidget() {
   const authorListLoading = useGraphStore((s) => s.authorListLoading);
   const setFilters = useGraphStore((s) => s.setFilters);
   const recomputeVisibility = useGraphStore((s) => s.recomputeVisibility);
+  const alwaysShowBadgedCommits = useGraphStore((s) => s.alwaysShowBadgedCommits);
+  const setAlwaysShowBadgedCommits = useGraphStore((s) => s.setAlwaysShowBadgedCommits);
   const resetAllFilters = useGraphStore((s) => s.resetAllFilters);
   const setActiveToggleWidget = useGraphStore((s) => s.setActiveToggleWidget);
   const mergedCommits = useGraphStore((s) => s.mergedCommits);
@@ -206,6 +208,12 @@ export function FilterWidget() {
     }
   }, [resetAllFilters, recomputeVisibility]);
 
+  const handleAlwaysShowBadgedCommitsChange = useCallback((value: boolean) => {
+    setAlwaysShowBadgedCommits(value);
+    rpcClient.persistUIState({ alwaysShowBadgedCommits: value });
+  }, [setAlwaysShowBadgedCommits]);
+
+  // A remembered preference, not a filter value: it never counts toward Reset All.
   const hasAnyFilters = !!(filters.branches?.length || filters.authors?.length || filters.afterDate || filters.beforeDate || filters.textFilter);
 
   // Branch badges: combine local+remote into merged badges
@@ -471,6 +479,23 @@ export function FilterWidget() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Badged-commit option: relaxes the Authors and Message filters above */}
+      <div className="flex gap-2">
+        <span className="w-16 flex-shrink-0" aria-hidden="true" />
+        <label
+          className="flex items-center gap-2 cursor-pointer select-none text-[var(--vscode-foreground)]"
+          title="Keep commits that show a branch, tag or HEAD badge visible even when they don't match the Authors or Message filter. Does not affect Branches or Dates."
+        >
+          <input
+            type="checkbox"
+            checked={alwaysShowBadgedCommits}
+            onChange={(e) => handleAlwaysShowBadgedCommitsChange(e.target.checked)}
+            className="w-4 h-4 accent-[var(--vscode-button-background)]"
+          />
+          <span>Always show badged commits</span>
+        </label>
       </div>
 
       <div id="datepicker-portal" />

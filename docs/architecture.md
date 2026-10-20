@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-10-13**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-10-20**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -303,6 +303,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── MultiTabIllustration.tsx      # 5.17.0 hero: animated miniature of the New Tab button opening a second graph group
 ├── CommitNavigationIllustration.tsx # 5.18.0 hero: animated miniature of Go to parent commit landing on the parent row
 ├── AutolinksIllustration.tsx     # 5.19.0 hero: animated miniature of a commit message's references turning into links
+├── BadgedCommitsIllustration.tsx # 5.20.0 hero: animated miniature of "Always show badged commits" bringing back main's tip
 └── HelpDialog.tsx                # "Help & Feedback": Badge Legend + GitHub Issues + docs/changelog/marketplace + version
 ```
 
@@ -367,7 +368,8 @@ utils/
 ├── commitRelations.ts            # Details panel Parents/Children links: children read off loaded commits,
 │                                 #   parent subjects, stash first-parent-only navigation, hash tooltip
 ├── rowVisibility.ts              # Scroll-offset maths for revealing a row when the details panel resizes the viewport
-├── commitVisibility.ts           # Visibility/filter predicates for the virtualized row list
+├── commitVisibility.ts           # `computeCommitVisibility`: one pass over commits applying the Author/Message filters →
+│                                 #   hidden set + badge-kept set ("Always show badged commits", rows rendered dimmed)
 ├── compareSlot.ts                # Compare panel slot model (Base/Target, commit-ish parsing)
 ├── dialogPosition.ts             # PURE: clamp a dragged dialog so its title stays reachable
 ├── compareDefaults.ts            # Default slot seeding
@@ -401,7 +403,8 @@ utils/
 ├── fileTreeBuilder.ts            # Flat file list → tree structure
 ├── radioAvailability.ts          # Enable/disable logic for mutually-exclusive options
 ├── mergeRefs.ts                  # Merges local/remote refs into DisplayRef[]. `filterDisplayRefsBySettings` is the single
-│                                 #   source of truth for which badges a row shows — the renderer and the search matcher both call it
+│                                 #   source of truth for which badges a row shows — the renderer and the search matcher both call it.
+│                                 #   `isBadgedCommit` builds on it (or HEAD) for the "Always show badged commits" filter option
 ├── refMergeSource.ts             # Whether a ref badge can be merged and under what name — a remote branch
 │                                 #   must be handed to `git merge` as `<remote>/<name>`, never the bare name
 ├── refWorktreeSource.ts          # The same question for "Create worktree…": which ref the badge hands to
