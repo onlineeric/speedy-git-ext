@@ -11,8 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Me button in the Filter panel.** Next to the **Authors** dropdown, **Me** adds your own commits to the author filter in one click, with no typing; click it again to remove them. "You" is the repository's `git config user.email`. The button is highlighted while you are in the filter, and disabled with a hint when `user.email` is not set. Commits you made under another email are not included; add that address from the dropdown.
 
-### Credits — Always show badged commits (#208)
-- Thanks to [@tbuyukliev](https://github.com/tbuyukliev) for requesting a way to keep branch tips visible while filtering to your own commits, and a quick way to select yourself, in [#208](https://github.com/onlineeric/speedy-git-ext/issues/208)!
+- **New branch names start with your `git.branchPrefix`.** When VS Code's `git.branchPrefix` setting is set (for example `feature/`), the **Create Branch** dialog opens with it already in the name box, so only the rest needs typing; it is filled in again each time the dialog opens. **Create Worktree** does the same for a new branch made from a commit; from a branch or tag it still suggests that ref's own name, unprefixed. The setting is read for the repository the graph shows, so a multi-root workspace can use a different prefix per folder, and a change applies the next time a dialog opens. A prefix on its own is not shown as an invalid name; checking starts once you type.
+
+### Credits — Always show badged commits (#208), branch prefix (#209)
+- Thanks to [@tbuyukliev](https://github.com/tbuyukliev) for requesting a way to keep branch tips visible while filtering to your own commits, and a quick way to select yourself, in [#208](https://github.com/onlineeric/speedy-git-ext/issues/208), and for asking that new branches respect `git.branchPrefix` in [#209](https://github.com/onlineeric/speedy-git-ext/issues/209)!
 
 ## [5.19.3] - 2026-10-15
 

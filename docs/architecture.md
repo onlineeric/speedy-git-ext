@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-10-20**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-10-21**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -53,7 +53,7 @@ src/
 │   ├── OperationGuard.ts         # In-progress checks (rebase/cherry-pick/revert/merge) → GitError | null
 │   └── handlers/                 # Domain RPC handlers; fetch services from the registry at call time
 │       ├── graphDataHandlers.ts  # getCommits/loadMore/getBranches/getCommitDetails/getAuthors/refresh
-│       ├── branchHandlers.ts     # create/rename/delete/fast-forward branch; commit checkout; merge + continue/abort merge
+│       ├── branchHandlers.ts     # create/rename/delete/fast-forward branch; `git.branchPrefix` read; commit checkout; merge + continue/abort merge
 │       ├── branchCheckoutHandlers.ts # Shared branch checkout/stash/pull execution; operation guard, busy lock,
 │                                     #   repository-bound recovery and request-correlated completion
 │       ├── remoteHandlers.ts     # fetch/push/pull, add/edit/remove remote
@@ -340,6 +340,7 @@ hooks/
 ├── useCommitHookWait.ts          # idle → running → waitingOnHooks phase + timer for dialogs that write a commit
 ├── useGitVersion.ts              # Lazily requests the installed git version once per session (store: gitVersion)
 ├── useDialogTelemetry.ts         # One confirmed/cancelled outcome per dialog open cycle
+├── usePrefilledBranchName.ts     # New-branch name field prefilled with `git.branchPrefix` (Create Branch/Worktree)
 ├── useSettingDraft.ts            # One Settings-dialog setting's draft: dirty check, discard, follows outside saved changes
 │                                 #   unless the user has edits it would overwrite
 ├── useSettingDraftRegistry.tsx   # The dialog's draft registry, SettingDraftScope (one per tab, supplies tabId) and
@@ -397,7 +398,7 @@ utils/
 │                                 #   pull policy, busy/worktree checks, telemetry; reads store only on interaction
 ├── branchSelection.ts            # getBranchKey (bare name vs remote/name) + additive select-all-local
 ├── mergedCommits.ts              # Detect merged-branch commit grouping for badges
-├── refNameField.ts               # Live ref-name validation state (error suppressed while pristine)
+├── refNameField.ts               # Live ref-name validation state (error suppressed while empty or still the prefill) + late-prefill merge
 ├── gitCommandBuilder.ts          # Constructs git command strings for preview display (rebase and fixup previews wrap
 │                                 #   the backend's shared arg builders)
 ├── helpLinks.ts                  # Help dialog links + build-time version (__EXTENSION_VERSION__)

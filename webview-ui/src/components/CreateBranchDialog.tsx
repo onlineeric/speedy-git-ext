@@ -14,6 +14,7 @@ import {
   dialogContentStyle,
 } from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
+import { usePrefilledBranchName } from '../hooks/usePrefilledBranchName';
 
 interface CreateBranchDialogProps {
   open: boolean;
@@ -23,11 +24,11 @@ interface CreateBranchDialogProps {
 
 export function CreateBranchDialog({ open, commit, onClose }: CreateBranchDialogProps) {
   const dialogTelemetry = useDialogTelemetry('createBranch', open);
-  const [name, setName] = useState('');
+  const { name, pristineName, setName, reset: resetName } = usePrefilledBranchName(open);
   const [checkout, setCheckout] = useState(false);
 
   const trimmedName = name.trim();
-  const { error: nameError, valid: canCreate } = deriveRefNameField(name, validateGitBranchName);
+  const { error: nameError, valid: canCreate } = deriveRefNameField(name, validateGitBranchName, pristineName);
   const commandPreview = buildCreateBranchCommand({
     name: trimmedName || '<name>',
     startPoint: commit.abbreviatedHash,
@@ -35,7 +36,7 @@ export function CreateBranchDialog({ open, commit, onClose }: CreateBranchDialog
   });
 
   const reset = () => {
-    setName('');
+    resetName();
     setCheckout(false);
   };
 

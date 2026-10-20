@@ -25,6 +25,7 @@ import {
   dialogContentStyle,
 } from './dialogStyles';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
+import { usePrefilledBranchName } from '../hooks/usePrefilledBranchName';
 
 // The source types live beside the pure derivation in `utils/refWorktreeSource`;
 // re-exported here so existing importers of this dialog keep working.
@@ -81,7 +82,10 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
   const { modes, defaultMode } = useMemo(() => modesForKind(source.kind), [source.kind]);
   const existingBranchDisabled = source.kind === 'local-branch' && existingWorktree !== undefined;
   const [branchMode, setBranchMode] = useState<WorktreeBranchMode>(() => initialBranchMode(defaultMode, existingBranchDisabled));
-  const [newBranchName, setNewBranchName] = useState(() => defaultNewBranchName(source));
+  const { name: newBranchName, pristineName: pristineBranchName, setName: setNewBranchName } = usePrefilledBranchName(
+    open,
+    defaultNewBranchName(source),
+  );
   // Both candidate folders, as the backend last computed them, plus whether the
   // choice applies at all. `null` until the first resolve answers.
   const [resolved, setResolved] = useState<ResolvedWorktreePaths | null>(null);
@@ -202,7 +206,7 @@ export function CreateWorktreeDialog({ open, source, existingWorktree, onClose }
   );
 
   const trimmedName = newBranchName.trim();
-  const branchNameField = deriveRefNameField(newBranchName, validateGitBranchName);
+  const branchNameField = deriveRefNameField(newBranchName, validateGitBranchName, pristineBranchName);
   const nameError = branchMode === 'new' ? branchNameField.error : undefined;
   const nameInvalid = branchMode === 'new' && !branchNameField.valid;
   const canConfirm = activePath.trim().length > 0 && !nameInvalid && !busy;

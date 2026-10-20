@@ -71,6 +71,8 @@ class RpcClient {
     resolve: (value: { ignoredEnvFiles: string[]; envFilesPresent: boolean }) => void;
     reject: (error: Error) => void;
   } | null = null;
+  /** `getBranchPrefix` requests awaiting their `branchPrefix` response, by request id. */
+  private pendingBranchPrefixes = new Map<number, (prefix: string) => void>();
   /**
    * Promise slot for correlating a dialog-initiated git action with its
    * backend response. Used by FilePickerDialog to lift its `isRunning` busy
@@ -113,6 +115,8 @@ class RpcClient {
       this.pendingWorktreeEnvFiles.reject(new Error('RPC client disposed'));
       this.pendingWorktreeEnvFiles = null;
     }
+    for (const resolve of this.pendingBranchPrefixes.values()) resolve('');
+    this.pendingBranchPrefixes.clear();
     this.clearPendingDialogAction();
     for (const resolve of this.pendingSettingSaves.values()) resolve({ ok: false, reason: 'failed', message: 'RPC client disposed' });
     this.pendingSettingSaves.clear();
@@ -378,6 +382,12 @@ class RpcClient {
           this.pendingWorktreeEnvFiles = null;
         }
         break;
+      case 'branchPrefix': {
+        const resolve = this.pendingBranchPrefixes.get(message.payload.requestId);
+        this.pendingBranchPrefixes.delete(message.payload.requestId);
+        resolve?.(message.payload.prefix);
+        break;
+      }
       case 'commitParents': {
         const lookupKey = message.payload.parents.map((parent) => parent.hash).join(',');
         const requestId = this.parentRequestIdByHash.get(lookupKey);
@@ -953,6 +963,15 @@ class RpcClient {
     return new Promise((resolve, reject) => {
       this.pendingWorktreeEnvFiles = { requestId, resolve, reject };
       this.send({ type: 'getWorktreeEnvFiles', payload: { requestId } });
+    });
+  }
+
+  /** VS Code's `git.branchPrefix` for the displayed repo; `''` when unset. Never rejects. */
+  getBranchPrefix(): Promise<string> {
+    const requestId = this.nextRequestId++;
+    return new Promise((resolve) => {
+      this.pendingBranchPrefixes.set(requestId, resolve);
+      this.send({ type: 'getBranchPrefix', payload: { requestId } });
     });
   }
 

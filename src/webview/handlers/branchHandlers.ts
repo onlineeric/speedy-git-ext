@@ -53,6 +53,15 @@ export const branchHandlers = {
     }
   },
 
+  getBranchPrefix: async (message, context) => {
+    // Scoped to the displayed repo: `git.branchPrefix` is a resource setting, so a
+    // multi-root workspace can give each folder its own prefix.
+    const prefix = vscode.workspace
+      .getConfiguration('git', vscode.Uri.file(context.runtime.currentRepoPath))
+      .get<string>('branchPrefix', '');
+    context.postMessage({ type: 'branchPrefix', payload: { requestId: message.payload.requestId, prefix } });
+  },
+
   createBranch: async (message, context) => {
     const services = context.services.current();
     const result = await services.gitBranchService.createBranch(
@@ -178,6 +187,7 @@ export const branchHandlers = {
   | 'stashAndCheckout'
   | 'stashAndCheckoutCommit'
   | 'fastForwardLocalBranch'
+  | 'getBranchPrefix'
   | 'createBranch'
   | 'renameBranch'
   | 'deleteBranch'

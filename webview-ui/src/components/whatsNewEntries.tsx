@@ -92,10 +92,12 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
     content: (
       <div className="space-y-6">
         <ContributorThanks login="tbuyukliev">
-          This release comes from your request in{' '}
+          This release comes from your requests in{' '}
           <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/208">#208</ExternalLink>, to keep
-          the tip of <code>main</code> in reach while the graph shows only your commits, and to pick yourself
-          without typing.
+          the tip of <code>main</code> in reach while the graph shows only your commits and to pick yourself
+          without typing, and in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/209">#209</ExternalLink>, to start
+          new branch names with your <code>git.branchPrefix</code>.
         </ContributorThanks>
 
         <WhatsNewSection title="Two new controls in the Filter panel">
@@ -145,6 +147,19 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
             </FeatureCard>
             <FeatureCard mark="✓" title="Remembered" accent={SHOWCASE_PURPLE_COLOR}>
               The checkbox keeps its state across reloads, and <UiLabel>Reset All</UiLabel> leaves it alone.
+            </FeatureCard>
+          </FeatureGrid>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="Your branch prefix, already typed">
+          <FeatureGrid>
+            <FeatureCard mark="⑂" title="Create Branch" accent={SHOWCASE_GREEN_COLOR}>
+              When VS Code’s <code>git.branchPrefix</code> is set, say to <code>feature/</code>,{' '}
+              <UiLabel>Create Branch Here...</UiLabel> opens with it in the name box. Just type the rest.
+            </FeatureCard>
+            <FeatureCard mark="W" title="Create Worktree" accent={SHOWCASE_BLUE_COLOR}>
+              A new branch for a worktree made from a commit starts with the prefix too. From a branch or tag, the
+              suggested name still matches it.
             </FeatureCard>
           </FeatureGrid>
         </WhatsNewSection>
