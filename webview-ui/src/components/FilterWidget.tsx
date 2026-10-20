@@ -361,8 +361,8 @@ export function FilterWidget() {
       <div className="flex gap-2">
         <span className="text-[var(--vscode-descriptionForeground)] w-16 flex-shrink-0 pt-0.5">Authors</span>
         <div className="flex-1 min-w-0 flex flex-col gap-1">
-          <div className="flex items-start gap-2">
-            <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0">
               <MultiSelectDropdown<Author>
                 items={authorList}
                 selectedItems={selectedAuthors}

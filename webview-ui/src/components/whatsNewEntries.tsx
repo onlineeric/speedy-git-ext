@@ -7,6 +7,7 @@ import { CommitNavigationIllustration } from './CommitNavigationIllustration';
 import { MultiTabIllustration } from './MultiTabIllustration';
 import autolinksRowScreenshot from '../../../resources/autolinks.png';
 import settingsAutolinksScreenshot from '../../../resources/settings-autolinks.png';
+import filtersShowBadgedScreenshot from '../../../resources/Filters_show-badged.png';
 import { BranchIcon, CloudIcon, GoToHeadIcon, NewTabIcon } from './icons';
 import { SubmoduleBadge } from './FileChangeShared';
 import { InlineRefBadge } from './InlineRefBadge';
@@ -96,6 +97,21 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           the tip of <code>main</code> in reach while the graph shows only your commits, and to pick yourself
           without typing.
         </ContributorThanks>
+
+        <WhatsNewSection title="Two new controls in the Filter panel">
+          <Screenshot
+            src={filtersShowBadgedScreenshot}
+            alt="The Filter panel with the new Me button beside the Authors dropdown and the Always show badged commits checkbox with its 60% / 40% opacity toggle"
+            width={517}
+            height={246}
+            caption={
+              <>
+                <UiLabel>Me</UiLabel> beside <UiLabel>Authors</UiLabel>, and <UiLabel>Always show badged commits</UiLabel>{' '}
+                under <UiLabel>Message</UiLabel> with its <UiLabel>Opacity</UiLabel> choice.
+              </>
+            }
+          />
+        </WhatsNewSection>
 
         <WhatsNewSection title="Branch from main without clearing the filter">
           <StepFlow>
