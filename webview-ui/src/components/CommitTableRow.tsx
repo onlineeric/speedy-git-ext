@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import type { Commit, CommitTableColumnId, TagMetadata, UserSettings, WorktreeInfo } from '@shared/types';
+import type { BadgedCommitOpacity, Commit, CommitTableColumnId, TagMetadata, UserSettings, WorktreeInfo } from '@shared/types';
 import type { GraphTopology } from '../utils/graphTopology';
 import { useGraphStore } from '../stores/graphStore';
 import { useAutolinkRules } from '../stores/graphSelectors';
@@ -102,15 +102,22 @@ interface CommitTableRowProps {
   /** Briefly pulses the row background after a "Go to HEAD" navigation. */
   isFlashing?: boolean;
   /**
-   * The row fails the Author / Message filter and is shown only because it carries a
-   * badge ("Always show badged commits"). Its text is dimmed; the graph and badges are not.
+   * Set only when the row fails the Author / Message filter and is shown because it carries
+   * a badge ("Always show badged commits"): the opacity its cells are dimmed to. The graph
+   * lane is never dimmed, so lines stay continuous with the rows around it.
    */
-  isBadgeKept?: boolean;
+  badgeKeptOpacity?: BadgedCommitOpacity;
   onClick: (event: React.MouseEvent) => void;
   onNodeMouseEnter?: (hash: string, rect: DOMRect) => void;
   onNodeMouseLeave?: () => void;
   style: React.CSSProperties;
 }
+
+/** Spelled out in full so Tailwind's JIT emits both classes. */
+const BADGE_KEPT_DIM_CLASSES: Record<BadgedCommitOpacity, string> = {
+  60: ' opacity-60',
+  40: ' opacity-40',
+};
 
 export const CommitTableRow = memo(function CommitTableRow({
   commit,
@@ -127,7 +134,7 @@ export const CommitTableRow = memo(function CommitTableRow({
   isCurrentSearchMatch = false,
   searchTerms = EMPTY_SEARCH_TERMS,
   isFlashing = false,
-  isBadgeKept = false,
+  badgeKeptOpacity,
   onClick,
   onNodeMouseEnter,
   onNodeMouseLeave,
@@ -219,7 +226,7 @@ export const CommitTableRow = memo(function CommitTableRow({
             stashIndex,
             searchTerms,
             autolinkRules,
-            isBadgeKept,
+            dimClass: badgeKeptOpacity ? BADGE_KEPT_DIM_CLASSES[badgeKeptOpacity] : '',
             onNodeMouseEnter,
             onNodeMouseLeave,
           })}
@@ -276,7 +283,7 @@ function renderColumn({
   stashIndex,
   searchTerms,
   autolinkRules,
-  isBadgeKept,
+  dimClass,
   onNodeMouseEnter,
   onNodeMouseLeave,
 }: {
@@ -304,12 +311,11 @@ function renderColumn({
   stashIndex: number;
   searchTerms: readonly SearchTerm[];
   autolinkRules: readonly AutolinkRule[];
-  isBadgeKept: boolean;
+  /** Leading-space opacity class for a badge-kept row, else empty. */
+  dimClass: string;
   onNodeMouseEnter?: (hash: string, rect: DOMRect) => void;
   onNodeMouseLeave?: () => void;
 }) {
-  // Badge-kept rows dim their text; the graph lane and the badges stay at full strength.
-  const dimClass = isBadgeKept ? ' opacity-60' : '';
   switch (columnId) {
     case 'graph':
       return (
@@ -342,7 +348,7 @@ function renderColumn({
       );
     case 'message':
       return (
-        <div className="flex h-full items-center gap-1 overflow-hidden">
+        <div className={`flex h-full items-center gap-1 overflow-hidden${dimClass}`}>
           {(isHead || visibleRefs.length > 0 || showDetachedWorktrees) && (
             <div className="flex shrink-0 items-center gap-1">
               {isHead && (
@@ -381,7 +387,7 @@ function renderColumn({
             </div>
           )}
           <span
-            className={`truncate text-sm ${isStash || isUncommitted ? 'italic' : ''}${dimClass}`}
+            className={`truncate text-sm ${isStash || isUncommitted ? 'italic' : ''}`}
             style={isStash ? STASH_SUBJECT_STYLE : isUncommitted ? UNCOMMITTED_SUBJECT_STYLE : undefined}
             title={commit.subject}
           >
@@ -423,8 +429,8 @@ function renderColumn({
     case 'signature':
       // Uncommitted/stash rows have no commit object to verify.
       if (isUncommitted || isStash) return null;
-      return isBadgeKept
-        ? <div className="h-full opacity-60"><SignatureColumnCell hash={commit.hash} /></div>
+      return dimClass
+        ? <div className={`h-full${dimClass}`}><SignatureColumnCell hash={commit.hash} /></div>
         : <SignatureColumnCell hash={commit.hash} />;
     default:
       return null;

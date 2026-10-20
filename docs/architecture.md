@@ -311,6 +311,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 
 ```
 ├── MultiSelectDropdown.tsx           # Generic multi-select popover with pinned actions
+├── SegmentedToggle.tsx               # Single-choice row of joined toggle boxes (role=radiogroup); used for the badged-commit opacity
 ├── MultiBranchDropdown.tsx           # Branch-specific wrapper, grouped local/remote
 ├── FilterableSingleSelectDropdown.tsx# Generic searchable single-select (repo/submodule pickers)
 ├── FileChangeShared.tsx              # Row/badge/action-icon primitives + shouldShowChangeCounts + SubmoduleBadge
@@ -369,7 +370,8 @@ utils/
 │                                 #   parent subjects, stash first-parent-only navigation, hash tooltip
 ├── rowVisibility.ts              # Scroll-offset maths for revealing a row when the details panel resizes the viewport
 ├── commitVisibility.ts           # `computeCommitVisibility`: one pass over commits applying the Author/Message filters →
-│                                 #   hidden set + badge-kept set ("Always show badged commits", rows rendered dimmed)
+│                                 #   hidden set + badge-kept set ("Always show badged commits", rows dimmed to the
+│                                 #   persisted `badgedCommitOpacity`, 60 or 40)
 ├── compareSlot.ts                # Compare panel slot model (Base/Target, commit-ish parsing)
 ├── dialogPosition.ts             # PURE: clamp a dragged dialog so its title stays reachable
 ├── compareDefaults.ts            # Default slot seeding

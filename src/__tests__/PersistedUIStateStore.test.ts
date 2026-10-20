@@ -182,6 +182,27 @@ describe('PersistedUIStateStore alwaysShowBadgedCommits', () => {
   });
 });
 
+describe('PersistedUIStateStore badgedCommitOpacity', () => {
+  it('defaults to 40 when missing or not one of the allowed values', () => {
+    const { badgedCommitOpacity: _omitted, ...legacy } = DEFAULT_PERSISTED_UI_STATE;
+    void _omitted;
+    expect(createStore({ 'speedyGit.uiState': legacy }).store.loadPersistedUIState().badgedCommitOpacity).toBe(40);
+    expect(
+      createStore({ 'speedyGit.uiState': { ...DEFAULT_PERSISTED_UI_STATE, badgedCommitOpacity: 50 } })
+        .store.loadPersistedUIState().badgedCommitOpacity,
+    ).toBe(40);
+  });
+
+  it('round-trips 60 and ignores a value outside the allowed set', () => {
+    const globalState: Record<string, unknown> = {};
+    const { store } = createStore(globalState);
+    store.savePersistedUIState({ badgedCommitOpacity: 60 });
+    store.savePersistedUIState({ badgedCommitOpacity: 50 as never });
+
+    expect(createStore(globalState).store.loadPersistedUIState().badgedCommitOpacity).toBe(60);
+  });
+});
+
 describe('PersistedUIStateStore across multiple graph tabs', () => {
   /** Two stores over one shared memento — the same shape as two tabs in one window. */
   function createTwoTabs() {

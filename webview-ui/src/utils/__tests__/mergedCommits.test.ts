@@ -119,6 +119,18 @@ describe('mergeUncommittedIntoCommits', () => {
 });
 
 describe('computeMergedTopology', () => {
+  it('keeps a stash hidden when its parent is shown only for its badge', () => {
+    const commits = [
+      commit({ hash: 'mine', parents: ['tip'] }),
+      commit({ hash: 'tip', parents: [] }),
+    ];
+    const stashes = [stash({ hash: 'onTip', parentHash: 'tip' }), stash({ index: 1, hash: 'onMine', parentHash: 'mine' })];
+    const { mergedCommits, topology } = computeMergedTopology(commits, stashes, undefined, new Set(), undefined, new Set(['tip']));
+
+    expect(mergedCommits.map(c => c.hash)).toEqual(['onMine', 'mine', 'tip']);
+    expect(topology.commitIndexByHash.has('onTip')).toBe(false);
+  });
+
   it('removes hidden commits from the displayed list while keeping visible ones indexed by row', () => {
     const commits = [
       commit({ hash: 'visible' }),

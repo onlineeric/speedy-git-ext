@@ -24,6 +24,7 @@ import type {
   FileViewMode,
   GraphFilters,
   PersistedUIState,
+  BadgedCommitOpacity,
   RemoteInfo,
   RebaseConflictInfo,
   RebaseEntry,
@@ -264,6 +265,9 @@ interface GraphStore {
   /** Persisted preference: keep badged commits visible under the Author / Message filters. */
   alwaysShowBadgedCommits: boolean;
   setAlwaysShowBadgedCommits: (value: boolean) => void;
+  /** Persisted preference: opacity of the badge-kept rows. */
+  badgedCommitOpacity: BadgedCommitOpacity;
+  setBadgedCommitOpacity: (value: BadgedCommitOpacity) => void;
   isRefreshing: boolean;
   consecutiveEmptyBatches: number;
   filteredOutCount: number;
@@ -541,6 +545,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   hiddenCommitHashes: new Set<string>(),
   badgeKeptCommitHashes: new Set<string>(),
   alwaysShowBadgedCommits: DEFAULT_PERSISTED_UI_STATE.alwaysShowBadgedCommits,
+  badgedCommitOpacity: DEFAULT_PERSISTED_UI_STATE.badgedCommitOpacity,
   consecutiveEmptyBatches: 0,
   filteredOutCount: 0,
   showGapIndicator: false,
@@ -583,10 +588,12 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       bottomPanelHeight: state.bottomPanelHeight,
       rightPanelWidth: state.rightPanelWidth,
       commitTableLayout: cloneCommitTableLayout(state.commitTableLayout),
+      badgedCommitOpacity: state.badgedCommitOpacity,
     });
     // Hydration can arrive after commits, so the option may need to re-filter what is loaded.
     get().setAlwaysShowBadgedCommits(state.alwaysShowBadgedCommits);
   },
+  setBadgedCommitOpacity: (badgedCommitOpacity) => set({ badgedCommitOpacity }),
   setAlwaysShowBadgedCommits: (alwaysShowBadgedCommits) => {
     const state = get();
     if (state.alwaysShowBadgedCommits === alwaysShowBadgedCommits) return;
@@ -608,7 +615,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setCommits: (commits) => {
     const filters = get().filters;
     const { hiddenCommitHashes, badgeKeptCommitHashes } = computeCommitVisibility(commits, filters, visibilityOptionsOf(get()));
-    const { mergedCommits, topology } = computeMergedTopology(commits, get().stashes, filters, hiddenCommitHashes, getUncommittedContext(get()));
+    const { mergedCommits, topology } = computeMergedTopology(commits, get().stashes, filters, hiddenCommitHashes, getUncommittedContext(get()), badgeKeptCommitHashes);
     const selectedCommit = get().selectedCommit;
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
@@ -653,7 +660,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const { commits, stashes, filters, totalLoadedWithoutFilter: existingTotal, selectedCommit } = get();
     const allCommits = [...commits, ...newCommits];
     const { hiddenCommitHashes, badgeKeptCommitHashes } = computeCommitVisibility(allCommits, filters, visibilityOptionsOf(get()));
-    const { mergedCommits, topology } = computeMergedTopology(allCommits, stashes, filters, hiddenCommitHashes, getUncommittedContext(get()));
+    const { mergedCommits, topology } = computeMergedTopology(allCommits, stashes, filters, hiddenCommitHashes, getUncommittedContext(get()), badgeKeptCommitHashes);
     const hasFilter = !!(filters.branches?.length || filters.afterDate || filters.beforeDate);
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
@@ -789,7 +796,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setFilters: (filters) => set((state) => ({ filters: { ...state.filters, ...filters } })),
   setRemotes: (remotes) => set({ remotes }),
   setStashes: (stashes) => {
-    const { mergedCommits, topology } = computeMergedTopology(get().commits, stashes, get().filters, get().hiddenCommitHashes, getUncommittedContext(get()));
+    const { mergedCommits, topology } = computeMergedTopology(get().commits, stashes, get().filters, get().hiddenCommitHashes, getUncommittedContext(get()), get().badgeKeptCommitHashes);
     const selectedCommit = get().selectedCommit;
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
@@ -1199,7 +1206,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const { commits, stashes, filters, branches } = get();
     const { hiddenCommitHashes, badgeKeptCommitHashes } = computeCommitVisibility(commits, filters, visibilityOptionsOf(get()));
     const uncommitted: UncommittedContext = { hasUncommittedChanges: hasChanges, counts, branches };
-    const { mergedCommits, topology } = computeMergedTopology(commits, stashes, filters, hiddenCommitHashes, uncommitted);
+    const { mergedCommits, topology } = computeMergedTopology(commits, stashes, filters, hiddenCommitHashes, uncommitted, badgeKeptCommitHashes);
     const selectedCommit = get().selectedCommit;
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
@@ -1252,7 +1259,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   recomputeVisibility: () => {
     const { commits, stashes, filters } = get();
     const { hiddenCommitHashes, badgeKeptCommitHashes } = computeCommitVisibility(commits, filters, visibilityOptionsOf(get()));
-    const { mergedCommits, topology } = computeMergedTopology(commits, stashes, filters, hiddenCommitHashes, getUncommittedContext(get()));
+    const { mergedCommits, topology } = computeMergedTopology(commits, stashes, filters, hiddenCommitHashes, getUncommittedContext(get()), badgeKeptCommitHashes);
     const selectedCommit = get().selectedCommit;
     const selectedCommitIndex = selectedCommit
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
@@ -1326,7 +1333,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     // initial load only; the one-shot flag keeps refreshes/re-renders free.
     const measureTopology = !topologyPerfSent && commits.length > 0;
     const topologyStart = measureTopology ? performance.now() : 0;
-    const { mergedCommits, topology } = computeMergedTopology(commits, stashes, filters, hiddenCommitHashes, uncommitted);
+    const { mergedCommits, topology } = computeMergedTopology(commits, stashes, filters, hiddenCommitHashes, uncommitted, badgeKeptCommitHashes);
     if (measureTopology) {
       topologyPerfSent = true;
       trackUi({

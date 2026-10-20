@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import type { Author } from '@shared/types';
+import type { Author, BadgedCommitOpacity } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { MultiSelectDropdown } from './MultiSelectDropdown';
+import { SegmentedToggle, type SegmentedToggleOption } from './SegmentedToggle';
 import { AuthorBadge } from './AuthorBadge';
 import { AuthorAvatar } from './AuthorAvatar';
 import { RefLabel } from './RefLabel';
@@ -46,6 +47,11 @@ function getAuthorSearchText(author: Author): string {
   return `${author.name} ${author.email}`;
 }
 
+const BADGED_COMMIT_OPACITY_OPTIONS: readonly SegmentedToggleOption<BadgedCommitOpacity>[] = [
+  { value: 60, label: '60%' },
+  { value: 40, label: '40%' },
+];
+
 export function FilterWidget() {
   const filters = useGraphStore((s) => s.filters);
   const authorList = useGraphStore((s) => s.authorList);
@@ -54,6 +60,8 @@ export function FilterWidget() {
   const recomputeVisibility = useGraphStore((s) => s.recomputeVisibility);
   const alwaysShowBadgedCommits = useGraphStore((s) => s.alwaysShowBadgedCommits);
   const setAlwaysShowBadgedCommits = useGraphStore((s) => s.setAlwaysShowBadgedCommits);
+  const badgedCommitOpacity = useGraphStore((s) => s.badgedCommitOpacity);
+  const setBadgedCommitOpacity = useGraphStore((s) => s.setBadgedCommitOpacity);
   const resetAllFilters = useGraphStore((s) => s.resetAllFilters);
   const setActiveToggleWidget = useGraphStore((s) => s.setActiveToggleWidget);
   const mergedCommits = useGraphStore((s) => s.mergedCommits);
@@ -212,6 +220,11 @@ export function FilterWidget() {
     setAlwaysShowBadgedCommits(value);
     rpcClient.persistUIState({ alwaysShowBadgedCommits: value });
   }, [setAlwaysShowBadgedCommits]);
+
+  const handleBadgedCommitOpacityChange = useCallback((value: BadgedCommitOpacity) => {
+    setBadgedCommitOpacity(value);
+    rpcClient.persistUIState({ badgedCommitOpacity: value });
+  }, [setBadgedCommitOpacity]);
 
   // A remembered preference, not a filter value: it never counts toward Reset All.
   const hasAnyFilters = !!(filters.branches?.length || filters.authors?.length || filters.afterDate || filters.beforeDate || filters.textFilter);
@@ -482,7 +495,7 @@ export function FilterWidget() {
       </div>
 
       {/* Badged-commit option: relaxes the Authors and Message filters above */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="w-16 flex-shrink-0" aria-hidden="true" />
         <label
           className="flex items-center gap-2 cursor-pointer select-none text-[var(--vscode-foreground)]"
@@ -496,6 +509,17 @@ export function FilterWidget() {
           />
           <span>Always show badged commits</span>
         </label>
+        {alwaysShowBadgedCommits && (
+          <div className="ml-2 flex items-center gap-2" title="How strongly commits kept only for their badge are dimmed">
+            <span className="text-[var(--vscode-descriptionForeground)]">Opacity</span>
+            <SegmentedToggle
+              ariaLabel="Opacity of badged commits that don't match the filter"
+              options={BADGED_COMMIT_OPACITY_OPTIONS}
+              value={badgedCommitOpacity}
+              onChange={handleBadgedCommitOpacityChange}
+            />
+          </div>
+        )}
       </div>
 
       <div id="datepicker-portal" />

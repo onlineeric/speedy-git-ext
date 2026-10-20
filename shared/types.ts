@@ -684,6 +684,14 @@ export interface ContainingBranchesResult {
   status: 'loaded' | 'loading' | 'error';
 }
 
+/** How strongly a row kept by "Always show badged commits" is dimmed: its opacity, in percent. */
+export const BADGED_COMMIT_OPACITIES = [60, 40] as const;
+export type BadgedCommitOpacity = (typeof BADGED_COMMIT_OPACITIES)[number];
+
+export function isBadgedCommitOpacity(value: unknown): value is BadgedCommitOpacity {
+  return BADGED_COMMIT_OPACITIES.includes(value as BadgedCommitOpacity);
+}
+
 export interface PersistedUIState {
   version: number;
   detailsPanelPosition: DetailsPanelPosition;
@@ -697,6 +705,8 @@ export interface PersistedUIState {
   commitTableLayout: CommitTableLayout;
   /** Filter panel: keep commits that show a badge visible under the Author / Message filters. */
   alwaysShowBadgedCommits: boolean;
+  /** Opacity of the rows that option keeps visible. */
+  badgedCommitOpacity: BadgedCommitOpacity;
 }
 
 export const DEFAULT_PERSISTED_UI_STATE: PersistedUIState = {
@@ -707,6 +717,7 @@ export const DEFAULT_PERSISTED_UI_STATE: PersistedUIState = {
   rightPanelWidth: 400,
   commitTableLayout: createDefaultCommitTableLayout(),
   alwaysShowBadgedCommits: false,
+  badgedCommitOpacity: 40,
 };
 
 export type RebaseState = 'idle' | 'in-progress';

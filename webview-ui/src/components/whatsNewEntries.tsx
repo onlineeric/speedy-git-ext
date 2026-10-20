@@ -114,7 +114,9 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
         <WhatsNewSection title="How it behaves">
           <FeatureGrid>
             <FeatureCard mark="◐" title="Dimmed, not hidden" accent={SHOWCASE_ORANGE_COLOR}>
-              A commit shown only for its badge has dimmed text; the badge and graph lines stay at full strength.
+              A commit shown only for its badge is dimmed, badge included, so your own commits stand out. Pick{' '}
+              <UiLabel>60%</UiLabel> or <UiLabel>40%</UiLabel> next to the checkbox; graph lines stay at full
+              strength.
             </FeatureCard>
             <FeatureCard mark="⑂" title="Only badges you can see" accent={SHOWCASE_GREEN_COLOR}>
               Tags and remote branches count only while <UiLabel>View</UiLabel> shows them.

@@ -13,18 +13,18 @@ function MiniRow({ width, badge, dimmed = false }: { width: string; badge?: stri
   return (
     <div className="relative flex h-3.5 items-center gap-1.5 px-1.5">
       <span className="relative h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: SHOWCASE_BLUE_COLOR }} />
-      {badge && (
-        <span
-          className="relative shrink-0 rounded-sm px-1 font-mono text-[8px] leading-[10px]"
-          style={{ color: SHOWCASE_GREEN_COLOR, background: tint(SHOWCASE_GREEN_COLOR, 22) }}
-        >
-          {badge}
-        </span>
-      )}
-      <span
-        className={`relative h-1 rounded-full${dimmed ? ' opacity-60' : ''}`}
-        style={{ width, background: tint(FOREGROUND_COLOR, dimmed ? 30 : 45) }}
-      />
+      {/* The graph dot stays at full strength; the badge and message after it are dimmed. */}
+      <span className={`relative flex min-w-0 flex-1 items-center gap-1.5${dimmed ? ' opacity-40' : ''}`}>
+        {badge && (
+          <span
+            className="shrink-0 rounded-sm px-1 font-mono text-[8px] leading-[10px]"
+            style={{ color: SHOWCASE_GREEN_COLOR, background: tint(SHOWCASE_GREEN_COLOR, 22) }}
+          >
+            {badge}
+          </span>
+        )}
+        <span className="h-1 rounded-full" style={{ width, background: tint(FOREGROUND_COLOR, 45) }} />
+      </span>
     </div>
   );
 }
@@ -33,7 +33,7 @@ function MiniRow({ width, badge, dimmed = false }: { width: string; badge?: stri
  * A miniature of the Filter panel over the graph for the 5.20.0 hero: the graph
  * is filtered to the user's own commits, "Always show badged commits" gets ticked,
  * and the tip of `main` — someone else's commit — slides back in, dimmed except
- * for its badge. Decorative only — the keyframes live in `index.css` and stop
+ * for its graph dot. Decorative only — the keyframes live in `index.css` and stop
  * under reduced motion, which leaves the option ticked and the tip shown.
  */
 export function BadgedCommitsIllustration() {
