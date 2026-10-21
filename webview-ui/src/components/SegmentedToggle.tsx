@@ -1,3 +1,5 @@
+import { buttonPrimaryColorsClassName, buttonSecondaryColorsClassName } from './dialogStyles';
+
 export interface SegmentedToggleOption<T extends string | number> {
   value: T;
   label: string;
@@ -33,9 +35,7 @@ export function SegmentedToggle<T extends string | number>({ options, value, onC
             aria-checked={selected}
             onClick={() => onChange(option.value)}
             className={`px-2 py-0.5 text-xs ${index > 0 ? 'border-l border-[var(--vscode-button-border,var(--vscode-input-border))] ' : ''}${
-              selected
-                ? 'bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)]'
-                : 'bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]'
+              selected ? buttonPrimaryColorsClassName : buttonSecondaryColorsClassName
             }`}
           >
             {option.label}

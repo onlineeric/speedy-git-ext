@@ -67,11 +67,19 @@ const buttonBaseClassName = 'px-3 py-1.5 text-sm rounded disabled:cursor-default
  */
 export const buttonInertClassName = 'cursor-default opacity-50';
 
-export const buttonPrimaryClassName =
-  `${buttonBaseClassName} bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]`;
+/**
+ * The color halves of the primary / secondary variants, for a compact control
+ * (a pressed / unpressed toggle) that needs its own shape but the same colors.
+ */
+export const buttonPrimaryColorsClassName =
+  'bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]';
 
-export const buttonSecondaryClassName =
-  `${buttonBaseClassName} bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]`;
+export const buttonSecondaryColorsClassName =
+  'bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]';
+
+export const buttonPrimaryClassName = `${buttonBaseClassName} ${buttonPrimaryColorsClassName}`;
+
+export const buttonSecondaryClassName = `${buttonBaseClassName} ${buttonSecondaryColorsClassName}`;
 
 /**
  * The confirming action of a destructive dialog — delete, discard, drop, force

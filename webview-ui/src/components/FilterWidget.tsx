@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import type { Author, BadgedCommitOpacity } from '@shared/types';
+import { BADGED_COMMIT_OPACITIES, type Author, type BadgedCommitOpacity } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { MultiSelectDropdown } from './MultiSelectDropdown';
 import { SegmentedToggle, type SegmentedToggleOption } from './SegmentedToggle';
+import { buttonPrimaryColorsClassName, buttonSecondaryColorsClassName } from './dialogStyles';
 import { AuthorBadge } from './AuthorBadge';
 import { AuthorAvatar } from './AuthorAvatar';
 import { RefLabel } from './RefLabel';
@@ -47,10 +48,8 @@ function getAuthorSearchText(author: Author): string {
   return `${author.name} ${author.email}`;
 }
 
-const BADGED_COMMIT_OPACITY_OPTIONS: readonly SegmentedToggleOption<BadgedCommitOpacity>[] = [
-  { value: 60, label: '60%' },
-  { value: 40, label: '40%' },
-];
+const BADGED_COMMIT_OPACITY_OPTIONS: readonly SegmentedToggleOption<BadgedCommitOpacity>[] =
+  BADGED_COMMIT_OPACITIES.map((value) => ({ value, label: `${value}%` }));
 
 export function FilterWidget() {
   const filters = useGraphStore((s) => s.filters);
@@ -389,9 +388,7 @@ export function FilterWidget() {
                     : `Add yourself (${currentUserEmail}) to the author filter`
               }
               className={`shrink-0 px-2 py-0.5 text-xs rounded border border-[var(--vscode-button-border,transparent)] disabled:opacity-40 disabled:cursor-not-allowed ${
-                isMeSelected
-                  ? 'bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)]'
-                  : 'bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)]'
+                isMeSelected ? buttonPrimaryColorsClassName : buttonSecondaryColorsClassName
               }`}
             >
               Me

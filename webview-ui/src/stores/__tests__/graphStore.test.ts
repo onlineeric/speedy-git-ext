@@ -522,4 +522,16 @@ describe('graphStore — always show badged commits', () => {
 
     expect(useGraphStore.getState().badgeKeptCommitHashes).toEqual(new Set(['tagged0']));
   });
+
+  it('counts a batch holding only badge-kept commits as empty for the gap indicator', () => {
+    filterToMine();
+    useGraphStore.getState().setAlwaysShowBadgedCommits(true);
+    useGraphStore.setState({ consecutiveEmptyBatches: 0, filteredOutCount: 0 });
+
+    useGraphStore.getState().appendCommits([foreignTagged('tagged1'), { ...makeCommit('other01'), authorEmail: 'other@example.com' }], 4);
+
+    const state = useGraphStore.getState();
+    expect(state.mergedCommits.map((c) => c.hash)).toContain('tagged1');
+    expect(state.consecutiveEmptyBatches).toBe(1);
+  });
 });

@@ -4,10 +4,6 @@ import type { DisplayRef } from '../types/displayRefs';
 import { getColor, getLaneColorStyle, DEFAULT_GRAPH_PALETTE } from './colorUtils';
 
 /**
- * Represents a combined branch badge in the filter panel.
- * Merges local and remote refs that share a branch name into one badge.
- */
-/**
  * Add an email to the author filter, or remove it when already there. `undefined`
  * (no author filter) rather than an empty list once the last one is removed.
  */
@@ -17,6 +13,10 @@ export function toggleAuthorFilterEmail(current: readonly string[] | undefined, 
   return next.length > 0 ? next : undefined;
 }
 
+/**
+ * Represents a combined branch badge in the filter panel.
+ * Merges local and remote refs that share a branch name into one badge.
+ */
 export interface BranchBadge {
   /** Unique key for React rendering */
   key: string;

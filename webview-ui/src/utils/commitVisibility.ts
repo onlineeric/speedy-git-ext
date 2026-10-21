@@ -40,13 +40,10 @@ export function computeCommitVisibility(
 ): CommitVisibility {
   const hiddenCommitHashes = new Set<string>();
   const badgeKeptCommitHashes = new Set<string>();
-  const hasAuthorFilter = !!filters.authors && filters.authors.length > 0;
-  const hasTextFilter = !!filters.textFilter;
+  if (!hasClientSideVisibilityFilter(filters)) return { hiddenCommitHashes, badgeKeptCommitHashes };
 
-  if (!hasAuthorFilter && !hasTextFilter) return { hiddenCommitHashes, badgeKeptCommitHashes };
-
-  const includedAuthors = hasAuthorFilter ? new Set(filters.authors) : null;
-  const textLower = hasTextFilter ? filters.textFilter!.toLowerCase() : '';
+  const includedAuthors = filters.authors?.length ? new Set(filters.authors) : null;
+  const textLower = filters.textFilter?.toLowerCase() ?? '';
 
   for (const commit of commits) {
     if (commit.refs.some(r => r.type === 'stash' || r.type === 'uncommitted')) continue;

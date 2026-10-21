@@ -113,12 +113,6 @@ interface CommitTableRowProps {
   style: React.CSSProperties;
 }
 
-/** Spelled out in full so Tailwind's JIT emits both classes. */
-const BADGE_KEPT_DIM_CLASSES: Record<BadgedCommitOpacity, string> = {
-  60: ' opacity-60',
-  40: ' opacity-40',
-};
-
 export const CommitTableRow = memo(function CommitTableRow({
   commit,
   commits,
@@ -196,42 +190,46 @@ export const CommitTableRow = memo(function CommitTableRow({
       }}
       onClick={onClick}
     >
-      {layout.columns.map((column, columnIndex) => (
-        <div
-          key={column.id}
-          className={`min-w-0 overflow-hidden px-2 ${columnIndex < layout.columns.length - 1 ? 'border-r border-[var(--vscode-panel-border)]' : ''}`}
-        >
-          {renderColumn({
-            columnId: column.id,
-            commit,
-            commits,
-            index,
-            topology,
-            rowHeight,
-            graphWidth: graphColumn?.effectiveWidth ?? 0,
-            graphColors,
-            isHead,
-            visibleRefs,
-            overflowRefs,
-            avatarsEnabled,
-            dateFormatter,
-            laneColor,
-            laneColorStyle,
-            worktreeByBranch,
-            tagMetadata,
-            detachedWorktrees,
-            showDetachedWorktrees,
-            isStash,
-            isUncommitted,
-            stashIndex,
-            searchTerms,
-            autolinkRules,
-            dimClass: badgeKeptOpacity ? BADGE_KEPT_DIM_CLASSES[badgeKeptOpacity] : '',
-            onNodeMouseEnter,
-            onNodeMouseLeave,
-          })}
-        </div>
-      ))}
+      {layout.columns.map((column, columnIndex) => {
+        const cellContent = renderColumn({
+          columnId: column.id,
+          commit,
+          commits,
+          index,
+          topology,
+          rowHeight,
+          graphWidth: graphColumn?.effectiveWidth ?? 0,
+          graphColors,
+          isHead,
+          visibleRefs,
+          overflowRefs,
+          avatarsEnabled,
+          dateFormatter,
+          laneColor,
+          laneColorStyle,
+          worktreeByBranch,
+          tagMetadata,
+          detachedWorktrees,
+          showDetachedWorktrees,
+          isStash,
+          isUncommitted,
+          stashIndex,
+          searchTerms,
+          autolinkRules,
+          onNodeMouseEnter,
+          onNodeMouseLeave,
+        });
+        // Dimmed inside the cell so the column divider keeps full opacity; the graph lane stays undimmed.
+        const dimmed = badgeKeptOpacity !== undefined && column.id !== 'graph';
+        return (
+          <div
+            key={column.id}
+            className={`min-w-0 overflow-hidden px-2 ${columnIndex < layout.columns.length - 1 ? 'border-r border-[var(--vscode-panel-border)]' : ''}`}
+          >
+            {dimmed ? <div className="h-full" style={{ opacity: badgeKeptOpacity / 100 }}>{cellContent}</div> : cellContent}
+          </div>
+        );
+      })}
     </div>
   );
 
@@ -283,7 +281,6 @@ function renderColumn({
   stashIndex,
   searchTerms,
   autolinkRules,
-  dimClass,
   onNodeMouseEnter,
   onNodeMouseLeave,
 }: {
@@ -311,8 +308,6 @@ function renderColumn({
   stashIndex: number;
   searchTerms: readonly SearchTerm[];
   autolinkRules: readonly AutolinkRule[];
-  /** Leading-space opacity class for a badge-kept row, else empty. */
-  dimClass: string;
   onNodeMouseEnter?: (hash: string, rect: DOMRect) => void;
   onNodeMouseLeave?: () => void;
 }) {
@@ -336,7 +331,7 @@ function renderColumn({
       );
     case 'hash':
       return (
-        <div className={`flex h-full items-center${dimClass}`}>
+        <div className="flex h-full items-center">
           <span
             className="truncate font-mono text-xs text-[var(--vscode-textLink-foreground)]"
             title={commit.hash}
@@ -348,7 +343,7 @@ function renderColumn({
       );
     case 'message':
       return (
-        <div className={`flex h-full items-center gap-1 overflow-hidden${dimClass}`}>
+        <div className="flex h-full items-center gap-1 overflow-hidden">
           {(isHead || visibleRefs.length > 0 || showDetachedWorktrees) && (
             <div className="flex shrink-0 items-center gap-1">
               {isHead && (
@@ -397,7 +392,7 @@ function renderColumn({
       );
     case 'author': {
       const authorContent = (
-        <div className={`flex h-full items-center gap-2 overflow-hidden${dimClass}`}>
+        <div className="flex h-full items-center gap-2 overflow-hidden">
           {avatarsEnabled && commit.author && !isUncommitted ? (
             <AuthorAvatar author={commit.author} email={commit.authorEmail} />
           ) : null}
@@ -419,7 +414,7 @@ function renderColumn({
     case 'date':
       return (
         <DateContextMenu authorDate={commit.authorDate}>
-          <div className={`flex h-full items-center${dimClass}`}>
+          <div className="flex h-full items-center">
             <span className="truncate text-xs text-[var(--vscode-descriptionForeground)]">
               {dateFormatter(commit.authorDate)}
             </span>
@@ -429,9 +424,7 @@ function renderColumn({
     case 'signature':
       // Uncommitted/stash rows have no commit object to verify.
       if (isUncommitted || isStash) return null;
-      return dimClass
-        ? <div className={`h-full${dimClass}`}><SignatureColumnCell hash={commit.hash} /></div>
-        : <SignatureColumnCell hash={commit.hash} />;
+      return <SignatureColumnCell hash={commit.hash} />;
     default:
       return null;
   }

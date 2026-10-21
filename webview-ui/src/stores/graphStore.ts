@@ -669,8 +669,12 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
       : -1;
 
-    // Count new visible commits in this batch for empty-batch tracking
-    const newVisibleCount = newCommits.filter(c => !hiddenCommitHashes.has(c.hash)).length;
+    // Count commits in this batch that match the filters, for empty-batch tracking. A badge-kept
+    // row is shown but does not match: counting it would reset the gap-indicator cap on every
+    // batch holding a branch tip or tag, and auto-prefetch would walk the whole history.
+    const newVisibleCount = newCommits.filter(
+      (c) => !hiddenCommitHashes.has(c.hash) && !badgeKeptCommitHashes.has(c.hash),
+    ).length;
     const prevEmpty = get().consecutiveEmptyBatches;
     const prevFilteredOut = get().filteredOutCount;
 
