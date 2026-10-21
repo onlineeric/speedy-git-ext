@@ -1,4 +1,4 @@
-import type { RefInfo } from '@shared/types';
+import type { Commit, RefInfo } from '@shared/types';
 import type { DisplayRef } from '../types/displayRefs';
 
 export interface MergeRefsResult {
@@ -145,4 +145,21 @@ export function filterDisplayRefsBySettings(
     }
     return [displayRef];
   });
+}
+
+export interface BadgeSettings {
+  showTags: boolean;
+  showRemoteBranches: boolean;
+}
+
+/**
+ * Whether a commit row shows at least one ref badge (or is HEAD, attached or detached).
+ * Decided by `filterDisplayRefsBySettings`, so "badged" always means "a badge the row
+ * actually draws" — a hidden tag or remote branch does not count.
+ */
+export function isBadgedCommit(commit: Commit, settings: BadgeSettings): boolean {
+  if (commit.refs.length === 0) return false;
+  const { isHead, displayRefs } = mergeRefs(commit.refs);
+  if (isHead) return true;
+  return filterDisplayRefsBySettings(displayRefs, settings).some((displayRef) => displayRef.type !== 'stash');
 }

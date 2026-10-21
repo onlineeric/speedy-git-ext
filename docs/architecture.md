@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-10-13**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-10-21**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -53,7 +53,7 @@ src/
 │   ├── OperationGuard.ts         # In-progress checks (rebase/cherry-pick/revert/merge) → GitError | null
 │   └── handlers/                 # Domain RPC handlers; fetch services from the registry at call time
 │       ├── graphDataHandlers.ts  # getCommits/loadMore/getBranches/getCommitDetails/getAuthors/refresh
-│       ├── branchHandlers.ts     # create/rename/delete/fast-forward branch; commit checkout; merge + continue/abort merge
+│       ├── branchHandlers.ts     # create/rename/delete/fast-forward branch; `git.branchPrefix` read; commit checkout; merge + continue/abort merge
 │       ├── branchCheckoutHandlers.ts # Shared branch checkout/stash/pull execution; operation guard, busy lock,
 │                                     #   repository-bound recovery and request-correlated completion
 │       ├── remoteHandlers.ts     # fetch/push/pull, add/edit/remove remote
@@ -87,7 +87,7 @@ src/
 ├── services/                     # All repo-bound; every method returns Result<T, GitError>
 │   ├── index.ts                  # Barrel export for all services
 │   ├── GitExecutor.ts            # Spawns git processes, 30s timeout — the only place git is invoked
-│   ├── GitLogService.ts          # Parses git log (null-byte format), branches, branches-containing-a-commit. Default 500 commits.
+│   ├── GitLogService.ts          # Parses git log (null-byte format), branches, branches-containing-a-commit, authors + `user.email` (Filter "Me"). Default 500 commits.
 │   │                             #   Also walks stash base commits, so a stash survives its branch moving
 │   ├── GitDiffService.ts         # Commit details (+ parent subjects), file changes, file content at revision; submodule (gitlink) pointers
 │   ├── GitBranchService.ts       # Checkout, create, rename, delete, fast-forward branches; merge any commit-ish + merge state/continue/abort
@@ -303,6 +303,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── MultiTabIllustration.tsx      # 5.17.0 hero: animated miniature of the New Tab button opening a second graph group
 ├── CommitNavigationIllustration.tsx # 5.18.0 hero: animated miniature of Go to parent commit landing on the parent row
 ├── AutolinksIllustration.tsx     # 5.19.0 hero: animated miniature of a commit message's references turning into links
+├── BadgedCommitsIllustration.tsx # 5.20.0 hero: animated miniature of "Always show badged commits" bringing back main's tip
 └── HelpDialog.tsx                # "Help & Feedback": Badge Legend + GitHub Issues + docs/changelog/marketplace + version
 ```
 
@@ -310,6 +311,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 
 ```
 ├── MultiSelectDropdown.tsx           # Generic multi-select popover with pinned actions
+├── SegmentedToggle.tsx               # Single-choice row of joined toggle boxes (role=radiogroup); used for the badged-commit opacity
 ├── MultiBranchDropdown.tsx           # Branch-specific wrapper, grouped local/remote
 ├── FilterableSingleSelectDropdown.tsx# Generic searchable single-select (repo/submodule pickers)
 ├── FileChangeShared.tsx              # Row/badge/action-icon primitives + shouldShowChangeCounts + SubmoduleBadge
@@ -338,6 +340,7 @@ hooks/
 ├── useCommitHookWait.ts          # idle → running → waitingOnHooks phase + timer for dialogs that write a commit
 ├── useGitVersion.ts              # Lazily requests the installed git version once per session (store: gitVersion)
 ├── useDialogTelemetry.ts         # One confirmed/cancelled outcome per dialog open cycle
+├── usePrefilledBranchName.ts     # New-branch name field prefilled with `git.branchPrefix` (Create Branch/Worktree)
 ├── useSettingDraft.ts            # One Settings-dialog setting's draft: dirty check, discard, follows outside saved changes
 │                                 #   unless the user has edits it would overwrite
 ├── useSettingDraftRegistry.tsx   # The dialog's draft registry, SettingDraftScope (one per tab, supplies tabId) and
@@ -367,7 +370,9 @@ utils/
 ├── commitRelations.ts            # Details panel Parents/Children links: children read off loaded commits,
 │                                 #   parent subjects, stash first-parent-only navigation, hash tooltip
 ├── rowVisibility.ts              # Scroll-offset maths for revealing a row when the details panel resizes the viewport
-├── commitVisibility.ts           # Visibility/filter predicates for the virtualized row list
+├── commitVisibility.ts           # `computeCommitVisibility`: one pass over commits applying the Author/Message filters →
+│                                 #   hidden set + badge-kept set ("Always show badged commits", rows dimmed to the
+│                                 #   persisted `badgedCommitOpacity`, 60 or 40)
 ├── compareSlot.ts                # Compare panel slot model (Base/Target, commit-ish parsing)
 ├── dialogPosition.ts             # PURE: clamp a dragged dialog so its title stays reachable
 ├── compareDefaults.ts            # Default slot seeding
@@ -393,7 +398,7 @@ utils/
 │                                 #   pull policy, busy/worktree checks, telemetry; reads store only on interaction
 ├── branchSelection.ts            # getBranchKey (bare name vs remote/name) + additive select-all-local
 ├── mergedCommits.ts              # Detect merged-branch commit grouping for badges
-├── refNameField.ts               # Live ref-name validation state (error suppressed while pristine)
+├── refNameField.ts               # Live ref-name validation state (error suppressed while empty or still the prefill) + late-prefill merge
 ├── gitCommandBuilder.ts          # Constructs git command strings for preview display (rebase and fixup previews wrap
 │                                 #   the backend's shared arg builders)
 ├── helpLinks.ts                  # Help dialog links + build-time version (__EXTENSION_VERSION__)
@@ -401,7 +406,8 @@ utils/
 ├── fileTreeBuilder.ts            # Flat file list → tree structure
 ├── radioAvailability.ts          # Enable/disable logic for mutually-exclusive options
 ├── mergeRefs.ts                  # Merges local/remote refs into DisplayRef[]. `filterDisplayRefsBySettings` is the single
-│                                 #   source of truth for which badges a row shows — the renderer and the search matcher both call it
+│                                 #   source of truth for which badges a row shows — the renderer and the search matcher both call it.
+│                                 #   `isBadgedCommit` builds on it (or HEAD) for the "Always show badged commits" filter option
 ├── refMergeSource.ts             # Whether a ref badge can be merged and under what name — a remote branch
 │                                 #   must be handed to `git merge` as `<remote>/<name>`, never the bare name
 ├── refWorktreeSource.ts          # The same question for "Create worktree…": which ref the badge hands to
@@ -429,7 +435,7 @@ utils/
 │                                 #   and every ref badge the row actually renders. Never matches the uncommitted row
 ├── searchHighlight.ts            # PURE: substring/prefix highlight segments (overlapping and adjacent matches merge
 │                                 #   into one box) + `refSearchMatchKind` — label match, hidden match, or none
-├── filterUtils.ts                # Author/date filter logic
+├── filterUtils.ts                # Author/date filter logic; `toggleAuthorFilterEmail` shared by the Authors dropdown and the "Me" button
 ├── refStyle.ts                   # Per-ref-kind badge styling
 ├── refBadgeContent.ts            # What a ref badge shows: label, lead icons (fork = local, cloud = remote;
 │                                 #   merged = both), remote count on the cloud, and the title tooltip

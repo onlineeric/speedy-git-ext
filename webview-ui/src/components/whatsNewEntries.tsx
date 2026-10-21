@@ -2,10 +2,12 @@ import type { ReactNode } from 'react';
 import { chooseUnseenWhatsNewEntry, type WhatsNewPayload } from '@shared/whatsNew';
 import { AutolinksIllustration } from './AutolinksIllustration';
 import { AutosquashIllustration } from './AutosquashIllustration';
+import { BadgedCommitsIllustration } from './BadgedCommitsIllustration';
 import { CommitNavigationIllustration } from './CommitNavigationIllustration';
 import { MultiTabIllustration } from './MultiTabIllustration';
 import autolinksRowScreenshot from '../../../resources/autolinks.png';
 import settingsAutolinksScreenshot from '../../../resources/settings-autolinks.png';
+import filtersShowBadgedScreenshot from '../../../resources/Filters_show-badged.png';
 import { BranchIcon, CloudIcon, GoToHeadIcon, NewTabIcon } from './icons';
 import { SubmoduleBadge } from './FileChangeShared';
 import { InlineRefBadge } from './InlineRefBadge';
@@ -83,6 +85,87 @@ export interface WhatsNewEntry {
  * with nothing worth interrupting for needs no other opt-out.
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
+  {
+    version: '5.20.0',
+    headline: 'Filter to your own commits and still see every branch tip.',
+    illustration: <BadgedCommitsIllustration />,
+    content: (
+      <div className="space-y-6">
+        <ContributorThanks login="tbuyukliev">
+          This release comes from your requests in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/208">#208</ExternalLink>, to keep
+          the tip of <code>main</code> in reach while the graph shows only your commits and to pick yourself
+          without typing, and in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/209">#209</ExternalLink>, to start
+          new branch names with your <code>git.branchPrefix</code>.
+        </ContributorThanks>
+
+        <WhatsNewSection title="Two new controls in the Filter panel">
+          <Screenshot
+            src={filtersShowBadgedScreenshot}
+            alt="The Filter panel with the new Me button beside the Authors dropdown and the Always show badged commits checkbox with its 60% / 40% opacity toggle"
+            width={517}
+            height={246}
+            caption={
+              <>
+                <UiLabel>Me</UiLabel> beside <UiLabel>Authors</UiLabel>, and <UiLabel>Always show badged commits</UiLabel>{' '}
+                under <UiLabel>Message</UiLabel> with its <UiLabel>Opacity</UiLabel> choice.
+              </>
+            }
+          />
+        </WhatsNewSection>
+
+        <WhatsNewSection title="Branch from main without clearing the filter">
+          <StepFlow>
+            <Step label="1" title="Filter to you" accent={SHOWCASE_BLUE_COLOR}>
+              Open <UiLabel>Filter</UiLabel> and click the new <UiLabel>Me</UiLabel> button next to{' '}
+              <UiLabel>Authors</UiLabel>: your commits, no typing. It uses your <code>git config user.email</code>.
+            </Step>
+            <Step label="2" title="Keep the badges" accent={SHOWCASE_PURPLE_COLOR}>
+              Tick <UiLabel>Always show badged commits</UiLabel>. Commits by others that carry a branch, tag or
+              HEAD badge come back.
+            </Step>
+            <Step label="3" title="Branch" accent={SHOWCASE_GREEN_COLOR}>
+              Right-click the tip of <code>main</code> and pick <UiLabel>Create Branch Here...</UiLabel>.
+            </Step>
+          </StepFlow>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="How it behaves">
+          <FeatureGrid>
+            <FeatureCard mark="◐" title="Dimmed, not hidden" accent={SHOWCASE_ORANGE_COLOR}>
+              A commit shown only for its badge is dimmed, badge included, so your own commits stand out. Pick{' '}
+              <UiLabel>60%</UiLabel> or <UiLabel>40%</UiLabel> next to the checkbox; graph lines stay at full
+              strength.
+            </FeatureCard>
+            <FeatureCard mark="⑂" title="Only badges you can see" accent={SHOWCASE_GREEN_COLOR}>
+              Tags and remote branches count only while <UiLabel>View</UiLabel> shows them.
+            </FeatureCard>
+            <FeatureCard mark="A" title="Authors and Message" accent={SHOWCASE_BLUE_COLOR}>
+              It relaxes those two filters only. <UiLabel>Branches</UiLabel> and <UiLabel>Dates</UiLabel> still
+              apply.
+            </FeatureCard>
+            <FeatureCard mark="✓" title="Remembered" accent={SHOWCASE_PURPLE_COLOR}>
+              The checkbox keeps its state across reloads, and <UiLabel>Reset All</UiLabel> leaves it alone.
+            </FeatureCard>
+          </FeatureGrid>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="Your branch prefix, already typed">
+          <FeatureGrid>
+            <FeatureCard mark="⑂" title="Create Branch" accent={SHOWCASE_GREEN_COLOR}>
+              When VS Code’s <code>git.branchPrefix</code> is set, say to <code>feature/</code>,{' '}
+              <UiLabel>Create Branch Here...</UiLabel> opens with it in the name box. Just type the rest.
+            </FeatureCard>
+            <FeatureCard mark="W" title="Create Worktree" accent={SHOWCASE_BLUE_COLOR}>
+              A new branch for a worktree made from a commit starts with the prefix too. From a branch or tag, the
+              suggested name still matches it.
+            </FeatureCard>
+          </FeatureGrid>
+        </WhatsNewSection>
+      </div>
+    ),
+  },
   {
     version: '5.19.0',
     headline: 'Custom keys (Jira, Linear, …) and issue numbers in commit messages are now links.',

@@ -15,7 +15,7 @@ A performance-first Git graph, history viewer, history-editing tool, and worktre
 | **Instant graph rendering** | Virtual scrolling + batch prefetch keeps large repos responsive — no loading spinners, no lag |
 | **Real Git operations** | Merge, rebase, cherry-pick, revert, reset, amend, fixup, drop commit, push, pull, fetch — all from context menus with live command preview |
 | **Compare anything to anything** | Two-click A vs B diff for any commit, branch, tag, or your working tree — with PR-style three-dot mode |
-| **Search and filter** | Multi-term search across messages, hashes, authors, emails, branches, and tags, then narrow history with branch, author, and date filters |
+| **Search and filter** | Multi-term search across messages, hashes, authors, emails, branches, and tags, then narrow history with branch, author, and date filters — optionally keeping every branch tip visible |
 | **Multiple graph tabs** | Open as many graphs as you like, each with its own repository, filters, search, and scroll position |
 | **Worktrees** | Run AI coding sessions on different branches at the same time without constantly switching your main checkout |
 | **Clean, scannable UI** | Color-coded branch lanes, icon-based local/remote badges, avatars, clickable issue links, and full VS Code theme support |
@@ -45,7 +45,7 @@ Create, open, reveal, and remove Git worktrees so different AI agents or editor 
 >![Speedy Git Right-click menu screenshot](./resources/right-click-menu.png)
 
 - Fast commit graph and history browsing with virtual scrolling, color-coded branch lanes, table-style rows, resizable columns, avatars, and clear HEAD/ref labels.
-- Powerful search across messages, hashes, authors, emails, branches, and tags, plus filtering by branch, author, and date, with match navigation for large histories.
+- Powerful search across messages, hashes, authors, emails, branches, and tags, plus filtering by branch, author, and date (with an option to keep badged commits such as branch tips visible), with match navigation for large histories.
 - Compare any two refs (commits, branches, tags, `HEAD~3`, or your working tree) with PR-style three-dot diffs.
 - Commit details with resizable bottom/right layout, file tree/list views, per-file stats, parent/child navigation, and inline diffs — including stashed untracked files and submodule pointer changes.
 - Branch, tag, stash, remote, submodule, worktree, and multi-repo workflows from one panel, including fetch, pull, push, checkout, merge, and remote management.

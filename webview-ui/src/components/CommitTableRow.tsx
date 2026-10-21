@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import type { Commit, CommitTableColumnId, TagMetadata, UserSettings, WorktreeInfo } from '@shared/types';
+import type { BadgedCommitOpacity, Commit, CommitTableColumnId, TagMetadata, UserSettings, WorktreeInfo } from '@shared/types';
 import type { GraphTopology } from '../utils/graphTopology';
 import { useGraphStore } from '../stores/graphStore';
 import { useAutolinkRules } from '../stores/graphSelectors';
@@ -101,6 +101,12 @@ interface CommitTableRowProps {
   searchTerms?: readonly SearchTerm[];
   /** Briefly pulses the row background after a "Go to HEAD" navigation. */
   isFlashing?: boolean;
+  /**
+   * Set only when the row fails the Author / Message filter and is shown because it carries
+   * a badge ("Always show badged commits"): the opacity its cells are dimmed to. The graph
+   * lane is never dimmed, so lines stay continuous with the rows around it.
+   */
+  badgeKeptOpacity?: BadgedCommitOpacity;
   onClick: (event: React.MouseEvent) => void;
   onNodeMouseEnter?: (hash: string, rect: DOMRect) => void;
   onNodeMouseLeave?: () => void;
@@ -122,6 +128,7 @@ export const CommitTableRow = memo(function CommitTableRow({
   isCurrentSearchMatch = false,
   searchTerms = EMPTY_SEARCH_TERMS,
   isFlashing = false,
+  badgeKeptOpacity,
   onClick,
   onNodeMouseEnter,
   onNodeMouseLeave,
@@ -183,41 +190,46 @@ export const CommitTableRow = memo(function CommitTableRow({
       }}
       onClick={onClick}
     >
-      {layout.columns.map((column, columnIndex) => (
-        <div
-          key={column.id}
-          className={`min-w-0 overflow-hidden px-2 ${columnIndex < layout.columns.length - 1 ? 'border-r border-[var(--vscode-panel-border)]' : ''}`}
-        >
-          {renderColumn({
-            columnId: column.id,
-            commit,
-            commits,
-            index,
-            topology,
-            rowHeight,
-            graphWidth: graphColumn?.effectiveWidth ?? 0,
-            graphColors,
-            isHead,
-            visibleRefs,
-            overflowRefs,
-            avatarsEnabled,
-            dateFormatter,
-            laneColor,
-            laneColorStyle,
-            worktreeByBranch,
-            tagMetadata,
-            detachedWorktrees,
-            showDetachedWorktrees,
-            isStash,
-            isUncommitted,
-            stashIndex,
-            searchTerms,
-            autolinkRules,
-            onNodeMouseEnter,
-            onNodeMouseLeave,
-          })}
-        </div>
-      ))}
+      {layout.columns.map((column, columnIndex) => {
+        const cellContent = renderColumn({
+          columnId: column.id,
+          commit,
+          commits,
+          index,
+          topology,
+          rowHeight,
+          graphWidth: graphColumn?.effectiveWidth ?? 0,
+          graphColors,
+          isHead,
+          visibleRefs,
+          overflowRefs,
+          avatarsEnabled,
+          dateFormatter,
+          laneColor,
+          laneColorStyle,
+          worktreeByBranch,
+          tagMetadata,
+          detachedWorktrees,
+          showDetachedWorktrees,
+          isStash,
+          isUncommitted,
+          stashIndex,
+          searchTerms,
+          autolinkRules,
+          onNodeMouseEnter,
+          onNodeMouseLeave,
+        });
+        // Dimmed inside the cell so the column divider keeps full opacity; the graph lane stays undimmed.
+        const dimmed = badgeKeptOpacity !== undefined && column.id !== 'graph';
+        return (
+          <div
+            key={column.id}
+            className={`min-w-0 overflow-hidden px-2 ${columnIndex < layout.columns.length - 1 ? 'border-r border-[var(--vscode-panel-border)]' : ''}`}
+          >
+            {dimmed ? <div className="h-full" style={{ opacity: badgeKeptOpacity / 100 }}>{cellContent}</div> : cellContent}
+          </div>
+        );
+      })}
     </div>
   );
 

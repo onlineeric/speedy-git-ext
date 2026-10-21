@@ -4,6 +4,16 @@ import type { DisplayRef } from '../types/displayRefs';
 import { getColor, getLaneColorStyle, DEFAULT_GRAPH_PALETTE } from './colorUtils';
 
 /**
+ * Add an email to the author filter, or remove it when already there. `undefined`
+ * (no author filter) rather than an empty list once the last one is removed.
+ */
+export function toggleAuthorFilterEmail(current: readonly string[] | undefined, email: string): string[] | undefined {
+  const list = current ?? [];
+  const next = list.includes(email) ? list.filter((e) => e !== email) : [...list, email];
+  return next.length > 0 ? next : undefined;
+}
+
+/**
  * Represents a combined branch badge in the filter panel.
  * Merges local and remote refs that share a branch name into one badge.
  */

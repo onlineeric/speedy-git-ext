@@ -50,6 +50,8 @@ export type RequestMessage =
   | { type: 'refresh'; payload: { filters?: Partial<GraphFilters> } }
   // Branch ops
   | { type: 'createBranch'; payload: { name: string; startPoint?: string; checkout?: boolean } }
+  /** VS Code's `git.branchPrefix` for the displayed repo, prefilled into new-branch name fields. Answered with `branchPrefix`. */
+  | { type: 'getBranchPrefix'; payload: { requestId: number } }
   | { type: 'renameBranch'; payload: { oldName: string; newName: string } }
   | { type: 'deleteBranch'; payload: { name: string; force?: boolean; deleteRemote?: { remote: string; name: string }; expect?: RefExpectation } }
   | { type: 'deleteRemoteBranch'; payload: { remote: string; name: string; expect?: RefExpectation } }
@@ -312,6 +314,7 @@ export type ResponseMessage =
   | { type: 'worktreeList'; payload: { worktrees: WorktreeInfo[]; baseDir: string | null } }
   | { type: 'worktreePathResolved'; payload: ResolvedWorktreePaths & { requestId: number } }
   | { type: 'worktreeEnvFiles'; payload: { requestId: number; ignoredEnvFiles: string[]; envFilesPresent: boolean } }
+  | { type: 'branchPrefix'; payload: { requestId: number; prefix: string } }
   | { type: 'containingBranches'; payload: { hash: string; branches: string[]; status: 'loaded' | 'error' } }
   | { type: 'persistedUIState'; payload: { uiState: PersistedUIState } }
   /**
@@ -319,7 +322,7 @@ export type ResponseMessage =
    * series' entry and stays silent when there is none or it equals `lastShownVersion`.
    */
   | { type: 'whatsNew'; payload: WhatsNewPayload }
-  | { type: 'authorList'; payload: { authors: Author[] } }
+  | { type: 'authorList'; payload: { authors: Author[]; /** `git config user.email`, for the Filter panel's "Me" button. */ currentUserEmail: string | null } }
   | { type: 'uncommittedChanges'; payload: UncommittedSummary }
   | { type: 'conflictState'; payload: ConflictState }
   | { type: 'initialData'; payload: InitialDataPayload }
@@ -339,7 +342,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   getCommits: true, getBranches: true, getCommitDetails: true,
   checkoutBranch: true, checkoutCommit: true, fetch: true, copyToClipboard: true,
   openDiff: true, openFile: true, refresh: true,
-  createBranch: true, renameBranch: true, deleteBranch: true,
+  createBranch: true, getBranchPrefix: true, renameBranch: true, deleteBranch: true,
   deleteRemoteBranch: true, mergeBranch: true, continueMerge: true, abortMerge: true,
   push: true, pull: true, fastForwardLocalBranch: true, getRemotes: true, addRemote: true,
   removeRemote: true, editRemote: true,
@@ -384,7 +387,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   commitsAppended: true, prefetchError: true, headLocation: true, headLocationFailed: true, repoList: true,
   checkoutNeedsStash: true, branchCheckoutFinished: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, settingSaveResult: true, submodulesData: true, submoduleOperationResult: true,
-  pushResult: true, avatarUrls: true, avatarAuthState: true, avatarCacheCleared: true, tagMetadata: true, worktreeList: true, worktreePathResolved: true, worktreeEnvFiles: true, containingBranches: true,
+  pushResult: true, avatarUrls: true, avatarAuthState: true, avatarCacheCleared: true, tagMetadata: true, worktreeList: true, worktreePathResolved: true, worktreeEnvFiles: true, branchPrefix: true, containingBranches: true,
   persistedUIState: true, authorList: true, uncommittedChanges: true, conflictState: true,
   whatsNew: true,
   initialData: true,

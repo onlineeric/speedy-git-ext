@@ -10,6 +10,7 @@ import {
   COMMIT_TABLE_MIN_WIDTHS,
   DEFAULT_PERSISTED_UI_STATE,
   cloneCommitTableLayout,
+  isBadgedCommitOpacity,
 } from '../../shared/types.js';
 
 const UI_STATE_KEY = 'speedyGit.uiState';
@@ -194,6 +195,13 @@ export class PersistedUIStateStore {
         typeof raw.rightPanelWidth === 'number' && isFinite(raw.rightPanelWidth) && raw.rightPanelWidth >= MIN_PANEL_SIZE
           ? raw.rightPanelWidth
           : defaults.rightPanelWidth,
+      alwaysShowBadgedCommits:
+        typeof raw.alwaysShowBadgedCommits === 'boolean'
+          ? raw.alwaysShowBadgedCommits
+          : defaults.alwaysShowBadgedCommits,
+      badgedCommitOpacity: isBadgedCommitOpacity(raw.badgedCommitOpacity)
+        ? raw.badgedCommitOpacity
+        : defaults.badgedCommitOpacity,
       commitTableLayout: cloneCommitTableLayout(this.loadRepoTableLayout()),
     };
     return this.uiStateCache;
@@ -247,6 +255,12 @@ export class PersistedUIStateStore {
       ...(typeof partial.rightPanelWidth === 'number' && isFinite(partial.rightPanelWidth)
         ? { rightPanelWidth: Math.max(MIN_PANEL_SIZE, partial.rightPanelWidth) }
         : partial.rightPanelWidth !== undefined ? { rightPanelWidth: defaults.rightPanelWidth } : {}),
+      ...(typeof partial.alwaysShowBadgedCommits === 'boolean'
+        ? { alwaysShowBadgedCommits: partial.alwaysShowBadgedCommits }
+        : {}),
+      ...(isBadgedCommitOpacity(partial.badgedCommitOpacity)
+        ? { badgedCommitOpacity: partial.badgedCommitOpacity }
+        : {}),
     };
 
     if (Object.keys(globalValidated).length > 0) {

@@ -6,9 +6,11 @@ import { postUncommittedCommitDetails } from './workingTreeHandlers.js';
 
 export const graphDataHandlers = {
   getAuthors: async (_message, context) => {
-    const result = await context.services.current().gitLogService.getAuthors();
+    const { gitLogService } = context.services.current();
+    const [result, userEmail] = await Promise.all([gitLogService.getAuthors(), gitLogService.getCurrentUserEmail()]);
     if (result.success) {
-      context.postMessage({ type: 'authorList', payload: { authors: result.value } });
+      const currentUserEmail = userEmail.success ? userEmail.value : null;
+      context.postMessage({ type: 'authorList', payload: { authors: result.value, currentUserEmail } });
     } else {
       context.postMessage({ type: 'error', payload: { error: result.error } });
     }

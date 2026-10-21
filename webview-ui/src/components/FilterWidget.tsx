@@ -1,13 +1,15 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import type { Author } from '@shared/types';
+import { BADGED_COMMIT_OPACITIES, type Author, type BadgedCommitOpacity } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { MultiSelectDropdown } from './MultiSelectDropdown';
+import { SegmentedToggle, type SegmentedToggleOption } from './SegmentedToggle';
+import { buttonPrimaryColorsClassName, buttonSecondaryColorsClassName } from './dialogStyles';
 import { AuthorBadge } from './AuthorBadge';
 import { AuthorAvatar } from './AuthorAvatar';
 import { RefLabel } from './RefLabel';
 import { getBranchLaneColorStyle } from '../utils/filterUtils';
-import { toDisplayRef, combineBranchRefs } from '../utils/filterUtils';
+import { toDisplayRef, combineBranchRefs, toggleAuthorFilterEmail } from '../utils/filterUtils';
 import DatePicker from 'react-datepicker';
 import { format, parse, isValid } from 'date-fns';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -46,12 +48,20 @@ function getAuthorSearchText(author: Author): string {
   return `${author.name} ${author.email}`;
 }
 
+const BADGED_COMMIT_OPACITY_OPTIONS: readonly SegmentedToggleOption<BadgedCommitOpacity>[] =
+  BADGED_COMMIT_OPACITIES.map((value) => ({ value, label: `${value}%` }));
+
 export function FilterWidget() {
   const filters = useGraphStore((s) => s.filters);
   const authorList = useGraphStore((s) => s.authorList);
   const authorListLoading = useGraphStore((s) => s.authorListLoading);
+  const currentUserEmail = useGraphStore((s) => s.currentUserEmail);
   const setFilters = useGraphStore((s) => s.setFilters);
   const recomputeVisibility = useGraphStore((s) => s.recomputeVisibility);
+  const alwaysShowBadgedCommits = useGraphStore((s) => s.alwaysShowBadgedCommits);
+  const setAlwaysShowBadgedCommits = useGraphStore((s) => s.setAlwaysShowBadgedCommits);
+  const badgedCommitOpacity = useGraphStore((s) => s.badgedCommitOpacity);
+  const setBadgedCommitOpacity = useGraphStore((s) => s.setBadgedCommitOpacity);
   const resetAllFilters = useGraphStore((s) => s.resetAllFilters);
   const setActiveToggleWidget = useGraphStore((s) => s.setActiveToggleWidget);
   const mergedCommits = useGraphStore((s) => s.mergedCommits);
@@ -150,19 +160,23 @@ export function FilterWidget() {
 
   // Stable callbacks: read current filter state from getState() inside the callback
   // so the dependency array is empty and the function reference never changes.
-  const handleAuthorToggle = useCallback(
-    (author: Author) => {
-      const current = useGraphStore.getState().filters.authors ?? [];
-      const exists = current.includes(author.email);
-      const next = exists
-        ? current.filter((e) => e !== author.email)
-        : [...current, author.email];
-      const authors = next.length > 0 ? next : undefined;
-      setFilters({ authors });
+  const toggleAuthorEmail = useCallback(
+    (email: string) => {
+      setFilters({ authors: toggleAuthorFilterEmail(useGraphStore.getState().filters.authors, email) });
       recomputeVisibility();
     },
     [setFilters, recomputeVisibility],
   );
+
+  const handleAuthorToggle = useCallback(
+    (author: Author) => toggleAuthorEmail(author.email),
+    [toggleAuthorEmail],
+  );
+
+  const handleMeToggle = useCallback(() => {
+    if (currentUserEmail) toggleAuthorEmail(currentUserEmail);
+  }, [currentUserEmail, toggleAuthorEmail]);
+  const isMeSelected = !!currentUserEmail && !!filters.authors?.includes(currentUserEmail);
 
   const handleAuthorClear = useCallback(() => {
     setFilters({ authors: undefined });
@@ -206,6 +220,17 @@ export function FilterWidget() {
     }
   }, [resetAllFilters, recomputeVisibility]);
 
+  const handleAlwaysShowBadgedCommitsChange = useCallback((value: boolean) => {
+    setAlwaysShowBadgedCommits(value);
+    rpcClient.persistUIState({ alwaysShowBadgedCommits: value });
+  }, [setAlwaysShowBadgedCommits]);
+
+  const handleBadgedCommitOpacityChange = useCallback((value: BadgedCommitOpacity) => {
+    setBadgedCommitOpacity(value);
+    rpcClient.persistUIState({ badgedCommitOpacity: value });
+  }, [setBadgedCommitOpacity]);
+
+  // A remembered preference, not a filter value: it never counts toward Reset All.
   const hasAnyFilters = !!(filters.branches?.length || filters.authors?.length || filters.afterDate || filters.beforeDate || filters.textFilter);
 
   // Branch badges: combine local+remote into merged badges
@@ -335,18 +360,40 @@ export function FilterWidget() {
       <div className="flex gap-2">
         <span className="text-[var(--vscode-descriptionForeground)] w-16 flex-shrink-0 pt-0.5">Authors</span>
         <div className="flex-1 min-w-0 flex flex-col gap-1">
-          <MultiSelectDropdown<Author>
-            items={authorList}
-            selectedItems={selectedAuthors}
-            onToggle={handleAuthorToggle}
-            onClearAll={handleAuthorClear}
-            getKey={getAuthorKey}
-            getSearchText={getAuthorSearchText}
-            renderItem={renderAuthorItem}
-            renderTrigger={renderAuthorTrigger}
-            placeholder="Filter authors..."
-            clearAllLabel="All Authors"
-          />
+          <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <MultiSelectDropdown<Author>
+                items={authorList}
+                selectedItems={selectedAuthors}
+                onToggle={handleAuthorToggle}
+                onClearAll={handleAuthorClear}
+                getKey={getAuthorKey}
+                getSearchText={getAuthorSearchText}
+                renderItem={renderAuthorItem}
+                renderTrigger={renderAuthorTrigger}
+                placeholder="Filter authors..."
+                clearAllLabel="All Authors"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleMeToggle}
+              disabled={!currentUserEmail}
+              aria-pressed={isMeSelected}
+              title={
+                !currentUserEmail
+                  ? 'Set git config user.email to filter to your own commits'
+                  : isMeSelected
+                    ? `Remove yourself (${currentUserEmail}) from the author filter`
+                    : `Add yourself (${currentUserEmail}) to the author filter`
+              }
+              className={`shrink-0 px-2 py-0.5 text-xs rounded border border-[var(--vscode-button-border,transparent)] disabled:opacity-40 disabled:cursor-not-allowed ${
+                isMeSelected ? buttonPrimaryColorsClassName : buttonSecondaryColorsClassName
+              }`}
+            >
+              Me
+            </button>
+          </div>
           {(filters.authors?.length ?? 0) > 0 ? (
             <div className="flex flex-wrap gap-1 max-h-[104px] overflow-y-auto">
               {filters.authors!.map((email) => {
@@ -471,6 +518,34 @@ export function FilterWidget() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Badged-commit option: relaxes the Authors and Message filters above */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="w-16 flex-shrink-0" aria-hidden="true" />
+        <label
+          className="flex items-center gap-2 cursor-pointer select-none text-[var(--vscode-foreground)]"
+          title="Keep commits that show a branch, tag or HEAD badge visible even when they don't match the Authors or Message filter. Does not affect Branches or Dates."
+        >
+          <input
+            type="checkbox"
+            checked={alwaysShowBadgedCommits}
+            onChange={(e) => handleAlwaysShowBadgedCommitsChange(e.target.checked)}
+            className="w-4 h-4 accent-[var(--vscode-button-background)]"
+          />
+          <span>Always show badged commits</span>
+        </label>
+        {alwaysShowBadgedCommits && (
+          <div className="ml-2 flex items-center gap-2" title="How strongly commits kept only for their badge are dimmed">
+            <span className="text-[var(--vscode-descriptionForeground)]">Opacity</span>
+            <SegmentedToggle
+              ariaLabel="Opacity of badged commits that don't match the filter"
+              options={BADGED_COMMIT_OPACITY_OPTIONS}
+              value={badgedCommitOpacity}
+              onChange={handleBadgedCommitOpacityChange}
+            />
+          </div>
+        )}
       </div>
 
       <div id="datepicker-portal" />
