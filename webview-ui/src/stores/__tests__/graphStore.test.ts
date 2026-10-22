@@ -476,7 +476,7 @@ describe('graphStore — always show badged commits', () => {
 
     const state = useGraphStore.getState();
     expect(state.mergedCommits.map((c) => c.hash)).toEqual(['mine000', 'tagged0']);
-    expect(state.badgeKeptCommitHashes).toEqual(new Set(['tagged0']));
+    expect(state.filterKeptCommitHashes).toEqual(new Set(['tagged0']));
     expect(state.hiddenCommitHashes).toEqual(new Set());
   });
 
@@ -499,7 +499,7 @@ describe('graphStore — always show badged commits', () => {
 
     const state = useGraphStore.getState();
     expect(state.mergedCommits.map((c) => c.hash)).toEqual(['mine000']);
-    expect(state.badgeKeptCommitHashes).toEqual(new Set());
+    expect(state.filterKeptCommitHashes).toEqual(new Set());
   });
 
   it('does not recompute on a Show tags change while the option is off', () => {
@@ -520,7 +520,7 @@ describe('graphStore — always show badged commits', () => {
       alwaysShowBadgedCommits: true,
     });
 
-    expect(useGraphStore.getState().badgeKeptCommitHashes).toEqual(new Set(['tagged0']));
+    expect(useGraphStore.getState().filterKeptCommitHashes).toEqual(new Set(['tagged0']));
   });
 
   it('counts a batch holding only badge-kept commits as empty for the gap indicator', () => {
@@ -533,5 +533,97 @@ describe('graphStore — always show badged commits', () => {
     const state = useGraphStore.getState();
     expect(state.mergedCommits.map((c) => c.hash)).toContain('tagged1');
     expect(state.consecutiveEmptyBatches).toBe(1);
+  });
+});
+
+describe('graphStore — revealed commits (GH #214)', () => {
+  const foreign = (hash: string, overrides: Partial<Commit> = {}): Commit => ({
+    ...makeCommit(hash),
+    authorEmail: 'other@example.com',
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    useGraphStore.setState({
+      loading: false,
+      pendingUserSettings: undefined,
+      alwaysShowBadgedCommits: false,
+      filters: { maxCount: 500 },
+      stashes: [],
+    });
+    useGraphStore.getState().clearRevealedCommits();
+    useGraphStore.getState().setCommits([makeCommit('mine000'), foreign('other00')]);
+    useGraphStore.getState().setFilters({ authors: ['test@example.com'] });
+    useGraphStore.getState().recomputeVisibility();
+  });
+
+  const shownHashes = () => useGraphStore.getState().mergedCommits.map((c) => c.hash);
+
+  it('shows a revealed commit dimmed without touching the fetch generation', () => {
+    const { fetchGeneration } = useGraphStore.getState();
+
+    useGraphStore.getState().revealCommit('other00');
+
+    const state = useGraphStore.getState();
+    expect(shownHashes()).toEqual(['mine000', 'other00']);
+    expect(state.filterKeptCommitHashes).toEqual(new Set(['other00']));
+    expect(state.revealedCommitCount).toBe(1);
+    expect(state.fetchGeneration).toBe(fetchGeneration);
+  });
+
+  it('keeps reveals across a refresh', () => {
+    useGraphStore.getState().revealCommit('other00');
+
+    useGraphStore.getState().setCommits([makeCommit('mine000'), foreign('other00')]);
+
+    expect(shownHashes()).toEqual(['mine000', 'other00']);
+  });
+
+  it.each([
+    ['setFilters', () => useGraphStore.getState().setFilters({ textFilter: 'x' })],
+    ['resetAllFilters', () => useGraphStore.getState().resetAllFilters()],
+    ['clearRevealedCommits', () => useGraphStore.getState().clearRevealedCommits()],
+  ])('clears every reveal and bumps the generation on %s', (_name, clear) => {
+    useGraphStore.getState().revealCommit('other00');
+    useGraphStore.getState().addRevealedExtraCommit(foreign('extra00', { authorDate: 1 }));
+    const { revealGeneration } = useGraphStore.getState();
+
+    clear();
+
+    const state = useGraphStore.getState();
+    expect(state.revealedCommitHashes.size).toBe(0);
+    expect(state.revealedExtraCommits).toEqual([]);
+    expect(state.revealGeneration).toBe(revealGeneration + 1);
+  });
+
+  it('merges a fetched extra into the graph, dimmed even when it passes the filters, never into commits', () => {
+    useGraphStore.getState().addRevealedExtraCommit(makeCommit('extra00'));
+
+    const state = useGraphStore.getState();
+    expect(shownHashes()).toEqual(['mine000', 'extra00']);
+    expect(state.filterKeptCommitHashes.has('extra00')).toBe(true);
+    expect(state.commits.map((c) => c.hash)).toEqual(['mine000', 'other00']);
+  });
+
+  it('drops an extra from the extras once it is loaded normally, keeping it revealed', () => {
+    useGraphStore.getState().addRevealedExtraCommit(foreign('extra00', { authorDate: 1 }));
+
+    useGraphStore.getState().appendCommits([foreign('extra00', { authorDate: 1 })], 1);
+
+    const state = useGraphStore.getState();
+    expect(state.revealedExtraCommits).toEqual([]);
+    expect(shownHashes()).toEqual(['mine000', 'extra00']);
+    expect(state.filterKeptCommitHashes.has('extra00')).toBe(true);
+  });
+
+  it('forgets extras a refresh no longer finds', () => {
+    useGraphStore.getState().addRevealedExtraCommit(foreign('gone000', { authorDate: 1 }));
+
+    useGraphStore.getState().replaceRevealedExtraCommits([]);
+
+    const state = useGraphStore.getState();
+    expect(state.revealedCommitHashes.size).toBe(0);
+    expect(state.revealedCommitCount).toBe(0);
+    expect(shownHashes()).toEqual(['mine000']);
   });
 });

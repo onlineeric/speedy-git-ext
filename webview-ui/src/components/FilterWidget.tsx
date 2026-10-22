@@ -5,6 +5,8 @@ import { rpcClient } from '../rpc/rpcClient';
 import { MultiSelectDropdown } from './MultiSelectDropdown';
 import { SegmentedToggle, type SegmentedToggleOption } from './SegmentedToggle';
 import { buttonPrimaryColorsClassName, buttonSecondaryColorsClassName } from './dialogStyles';
+import { EyeIcon } from './icons';
+import { trackUiInteraction } from '../utils/telemetry';
 import { AuthorBadge } from './AuthorBadge';
 import { AuthorAvatar } from './AuthorAvatar';
 import { RefLabel } from './RefLabel';
@@ -548,7 +550,44 @@ export function FilterWidget() {
         )}
       </div>
 
+      <RevealedCommitsChip />
+
       <div id="datepicker-portal" />
+    </div>
+  );
+}
+
+/**
+ * Commits shown although the filters hide them, because the user navigated to them (GH #214).
+ * Sits under "Always show badged commits", the other "shown despite the filters" control.
+ */
+function RevealedCommitsChip() {
+  const count = useGraphStore((s) => s.revealedCommitCount);
+  const clearRevealedCommits = useGraphStore((s) => s.clearRevealedCommits);
+  if (count === 0) return null;
+
+  const handleHide = () => {
+    trackUiInteraction('filterPanel', 'clearRevealedCommits');
+    clearRevealedCommits();
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="w-16 flex-shrink-0" aria-hidden="true" />
+      <span
+        className="flex items-center gap-1.5 text-[var(--vscode-descriptionForeground)]"
+        title="Shown dimmed because you navigated to them although the filters hide them. Cleared when the filters change."
+      >
+        <EyeIcon className="flex-shrink-0" />
+        {count === 1 ? '1 revealed commit' : `${count} revealed commits`}
+      </span>
+      <button
+        type="button"
+        onClick={handleHide}
+        className={`px-2 py-0.5 text-xs rounded border border-[var(--vscode-button-border,transparent)] ${buttonSecondaryColorsClassName}`}
+      >
+        Hide
+      </button>
     </div>
   );
 }

@@ -19,6 +19,20 @@ const LOG_FORMAT = '%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D';
  */
 const COMMIT_POSITION_SEARCH_CAP = 100_000;
 
+/** A bare object name, SHA-1 or SHA-256 — no revision syntax, so it cannot reach git as a flag or range. */
+const OBJECT_NAME_RE = /^[0-9a-f]{4,64}$/i;
+
+/** Commits from a `LOG_FORMAT` listing, skipping lines that do not parse. */
+function parseLogOutput(stdout: string): Commit[] {
+  const commits: Commit[] = [];
+  for (const line of stdout.trim().split('\n')) {
+    if (!line) continue;
+    const parsed = parseCommitLine(line);
+    if (parsed) commits.push(parsed);
+  }
+  return commits;
+}
+
 /**
  * 0-based index of the line exactly equal to `hash` in a newline-separated
  * hash listing, or -1.
@@ -202,21 +216,39 @@ export class GitLogService {
       return result;
     }
 
-    const lines = result.value.stdout.trim().split('\n').filter(Boolean);
-    const commits: Commit[] = [];
-
-    for (const line of lines) {
-      const parsed = parseCommitLine(line);
-      if (parsed) {
-        commits.push(parsed);
-      }
-    }
-
+    const commits = parseLogOutput(result.value.stdout);
     const hasFilter = !!(filters?.branches?.length || filters?.afterDate || filters?.beforeDate);
     return ok({
       commits,
       totalLoadedWithoutFilter: hasFilter ? undefined : commits.length,
     });
+  }
+
+  /**
+   * The given commits, each formatted and decorated exactly like a `getCommits`
+   * row, regardless of any filter (GH #214: a navigation target outside the
+   * filtered stream). Hashes that are not valid object names or no longer exist
+   * are left out rather than failing the call.
+   *
+   * One `git log --no-walk` covers the batch; git refuses the whole batch over a
+   * single missing object, so only then is each hash asked for on its own.
+   */
+  async getCommitsByHash(hashes: readonly string[]): Promise<Commit[]> {
+    const valid = hashes.filter((hash) => OBJECT_NAME_RE.test(hash));
+    if (valid.length === 0) return [];
+    const batch = await this.readCommitsNoWalk(valid);
+    if (batch || valid.length === 1) return batch ?? [];
+    const singles = await Promise.all(valid.map((hash) => this.readCommitsNoWalk([hash])));
+    return singles.flatMap((commits) => commits ?? []);
+  }
+
+  /** `git log --no-walk` over `hashes`; null when git refused (e.g. a missing object). */
+  private async readCommitsNoWalk(hashes: readonly string[]): Promise<Commit[] | null> {
+    const result = await this.executor.execute({
+      args: ['log', '--no-walk', `--format=${LOG_FORMAT}`, '--decorate=full', ...hashes, '--'],
+      cwd: this.workspacePath,
+    });
+    return result.success ? parseLogOutput(result.value.stdout) : null;
   }
 
   /** Full hash of the commit HEAD points at. Fails on an unborn branch (fresh repo). */

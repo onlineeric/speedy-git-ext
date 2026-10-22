@@ -109,9 +109,9 @@ export function mergeUncommittedIntoCommits(
  * node for display. Topology is calculated from the *full* commit list (including hidden) so that
  * lane reservations remain stable when a filter toggles.
  *
- * `badgeKeptHashes` are commits shown only for their badge ("Always show badged commits"). A stash
- * on one of them stays hidden, exactly as it would on a hidden parent: the option brings back
- * branch tips, not other people's stashes.
+ * `filterKeptHashes` are commits shown despite the filters — for their badge ("Always show badged
+ * commits") or because a "Go to" navigation revealed them. A stash on one of them stays hidden,
+ * exactly as it would on a hidden parent: both bring back the commit, not other people's stashes.
  */
 export function computeMergedTopology(
   commits: Commit[],
@@ -119,13 +119,13 @@ export function computeMergedTopology(
   filters?: GraphFilters,
   hiddenHashes?: Set<string>,
   uncommitted?: UncommittedContext,
-  badgeKeptHashes?: Set<string>,
+  filterKeptHashes?: Set<string>,
 ): { mergedCommits: Commit[]; topology: GraphTopology } {
   const visibleCommits = hiddenHashes && hiddenHashes.size > 0
     ? commits.filter(c => !hiddenHashes.has(c.hash))
     : commits;
-  const visibleStashes = badgeKeptHashes && badgeKeptHashes.size > 0
-    ? stashes.filter(s => !badgeKeptHashes.has(s.parentHash))
+  const visibleStashes = filterKeptHashes && filterKeptHashes.size > 0
+    ? stashes.filter(s => !filterKeptHashes.has(s.parentHash))
     : stashes;
   let mergedCommits = mergeStashesIntoCommits(visibleCommits, visibleStashes, filters);
   if (uncommitted) {

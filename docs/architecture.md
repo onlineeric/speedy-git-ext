@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-10-21**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-10-22**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -52,7 +52,7 @@ src/
 │                                 #   resolves its base dir off that one `git worktree list`
 │   ├── OperationGuard.ts         # In-progress checks (rebase/cherry-pick/revert/merge) → GitError | null
 │   └── handlers/                 # Domain RPC handlers; fetch services from the registry at call time
-│       ├── graphDataHandlers.ts  # getCommits/loadMore/getBranches/getCommitDetails/getAuthors/refresh
+│       ├── graphDataHandlers.ts  # getCommits/loadMore/locateHead/getCommitsByHash/getBranches/getCommitDetails/getAuthors/refresh
 │       ├── branchHandlers.ts     # create/rename/delete/fast-forward branch; `git.branchPrefix` read; commit checkout; merge + continue/abort merge
 │       ├── branchCheckoutHandlers.ts # Shared branch checkout/stash/pull execution; operation guard, busy lock,
 │                                     #   repository-bound recovery and request-correlated completion
@@ -87,7 +87,7 @@ src/
 ├── services/                     # All repo-bound; every method returns Result<T, GitError>
 │   ├── index.ts                  # Barrel export for all services
 │   ├── GitExecutor.ts            # Spawns git processes, 30s timeout — the only place git is invoked
-│   ├── GitLogService.ts          # Parses git log (null-byte format), branches, branches-containing-a-commit, authors + `user.email` (Filter "Me"). Default 500 commits.
+│   ├── GitLogService.ts          # Parses git log (null-byte format), branches, branches-containing-a-commit, authors + `user.email` (Filter "Me"), unfiltered commits by hash (`--no-walk`, revealed commits). Default 500 commits.
 │   │                             #   Also walks stash base commits, so a stash survives its branch moving
 │   ├── GitDiffService.ts         # Commit details (+ parent subjects), file changes, file content at revision; submodule (gitlink) pointers
 │   ├── GitBranchService.ts       # Checkout, create, rename, delete, fast-forward branches; merge any commit-ish + merge state/continue/abort
@@ -202,7 +202,7 @@ webview-ui/src/assets.d.ts        # `*.png` imports are `data:` URLs — vite.co
 ├── ToolbarIconButton.tsx         # Shared toolbar button: icon + optional label (speedyGit.toolbar.showLabels);
 │                                 #   right-click menu toggles labels / Remote button, extensible via extraMenuItems
 ├── TogglePanel.tsx               # Collapsible panel for Filter/Search/Compare widgets
-├── FilterWidget.tsx              # Author/date filter panel (react-datepicker)
+├── FilterWidget.tsx              # Author/date filter panel (react-datepicker) + the "N revealed commits [Hide]" chip
 ├── SearchWidget.tsx              # Text search across commits. Owns the one canonical parse per recompute; typing is
 │                                 #   debounced 300ms, everything else recomputes at once in a layout effect
 ├── CompareWidget.tsx             # Branch comparison
@@ -366,13 +366,18 @@ utils/
 ├── commitMenuAvailability.ts     # Which commit actions apply (rebase/reset/revert/drop/cherry-pick/merge/amend/fixup)
 │                                 #   + hasRemoteCounterpart: does the checked-out branch have a remote (gates force push)
 ├── headNavigation.ts             # "Go to HEAD" decision logic + toast messages; also drives the details panel's
-│                                 #   Go to parent/child (decideLoadedCommitNavigation, per-target messages)
-├── commitRelations.ts            # Details panel Parents/Children links: children read off loaded commits,
-│                                 #   parent subjects, stash first-parent-only navigation, hash tooltip
+│                                 #   Go to parent/child (decideLoadedCommitNavigation, per-target messages). Every
+│                                 #   navigation lands (GH #214): `reveal` a filter-hidden target, `fetchSingle` one
+│                                 #   outside the filtered stream; "can't be shown" toasts are one reason-free sentence
+├── revealedCommits.ts            # PURE: mergeRevealedExtraCommits — revealed commits fetched from outside the stream,
+│                                 #   inserted by date but never above a loaded child / below a loaded parent
+├── commitRelations.ts            # Details panel Parents/Children links: children read off loaded + revealed commits,
+│                                 #   parent subjects, stash first-parent-only navigation, hash tooltip,
+│                                 #   childrenMayBeIncomplete (the generic "Some children may not be shown" note)
 ├── rowVisibility.ts              # Scroll-offset maths for revealing a row when the details panel resizes the viewport
 ├── commitVisibility.ts           # `computeCommitVisibility`: one pass over commits applying the Author/Message filters →
-│                                 #   hidden set + badge-kept set ("Always show badged commits", rows dimmed to the
-│                                 #   persisted `badgedCommitOpacity`, 60 or 40)
+│                                 #   hidden set + filter-kept set (badge-kept under "Always show badged commits", or
+│                                 #   revealed by a Go to navigation; rows dimmed to the persisted `badgedCommitOpacity`)
 ├── compareSlot.ts                # Compare panel slot model (Base/Target, commit-ish parsing)
 ├── dialogPosition.ts             # PURE: clamp a dragged dialog so its title stays reachable
 ├── compareDefaults.ts            # Default slot seeding

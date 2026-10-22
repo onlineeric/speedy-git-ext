@@ -8,10 +8,10 @@ import { formatRelativeDate } from '../utils/formatDate';
 import { renderInlineCode } from '../utils/inlineCodeRenderer';
 import { slotLabel } from '../utils/compareSlot';
 import { signatureGlyph } from '../utils/signatureGlyph';
-import { ADDED_COLOR, DELETED_COLOR, ERROR_COLOR, NEUTRAL_COLOR, UNTRACKED_COLOR } from '../utils/themeColors';
-import { buildChildLinks, buildParentLinks, relatedCommitTooltip, type RelatedCommitLink } from '../utils/commitRelations';
+import { ADDED_COLOR, DELETED_COLOR, ERROR_COLOR, NEUTRAL_COLOR, UNTRACKED_COLOR, WARNING_COLOR } from '../utils/themeColors';
+import { buildChildLinks, buildParentLinks, childrenMayBeIncomplete, relatedCommitTooltip, type RelatedCommitLink } from '../utils/commitRelations';
 import { trackUiInteraction } from '../utils/telemetry';
-import { CloseIcon, MoveRightIcon, MoveBottomIcon, ChevronDownIcon, ChevronRightIcon, InfoIcon, GoToHeadIcon } from './icons';
+import { CloseIcon, MoveRightIcon, MoveBottomIcon, ChevronDownIcon, ChevronRightIcon, InfoIcon, GoToHeadIcon, WarningIcon } from './icons';
 import { FileChangesTreeView } from './FileChangesTreeView';
 import { FileChangeRow, ViewModeToggle } from './FileChangeShared';
 import { AuthorBadge } from './AuthorBadge';
@@ -508,20 +508,38 @@ function CommitMetadata({ details }: { details: CommitDetails }) {
   );
 }
 
-/** The Parents and Children rows; each hash copies on click and has a "Go to" icon. */
+/**
+ * The Parents and Children rows; each hash copies on click and has a "Go to" icon.
+ * Revealed commits from outside the filtered stream count as loaded here, so a
+ * commit revealed by fetch still appears in its parent's Children row.
+ */
 function CommitRelations({ details }: { details: CommitDetails }) {
-  const commits = useGraphStore((state) => state.commits);
+  const loadedCommits = useGraphStore((state) => state.commits);
+  const revealedExtraCommits = useGraphStore((state) => state.revealedExtraCommits);
+  const beforeDate = useGraphStore((state) => state.filters.beforeDate);
   const isStash = useGraphStore((state) => state.stashes.some((stash) => stash.hash === details.hash));
+  const commits = useMemo(
+    () => (revealedExtraCommits.length === 0 ? loadedCommits : [...loadedCommits, ...revealedExtraCommits]),
+    [loadedCommits, revealedExtraCommits],
+  );
+  const isRevealedExtra = revealedExtraCommits.some((commit) => commit.hash === details.hash);
   const parents = useMemo(() => buildParentLinks(details, commits, isStash), [details, commits, isStash]);
   const children = useMemo(() => buildChildLinks(commits, details.hash), [commits, details.hash]);
+  // The uncommitted row and stashes never have children in the graph, so nothing can be missing.
+  const childrenIncomplete = details.hash !== UNCOMMITTED_HASH && !isStash && childrenMayBeIncomplete({ beforeDate }, isRevealedExtra);
 
   return (
     <>
       {parents.length > 0 && (
         <RelatedCommitsRow label={parents.length > 1 ? 'Parents' : 'Parent'} links={parents} target="parent" />
       )}
-      {children.length > 0 && (
-        <RelatedCommitsRow label={children.length > 1 ? 'Children' : 'Child'} links={children} target="child" />
+      {(children.length > 0 || childrenIncomplete) && (
+        <RelatedCommitsRow
+          label={children.length === 1 ? 'Child' : 'Children'}
+          links={children}
+          target="child"
+          note={childrenIncomplete ? 'Some children may not be shown in the current view.' : undefined}
+        />
       )}
     </>
   );
@@ -531,10 +549,13 @@ function RelatedCommitsRow({
   label,
   links,
   target,
+  note,
 }: {
   label: string;
   links: RelatedCommitLink[];
   target: 'parent' | 'child';
+  /** A muted warning line under the links. */
+  note?: string;
 }) {
   // Same busy rule as the toolbar's Go to HEAD: one navigation at a time.
   const navigationBusy = useGraphStore((state) => state.goToHeadState !== 'idle' || state.loading);
@@ -577,6 +598,12 @@ function RelatedCommitsRow({
             )}
           </span>
         ))}
+        {note && (
+          <span className="flex basis-full items-center gap-1 font-sans text-[var(--vscode-descriptionForeground)]">
+            <WarningIcon className="flex-shrink-0" style={{ color: WARNING_COLOR }} />
+            {note}
+          </span>
+        )}
       </span>
     </div>
   );

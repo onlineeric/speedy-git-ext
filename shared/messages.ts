@@ -141,6 +141,13 @@ export type RequestMessage =
    * `rev-parse` instead of a full log traversal.
    */
   | { type: 'locateHead'; payload: { filters: { branches?: string[]; afterDate?: string; beforeDate?: string }; displayedHeadHash: string | null; targetHash?: string } }
+  /**
+   * Read specific commits by hash, ignoring every filter — answered with
+   * `commitsByHash`. Serves a navigation to a commit outside the filtered log
+   * stream (GH #214) and the refresh re-validation of commits revealed that way.
+   * `requestId` pairs the answer with its request.
+   */
+  | { type: 'getCommitsByHash'; payload: { requestId: number; hashes: string[] } }
   | { type: 'openSettings'; payload: { query?: string } }
   /**
    * Current avatar authorization state, answered with `avatarAuthState`. Sent
@@ -287,6 +294,8 @@ export type ResponseMessage =
    * on an unrelated request's error that happens to arrive mid-navigation.
    */
   | { type: 'headLocationFailed'; payload: { error: GitError | { message: string } } }
+  /** Answer to `getCommitsByHash`: the requested commits that exist; never an error. */
+  | { type: 'commitsByHash'; payload: { requestId: number; commits: Commit[] } }
   | { type: 'repoList'; payload: { repos: RepoInfo[]; activeRepoPath: string } }
   | { type: 'checkoutNeedsStash'; payload: BranchCheckoutRequest }
   | { type: 'branchCheckoutFinished'; payload: { requestId: number } }
@@ -357,7 +366,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   dropCommit: true, isCommitPushed: true, getCommitParents: true,
   getCommitMessage: true, amendCommit: true,
   createFixupCommit: true, cancelCommitWait: true, getGitVersion: true,
-  loadMoreCommits: true, locateHead: true, openSettings: true, switchRepo: true, displayRepo: true,
+  loadMoreCommits: true, locateHead: true, getCommitsByHash: true, openSettings: true, switchRepo: true, displayRepo: true,
   getSettings: true, setToolbarSetting: true, setWorktreeFolderNameStyle: true,
   setCustomAutolinks: true, setRemoteAutolinksEnabled: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
   getAvatarAuthState: true, requestGitHubAuth: true, removeGitHubAuth: true, setAvatarRefreshDays: true,
@@ -384,7 +393,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   rebaseState: true, rebaseCommits: true, rebaseRangeCommits: true, gitVersion: true, signatureInfo: true,
   signaturePresence: true, signaturePresenceFailed: true, signaturesVerified: true,
   commitPushedResult: true, commitParents: true, commitMessage: true,
-  commitsAppended: true, prefetchError: true, headLocation: true, headLocationFailed: true, repoList: true,
+  commitsAppended: true, prefetchError: true, headLocation: true, headLocationFailed: true, commitsByHash: true, repoList: true,
   checkoutNeedsStash: true, branchCheckoutFinished: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, settingSaveResult: true, submodulesData: true, submoduleOperationResult: true,
   pushResult: true, avatarUrls: true, avatarAuthState: true, avatarCacheCleared: true, tagMetadata: true, worktreeList: true, worktreePathResolved: true, worktreeEnvFiles: true, branchPrefix: true, containingBranches: true,

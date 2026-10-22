@@ -111,6 +111,12 @@ export const graphDataHandlers = {
     });
   },
 
+  getCommitsByHash: async (message, context) => {
+    const { requestId, hashes } = message.payload;
+    const commits = await context.services.current().gitLogService.getCommitsByHash(hashes);
+    context.postMessage({ type: 'commitsByHash', payload: { requestId, commits } });
+  },
+
   getBranches: async (_message, context) => {
     const result = await context.services.current().gitLogService.getBranches();
     if (result.success) {
@@ -158,6 +164,7 @@ export const graphDataHandlers = {
   | 'getCommits'
   | 'loadMoreCommits'
   | 'locateHead'
+  | 'getCommitsByHash'
   | 'getBranches'
   | 'getCommitDetails'
   | 'getContainingBranches'

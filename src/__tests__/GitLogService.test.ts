@@ -289,6 +289,44 @@ describe('GitLogService.getCommitPosition', () => {
   });
 });
 
+describe('GitLogService.getCommitsByHash', () => {
+  const hashA = 'a'.repeat(40);
+  const hashB = 'b'.repeat(40);
+  const lineFor = (hash: string) => [hash, hash.slice(0, 7), '', 'Ann', 'ann@x.io', '1700000000', `subject ${hash[0]}`, ''].join('\0');
+
+  it('reads the batch with one unfiltered, decorated --no-walk log', async () => {
+    const service = new GitLogService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute')
+      .mockResolvedValue({ success: true, value: { stdout: `${lineFor(hashA)}\n${lineFor(hashB)}\n`, stderr: '' } });
+
+    const commits = await service.getCommitsByHash([hashA, hashB]);
+
+    expect(commits.map((c) => c.hash)).toEqual([hashA, hashB]);
+    expect(executeSpy).toHaveBeenCalledTimes(1);
+    expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({
+      args: ['log', '--no-walk', '--format=%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D', '--decorate=full', hashA, hashB, '--'],
+    }));
+  });
+
+  it('falls back to one log per hash when a missing object fails the batch', async () => {
+    const service = new GitLogService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute').mockImplementation(async ({ args }) => {
+      if (args.includes(hashB)) return { success: false as const, error: new GitError('bad object', 'COMMAND_FAILED') };
+      return { success: true as const, value: { stdout: lineFor(hashA), stderr: '' } };
+    });
+
+    expect((await service.getCommitsByHash([hashA, hashB])).map((c) => c.hash)).toEqual([hashA]);
+  });
+
+  it('never passes anything but a bare object name to git', async () => {
+    const service = new GitLogService('/repo', mockLog);
+    const executeSpy = vi.spyOn(service['executor'], 'execute');
+
+    expect(await service.getCommitsByHash(['--all', 'HEAD~1', ''])).toEqual([]);
+    expect(executeSpy).not.toHaveBeenCalled();
+  });
+});
+
 describe('GitLogService.getContainingBranches', () => {
   /** Answer the `git branch --contains` call with `stdout`. */
   function serviceReturning(stdout: string) {

@@ -36,14 +36,18 @@ describe('decideHeadNavigation', () => {
     expect(decideHeadNavigation(context({ mergedIndex: 3, index: 9999 }))).toEqual({ kind: 'scrollTo' });
   });
 
-  it('reports hiddenByFilter when HEAD is loaded but hidden client-side', () => {
+  it('reveals HEAD when it is loaded but hidden client-side', () => {
     expect(
       decideHeadNavigation(context({ isHiddenClientSide: true, index: 10 })),
-    ).toEqual({ kind: 'hiddenByFilter' });
+    ).toEqual({ kind: 'reveal' });
   });
 
-  it('reports notInView when HEAD is absent from the filtered log stream', () => {
-    expect(decideHeadNavigation(context({ index: -1 }))).toEqual({ kind: 'notInView' });
+  it('fetches HEAD alone when it is absent from the filtered log stream', () => {
+    expect(decideHeadNavigation(context({ index: -1 }))).toEqual({ kind: 'fetchSingle' });
+  });
+
+  it('never fetches alone a commit that is in the stream but not loaded yet', () => {
+    expect(decideHeadNavigation(context({ index: 800, loadedCount: 500 }))).toEqual({ kind: 'loadMore', targetIndex: 800 });
   });
 
   it('requests a targeted load when HEAD is deeper than the loaded commits', () => {
@@ -105,10 +109,10 @@ describe('decideHeadContinuation', () => {
     ).toEqual({ kind: 'scrollTo' });
   });
 
-  it('reports hiddenByFilter when the batch loaded the target but a filter hides it', () => {
+  it('reveals the target when the batch loaded it but a filter hides it', () => {
     expect(
       decideHeadContinuation(continuation({ isHiddenClientSide: true })),
-    ).toEqual({ kind: 'hiddenByFilter' });
+    ).toEqual({ kind: 'reveal' });
   });
 
   it('reports unreachable when history runs out before the target is found', () => {
@@ -145,8 +149,8 @@ describe('decideLoadedCommitNavigation', () => {
     expect(decideLoadedCommitNavigation({ mergedIndex: 3, isHiddenClientSide: false })).toEqual({ kind: 'scrollTo' });
   });
 
-  it('reports a loaded row hidden by the author/search filter', () => {
-    expect(decideLoadedCommitNavigation({ mergedIndex: -1, isHiddenClientSide: true })).toEqual({ kind: 'hiddenByFilter' });
+  it('reveals a loaded row hidden by the author/search filter', () => {
+    expect(decideLoadedCommitNavigation({ mergedIndex: -1, isHiddenClientSide: true })).toEqual({ kind: 'reveal' });
   });
 
   it('asks the backend to locate a commit that is not loaded', () => {
@@ -160,9 +164,17 @@ describe('COMMIT_NAVIGATION_MESSAGES', () => {
   });
 
   it('names the parent or child commit in every outcome', () => {
-    for (const kind of ['hiddenByFilter', 'notInView', 'unresolved', 'unreachable'] as const) {
+    for (const kind of ['notInView', 'unresolved', 'unreachable'] as const) {
       expect(COMMIT_NAVIGATION_MESSAGES.parent[kind]).toContain('parent commit');
       expect(COMMIT_NAVIGATION_MESSAGES.child[kind]).toContain('child commit');
+    }
+  });
+
+  it('words every "exists but cannot be shown" outcome the same, without a reason', () => {
+    for (const target of ['head', 'parent', 'child'] as const) {
+      const messages = COMMIT_NAVIGATION_MESSAGES[target];
+      expect(messages.notInView).toBe(messages.unreachable);
+      expect(messages.notInView).toMatch(/can't be shown in the current view\.$/);
     }
   });
 });
