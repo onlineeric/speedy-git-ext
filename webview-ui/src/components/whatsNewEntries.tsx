@@ -8,6 +8,8 @@ import { MultiTabIllustration } from './MultiTabIllustration';
 import autolinksRowScreenshot from '../../../resources/autolinks.png';
 import settingsAutolinksScreenshot from '../../../resources/settings-autolinks.png';
 import filtersShowBadgedScreenshot from '../../../resources/Filters_show-badged.png';
+import goToParentChildrenScreenshot from '../../../resources/goto-parent-children.png';
+import revealCommitScreenshot from '../../../resources/reveal-commit.png';
 import { BranchIcon, CloudIcon, GoToHeadIcon, NewTabIcon } from './icons';
 import { SubmoduleBadge } from './FileChangeShared';
 import { InlineRefBadge } from './InlineRefBadge';
@@ -85,6 +87,86 @@ export interface WhatsNewEntry {
  * with nothing worth interrupting for needs no other opt-out.
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
+  {
+    version: '5.21.0',
+    headline: 'Go to parent, child or HEAD now always lands, even when a filter hides the commit.',
+    illustration: <CommitNavigationIllustration />,
+    content: (
+      <div className="space-y-6">
+        <ContributorThanks login="tbuyukliev">
+          This release comes from your request in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/214">#214</ExternalLink>, to reach a
+          topic branch’s fork point while the graph shows only your commits, so you can{' '}
+          <UiLabel>Reset Current Branch to Here</UiLabel> and tidy the branch before review.
+        </ContributorThanks>
+
+        <WhatsNewSection title="Find the fork point in a filtered view">
+          <StepFlow>
+            <Step label="1" title="Go to it" accent={SHOWCASE_BLUE_COLOR}>
+              Select a commit and click the <GoToHeadIcon className="inline h-3 w-3 align-[-1px]" /> icon beside a
+              hash in the <UiLabel>Parent</UiLabel> or <UiLabel>Children</UiLabel> row of the details panel.
+            </Step>
+            <Step label="2" title="It is revealed" accent={SHOWCASE_PURPLE_COLOR}>
+              If the <UiLabel>Authors</UiLabel> or <UiLabel>Message</UiLabel> filter hides it, the commit is shown
+              anyway, dimmed, and selected. The rest of the filter still applies.
+            </Step>
+            <Step label="3" title="Act on it" accent={SHOWCASE_GREEN_COLOR}>
+              Right-click it, for example to <UiLabel>Reset Current Branch to Here</UiLabel>.
+            </Step>
+          </StepFlow>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="Click Go to parent or Go to child">
+          <Screenshot
+            src={goToParentChildrenScreenshot}
+            alt="The details panel's Parent and Children rows, each hash followed by a Go to icon"
+            width={380}
+            height={134}
+            caption={
+              <>
+                Every hash in <UiLabel>Parent</UiLabel> and <UiLabel>Children</UiLabel> has its own Go to icon.
+              </>
+            }
+          />
+        </WhatsNewSection>
+
+        <WhatsNewSection title="The revealed commit joins the filtered graph">
+          <Screenshot
+            src={revealCommitScreenshot}
+            alt="The graph filtered to one author, with a dimmed commit by another author selected, and the Filter panel showing 1 revealed commit with a Hide button"
+            width={920}
+            height={631}
+            caption={
+              <>
+                Filtered to Bob Martinez, the fork point by another author is revealed, dimmed like a badged commit.
+                The Filter panel counts it: <UiLabel>1 revealed commit</UiLabel>.
+              </>
+            }
+          />
+        </WhatsNewSection>
+
+        <WhatsNewSection title="How it behaves">
+          <FeatureGrid>
+            <FeatureCard mark="◎" title="Go to HEAD too" accent={SHOWCASE_ORANGE_COLOR}>
+              <UiLabel>HEAD</UiLabel> in the toolbar lands the same way, even when the <UiLabel>Branches</UiLabel>{' '}
+              filter leaves out your current branch.
+            </FeatureCard>
+            <FeatureCard mark="⌚" title="Outside the dates" accent={SHOWCASE_BLUE_COLOR}>
+              A commit outside the <UiLabel>Dates</UiLabel> range is fetched on its own and placed in the graph.
+            </FeatureCard>
+            <FeatureCard mark="✕" title="Hide them again" accent={SHOWCASE_PURPLE_COLOR}>
+              Click <UiLabel>Hide</UiLabel> next to the count. Changing any filter or <UiLabel>Reset All</UiLabel>{' '}
+              clears them too; a refresh keeps them.
+            </FeatureCard>
+            <FeatureCard mark="!" title="Children may be missing" accent={SHOWCASE_RED_COLOR}>
+              When a date filter or a revealed commit means some children are not loaded, the{' '}
+              <UiLabel>Children</UiLabel> row says so.
+            </FeatureCard>
+          </FeatureGrid>
+        </WhatsNewSection>
+      </div>
+    ),
+  },
   {
     version: '5.20.0',
     headline: 'Filter to your own commits and still see every branch tip.',
