@@ -2,12 +2,15 @@
  * The Parents / Children rows of the commit details panel (pure, unit-tested).
  *
  * Parents come from git (`CommitDetails.parents`). Children do not: git keeps no
- * link from a commit to its children, so they are read off the loaded commits.
- * That is complete for the current view — the log is `--date-order`, which never
- * lists a parent before all of its children, so any child the view contains is
- * loaded by the time its parent is.
+ * link from a commit to its children, so they are read off the loaded commits
+ * plus the revealed commits fetched from outside the filtered stream (GH #214).
+ * The log is `--date-order`, which never lists a parent before all of its
+ * children, so any child the stream contains is loaded by the time its parent is.
+ * A child outside the stream (newer than a Date filter's end, or the child of a
+ * revealed commit) is never loaded and so not listed — discovering it would cost
+ * a history walk per details open — which `childrenMayBeIncomplete` warns about.
  */
-import type { Commit, CommitDetails } from '@shared/types';
+import type { Commit, CommitDetails, GraphFilters } from '@shared/types';
 
 /** One hash in a Parents / Children row. */
 export interface RelatedCommitLink {
@@ -44,13 +47,32 @@ export function buildParentLinks(
   }));
 }
 
-/** The child links for a details view; every child is a loaded commit. */
+/** The child links for a details view; every child is a loaded (or revealed) commit. */
 export function buildChildLinks(commits: readonly Commit[], hash: string): RelatedCommitLink[] {
   return findChildCommits(commits, hash).map((commit) => ({
     hash: commit.hash,
     subject: commit.subject,
     navigable: true,
   }));
+}
+
+/**
+ * Whether the Children row may be missing children the repository has. Reason-
+ * agnostic on purpose: the panel shows one generic note, so a new cause is one
+ * more condition here, never a new message.
+ *
+ * - A Date filter end: children newer than the range are never loaded. A start
+ *   alone cannot hide a loaded commit's children — they are newer, so in range.
+ * - A revealed commit from outside the stream: its children may be outside too.
+ *
+ * The Branch filter never counts: a child on an unselected branch is outside
+ * what the user asked to see.
+ */
+export function childrenMayBeIncomplete(
+  filters: Pick<GraphFilters, 'beforeDate'>,
+  isRevealedExtra: boolean,
+): boolean {
+  return !!filters.beforeDate || isRevealedExtra;
 }
 
 /** Tooltip for a Parents / Children hash link: the copy hint, then the subject. */

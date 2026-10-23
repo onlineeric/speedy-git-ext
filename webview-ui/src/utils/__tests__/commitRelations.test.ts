@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Commit } from '@shared/types';
-import { buildChildLinks, buildParentLinks, findChildCommits, relatedCommitTooltip } from '../commitRelations';
+import { buildChildLinks, buildParentLinks, childrenMayBeIncomplete, findChildCommits, relatedCommitTooltip } from '../commitRelations';
 
 function commit(hash: string, parents: string[], subject = `subject ${hash}`): Commit {
   return { hash, abbreviatedHash: hash.slice(0, 7), parents, author: 'A', authorEmail: 'a@x', authorDate: 0, subject, refs: [] };
@@ -58,5 +58,26 @@ describe('relatedCommitTooltip', () => {
 
   it('shows only the copy hint when the subject is unknown', () => {
     expect(relatedCommitTooltip({ hash: 'abc' })).toBe('Click to copy: abc');
+  });
+});
+
+describe('revealed commits (GH #214)', () => {
+  it('finds a child among the revealed extras merged into the list', () => {
+    const withExtra = [...commits, commit('revealedChild', ['root'])];
+    expect(buildChildLinks(withExtra, 'root').map((link) => link.hash)).toEqual(['main1', 'feat1', 'revealedChild']);
+  });
+});
+
+describe('childrenMayBeIncomplete', () => {
+  it('is false with no Date filter end for a loaded commit', () => {
+    expect(childrenMayBeIncomplete({}, false)).toBe(false);
+  });
+
+  it('is true while a Date filter end hides newer children', () => {
+    expect(childrenMayBeIncomplete({ beforeDate: '2026-01-01T23:59:59' }, false)).toBe(true);
+  });
+
+  it('is true for a revealed commit from outside the stream', () => {
+    expect(childrenMayBeIncomplete({}, true)).toBe(true);
   });
 });

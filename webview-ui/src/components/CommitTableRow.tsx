@@ -106,7 +106,7 @@ interface CommitTableRowProps {
    * a badge ("Always show badged commits"): the opacity its cells are dimmed to. The graph
    * lane is never dimmed, so lines stay continuous with the rows around it.
    */
-  badgeKeptOpacity?: BadgedCommitOpacity;
+  filterKeptOpacity?: BadgedCommitOpacity;
   onClick: (event: React.MouseEvent) => void;
   onNodeMouseEnter?: (hash: string, rect: DOMRect) => void;
   onNodeMouseLeave?: () => void;
@@ -128,7 +128,7 @@ export const CommitTableRow = memo(function CommitTableRow({
   isCurrentSearchMatch = false,
   searchTerms = EMPTY_SEARCH_TERMS,
   isFlashing = false,
-  badgeKeptOpacity,
+  filterKeptOpacity,
   onClick,
   onNodeMouseEnter,
   onNodeMouseLeave,
@@ -220,13 +220,13 @@ export const CommitTableRow = memo(function CommitTableRow({
           onNodeMouseLeave,
         });
         // Dimmed inside the cell so the column divider keeps full opacity; the graph lane stays undimmed.
-        const dimmed = badgeKeptOpacity !== undefined && column.id !== 'graph';
+        const dimmed = filterKeptOpacity !== undefined && column.id !== 'graph';
         return (
           <div
             key={column.id}
             className={`min-w-0 overflow-hidden px-2 ${columnIndex < layout.columns.length - 1 ? 'border-r border-[var(--vscode-panel-border)]' : ''}`}
           >
-            {dimmed ? <div className="h-full" style={{ opacity: badgeKeptOpacity / 100 }}>{cellContent}</div> : cellContent}
+            {dimmed ? <div className="h-full" style={{ opacity: filterKeptOpacity / 100 }}>{cellContent}</div> : cellContent}
           </div>
         );
       })}

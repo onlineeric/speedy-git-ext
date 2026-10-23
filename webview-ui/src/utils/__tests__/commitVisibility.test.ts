@@ -5,6 +5,7 @@ import { computeCommitVisibility, type VisibilityOptions } from '../commitVisibi
 const OPTION_OFF: VisibilityOptions = {
   alwaysShowBadgedCommits: false,
   badgeSettings: { showTags: true, showRemoteBranches: true },
+  revealedCommitHashes: new Set(),
 };
 
 function computeHiddenCommitHashes(commits: Commit[], filters: GraphFilters): Set<string> {
@@ -90,41 +91,42 @@ describe('computeCommitVisibility — always show badged commits', () => {
   const optionOn = (badgeSettings = { showTags: true, showRemoteBranches: true }): VisibilityOptions => ({
     alwaysShowBadgedCommits: true,
     badgeSettings,
+    revealedCommitHashes: new Set(),
   });
   const foreign = (hash: string, refs: RefInfo[] = []) => commit({ hash, authorEmail: 'bob@example.com', refs });
 
-  it('leaves results unchanged and reports no badge-kept commits when the option is off', () => {
+  it('leaves results unchanged and reports no filter-kept commits when the option is off', () => {
     const commits = [foreign('a', [ref('branch', 'main')]), foreign('b')];
     const result = computeCommitVisibility(commits, authorFilter, OPTION_OFF);
     expect(result.hiddenCommitHashes).toEqual(new Set(['a', 'b']));
-    expect(result.badgeKeptCommitHashes).toEqual(new Set());
+    expect(result.filterKeptCommitHashes).toEqual(new Set());
   });
 
   it('keeps a foreign commit with a local branch, and hides one without refs', () => {
     const commits = [foreign('a', [ref('branch', 'main')]), foreign('b')];
     const result = computeCommitVisibility(commits, authorFilter, optionOn());
-    expect(result.badgeKeptCommitHashes).toEqual(new Set(['a']));
+    expect(result.filterKeptCommitHashes).toEqual(new Set(['a']));
     expect(result.hiddenCommitHashes).toEqual(new Set(['b']));
   });
 
-  it('does not mark a commit that passes the filter as badge-kept', () => {
+  it('does not mark a commit that passes the filter as filter-kept', () => {
     const commits = [commit({ hash: 'mine', refs: [ref('branch', 'feature')] })];
     const result = computeCommitVisibility(commits, authorFilter, optionOn());
-    expect(result.badgeKeptCommitHashes).toEqual(new Set());
+    expect(result.filterKeptCommitHashes).toEqual(new Set());
     expect(result.hiddenCommitHashes).toEqual(new Set());
   });
 
   it('counts a tag only while tags are shown', () => {
     const commits = [foreign('t', [ref('tag', 'v1.0')])];
-    expect(computeCommitVisibility(commits, authorFilter, optionOn()).badgeKeptCommitHashes).toEqual(new Set(['t']));
+    expect(computeCommitVisibility(commits, authorFilter, optionOn()).filterKeptCommitHashes).toEqual(new Set(['t']));
     const hidden = computeCommitVisibility(commits, authorFilter, optionOn({ showTags: false, showRemoteBranches: true }));
     expect(hidden.hiddenCommitHashes).toEqual(new Set(['t']));
-    expect(hidden.badgeKeptCommitHashes).toEqual(new Set());
+    expect(hidden.filterKeptCommitHashes).toEqual(new Set());
   });
 
   it('counts a remote-only branch only while remote branches are shown', () => {
     const commits = [foreign('r', [remote('feature')])];
-    expect(computeCommitVisibility(commits, authorFilter, optionOn()).badgeKeptCommitHashes).toEqual(new Set(['r']));
+    expect(computeCommitVisibility(commits, authorFilter, optionOn()).filterKeptCommitHashes).toEqual(new Set(['r']));
     const hidden = computeCommitVisibility(commits, authorFilter, optionOn({ showTags: true, showRemoteBranches: false }));
     expect(hidden.hiddenCommitHashes).toEqual(new Set(['r']));
   });
@@ -132,12 +134,12 @@ describe('computeCommitVisibility — always show badged commits', () => {
   it('keeps a local+remote branch when remote branches are hidden (degraded to local)', () => {
     const commits = [foreign('m', [ref('branch', 'main'), remote('main')])];
     const result = computeCommitVisibility(commits, authorFilter, optionOn({ showTags: true, showRemoteBranches: false }));
-    expect(result.badgeKeptCommitHashes).toEqual(new Set(['m']));
+    expect(result.filterKeptCommitHashes).toEqual(new Set(['m']));
   });
 
   it('keeps a detached HEAD commit', () => {
     const commits = [foreign('d', [ref('head', 'HEAD')])];
-    expect(computeCommitVisibility(commits, authorFilter, optionOn()).badgeKeptCommitHashes).toEqual(new Set(['d']));
+    expect(computeCommitVisibility(commits, authorFilter, optionOn()).filterKeptCommitHashes).toEqual(new Set(['d']));
   });
 
   it('applies the same rules to the Message filter alone', () => {
@@ -146,7 +148,7 @@ describe('computeCommitVisibility — always show badged commits', () => {
       commit({ hash: 'b', subject: 'unrelated' }),
     ];
     const result = computeCommitVisibility(commits, { textFilter: 'login' } as GraphFilters, optionOn());
-    expect(result.badgeKeptCommitHashes).toEqual(new Set(['a']));
+    expect(result.filterKeptCommitHashes).toEqual(new Set(['a']));
     expect(result.hiddenCommitHashes).toEqual(new Set(['b']));
   });
 
@@ -154,7 +156,7 @@ describe('computeCommitVisibility — always show badged commits', () => {
     const commits = [foreign('a', [ref('branch', 'main')]), foreign('b')];
     const result = computeCommitVisibility(commits, {} as GraphFilters, optionOn());
     expect(result.hiddenCommitHashes).toEqual(new Set());
-    expect(result.badgeKeptCommitHashes).toEqual(new Set());
+    expect(result.filterKeptCommitHashes).toEqual(new Set());
   });
 
   it('never puts stash or uncommitted entries in either set', () => {
@@ -164,6 +166,44 @@ describe('computeCommitVisibility — always show badged commits', () => {
     ];
     const result = computeCommitVisibility(commits, authorFilter, optionOn());
     expect(result.hiddenCommitHashes).toEqual(new Set());
-    expect(result.badgeKeptCommitHashes).toEqual(new Set());
+    expect(result.filterKeptCommitHashes).toEqual(new Set());
+  });
+});
+
+describe('computeCommitVisibility — revealed commits (GH #214)', () => {
+  const authorFilter = { authors: ['alice@example.com'] } as GraphFilters;
+  const foreign = (hash: string, refs: RefInfo[] = []) => commit({ hash, authorEmail: 'bob@example.com', refs });
+  const revealing = (hashes: string[], alwaysShowBadgedCommits = false): VisibilityOptions => ({
+    ...OPTION_OFF,
+    alwaysShowBadgedCommits,
+    revealedCommitHashes: new Set(hashes),
+  });
+
+  it('keeps a revealed commit that fails the filter, dimmed', () => {
+    const commits = [foreign('x'), foreign('y')];
+    const result = computeCommitVisibility(commits, authorFilter, revealing(['x']));
+    expect(result.filterKeptCommitHashes).toEqual(new Set(['x']));
+    expect(result.hiddenCommitHashes).toEqual(new Set(['y']));
+  });
+
+  it('feeds badge-kept and revealed commits into the one filter-kept set', () => {
+    const commits = [foreign('tip', [ref('branch', 'main')]), foreign('x'), foreign('y')];
+    const result = computeCommitVisibility(commits, authorFilter, revealing(['x'], true));
+    expect(result.filterKeptCommitHashes).toEqual(new Set(['tip', 'x']));
+    expect(result.hiddenCommitHashes).toEqual(new Set(['y']));
+  });
+
+  it('does not dim a revealed commit that passes the filters', () => {
+    const commits = [commit({ hash: 'mine' })];
+    const result = computeCommitVisibility(commits, authorFilter, revealing(['mine']));
+    expect(result.filterKeptCommitHashes).toEqual(new Set());
+    expect(result.hiddenCommitHashes).toEqual(new Set());
+  });
+
+  it('matches the unrevealed output when nothing is revealed', () => {
+    const commits = [foreign('x'), commit({ hash: 'mine' })];
+    expect(computeCommitVisibility(commits, authorFilter, revealing([]))).toEqual(
+      computeCommitVisibility(commits, authorFilter, OPTION_OFF),
+    );
   });
 });

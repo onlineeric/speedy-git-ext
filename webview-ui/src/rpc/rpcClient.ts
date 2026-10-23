@@ -2,7 +2,7 @@ import type { RequestMessage, ResponseMessage } from '@shared/messages';
 import type { CustomAutolink } from '@shared/autolinks';
 import type { FixupCommitArgsOptions } from '@shared/fixupCommit';
 import type { RefExpectation } from '@shared/refRevalidation';
-import type { BranchCheckoutTarget, CherryPickOptions, CompareMode, GraphFilters, InteractiveRebaseConfig, RebaseRangeCommit, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting, WorktreeFolderNameStyle } from '@shared/types';
+import type { BranchCheckoutTarget, CherryPickOptions, Commit, CompareMode, GraphFilters, InteractiveRebaseConfig, RebaseRangeCommit, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting, WorktreeFolderNameStyle } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import {
   COMMIT_NAVIGATION_MESSAGES,
@@ -82,6 +82,13 @@ class RpcClient {
   private pendingDialogAction: { resolve: () => void; reject: (error: string) => void } | null = null;
   /** Settings dialog saves awaiting their `settingSaveResult`, by request id. */
   private pendingSettingSaves = new Map<number, (outcome: SettingSaveOutcome) => void>();
+  /**
+   * In-flight `getCommitsByHash` requests (GH #214): a navigation fetching its
+   * out-of-stream target, or a refresh re-reading the revealed extras. Each
+   * carries the `revealGeneration` it was asked under; a reply that outlived a
+   * filter change, repo switch or Hide is dropped.
+   */
+  private pendingCommitsByHash = new Map<number, { purpose: 'navigate'; hash: string; revealGeneration: number } | { purpose: 'revalidate'; revealGeneration: number }>();
 
   private messageHandler = (event: MessageEvent) => {
     const message = event.data as ResponseMessage;
@@ -128,6 +135,7 @@ class RpcClient {
     switch (message.type) {
       case 'commits':
         store.setCommits(message.payload.commits);
+        this.revalidateRevealedExtras();
         this.applyPendingHeadSelection();
         if (message.payload.totalLoadedWithoutFilter !== undefined) {
           store.setTotalLoadedWithoutFilter(message.payload.totalLoadedWithoutFilter);
@@ -175,6 +183,9 @@ class RpcClient {
         this.applyHeadNavigation(decision, hash);
         break;
       }
+      case 'commitsByHash':
+        this.handleCommitsByHash(message.payload.requestId, message.payload.commits);
+        break;
       case 'headLocationFailed':
         // Only this response — never the generic `error` below — ends the flow
         // on a failure, because only this one is known to belong to it.
@@ -451,6 +462,7 @@ class RpcClient {
         break;
       case 'initialData':
         store.setInitialData(message.payload);
+        if (message.payload.commits !== null) this.revalidateRevealedExtras();
         store.setIsLoadingRepo(false);
         this.applyPendingHeadSelection();
         if (message.payload.errors.length > 0) {
@@ -1071,6 +1083,21 @@ class RpcClient {
           this.refreshDetailsPanelIfOpen(hash);
         }
         break;
+      case 'reveal':
+        if (hash) {
+          store.revealCommit(hash);
+          if (useGraphStore.getState().navigateToCommit(hash)) this.refreshDetailsPanelIfOpen(hash);
+        }
+        break;
+      case 'fetchSingle': {
+        if (!hash) break;
+        // Stays busy until the reply lands, so a second click cannot start a parallel navigation.
+        store.setGoToHeadState('loading');
+        const requestId = this.nextRequestId++;
+        this.pendingCommitsByHash.set(requestId, { purpose: 'navigate', hash, revealGeneration: store.revealGeneration });
+        this.send({ type: 'getCommitsByHash', payload: { requestId, hashes: [hash] } });
+        break;
+      }
       case 'loadMore': {
         if (!hash) break;
         store.setPendingHead({
@@ -1082,13 +1109,56 @@ class RpcClient {
         this.requestTargetedBatch(decision.targetIndex);
         break;
       }
-      // hiddenByFilter / notInView / unresolved: each decision kind is also its
+      // notInView / unresolved / unreachable: each decision kind is also its
       // user-facing message key, so one branch handles all the terminal cases.
       default:
         store.resetGoToHead();
         store.setError(COMMIT_NAVIGATION_MESSAGES[store.navigationTarget][decision.kind]);
         break;
     }
+  }
+
+  /**
+   * A refresh can rebase a revealed extra away or move its badges, so re-read
+   * them all in one request. Revealed *loaded* commits need no check: a commit
+   * that is gone is simply no longer loaded.
+   */
+  private revalidateRevealedExtras() {
+    const { revealedExtraCommits, revealGeneration } = useGraphStore.getState();
+    if (revealedExtraCommits.length === 0) return;
+    const requestId = this.nextRequestId++;
+    this.pendingCommitsByHash.set(requestId, { purpose: 'revalidate', revealGeneration });
+    this.send({ type: 'getCommitsByHash', payload: { requestId, hashes: revealedExtraCommits.map((commit) => commit.hash) } });
+  }
+
+  private handleCommitsByHash(requestId: number, commits: Commit[]) {
+    const request = this.pendingCommitsByHash.get(requestId);
+    if (!request) return;
+    this.pendingCommitsByHash.delete(requestId);
+    const store = useGraphStore.getState();
+    const isStale = request.revealGeneration !== store.revealGeneration;
+
+    if (request.purpose === 'revalidate') {
+      if (!isStale) store.replaceRevealedExtraCommits(commits);
+      return;
+    }
+    // A refresh mid-fetch already ended the navigation; a filter change voids it quietly.
+    if (store.goToHeadState === 'idle') return;
+    if (isStale) {
+      store.resetGoToHead();
+      return;
+    }
+    const commit = commits.find((candidate) => candidate.hash === request.hash);
+    if (commit) {
+      store.addRevealedExtraCommit(commit);
+      if (useGraphStore.getState().navigateToCommit(request.hash)) {
+        this.refreshDetailsPanelIfOpen(request.hash);
+        return;
+      }
+    }
+    // Gone from the repository since it was located: a genuinely stale view.
+    store.resetGoToHead();
+    store.setError(COMMIT_NAVIGATION_MESSAGES[store.navigationTarget].notInView);
   }
 
   /**

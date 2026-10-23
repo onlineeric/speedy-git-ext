@@ -138,6 +138,8 @@ export const UI_SURFACES = [
   'autolinkSettings',
   // The Settings dialog's footer, shown while a setting has unsaved changes
   'settingsDialog',
+  // The Filter panel (its own controls; opening/closing it is a panelToggle)
+  'filterPanel',
 ] as const;
 
 export type UiSurface = (typeof UI_SURFACES)[number];
@@ -197,6 +199,8 @@ export const UI_ACTIONS = [
   'columnShowSignature', 'columnHideSignature',
   // Commit details panel: the navigate icon beside a Parents/Children hash
   'goToParent', 'goToChild',
+  // Filter panel: the revealed-commits chip's Hide button
+  'clearRevealedCommits',
   // Avatar settings section (View popover) + the Author-header shortcut to it
   'avatarAuthorizeClick', 'avatarRemoveTokenClick', 'avatarRefreshDaysChange', 'avatarSettingsShortcut', 'avatarClearCache',
   // An autolink in a commit message was opened, by which kind of rule matched it

@@ -5,6 +5,11 @@
  * position in the filtered log stream. This module turns that answer — plus
  * the webview's current load/filter state — into one concrete next step for
  * the RPC client to execute.
+ *
+ * Every navigation reaches its commit regardless of the filters (GH #214): a
+ * target hidden by a client-side filter is *revealed* (shown dimmed), and one
+ * outside the backend-filtered stream is *fetched* by hash. Only a commit that
+ * cannot be found or loaded ends in a toast.
  */
 
 /** Everything the decision needs, snapshotted from the store + backend answer. */
@@ -32,9 +37,11 @@ export type HeadNavigationDecision =
   | { kind: 'scrollTo' }
   /** HEAD is deeper than what is loaded — request commits up to its position. */
   | { kind: 'loadMore'; targetIndex: number }
-  /** HEAD is loaded but hidden by a client-side author/search filter. */
-  | { kind: 'hiddenByFilter' }
-  /** HEAD is not part of the filtered log stream (branch/date filters), or the view is stale. */
+  /** HEAD is loaded but hidden by a client-side author/search filter — reveal it, then scroll. */
+  | { kind: 'reveal' }
+  /** HEAD is not part of the filtered log stream (branch/date filters) — fetch it alone, then scroll. */
+  | { kind: 'fetchSingle' }
+  /** The view is stale: HEAD's located position no longer matches what is loaded. */
   | { kind: 'notInView' }
   /** HEAD could not be resolved at all (e.g. repository without commits). */
   | { kind: 'unresolved' };
@@ -47,12 +54,17 @@ export function decideHeadNavigation(context: HeadLocationContext): HeadNavigati
     return { kind: 'scrollTo' };
   }
   if (context.isHiddenClientSide) {
-    return { kind: 'hiddenByFilter' };
+    return { kind: 'reveal' };
   }
-  // No usable position: either HEAD is not in the filtered stream (-1), or the
-  // position walk was skipped for a displayed row that has since gone (null,
-  // raced with a refresh). Both leave a refresh as the way forward.
-  if (context.index === null || context.index < 0) {
+  // Outside the filtered stream: loading more can never reach it, so it is
+  // fetched on its own. Never for a commit that *is* in the stream but not
+  // loaded yet — inserted alone, it would sit below a gap of unloaded commits.
+  if (context.index !== null && context.index < 0) {
+    return { kind: 'fetchSingle' };
+  }
+  // The position walk was skipped for a displayed row that has since gone
+  // (raced with a refresh) — a refresh is the way forward.
+  if (context.index === null) {
     return { kind: 'notInView' };
   }
   if (context.index >= context.loadedCount && context.hasMore) {
@@ -85,14 +97,14 @@ export interface HeadContinuationContext {
 export type HeadContinuationDecision =
   | { kind: 'scrollTo' }
   | { kind: 'loadMore'; targetIndex: number }
-  | { kind: 'hiddenByFilter' }
+  | { kind: 'reveal' }
   /** Ran out of history, or hit the attempt cap, without reaching HEAD. */
   | { kind: 'unreachable' };
 
 /**
  * Decide the next step after a targeted batch lands: navigate once the target
- * row exists, otherwise keep requesting batches until it is found, filtered
- * out, exhausted or capped.
+ * row exists, reveal it once it is loaded but filtered out, otherwise keep
+ * requesting batches until it is found, exhausted or capped.
  *
  * Kept here beside `decideHeadNavigation` rather than in the RPC client so both
  * halves of one navigation state machine answer to the same rules — and so the
@@ -103,7 +115,7 @@ export function decideHeadContinuation(context: HeadContinuationContext): HeadCo
     return { kind: 'scrollTo' };
   }
   if (context.isHiddenClientSide) {
-    return { kind: 'hiddenByFilter' };
+    return { kind: 'reveal' };
   }
   if (!context.hasMore || context.attempts >= MAX_GO_TO_HEAD_LOADS) {
     return { kind: 'unreachable' };
@@ -120,24 +132,31 @@ export function decideHeadContinuation(context: HeadContinuationContext): HeadCo
  */
 export type CommitNavigationTarget = 'head' | 'parent' | 'child';
 
-type NavigationMessageKind = 'hiddenByFilter' | 'notInView' | 'unresolved' | 'unreachable';
+type NavigationMessageKind = 'notInView' | 'unresolved' | 'unreachable';
+
+/**
+ * The commit exists but could not be brought on screen. Deliberately one
+ * reason-free sentence for every such outcome: a new cause reuses it rather
+ * than each needing its own wording.
+ */
+function cannotShowMessage(label: string): string {
+  return `The ${label} commit can't be shown in the current view.`;
+}
 
 /** User-facing toast messages for the non-navigating outcomes. */
-export const HEAD_NAVIGATION_MESSAGES = {
-  hiddenByFilter: 'The HEAD commit is hidden by the current author or search filter.',
-  notInView: 'The HEAD commit is not in the current view. Clear filters or refresh and try again.',
+export const HEAD_NAVIGATION_MESSAGES: Record<NavigationMessageKind, string> = {
+  notInView: cannotShowMessage('HEAD'),
   unresolved: 'Could not resolve HEAD — the repository may not have any commits yet.',
-  unreachable: 'Could not reach the HEAD commit. Refresh and try again.',
-} as const;
+  unreachable: cannotShowMessage('HEAD'),
+};
 
 function relatedCommitMessages(label: 'parent' | 'child'): Record<NavigationMessageKind, string> {
   return {
-    hiddenByFilter: `The ${label} commit is hidden by the current author or search filter.`,
-    notInView: `The ${label} commit is not in the current view. Clear filters or refresh and try again.`,
+    notInView: cannotShowMessage(label),
     // A parent/child navigation starts from a known hash, so this is a stale
     // view rather than an empty repository.
     unresolved: `Could not find the ${label} commit. Refresh and try again.`,
-    unreachable: `Could not reach the ${label} commit. Refresh and try again.`,
+    unreachable: cannotShowMessage(label),
   };
 }
 
@@ -158,18 +177,18 @@ export interface LoadedCommitContext {
 
 export type LoadedCommitDecision =
   | { kind: 'scrollTo' }
-  | { kind: 'hiddenByFilter' }
+  | { kind: 'reveal' }
   /** Not loaded yet — ask the backend for its position (`locateHead` with a `targetHash`). */
   | { kind: 'locate' };
 
 /**
  * First step of a navigation whose hash is already known (parent/child). A row
- * that is displayed or filtered out needs no backend round trip; only a commit
+ * that is displayed or filtered out (revealed) needs no backend round trip; only a commit
  * deeper than the loaded batches must be located first.
  */
 export function decideLoadedCommitNavigation(context: LoadedCommitContext): LoadedCommitDecision {
   if (context.mergedIndex >= 0) return { kind: 'scrollTo' };
-  if (context.isHiddenClientSide) return { kind: 'hiddenByFilter' };
+  if (context.isHiddenClientSide) return { kind: 'reveal' };
   return { kind: 'locate' };
 }
 

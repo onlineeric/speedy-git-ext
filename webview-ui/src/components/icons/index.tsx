@@ -529,6 +529,27 @@ export function InfoIcon({ className, style }: IconProps) {
   );
 }
 
+/** Warning triangle with "!" — 12×12, inherits text color via currentColor. */
+export function WarningIcon({ className, style }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} style={style} aria-hidden>
+      <path d="M 6 1.2 L 11.2 10.4 L 0.8 10.4 Z" stroke="currentColor" strokeWidth={1.1} strokeLinejoin="round" />
+      <line x1={6} y1={4.4} x2={6} y2={7.2} stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" />
+      <circle cx={6} cy={8.8} r={0.65} fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Eye — 12×12, for commits revealed despite the filters. Inherits text color via currentColor. */
+export function EyeIcon({ className, style }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} style={style} aria-hidden>
+      <path d="M 0.8 6 Q 6 0.6 11.2 6 Q 6 11.4 0.8 6 Z" stroke="currentColor" strokeWidth={1.1} strokeLinejoin="round" />
+      <circle cx={6} cy={6} r={1.7} fill="currentColor" />
+    </svg>
+  );
+}
+
 /** The collapsed toolbar group's trigger — the overflow kebab. */
 export function MoreIcon({ className }: IconProps) {
   return (

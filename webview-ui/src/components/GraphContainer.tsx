@@ -38,7 +38,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
   const hasMore = useGraphStore((state) => state.hasMore);
   const lastBatchStartIndex = useGraphStore((state) => state.lastBatchStartIndex);
   const hiddenCommitHashes = useGraphStore((state) => state.hiddenCommitHashes);
-  const badgeKeptCommitHashes = useGraphStore((state) => state.badgeKeptCommitHashes);
+  const filterKeptCommitHashes = useGraphStore((state) => state.filterKeptCommitHashes);
   const badgedCommitOpacity = useGraphStore((state) => state.badgedCommitOpacity);
   const showGapIndicator = useGraphStore((state) => state.showGapIndicator);
   const filteredOutCount = useGraphStore((state) => state.filteredOutCount);
@@ -389,7 +389,7 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
                     isCurrentSearchMatch={isCurrentSearchMatch}
                     searchTerms={isSearchMatch ? searchTerms : EMPTY_SEARCH_TERMS}
                     isFlashing={flashCommitHash === commit.hash}
-                    badgeKeptOpacity={badgeKeptCommitHashes.has(commit.hash) ? badgedCommitOpacity : undefined}
+                    filterKeptOpacity={filterKeptCommitHashes.has(commit.hash) ? badgedCommitOpacity : undefined}
                     onClick={(event) => handleCommitClick(commit.hash, virtualItem.index, event)}
                     onNodeMouseEnter={stableOnNodeMouseEnter}
                     onNodeMouseLeave={stableOnNodeMouseLeave}

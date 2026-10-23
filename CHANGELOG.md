@@ -4,6 +4,17 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.21.0] - 2026-10-23
+
+### Changed
+- **Go to parent, child and HEAD now always reach the commit, whatever the filters.** In a filtered graph, the details panel's **Go to parent commit** / **Go to child commit** icons and the toolbar's **HEAD** used to stop with a message when a filter hid the target. Now a commit hidden by the **Authors** or **Message** filter is revealed: shown dimmed, like a badged commit, and selected, while the rest of the filter still applies. A commit outside the **Dates** range (or, for HEAD, outside the **Branches** filter) is fetched on its own and placed in the graph. This makes it easy to reach a topic branch's fork point while viewing only your own commits, and **Reset Current Branch to Here**.
+- **Revealed commits are counted in the Filter panel.** "N revealed commits" appears with a **Hide** button that hides them again. Changing any filter, **Reset All**, or switching repository also clears them; a refresh keeps them.
+- **The Children row warns when it may be incomplete.** With a **Dates** end set, or on a commit fetched from outside the filtered range, it shows "Some children may not be shown in the current view."
+- **Messages for a commit that still can't be shown** now read "The parent / child / HEAD commit can't be shown in the current view."
+
+### Credits — Reveal filtered-out commits (#214)
+- Thanks to [@tbuyukliev](https://github.com/tbuyukliev) for asking to reach a topic branch's fork point in a filtered view in [#214](https://github.com/onlineeric/speedy-git-ext/issues/214)!
+
 ## [5.20.0] - 2026-10-20
 
 ### Added
