@@ -284,8 +284,9 @@ export type ResponseMessage =
    * Answer to `locateHead`. `hash` is null when HEAD cannot be resolved (e.g.
    * unborn branch in a fresh repo); `index` is HEAD's 0-based position in the
    * filtered log stream, -1 when HEAD is not part of that stream, and null when
-   * the position was not computed because the webview's displayed HEAD was
-   * confirmed to be current (it already knows where the row is).
+   * the position is unknown: not computed because the webview's displayed HEAD
+   * was confirmed to be current (it already knows where the row is), or deeper
+   * than the position search reaches — so -1 always means "outside the filters".
    */
   | { type: 'headLocation'; payload: { hash: string | null; index: number | null } }
   /**

@@ -63,6 +63,21 @@ describe('Go to — reveal filtered-out targets (GH #214)', () => {
     expect(state.error).toBeUndefined();
   });
 
+  it('drops a fetch reply whose navigation a refresh ended, even while a newer one runs', () => {
+    useGraphStore.setState({ goToHeadState: 'locating', navigationTarget: 'parent' });
+    rpcClient['handleMessage']({ type: 'headLocation', payload: { hash: 'old', index: -1 } });
+    const { requestId } = lastByHashRequest();
+
+    rpcClient['handleMessage']({ type: 'commits', payload: { commits: useGraphStore.getState().commits } });
+    rpcClient.goToHead();
+    rpcClient['handleMessage']({ type: 'commitsByHash', payload: { requestId, commits: [commit('old')] } });
+
+    const state = useGraphStore.getState();
+    expect(state.goToHeadState).toBe('locating');
+    expect(state.selectedCommit).not.toBe('old');
+    expect(state.revealedExtraCommits).toEqual([]);
+  });
+
   it('keeps the generic toast when the fetched commit no longer exists', () => {
     useGraphStore.setState({ goToHeadState: 'locating', navigationTarget: 'child', error: undefined });
     rpcClient['handleMessage']({ type: 'headLocation', payload: { hash: 'old', index: -1 } });
@@ -78,5 +93,16 @@ describe('Go to — reveal filtered-out targets (GH #214)', () => {
     rpcClient['handleMessage']({ type: 'commits', payload: { commits: useGraphStore.getState().commits } });
 
     expect(lastByHashRequest().hashes).toEqual(['old']);
+  });
+
+  it('keeps an extra revealed while a refresh re-read was in flight', () => {
+    useGraphStore.getState().addRevealedExtraCommit(commit('old'));
+    rpcClient['handleMessage']({ type: 'commits', payload: { commits: useGraphStore.getState().commits } });
+    const revalidateId = lastByHashRequest().requestId;
+
+    useGraphStore.getState().addRevealedExtraCommit(commit('newer'));
+    rpcClient['handleMessage']({ type: 'commitsByHash', payload: { requestId: revalidateId, commits: [commit('old')] } });
+
+    expect(useGraphStore.getState().revealedExtraCommits.map((c) => c.hash).sort()).toEqual(['newer', 'old']);
   });
 });

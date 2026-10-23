@@ -7,6 +7,12 @@ import {
 } from '../../shared/gitRefValidation.js';
 
 const HASH_WITH_PARENT_RE = /^[0-9a-f]{4,40}(~\d+)?$/i;
+const OBJECT_NAME_RE = /^[0-9a-f]{4,64}$/i;
+
+/** A bare object name, SHA-1 or SHA-256: no revision syntax, so it cannot reach git as a flag or a range. */
+export function isObjectName(name: string): boolean {
+  return OBJECT_NAME_RE.test(name);
+}
 
 /** Validates that a string looks like a git commit hash (hex, 4–40 chars, optional ~N suffix). */
 export function validateHash(hash: string): Result<string> {

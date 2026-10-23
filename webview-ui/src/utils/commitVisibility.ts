@@ -7,6 +7,8 @@ export interface VisibilityOptions {
   badgeSettings: BadgeSettings;
   /** Commits the user navigated to while the filters hide them (GH #214); kept visible, dimmed. */
   revealedCommitHashes: ReadonlySet<string>;
+  /** Revealed commits fetched from outside the backend-filtered stream; always dimmed, whatever the filters. */
+  outOfStreamHashes: ReadonlySet<string>;
 }
 
 export interface CommitVisibility {
@@ -14,7 +16,8 @@ export interface CommitVisibility {
   hiddenCommitHashes: Set<string>;
   /**
    * Commits that fail those filters but stay visible, rendered dimmed: kept for their badge
-   * ("Always show badged commits") or revealed by a "Go to" navigation.
+   * ("Always show badged commits") or revealed by a "Go to" navigation. A revealed commit from outside
+   * the backend-filtered stream is in here even when it passes the Author / Message filters.
    */
   filterKeptCommitHashes: Set<string>;
 }
@@ -44,7 +47,7 @@ export function computeCommitVisibility(
   options: VisibilityOptions,
 ): CommitVisibility {
   const hiddenCommitHashes = new Set<string>();
-  const filterKeptCommitHashes = new Set<string>();
+  const filterKeptCommitHashes = new Set(options.outOfStreamHashes);
   if (!hasClientSideVisibilityFilter(filters)) return { hiddenCommitHashes, filterKeptCommitHashes };
 
   const includedAuthors = filters.authors?.length ? new Set(filters.authors) : null;
@@ -52,6 +55,7 @@ export function computeCommitVisibility(
 
   for (const commit of commits) {
     if (commit.refs.some(r => r.type === 'stash' || r.type === 'uncommitted')) continue;
+    if (options.outOfStreamHashes.has(commit.hash)) continue;
     if (!failsAuthorOrTextFilter(commit, includedAuthors, textLower)) continue;
 
     if (

@@ -19,6 +19,10 @@ import './datepicker-overrides.css';
 
 const ISO_FORMAT = "yyyy-MM-dd'T'HH:mm:ss";
 
+/** Shape of the panel's compact buttons; each pairs it with a color half from `dialogStyles`. */
+const compactButtonClassName =
+  'px-2 py-0.5 text-xs rounded border border-[var(--vscode-button-border,transparent)] disabled:opacity-40 disabled:cursor-not-allowed';
+
 function parseISOToDate(iso: string | undefined): Date | null {
   if (!iso) return null;
   const parsed = parse(iso, ISO_FORMAT, new Date());
@@ -293,7 +297,7 @@ export function FilterWidget() {
           <button
             onClick={handleResetAll}
             disabled={!hasAnyFilters}
-            className="px-2 py-0.5 text-xs rounded border border-[var(--vscode-button-border,transparent)] bg-[var(--vscode-button-secondaryBackground)] text-[var(--vscode-button-secondaryForeground)] hover:bg-[var(--vscode-button-secondaryHoverBackground)] disabled:opacity-40 disabled:cursor-not-allowed"
+            className={`${compactButtonClassName} ${buttonSecondaryColorsClassName}`}
           >
             Reset All
           </button>
@@ -389,7 +393,7 @@ export function FilterWidget() {
                     ? `Remove yourself (${currentUserEmail}) from the author filter`
                     : `Add yourself (${currentUserEmail}) to the author filter`
               }
-              className={`shrink-0 px-2 py-0.5 text-xs rounded border border-[var(--vscode-button-border,transparent)] disabled:opacity-40 disabled:cursor-not-allowed ${
+              className={`shrink-0 ${compactButtonClassName} ${
                 isMeSelected ? buttonPrimaryColorsClassName : buttonSecondaryColorsClassName
               }`}
             >
@@ -584,7 +588,7 @@ function RevealedCommitsChip() {
       <button
         type="button"
         onClick={handleHide}
-        className={`px-2 py-0.5 text-xs rounded border border-[var(--vscode-button-border,transparent)] ${buttonSecondaryColorsClassName}`}
+        className={`${compactButtonClassName} ${buttonSecondaryColorsClassName}`}
       >
         Hide
       </button>

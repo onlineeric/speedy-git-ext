@@ -2,6 +2,7 @@ import type { LogOutputChannel } from 'vscode';
 import { GitExecutor } from './GitExecutor.js';
 import { parseCommitLine, parseBranchLine, parseBranchRefName, parseStashBaseHash } from '../utils/gitParsers.js';
 import { readHeadHash } from '../utils/gitQueries.js';
+import { isObjectName } from '../utils/gitValidation.js';
 import { type Result, ok } from '../../shared/errors.js';
 import type { Author, Commit, Branch, GraphFilters } from '../../shared/types.js';
 
@@ -19,9 +20,6 @@ const LOG_FORMAT = '%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D';
  */
 const COMMIT_POSITION_SEARCH_CAP = 100_000;
 
-/** A bare object name, SHA-1 or SHA-256 — no revision syntax, so it cannot reach git as a flag or range. */
-const OBJECT_NAME_RE = /^[0-9a-f]{4,64}$/i;
-
 /** Commits from a `LOG_FORMAT` listing, skipping lines that do not parse. */
 function parseLogOutput(stdout: string): Commit[] {
   const commits: Commit[] = [];
@@ -35,29 +33,30 @@ function parseLogOutput(stdout: string): Commit[] {
 
 /**
  * 0-based index of the line exactly equal to `hash` in a newline-separated
- * hash listing, or -1.
+ * hash listing (-1 when absent), and how many lines were scanned — the whole
+ * listing when absent.
  *
  * Scans the buffer with a cursor rather than `split('\n').indexOf(...)`: the
  * listing runs to `COMMIT_POSITION_SEARCH_CAP` lines, and splitting it would
  * allocate that many separate strings just to find one index.
  */
-function indexOfHashLine(stdout: string, hash: string): number {
+function locateHashLine(stdout: string, hash: string): { index: number; linesScanned: number } {
   let lineStart = 0;
-  let index = 0;
+  let linesScanned = 0;
 
-  while (lineStart <= stdout.length) {
+  while (lineStart < stdout.length) {
     let lineEnd = stdout.indexOf('\n', lineStart);
     if (lineEnd === -1) lineEnd = stdout.length;
 
     if (lineEnd - lineStart === hash.length && stdout.startsWith(hash, lineStart)) {
-      return index;
+      return { index: linesScanned, linesScanned: linesScanned + 1 };
     }
 
     lineStart = lineEnd + 1;
-    index++;
+    linesScanned++;
   }
 
-  return -1;
+  return { index: -1, linesScanned };
 }
 
 export class GitLogService {
@@ -230,25 +229,18 @@ export class GitLogService {
    * filtered stream). Hashes that are not valid object names or no longer exist
    * are left out rather than failing the call.
    *
-   * One `git log --no-walk` covers the batch; git refuses the whole batch over a
-   * single missing object, so only then is each hash asked for on its own.
+   * One `git log --no-walk` covers the batch; `--ignore-missing` makes git skip
+   * a name that no longer resolves (rebased away, gc'd) instead of refusing the
+   * whole batch over it.
    */
   async getCommitsByHash(hashes: readonly string[]): Promise<Commit[]> {
-    const valid = hashes.filter((hash) => OBJECT_NAME_RE.test(hash));
+    const valid = hashes.filter(isObjectName);
     if (valid.length === 0) return [];
-    const batch = await this.readCommitsNoWalk(valid);
-    if (batch || valid.length === 1) return batch ?? [];
-    const singles = await Promise.all(valid.map((hash) => this.readCommitsNoWalk([hash])));
-    return singles.flatMap((commits) => commits ?? []);
-  }
-
-  /** `git log --no-walk` over `hashes`; null when git refused (e.g. a missing object). */
-  private async readCommitsNoWalk(hashes: readonly string[]): Promise<Commit[] | null> {
     const result = await this.executor.execute({
-      args: ['log', '--no-walk', `--format=${LOG_FORMAT}`, '--decorate=full', ...hashes, '--'],
+      args: ['log', '--no-walk', '--ignore-missing', `--format=${LOG_FORMAT}`, '--decorate=full', ...valid, '--'],
       cwd: this.workspacePath,
     });
-    return result.success ? parseLogOutput(result.value.stdout) : null;
+    return result.success ? parseLogOutput(result.value.stdout) : [];
   }
 
   /** Full hash of the commit HEAD points at. Fails on an unborn branch (fresh repo). */
@@ -260,12 +252,14 @@ export class GitLogService {
    * 0-based position of `hash` in the same ordered log stream `getCommits`
    * paginates through (hash-only listing, so this stays cheap even for large
    * repositories). Returns -1 when the commit is not in the stream — filtered
-   * out by branch/date filters or deeper than the search cap.
+   * out by branch/date filters — and null when the listing reached the search
+   * cap without finding it: the commit may still be in the stream, deeper, so
+   * the caller must not treat it as outside the filters.
    *
    * This walks the whole history, so callers should reach for it only when the
    * commit's position is not already known client-side.
    */
-  async getCommitPosition(hash: string, filters?: Partial<GraphFilters>): Promise<Result<number>> {
+  async getCommitPosition(hash: string, filters?: Partial<GraphFilters>): Promise<Result<number | null>> {
     this.log.info('Locating commit position in log stream');
     // No decoration: the %H format emits no ref names for it to appear in.
     const args = await this.buildLogArgs(
@@ -283,7 +277,9 @@ export class GitLogService {
       return result;
     }
 
-    return ok(indexOfHashLine(result.value.stdout, hash));
+    const { index, linesScanned } = locateHashLine(result.value.stdout, hash);
+    if (index < 0 && linesScanned >= COMMIT_POSITION_SEARCH_CAP) return ok(null);
+    return ok(index);
   }
 
   async getAuthors(): Promise<Result<Author[]>> {

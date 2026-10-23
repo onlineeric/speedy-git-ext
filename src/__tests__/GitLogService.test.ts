@@ -287,6 +287,17 @@ describe('GitLogService.getCommitPosition', () => {
 
     expect(result).toEqual({ success: true, value: -1 });
   });
+
+  it('returns null, not -1, when the listing hit the search cap without the commit', async () => {
+    const service = new GitLogService('/repo', mockLog);
+    vi.spyOn(service['executor'], 'execute')
+      .mockImplementation(async ({ args }) =>
+        ({ success: true as const, value: { stdout: args[0] === 'stash' ? '' : 'aaa\n'.repeat(100_000), stderr: '' } }));
+
+    const result = await service.getCommitPosition('zzz');
+
+    expect(result).toEqual({ success: true, value: null });
+  });
 });
 
 describe('GitLogService.getCommitsByHash', () => {
@@ -304,18 +315,16 @@ describe('GitLogService.getCommitsByHash', () => {
     expect(commits.map((c) => c.hash)).toEqual([hashA, hashB]);
     expect(executeSpy).toHaveBeenCalledTimes(1);
     expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({
-      args: ['log', '--no-walk', '--format=%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D', '--decorate=full', hashA, hashB, '--'],
+      args: ['log', '--no-walk', '--ignore-missing', '--format=%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D', '--decorate=full', hashA, hashB, '--'],
     }));
   });
 
-  it('falls back to one log per hash when a missing object fails the batch', async () => {
+  it('answers with no commits rather than an error when git fails', async () => {
     const service = new GitLogService('/repo', mockLog);
-    vi.spyOn(service['executor'], 'execute').mockImplementation(async ({ args }) => {
-      if (args.includes(hashB)) return { success: false as const, error: new GitError('bad object', 'COMMAND_FAILED') };
-      return { success: true as const, value: { stdout: lineFor(hashA), stderr: '' } };
-    });
+    vi.spyOn(service['executor'], 'execute')
+      .mockResolvedValue({ success: false, error: new GitError('not a git repository', 'COMMAND_FAILED') });
 
-    expect((await service.getCommitsByHash([hashA, hashB])).map((c) => c.hash)).toEqual([hashA]);
+    expect(await service.getCommitsByHash([hashA])).toEqual([]);
   });
 
   it('never passes anything but a bare object name to git', async () => {

@@ -54,7 +54,12 @@ import { slotsEqual } from '../utils/compareSlot';
 import type { InitialDataPayload } from '@shared/messages';
 import type { GitVersion } from '@shared/gitVersion';
 import { type GraphTopology } from '../utils/graphTopology';
-import { computeCommitVisibility, hasClientSideVisibilityFilter, type VisibilityOptions } from '../utils/commitVisibility';
+import {
+  computeCommitVisibility,
+  hasClientSideVisibilityFilter,
+  type CommitVisibility,
+  type VisibilityOptions,
+} from '../utils/commitVisibility';
 import { computeMergedTopology, type UncommittedContext } from '../utils/mergedCommits';
 import { mergeRevealedExtraCommits } from '../utils/revealedCommits';
 import { findHeadCommitHash } from '../utils/commitRefs';
@@ -285,8 +290,12 @@ interface GraphStore {
   revealCommit: (hash: string) => void;
   /** Reveal a commit fetched from outside the backend-filtered stream. */
   addRevealedExtraCommit: (commit: Commit) => void;
-  /** Replace the revealed extras with a refresh's re-read of them; any not returned no longer exist. */
-  replaceRevealedExtraCommits: (commits: Commit[]) => void;
+  /**
+   * Apply a refresh's re-read of the extras in `requestedHashes`: each is replaced by its re-read
+   * copy, or forgotten when not returned (it no longer exists). An extra revealed after the re-read
+   * was asked for is not part of it and is kept as is.
+   */
+  replaceRevealedExtraCommits: (requestedHashes: readonly string[], commits: Commit[]) => void;
   clearRevealedCommits: () => void;
   /** Persisted preference: keep badged commits visible under the Author / Message filters. */
   alwaysShowBadgedCommits: boolean;
@@ -438,11 +447,16 @@ function getUncommittedContext(state: GraphStore): UncommittedContext {
   return { hasUncommittedChanges: state.hasUncommittedChanges, counts: state.uncommittedCounts, branches: state.branches };
 }
 
-function visibilityOptionsOf(state: GraphStore, userSettings: UserSettings = state.userSettings): VisibilityOptions {
+function visibilityOptionsOf(
+  state: GraphStore,
+  outOfStreamHashes: ReadonlySet<string>,
+  userSettings: UserSettings = state.userSettings,
+): VisibilityOptions {
   return {
     alwaysShowBadgedCommits: state.alwaysShowBadgedCommits,
     badgeSettings: { showTags: userSettings.showTags, showRemoteBranches: userSettings.showRemoteBranches },
     revealedCommitHashes: state.revealedCommitHashes,
+    outOfStreamHashes,
   };
 }
 
@@ -452,15 +466,17 @@ interface GraphViewInput {
   uncommitted: UncommittedContext;
   /** Settings to read badge visibility from, when not yet applied to the state (initial data). */
   userSettings?: UserSettings;
+  /** The state's current visibility, when only stashes changed and it cannot have moved. */
+  visibility?: CommitVisibility;
 }
 
-interface GraphView {
+interface GraphView extends CommitVisibility {
   mergedCommits: Commit[];
   topology: GraphTopology;
-  hiddenCommitHashes: Set<string>;
-  filterKeptCommitHashes: Set<string>;
   revealedExtraCommits: readonly Commit[];
   revealedCommitCount: number;
+  /** The selected commit's index in `mergedCommits`; -1 when it is gone or nothing is selected. */
+  selectedCommitIndex: number;
 }
 
 /**
@@ -471,13 +487,11 @@ interface GraphView {
 function computeGraphView(state: GraphStore, input: GraphViewInput): GraphView {
   const { filters } = state;
   const { commits, unloadedExtras } = mergeRevealedExtraCommits(input.commits, state.revealedExtraCommits);
-  const { hiddenCommitHashes, filterKeptCommitHashes } = computeCommitVisibility(
+  const { hiddenCommitHashes, filterKeptCommitHashes } = input.visibility ?? computeCommitVisibility(
     commits,
     filters,
-    visibilityOptionsOf(state, input.userSettings),
+    visibilityOptionsOf(state, new Set(unloadedExtras.map((extra) => extra.hash)), input.userSettings),
   );
-  // Outside the backend filters, so dimmed even when they pass the Author / Message filters.
-  for (const extra of unloadedExtras) filterKeptCommitHashes.add(extra.hash);
   const { mergedCommits, topology } = computeMergedTopology(
     commits,
     input.stashes,
@@ -490,22 +504,36 @@ function computeGraphView(state: GraphStore, input: GraphViewInput): GraphView {
   for (const hash of state.revealedCommitHashes) {
     if (filterKeptCommitHashes.has(hash)) revealedCommitCount++;
   }
-  return { mergedCommits, topology, hiddenCommitHashes, filterKeptCommitHashes, revealedExtraCommits: unloadedExtras, revealedCommitCount };
+  return {
+    mergedCommits,
+    topology,
+    hiddenCommitHashes,
+    filterKeptCommitHashes,
+    revealedExtraCommits: unloadedExtras,
+    revealedCommitCount,
+    selectedCommitIndex: selectedIndexIn(mergedCommits, state.selectedCommit),
+  };
 }
 
-/** Index of the selected commit in a recomputed row list; -1 when it is gone or nothing is selected. */
+/** Index of the selected commit in a row list; -1 when it is gone or nothing is selected. */
 function selectedIndexIn(mergedCommits: Commit[], selectedCommit: string | undefined): number {
   return selectedCommit ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit) : -1;
 }
 
 /**
- * Recompute the graph after the revealed list changed, leaving every other piece of state alone.
- * Declared as a function (hoisted) because it reads the store the `create` call below builds.
+ * Apply a change to the revealed list and the graph it shows in one `set`, leaving every other
+ * piece of state alone. Declared as a function (hoisted) because it reads the store the `create`
+ * call below builds.
  */
-function applyGraphView(): void {
-  const state = useGraphStore.getState();
+function applyRevealChange(change: Pick<GraphStore, 'revealedCommitHashes' | 'revealedExtraCommits'> & Partial<GraphStore>): void {
+  const state = { ...useGraphStore.getState(), ...change };
   const view = computeGraphView(state, { commits: state.commits, stashes: state.stashes, uncommitted: getUncommittedContext(state) });
-  useGraphStore.setState({ ...view, selectedCommitIndex: selectedIndexIn(view.mergedCommits, state.selectedCommit) });
+  useGraphStore.setState({ ...change, ...view });
+}
+
+/** A commit's content is fixed by its hash; only its ref decorations can differ on a re-read. */
+function sameRefs(a: Commit, b: Commit): boolean {
+  return JSON.stringify(a.refs) === JSON.stringify(b.refs);
 }
 
 /** Empties the revealed list; spread into the same `set` as the filter change that voids it. */
@@ -719,9 +747,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setTagMetadata: (tagMetadata) => set({ tagMetadata }),
   setCommits: (commits) => {
     const view = computeGraphView(get(), { commits, stashes: get().stashes, uncommitted: getUncommittedContext(get()) });
-    const { mergedCommits } = view;
+    const { mergedCommits, selectedCommitIndex } = view;
     const selectedCommit = get().selectedCommit;
-    const selectedCommitIndex = selectedIndexIn(mergedCommits, selectedCommit);
 
     // Preserve multi-selection and last-clicked state for hashes that still exist
     const newHashSet = new Set(mergedCommits.map((c) => c.hash));
@@ -756,12 +783,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     });
   },
   appendCommits: (newCommits, totalLoadedWithoutFilter) => {
-    const { commits, stashes, filters, totalLoadedWithoutFilter: existingTotal, selectedCommit } = get();
+    const { commits, stashes, filters, totalLoadedWithoutFilter: existingTotal } = get();
     const allCommits = [...commits, ...newCommits];
     const view = computeGraphView(get(), { commits: allCommits, stashes, uncommitted: getUncommittedContext(get()) });
-    const { hiddenCommitHashes, filterKeptCommitHashes } = view;
+    const { hiddenCommitHashes, filterKeptCommitHashes, selectedCommitIndex } = view;
     const hasFilter = !!(filters.branches?.length || filters.afterDate || filters.beforeDate);
-    const selectedCommitIndex = selectedIndexIn(view.mergedCommits, selectedCommit);
 
     // Count commits in this batch that match the filters, for empty-batch tracking. A filter-kept
     // row (badge-kept or revealed) is shown but does not match: counting it would reset the
@@ -802,9 +828,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
   setBranches: (branches) => set({ branches }),
   setSelectedCommit: (selectedCommit) => {
-    const index = selectedCommit
-      ? get().mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
-      : -1;
+    const index = selectedIndexIn(get().mergedCommits, selectedCommit);
     // FR-023 (042-compare-refs): selecting a single commit dismisses any showing compare result
     set({ selectedCommit, selectedCommitIndex: index, ...(selectedCommit ? { compareResult: null } : {}) });
   },
@@ -897,8 +921,16 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setFilters: (filters) => set((state) => ({ filters: { ...state.filters, ...filters }, ...clearedReveals(state) })),
   setRemotes: (remotes) => set({ remotes }),
   setStashes: (stashes) => {
-    const view = computeGraphView(get(), { commits: get().commits, stashes, uncommitted: getUncommittedContext(get()) });
-    set({ stashes, ...view, selectedCommitIndex: selectedIndexIn(view.mergedCommits, get().selectedCommit) });
+    const state = get();
+    // Stashes never change which commits the filters hide, so the visibility pass is reused.
+    const { hiddenCommitHashes, filterKeptCommitHashes } = state;
+    const view = computeGraphView(state, {
+      commits: state.commits,
+      stashes,
+      uncommitted: getUncommittedContext(state),
+      visibility: { hiddenCommitHashes, filterKeptCommitHashes },
+    });
+    set({ stashes, ...view });
   },
   setMaxVisibleRefs: (count) => set({ maxVisibleRefs: count }),
   setCherryPickInProgress: (cherryPickInProgress) => set({ cherryPickInProgress }),
@@ -1307,7 +1339,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const uncommitted: UncommittedContext = { hasUncommittedChanges: hasChanges, counts, branches };
     const view = computeGraphView(get(), { commits, stashes, uncommitted });
     const selectedCommit = get().selectedCommit;
-    const selectedCommitIndex = selectedIndexIn(view.mergedCommits, selectedCommit);
     set({
       uncommittedStagedFiles: payload.stagedFiles,
       uncommittedUnstagedFiles: payload.unstagedFiles,
@@ -1316,7 +1347,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       uncommittedCounts: counts,
       hasUncommittedChanges: hasChanges,
       ...view,
-      selectedCommitIndex,
     });
     // Auto-refresh details panel from the already-received data (avoids a redundant backend round-trip)
     if (selectedCommit === UNCOMMITTED_HASH && get().detailsPanelOpen) {
@@ -1355,7 +1385,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const view = computeGraphView(get(), { commits, stashes, uncommitted: getUncommittedContext(get()) });
     set({
       ...view,
-      selectedCommitIndex: selectedIndexIn(view.mergedCommits, get().selectedCommit),
       fetchGeneration: get().fetchGeneration + 1,
       consecutiveEmptyBatches: 0,
       filteredOutCount: 0,
@@ -1376,30 +1405,33 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   // Unlike recomputeVisibility, a reveal changes no filter: the loaded stream and any in-flight
   // batch stay valid, so the fetch generation and empty-batch tracking are left alone.
   revealCommit: (hash) => {
-    const revealedCommitHashes = new Set(get().revealedCommitHashes).add(hash);
-    set({ revealedCommitHashes });
-    applyGraphView();
+    const { revealedCommitHashes, revealedExtraCommits } = get();
+    applyRevealChange({ revealedCommitHashes: new Set(revealedCommitHashes).add(hash), revealedExtraCommits });
   },
   addRevealedExtraCommit: (commit) => {
     const { revealedCommitHashes, revealedExtraCommits } = get();
-    set({
+    applyRevealChange({
       revealedCommitHashes: new Set(revealedCommitHashes).add(commit.hash),
       revealedExtraCommits: [...revealedExtraCommits.filter((extra) => extra.hash !== commit.hash), commit],
     });
-    applyGraphView();
   },
-  replaceRevealedExtraCommits: (commits) => {
-    const returned = new Set(commits.map((commit) => commit.hash));
+  replaceRevealedExtraCommits: (requestedHashes, commits) => {
+    const requested = new Set(requestedHashes);
+    const reread = new Map(commits.map((commit) => [commit.hash, commit]));
     const revealedCommitHashes = new Set(get().revealedCommitHashes);
+    const revealedExtraCommits: Commit[] = [];
+    let changed = false;
     for (const extra of get().revealedExtraCommits) {
-      if (!returned.has(extra.hash)) revealedCommitHashes.delete(extra.hash);
+      const current = requested.has(extra.hash) ? reread.get(extra.hash) : extra;
+      if (current) revealedExtraCommits.push(current);
+      else revealedCommitHashes.delete(extra.hash);
+      if (!current || !sameRefs(current, extra)) changed = true;
     }
-    set({ revealedCommitHashes, revealedExtraCommits: commits });
-    applyGraphView();
+    // A refresh re-reads every extra, and almost always gets them back unchanged: skip the recompute.
+    if (changed) applyRevealChange({ revealedCommitHashes, revealedExtraCommits });
   },
   clearRevealedCommits: () => {
-    set(clearedReveals(get()));
-    applyGraphView();
+    applyRevealChange(clearedReveals(get()));
   },
   setIsRefreshing: (isRefreshing) => set({ isRefreshing }),
   setInitialData: (payload) => {
@@ -1448,7 +1480,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       uncommitted,
       userSettings: state.pendingUserSettings ?? state.userSettings,
     });
-    const { mergedCommits } = view;
+    const { mergedCommits, selectedCommitIndex } = view;
     if (measureTopology) {
       topologyPerfSent = true;
       trackUi({
@@ -1462,9 +1494,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     // Preserve selection for hashes that still exist
     const newHashSet = new Set(mergedCommits.map((c) => c.hash));
     const selectedCommit = state.selectedCommit;
-    const selectedCommitIndex = selectedCommit
-      ? mergedCommits.findIndex((commit) => commit.hash === selectedCommit)
-      : -1;
 
     const worktreeLookups = buildWorktreeLookups(worktrees);
 
