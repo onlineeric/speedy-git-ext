@@ -83,12 +83,17 @@ class RpcClient {
   /** Settings dialog saves awaiting their `settingSaveResult`, by request id. */
   private pendingSettingSaves = new Map<number, (outcome: SettingSaveOutcome) => void>();
   /**
-   * In-flight `getCommitsByHash` requests (GH #214): a navigation fetching its
-   * out-of-stream target, or a refresh re-reading the revealed extras. Each
-   * carries the `revealGeneration` it was asked under; a reply that outlived a
-   * filter change, repo switch or Hide is dropped.
+   * `getCommitsByHash` requests (GH #214) re-reading the revealed extras after a
+   * refresh. Each carries the `revealGeneration` it was asked under; a reply that
+   * outlived a filter change, repo switch or Hide is dropped.
    */
-  private pendingCommitsByHash = new Map<number, { purpose: 'navigate'; hash: string; revealGeneration: number } | { purpose: 'revalidate'; revealGeneration: number }>();
+  private pendingExtrasRevalidations = new Map<number, { hashes: string[]; revealGeneration: number }>();
+  /**
+   * The `getCommitsByHash` request of the navigation in flight, if it is waiting
+   * on one. A reply to any other request belongs to a navigation that already
+   * ended, and must not land over the one running now.
+   */
+  private activeNavigationFetch: { requestId: number; hash: string; revealGeneration: number } | null = null;
 
   private messageHandler = (event: MessageEvent) => {
     const message = event.data as ResponseMessage;
@@ -127,6 +132,8 @@ class RpcClient {
     this.clearPendingDialogAction();
     for (const resolve of this.pendingSettingSaves.values()) resolve({ ok: false, reason: 'failed', message: 'RPC client disposed' });
     this.pendingSettingSaves.clear();
+    this.pendingExtrasRevalidations.clear();
+    this.activeNavigationFetch = null;
   }
 
   private handleMessage(message: ResponseMessage) {
@@ -1031,6 +1038,7 @@ class RpcClient {
   goToHead() {
     const store = useGraphStore.getState();
     if (store.goToHeadState !== 'idle' || store.loading) return;
+    this.activeNavigationFetch = null;
     store.setNavigationTarget('head');
     store.setGoToHeadState('locating');
     this.send({
@@ -1051,6 +1059,7 @@ class RpcClient {
   goToRelatedCommit(hash: string, target: 'parent' | 'child') {
     const store = useGraphStore.getState();
     if (store.goToHeadState !== 'idle' || store.loading) return;
+    this.activeNavigationFetch = null;
     store.setNavigationTarget(target);
     const decision = decideLoadedCommitNavigation({
       mergedIndex: store.mergedCommits.findIndex((c) => c.hash === hash),
@@ -1094,7 +1103,7 @@ class RpcClient {
         // Stays busy until the reply lands, so a second click cannot start a parallel navigation.
         store.setGoToHeadState('loading');
         const requestId = this.nextRequestId++;
-        this.pendingCommitsByHash.set(requestId, { purpose: 'navigate', hash, revealGeneration: store.revealGeneration });
+        this.activeNavigationFetch = { requestId, hash, revealGeneration: store.revealGeneration };
         this.send({ type: 'getCommitsByHash', payload: { requestId, hashes: [hash] } });
         break;
       }
@@ -1127,24 +1136,28 @@ class RpcClient {
     const { revealedExtraCommits, revealGeneration } = useGraphStore.getState();
     if (revealedExtraCommits.length === 0) return;
     const requestId = this.nextRequestId++;
-    this.pendingCommitsByHash.set(requestId, { purpose: 'revalidate', revealGeneration });
-    this.send({ type: 'getCommitsByHash', payload: { requestId, hashes: revealedExtraCommits.map((commit) => commit.hash) } });
+    const hashes = revealedExtraCommits.map((commit) => commit.hash);
+    this.pendingExtrasRevalidations.set(requestId, { hashes, revealGeneration });
+    this.send({ type: 'getCommitsByHash', payload: { requestId, hashes } });
   }
 
   private handleCommitsByHash(requestId: number, commits: Commit[]) {
-    const request = this.pendingCommitsByHash.get(requestId);
-    if (!request) return;
-    this.pendingCommitsByHash.delete(requestId);
     const store = useGraphStore.getState();
-    const isStale = request.revealGeneration !== store.revealGeneration;
-
-    if (request.purpose === 'revalidate') {
-      if (!isStale) store.replaceRevealedExtraCommits(commits);
+    const revalidation = this.pendingExtrasRevalidations.get(requestId);
+    if (revalidation) {
+      this.pendingExtrasRevalidations.delete(requestId);
+      if (revalidation.revealGeneration === store.revealGeneration) {
+        store.replaceRevealedExtraCommits(revalidation.hashes, commits);
+      }
       return;
     }
-    // A refresh mid-fetch already ended the navigation; a filter change voids it quietly.
+    // A refresh mid-fetch already ended the navigation (and a later one may be
+    // running now); a filter change voids it quietly.
+    const request = this.activeNavigationFetch;
+    if (request?.requestId !== requestId) return;
+    this.activeNavigationFetch = null;
     if (store.goToHeadState === 'idle') return;
-    if (isStale) {
+    if (request.revealGeneration !== store.revealGeneration) {
       store.resetGoToHead();
       return;
     }

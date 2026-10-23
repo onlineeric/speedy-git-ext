@@ -619,11 +619,22 @@ describe('graphStore — revealed commits (GH #214)', () => {
   it('forgets extras a refresh no longer finds', () => {
     useGraphStore.getState().addRevealedExtraCommit(foreign('gone000', { authorDate: 1 }));
 
-    useGraphStore.getState().replaceRevealedExtraCommits([]);
+    useGraphStore.getState().replaceRevealedExtraCommits(['gone000'], []);
 
     const state = useGraphStore.getState();
     expect(state.revealedCommitHashes.size).toBe(0);
     expect(state.revealedCommitCount).toBe(0);
     expect(shownHashes()).toEqual(['mine000']);
+  });
+
+  it('keeps an extra revealed after the re-read was asked for', () => {
+    useGraphStore.getState().addRevealedExtraCommit(foreign('gone000', { authorDate: 2 }));
+    useGraphStore.getState().addRevealedExtraCommit(foreign('newer00', { authorDate: 1 }));
+
+    useGraphStore.getState().replaceRevealedExtraCommits(['gone000'], []);
+
+    const state = useGraphStore.getState();
+    expect(state.revealedExtraCommits.map((c) => c.hash)).toEqual(['newer00']);
+    expect(state.revealedCommitHashes.has('newer00')).toBe(true);
   });
 });

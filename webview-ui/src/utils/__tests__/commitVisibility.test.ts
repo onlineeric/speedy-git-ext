@@ -6,6 +6,7 @@ const OPTION_OFF: VisibilityOptions = {
   alwaysShowBadgedCommits: false,
   badgeSettings: { showTags: true, showRemoteBranches: true },
   revealedCommitHashes: new Set(),
+  outOfStreamHashes: new Set(),
 };
 
 function computeHiddenCommitHashes(commits: Commit[], filters: GraphFilters): Set<string> {
@@ -92,6 +93,7 @@ describe('computeCommitVisibility — always show badged commits', () => {
     alwaysShowBadgedCommits: true,
     badgeSettings,
     revealedCommitHashes: new Set(),
+  outOfStreamHashes: new Set(),
   });
   const foreign = (hash: string, refs: RefInfo[] = []) => commit({ hash, authorEmail: 'bob@example.com', refs });
 
@@ -198,6 +200,13 @@ describe('computeCommitVisibility — revealed commits (GH #214)', () => {
     const result = computeCommitVisibility(commits, authorFilter, revealing(['mine']));
     expect(result.filterKeptCommitHashes).toEqual(new Set());
     expect(result.hiddenCommitHashes).toEqual(new Set());
+  });
+
+  it('dims an out-of-stream commit even when it passes the filters, or none is active', () => {
+    const commits = [commit({ hash: 'extra' }), commit({ hash: 'mine' })];
+    const options = { ...OPTION_OFF, outOfStreamHashes: new Set(['extra']) };
+    expect(computeCommitVisibility(commits, authorFilter, options).filterKeptCommitHashes).toEqual(new Set(['extra']));
+    expect(computeCommitVisibility(commits, {} as GraphFilters, options).filterKeptCommitHashes).toEqual(new Set(['extra']));
   });
 
   it('matches the unrevealed output when nothing is revealed', () => {

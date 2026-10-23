@@ -18,8 +18,9 @@ export interface HeadLocationContext {
   hash: string | null;
   /**
    * HEAD's 0-based position in the filtered log stream; -1 when absent, and
-   * null when the backend skipped the position walk because the row the
-   * webview displays as HEAD is current (see `findHeadCommitHash`).
+   * null when the position is unknown — the backend skipped the walk because
+   * the row the webview displays as HEAD is current (see `findHeadCommitHash`),
+   * or the walk hit its depth cap before reaching the commit.
    */
   index: number | null;
   /** Number of raw commits currently loaded in the store. */
@@ -62,8 +63,9 @@ export function decideHeadNavigation(context: HeadLocationContext): HeadNavigati
   if (context.index !== null && context.index < 0) {
     return { kind: 'fetchSingle' };
   }
-  // The position walk was skipped for a displayed row that has since gone
-  // (raced with a refresh) — a refresh is the way forward.
+  // Position unknown: the walk was skipped for a displayed row that has since
+  // gone (raced with a refresh), or the commit lies deeper than the walk's cap
+  // and so may still be in the stream — never fetched alone, per the rule above.
   if (context.index === null) {
     return { kind: 'notInView' };
   }
@@ -135,30 +137,24 @@ export type CommitNavigationTarget = 'head' | 'parent' | 'child';
 type NavigationMessageKind = 'notInView' | 'unresolved' | 'unreachable';
 
 /**
- * The commit exists but could not be brought on screen. Deliberately one
- * reason-free sentence for every such outcome: a new cause reuses it rather
- * than each needing its own wording.
+ * Toast messages for one navigation target. `notInView` and `unreachable` both mean the commit
+ * exists but could not be brought on screen: deliberately one reason-free sentence, so a new
+ * cause reuses it rather than each needing its own wording.
  */
-function cannotShowMessage(label: string): string {
-  return `The ${label} commit can't be shown in the current view.`;
+function navigationMessages(label: string, unresolved: string): Record<NavigationMessageKind, string> {
+  const cannotShow = `The ${label} commit can't be shown in the current view.`;
+  return { notInView: cannotShow, unresolved, unreachable: cannotShow };
 }
 
 /** User-facing toast messages for the non-navigating outcomes. */
-export const HEAD_NAVIGATION_MESSAGES: Record<NavigationMessageKind, string> = {
-  notInView: cannotShowMessage('HEAD'),
-  unresolved: 'Could not resolve HEAD — the repository may not have any commits yet.',
-  unreachable: cannotShowMessage('HEAD'),
-};
+export const HEAD_NAVIGATION_MESSAGES = navigationMessages(
+  'HEAD',
+  'Could not resolve HEAD — the repository may not have any commits yet.',
+);
 
-function relatedCommitMessages(label: 'parent' | 'child'): Record<NavigationMessageKind, string> {
-  return {
-    notInView: cannotShowMessage(label),
-    // A parent/child navigation starts from a known hash, so this is a stale
-    // view rather than an empty repository.
-    unresolved: `Could not find the ${label} commit. Refresh and try again.`,
-    unreachable: cannotShowMessage(label),
-  };
-}
+// A parent/child navigation starts from a known hash, so `unresolved` is a stale view rather than an empty repository.
+const relatedCommitMessages = (label: 'parent' | 'child') =>
+  navigationMessages(label, `Could not find the ${label} commit. Refresh and try again.`);
 
 /** Toast messages per navigation target; `head` is {@link HEAD_NAVIGATION_MESSAGES}. */
 export const COMMIT_NAVIGATION_MESSAGES: Record<CommitNavigationTarget, Record<NavigationMessageKind, string>> = {

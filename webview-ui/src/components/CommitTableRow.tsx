@@ -102,9 +102,9 @@ interface CommitTableRowProps {
   /** Briefly pulses the row background after a "Go to HEAD" navigation. */
   isFlashing?: boolean;
   /**
-   * Set only when the row fails the Author / Message filter and is shown because it carries
-   * a badge ("Always show badged commits"): the opacity its cells are dimmed to. The graph
-   * lane is never dimmed, so lines stay continuous with the rows around it.
+   * Set only when the row is shown despite the filters — kept for its badge ("Always show
+   * badged commits") or revealed by a "Go to" navigation: the opacity its cells are dimmed to.
+   * The graph lane is never dimmed, so lines stay continuous with the rows around it.
    */
   filterKeptOpacity?: BadgedCommitOpacity;
   onClick: (event: React.MouseEvent) => void;
