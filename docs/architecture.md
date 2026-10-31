@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-10-22**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-10-31**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -48,6 +48,7 @@ src/
 │   ├── RepoDataLoader.ts         # Initial + deferred data, avatar cache hydration/enqueue, submodules, initial-load perf/error telemetry
 │   ├── RefreshCoordinator.ts     # When to load: initial/manual/auto, hidden-panel deferral, loading lifecycle
 │   ├── EditorCommandService.ts   # VS Code diff/file/compare editors, worktree folder/reveal, signature help.
+│                                 #   openMultiDiffEditor ("Open Changes") opens `vscode.changes` from multiDiffPlan
 │                                 #   findRemovableWorktree answers with the list it guarded against, so a removal
 │                                 #   resolves its base dir off that one `git worktree list`
 │   ├── OperationGuard.ts         # In-progress checks (rebase/cherry-pick/revert/merge) → GitError | null
@@ -139,6 +140,9 @@ src/
     ├── editorSplitFill.ts        # PURE: "Split Editor Right" on a graph. A webview cannot be duplicated, so the
     │                             #   split is recognised from its aftermath — a group that opened EMPTY while the
     │                             #   group the user was in had a graph as its active tab
+    ├── multiDiffPlan.ts          # PURE: "Open Changes" — a list's two sides (commit/staged/unstaged/compare) and
+    │                             #   each file's original/modified side; added/deleted leave a side out, renames
+    │                             #   read the old path. Same pairs a single-file click opens
     ├── gitShowUri.ts             # PURE: the git-show: URI contract. The FRAGMENT carries the repository (plus an
     │                             #   optional cache-busting nonce for the submodule working-tree side)
     ├── debounceByKey.ts          # PURE: debounce + minimum interval, kept per key, so a storm in one repo cannot
@@ -304,6 +308,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── CommitNavigationIllustration.tsx # 5.18.0 hero: animated miniature of Go to parent commit landing on the parent row
 ├── AutolinksIllustration.tsx     # 5.19.0 hero: animated miniature of a commit message's references turning into links
 ├── BadgedCommitsIllustration.tsx # 5.20.0 hero: animated miniature of "Always show badged commits" bringing back main's tip
+├── OpenChangesIllustration.tsx   # 5.22.0 hero: animated miniature of Open Changes opening the multi-file diff editor
 └── HelpDialog.tsx                # "Help & Feedback": Badge Legend + GitHub Issues + docs/changelog/marketplace + version
 ```
 
@@ -315,6 +320,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── MultiBranchDropdown.tsx           # Branch-specific wrapper, grouped local/remote
 ├── FilterableSingleSelectDropdown.tsx# Generic searchable single-select (repo/submodule pickers)
 ├── FileChangeShared.tsx              # Row/badge/action-icon primitives + shouldShowChangeCounts + SubmoduleBadge
+│                                     #   + OpenChangesButton (a file list's "Open Changes", with its telemetry)
 ├── FileChangesTreeView.tsx           # Tree rendering over fileTreeBuilder output
 └── datepicker-overrides.css          # react-datepicker theming
 ```

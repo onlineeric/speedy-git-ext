@@ -380,6 +380,21 @@ export interface FileChange {
   isSubmodule?: boolean;
 }
 
+/**
+ * Which list an "Open Changes" button belongs to, i.e. what its two sides are.
+ * The backend resolves HEAD itself for the uncommitted sources, so a stale
+ * webview can't hand it the wrong base.
+ */
+export type MultiDiffSource =
+  | { kind: 'commit'; hash: string; parentHash?: string }
+  | { kind: 'staged' }
+  | { kind: 'unstaged' }
+  /** `null` is the working-tree slot, as in {@link CompareResult}. */
+  | { kind: 'compare'; aHash: string | null; bHash: string | null };
+
+/** The parts of a {@link FileChange} a multi-file diff needs. */
+export type MultiDiffFile = Pick<FileChange, 'path' | 'oldPath' | 'status' | 'isSubmodule'>;
+
 export type FileChangeStatus =
   | 'added'
   | 'modified'

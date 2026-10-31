@@ -128,6 +128,26 @@
   98%, 100% { max-height: 0; opacity: 0; }
 }
 
+/* The Open Changes illustration: the button on a file list is clicked and the
+   multi-file diff editor opens with every file stacked in it, one after the
+   other. The editor's resting state is open, so with no animation it reads as
+   the result. All three share one duration. */
+@keyframes whats-new-changes-click {
+  0%, 10% { opacity: 0; transform: scale(0.4); }
+  16% { opacity: 1; transform: scale(1); }
+  28%, 100% { opacity: 0; transform: scale(2.2); }
+}
+@keyframes whats-new-changes-open {
+  0%, 20% { opacity: 0; transform: translateY(6px); }
+  30%, 90% { opacity: 1; transform: translateY(0); }
+  98%, 100% { opacity: 0; transform: translateY(0); }
+}
+@keyframes whats-new-changes-file {
+  0%, 26% { opacity: 0; }
+  34%, 90% { opacity: 1; }
+  98%, 100% { opacity: 0; }
+}
+
 @layer utilities {
   .animate-whats-new-countdown {
     transform-origin: left;
@@ -176,6 +196,17 @@
     }
     .animate-whats-new-badged-row {
       animation: whats-new-badged-row 5s ease-in-out infinite;
+    }
+    .animate-whats-new-changes-click {
+      animation: whats-new-changes-click 5s ease-out infinite;
+    }
+    .animate-whats-new-changes-open {
+      animation: whats-new-changes-open 5s ease-out infinite;
+    }
+    /* Staggered per file through --whats-new-changes-delay, set inline. */
+    .animate-whats-new-changes-file {
+      animation: whats-new-changes-file 5s ease-out infinite;
+      animation-delay: var(--whats-new-changes-delay, 0s);
     }
   }
   .animate-toast-in {

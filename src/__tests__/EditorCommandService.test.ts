@@ -235,4 +235,48 @@ describe('EditorCommandService', () => {
     }
     expect(worktreeFragments[0]).not.toBe(worktreeFragments[1]);
   });
+
+  it('opens staged changes as one multi-file diff, HEAD to the index, added files with no original', async () => {
+    const { service } = makeEditorCommandService({ repoPath: '/repo-a', headHash: 'abcdef123456' });
+    const executeCommand = vi.mocked(vscode.commands.executeCommand);
+    executeCommand.mockClear();
+
+    await service.openMultiDiffEditor('Staged Changes', { kind: 'staged' }, [
+      { path: 'src/a.ts', status: 'modified' },
+      { path: 'src/new.ts', status: 'added' },
+    ]);
+
+    expect(executeCommand).toHaveBeenCalledWith('vscode.changes', 'Staged Changes', [
+      [
+        expect.objectContaining({ scheme: 'file', fsPath: expect.stringContaining('a.ts') }),
+        expect.objectContaining({ authority: 'abcdef123456', query: 'src/a.ts' }),
+        expect.objectContaining({ authority: 'staged', query: 'src/a.ts' }),
+      ],
+      [
+        expect.objectContaining({ scheme: 'file' }),
+        undefined,
+        expect.objectContaining({ authority: 'staged', query: 'src/new.ts' }),
+      ],
+    ]);
+  });
+
+  it('routes a submodule in a multi-file diff through the worktree sentinel, never a file URI', async () => {
+    const { service } = makeEditorCommandService({ repoPath: '/repo-a' });
+    const executeCommand = vi.mocked(vscode.commands.executeCommand);
+    executeCommand.mockClear();
+
+    await service.openMultiDiffEditor('t', { kind: 'unstaged' }, [{ path: 'libs/sub', status: 'modified', isSubmodule: true }]);
+
+    const [, , resources] = executeCommand.mock.calls[0] as [string, string, unknown[][]];
+    expect(resources[0][2]).toEqual(expect.objectContaining({ authority: 'worktree', query: 'libs/sub' }));
+  });
+
+  it('warns instead of throwing when the multi-file diff editor is unavailable', async () => {
+    const { service } = makeEditorCommandService();
+    vi.mocked(vscode.commands.executeCommand).mockRejectedValueOnce(new Error('command not found'));
+
+    await service.openMultiDiffEditor('t', { kind: 'commit', hash: 'c2', parentHash: 'c1' }, [{ path: 'a.ts', status: 'modified' }]);
+
+    expect(vscode.window.showWarningMessage).toHaveBeenCalled();
+  });
 });

@@ -62,6 +62,11 @@ export const workingTreeHandlers = {
     await context.editorCommands.openDiffEditor(message.payload.hash, message.payload.filePath, message.payload.parentHash, message.payload.status, message.payload.isSubmodule);
   },
 
+  openMultiDiff: async (message, context) => {
+    const { title, source, files } = message.payload;
+    await context.editorCommands.openMultiDiffEditor(title, source, files);
+  },
+
   openFile: async (message, context) => {
     await context.editorCommands.openFileAtRevision(message.payload.hash, message.payload.filePath);
   },
@@ -81,6 +86,7 @@ export const workingTreeHandlers = {
   | 'getConflictState'
   | 'openStagedDiff'
   | 'openDiff'
+  | 'openMultiDiff'
   | 'openFile'
   | 'openCurrentFile'
 >;

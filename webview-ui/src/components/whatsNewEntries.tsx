@@ -5,12 +5,13 @@ import { AutosquashIllustration } from './AutosquashIllustration';
 import { BadgedCommitsIllustration } from './BadgedCommitsIllustration';
 import { CommitNavigationIllustration } from './CommitNavigationIllustration';
 import { MultiTabIllustration } from './MultiTabIllustration';
+import { OpenChangesIllustration } from './OpenChangesIllustration';
 import autolinksRowScreenshot from '../../../resources/autolinks.png';
 import settingsAutolinksScreenshot from '../../../resources/settings-autolinks.png';
 import filtersShowBadgedScreenshot from '../../../resources/Filters_show-badged.png';
 import goToParentChildrenScreenshot from '../../../resources/goto-parent-children.png';
 import revealCommitScreenshot from '../../../resources/reveal-commit.png';
-import { BranchIcon, CloudIcon, GoToHeadIcon, NewTabIcon } from './icons';
+import { BranchIcon, CloudIcon, GoToHeadIcon, NewTabIcon, OpenChangesIcon } from './icons';
 import { SubmoduleBadge } from './FileChangeShared';
 import { InlineRefBadge } from './InlineRefBadge';
 import { RefBadgeLegend } from './RefBadgeLegend';
@@ -87,6 +88,55 @@ export interface WhatsNewEntry {
  * with nothing worth interrupting for needs no other opt-out.
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
+  {
+    version: '5.22.0',
+    headline: 'Open Changes: review every file of a commit in one diff editor.',
+    illustration: <OpenChangesIllustration />,
+    content: (
+      <div className="space-y-6">
+        <ContributorThanks login="tbuyukliev">
+          This release comes from your request in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/217">#217</ExternalLink>, to see a
+          commit’s full diff in one tab, like the <UiLabel>Open Changes</UiLabel> button in VS Code’s own Source
+          Control view, instead of clicking each file.
+        </ContributorThanks>
+
+        <WhatsNewSection title="Every changed file, one scroll">
+          <StepFlow>
+            <Step label="1" title="Select a commit" accent={SHOWCASE_BLUE_COLOR}>
+              Its changed files appear in the details panel, as before.
+            </Step>
+            <Step label="2" title="Click Open Changes" accent={SHOWCASE_ORANGE_COLOR}>
+              The <OpenChangesIcon className="inline align-[-2px]" size={13} /> button sits beside the list / tree
+              toggle. Hover it to see <UiLabel>Open Changes</UiLabel>.
+            </Step>
+            <Step label="3" title="Read it top to bottom" accent={SHOWCASE_GREEN_COLOR}>
+              VS Code’s multi-file diff editor opens with every file stacked in one tab. Collapse the ones you have
+              read.
+            </Step>
+          </StepFlow>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="On every list of changed files">
+          <FeatureGrid>
+            <FeatureCard mark="●" title="A commit" gitFlag="git show" accent={SHOWCASE_BLUE_COLOR}>
+              All of the commit’s files, compared with its first parent.
+            </FeatureCard>
+            <FeatureCard mark="±" title="Staged and unstaged" accent={SHOWCASE_GREEN_COLOR}>
+              <UiLabel>Staged Changes</UiLabel> and <UiLabel>Unstaged Changes</UiLabel> each have their own button,
+              next to <UiLabel>Unstage All</UiLabel> / <UiLabel>Stage All</UiLabel>.
+            </FeatureCard>
+            <FeatureCard mark="≡" title="A stash" accent={SHOWCASE_PURPLE_COLOR}>
+              The stash’s <UiLabel>Changes</UiLabel> section opens the same way.
+            </FeatureCard>
+            <FeatureCard mark="⇄" title="A comparison" gitFlag="git diff A B" accent={SHOWCASE_ORANGE_COLOR}>
+              The result of <UiLabel>Compare</UiLabel> opens as one diff, from the first ref to the second.
+            </FeatureCard>
+          </FeatureGrid>
+        </WhatsNewSection>
+      </div>
+    ),
+  },
   {
     version: '5.21.0',
     headline: 'Go to parent, child or HEAD now always lands, even when a filter hides the commit.',

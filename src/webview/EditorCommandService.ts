@@ -2,9 +2,10 @@ import * as path from 'path';
 import { randomUUID } from 'node:crypto';
 import * as vscode from 'vscode';
 import { GitError, err, ok, type Result } from '../../shared/errors.js';
-import type { FileChangeStatus, WorktreeInfo } from '../../shared/types.js';
+import type { FileChangeStatus, MultiDiffFile, MultiDiffSource, WorktreeInfo } from '../../shared/types.js';
 import { UNCOMMITTED_HASH } from '../../shared/types.js';
 import { buildGitShowUriParts, STAGED_AUTHORITY, WORKTREE_AUTHORITY } from '../utils/gitShowUri.js';
+import { multiDiffNeedsHead, planMultiDiffEntries, resolveMultiDiffRevisions, type DiffSide } from '../utils/multiDiffPlan.js';
 import type { GitServiceRegistry } from './GitServiceRegistry.js';
 import type { WebviewRuntime } from './WebviewRuntime.js';
 
@@ -164,6 +165,42 @@ export class EditorCommandService {
       await vscode.commands.executeCommand('vscode.diff', buildUri(payload.aHash), buildUri(payload.bHash), payload.title);
     } catch {
       this.log.warn(`Compare diff editor failed for: ${payload.filePath}`);
+    }
+  }
+
+  /**
+   * "Open Changes": every file of one list in VS Code's multi-file diff editor.
+   * Each call opens a fresh editor, so reopening a list after it changed never
+   * shows the old file set.
+   */
+  async openMultiDiffEditor(title: string, source: MultiDiffSource, files: MultiDiffFile[]): Promise<void> {
+    const headHash = multiDiffNeedsHead(source) ? await this.getHeadHash() : '';
+    const entries = planMultiDiffEntries(resolveMultiDiffRevisions(source, headHash), files);
+    const resources = entries.map((entry) => [
+      vscode.Uri.file(path.join(this.runtime.currentRepoPath, entry.filePath)),
+      entry.original && this.buildDiffSideUri(entry.original),
+      entry.modified && this.buildDiffSideUri(entry.modified),
+    ]);
+
+    try {
+      await vscode.commands.executeCommand('vscode.changes', title, resources);
+    } catch (error) {
+      this.log.warn(`Multi-file diff editor failed: ${error}`);
+      vscode.window.showWarningMessage('Could not open the changes. The multi-file diff editor needs VS Code 1.86 or later.');
+    }
+  }
+
+  private buildDiffSideUri(side: DiffSide): vscode.Uri {
+    const fileName = side.filePath.split('/').pop() ?? side.filePath;
+    switch (side.revision.kind) {
+      case 'commit':
+        return this.buildGitShowUri(side.revision.hash, side.filePath, `${side.revision.hash.slice(0, 8)}: ${fileName}`);
+      case 'index':
+        return this.buildGitShowUri(STAGED_AUTHORITY, side.filePath, `Staged: ${fileName}`);
+      case 'workingTree':
+        return side.isSubmodule
+          ? this.buildWorktreeSubmoduleUri(side.filePath, fileName)
+          : vscode.Uri.file(path.join(this.runtime.currentRepoPath, side.filePath));
     }
   }
 
