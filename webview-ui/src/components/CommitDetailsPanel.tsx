@@ -275,13 +275,15 @@ function CompareLoadingBody() {
 function CompareBody({ result }: { result: CompareResult }) {
   const fileViewMode = useGraphStore((state) => state.fileViewMode);
 
+  const compareTitle = `${slotLabel(result.a)} → ${slotLabel(result.b)}`;
+
   const handleFileClick = (file: FileChange) => {
     rpcClient.openCompareDiff({
       filePath: file.path,
       aHash: result.aResolvedHash,
       bHash: result.bResolvedHash,
       status: file.status,
-      title: `${slotLabel(result.a)} → ${slotLabel(result.b)} · ${file.path}`,
+      title: `${compareTitle} · ${file.path}`,
       isSubmodule: file.isSubmodule,
     });
   };
@@ -306,16 +308,14 @@ function CompareBody({ result }: { result: CompareResult }) {
       <div className="px-3 py-2">
         <div className="mb-1 flex items-center gap-2">
           <ViewModeToggle />
-          {result.files.length > 0 && (
-            <OpenChangesButton
-              files={result.files}
-              target={{
-                title: `${slotLabel(result.a)} → ${slotLabel(result.b)}`,
-                source: { kind: 'compare', aHash: result.aResolvedHash, bHash: result.bResolvedHash },
-                telemetryAction: 'openChangesCompare',
-              }}
-            />
-          )}
+          <OpenChangesButton
+            files={result.files}
+            target={{
+              title: compareTitle,
+              source: { kind: 'compare', aHash: result.aResolvedHash, bHash: result.bResolvedHash },
+              telemetryAction: 'openChangesCompare',
+            }}
+          />
         </div>
         {fileViewMode === 'list' ? (
           <div className="space-y-0.5">
@@ -923,7 +923,7 @@ function FileChangesList({
           {details.files.length} file{details.files.length !== 1 ? 's' : ''} changed
         </span>
         <ViewModeToggle />
-        {details.files.length > 0 && <OpenChangesButton files={details.files} target={commitOpenChanges} />}
+        <OpenChangesButton files={details.files} target={commitOpenChanges} />
       </div>
       {fileViewMode === 'list' ? (
         <div className="space-y-0.5">

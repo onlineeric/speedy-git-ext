@@ -46,7 +46,7 @@ export function resolveMultiDiffRevisions(source: MultiDiffSource, headHash: str
     case 'unstaged':
       return { before: head, after: { kind: 'workingTree' } };
     case 'compare':
-      return { before: toRevision(source.aHash), after: toRevision(source.bHash) };
+      return { before: compareSlotRevision(source.aHash), after: compareSlotRevision(source.bHash) };
   }
 }
 
@@ -55,8 +55,13 @@ export function multiDiffNeedsHead(source: MultiDiffSource): boolean {
   return source.kind === 'staged' || source.kind === 'unstaged';
 }
 
+/**
+ * Each file's two sides. A file left with neither side — a deletion with
+ * nothing before it — has no diff to show and is dropped rather than handed to
+ * the editor as an empty entry.
+ */
 export function planMultiDiffEntries(revisions: MultiDiffRevisions, files: MultiDiffFile[]): MultiDiffEntry[] {
-  return files.map((file) => {
+  return files.flatMap((file) => {
     const isSubmodule = file.isSubmodule === true;
     const isNew = file.status === 'added' || file.status === 'untracked';
     const original = !isNew && revisions.before
@@ -65,10 +70,11 @@ export function planMultiDiffEntries(revisions: MultiDiffRevisions, files: Multi
     const modified = file.status === 'deleted'
       ? undefined
       : { revision: revisions.after, filePath: file.path, isSubmodule };
-    return { filePath: file.path, original, modified };
+    return original || modified ? [{ filePath: file.path, original, modified }] : [];
   });
 }
 
-function toRevision(hash: string | null): DiffRevision {
+/** A compare slot's side: `null` is the working-tree slot, as in `CompareResult`. */
+export function compareSlotRevision(hash: string | null): DiffRevision {
   return hash === null ? { kind: 'workingTree' } : { kind: 'commit', hash };
 }

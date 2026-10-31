@@ -139,6 +139,8 @@ export interface OpenChangesTarget {
 
 /** Opens every file of a list in VS Code's multi-file diff editor (#217). */
 export function OpenChangesButton({ target, files }: { target: OpenChangesTarget; files: FileChange[] }) {
+  if (files.length === 0) return null;
+
   const handleClick = () => {
     trackUiInteraction('commitDetails', target.telemetryAction);
     rpcClient.openMultiDiff(target.title, target.source, files);

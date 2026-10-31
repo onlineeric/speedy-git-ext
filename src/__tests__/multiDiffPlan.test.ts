@@ -85,6 +85,11 @@ describe('planMultiDiffEntries', () => {
     expect(entry.modified?.isSubmodule).toBe(true);
   });
 
+  it('drops a deletion with nothing before it, which has no side to show', () => {
+    const unborn = resolveMultiDiffRevisions({ kind: 'unstaged' }, '');
+    expect(planMultiDiffEntries(unborn, [{ path: 'gone.ts', status: 'deleted' }])).toEqual([]);
+  });
+
   it('shows every file as added when there is nothing before', () => {
     const rootCommit = resolveMultiDiffRevisions({ kind: 'commit', hash: 'c1' }, '');
     const [entry] = planMultiDiffEntries(rootCommit, [{ path: 'a.ts', status: 'modified' }]);
