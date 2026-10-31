@@ -11,6 +11,8 @@ import settingsAutolinksScreenshot from '../../../resources/settings-autolinks.p
 import filtersShowBadgedScreenshot from '../../../resources/Filters_show-badged.png';
 import goToParentChildrenScreenshot from '../../../resources/goto-parent-children.png';
 import revealCommitScreenshot from '../../../resources/reveal-commit.png';
+import showChangesCommitScreenshot from '../../../resources/show-changes-commit.png';
+import showChangesUncommittedScreenshot from '../../../resources/show-changes-uncommitted.png';
 import { BranchIcon, CloudIcon, GoToHeadIcon, NewTabIcon, OpenChangesIcon } from './icons';
 import { SubmoduleBadge } from './FileChangeShared';
 import { InlineRefBadge } from './InlineRefBadge';
@@ -115,6 +117,34 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
               read.
             </Step>
           </StepFlow>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="On a commit">
+          <Screenshot
+            src={showChangesCommitScreenshot}
+            alt="The details panel's 5 files changed header with the Open Changes button beside the list and tree toggle"
+            width={256}
+            height={117}
+            caption={
+              <>
+                <UiLabel>Open Changes</UiLabel> beside the list / tree toggle.
+              </>
+            }
+          />
+        </WhatsNewSection>
+
+        <WhatsNewSection title="On staged and unstaged changes">
+          <Screenshot
+            src={showChangesUncommittedScreenshot}
+            alt="The uncommitted changes in the details panel, with an Open Changes button beside Staged Changes and another beside Unstaged Changes"
+            width={321}
+            height={290}
+            caption={
+              <>
+                One button per group, next to <UiLabel>Unstage All</UiLabel> and <UiLabel>Stage All</UiLabel>.
+              </>
+            }
+          />
         </WhatsNewSection>
 
         <WhatsNewSection title="On every list of changed files">

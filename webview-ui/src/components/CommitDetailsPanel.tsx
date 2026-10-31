@@ -996,7 +996,7 @@ function FileChangeSection({
           <span style={{ color: variantColor }}>{title}</span>
           <span className="text-[var(--vscode-descriptionForeground)]">({files.length})</span>
         </button>
-        <span className="ml-auto flex items-center gap-1">
+        <span className="ml-2 flex items-center gap-1">
           {openChanges && <OpenChangesButton files={files} target={openChanges} />}
           {onBulkAction && bulkActionLabel && (
             <button
