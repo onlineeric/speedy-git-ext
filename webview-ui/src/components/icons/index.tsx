@@ -141,6 +141,19 @@ export function TreeViewIcon({ className, size = 16 }: IconProps & { size?: numb
   );
 }
 
+/** Stacked diff sheets ("Open Changes": every file in one diff editor) — inherits text color via currentColor */
+export function OpenChangesIcon({ className, size = 16 }: IconProps & { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path d="M 3.5 1 H 10 A 1 1 0 0 1 11 2 V 8.5" stroke="currentColor" strokeWidth={1} strokeLinecap="round" />
+      <rect x={1} y={3} width={7.5} height={8} rx={1} stroke="currentColor" strokeWidth={1} />
+      <line x1={4.75} y1={4.75} x2={4.75} y2={7.25} stroke="currentColor" strokeWidth={1} strokeLinecap="round" />
+      <line x1={3.5} y1={6} x2={6} y2={6} stroke="currentColor" strokeWidth={1} strokeLinecap="round" />
+      <line x1={3.5} y1={9} x2={6} y2={9} stroke="currentColor" strokeWidth={1} strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /** Cloud shape for remote management — 12×12, inherits text color via currentColor */
 export function CloudIcon({ className }: IconProps) {
   return (

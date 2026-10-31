@@ -199,6 +199,8 @@ export const UI_ACTIONS = [
   'columnShowSignature', 'columnHideSignature',
   // Commit details panel: the navigate icon beside a Parents/Children hash
   'goToParent', 'goToChild',
+  // Commit details panel: "Open Changes" on a file list, by which list it was
+  'openChangesCommit', 'openChangesStash', 'openChangesStaged', 'openChangesUnstaged', 'openChangesCompare',
   // Filter panel: the revealed-commits chip's Hide button
   'clearRevealedCommits',
   // Avatar settings section (View popover) + the Author-header shortcut to it

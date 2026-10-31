@@ -1,4 +1,4 @@
-import type { BranchCheckoutRequest, Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, MergeState, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RebaseRangeCommit, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, AvatarAuthState, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata, ToolbarBooleanSetting, WorktreeFolderNameStyle, ResolvedWorktreePaths } from './types.js';
+import type { BranchCheckoutRequest, Commit, Branch, CommitDetails, GraphFilters, RemoteInfo, StashEntry, ResetMode, PushForceMode, CherryPickOptions, CherryPickState, RevertState, RevertOptions, MergeState, CommitSignatureInfo, SignaturePresence, CommitParentInfo, InteractiveRebaseConfig, RebaseState, RebaseConflictInfo, RebaseEntry, RebaseRangeCommit, RepoInfo, Submodule, UserSettings, SubmoduleNavEntry, AvatarUrlMap, AvatarAuthState, WorktreeInfo, WorktreeBranchMode, PersistedUIState, Author, FileChangeStatus, MultiDiffSource, MultiDiffFile, ConflictState, UncommittedSummary, SlotValue, CompareMode, CompareResult, TagMetadata, ToolbarBooleanSetting, WorktreeFolderNameStyle, ResolvedWorktreePaths } from './types.js';
 
 /** Payload for the batched initial data message */
 export interface InitialDataPayload {
@@ -243,6 +243,8 @@ export type RequestMessage =
   | { type: 'compareRefs'; payload: { a: SlotValue; b: SlotValue; mode: CompareMode; requestId: string } }
   | { type: 'cancelCompare'; payload: { requestId: string } }
   | { type: 'openCompareDiff'; payload: { filePath: string; aHash: string | null; bHash: string | null; status: FileChangeStatus; title: string; isSubmodule?: boolean } }
+  // "Open Changes": every file of one list in VS Code's multi-file diff editor (#217)
+  | { type: 'openMultiDiff'; payload: { source: MultiDiffSource; files: MultiDiffFile[]; title: string } }
   /**
    * Fire-and-forget UI telemetry report (049-usage-telemetry). One-way by
    * contract: the webview never awaits it and the handler never posts a
@@ -382,7 +384,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   stageFiles: true, unstageFiles: true, stageAll: true, unstageAll: true,
   discardFiles: true, discardAllUnstaged: true, stashWithMessage: true, stashSelected: true,
   getConflictState: true, openStagedDiff: true,
-  compareRefs: true, cancelCompare: true, openCompareDiff: true,
+  compareRefs: true, cancelCompare: true, openCompareDiff: true, openMultiDiff: true,
   trackUiEvent: true,
   openNewGraphTab: true,
 };

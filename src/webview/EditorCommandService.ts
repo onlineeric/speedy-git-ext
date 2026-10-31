@@ -2,9 +2,10 @@ import * as path from 'path';
 import { randomUUID } from 'node:crypto';
 import * as vscode from 'vscode';
 import { GitError, err, ok, type Result } from '../../shared/errors.js';
-import type { FileChangeStatus, WorktreeInfo } from '../../shared/types.js';
+import type { FileChangeStatus, MultiDiffFile, MultiDiffSource, WorktreeInfo } from '../../shared/types.js';
 import { UNCOMMITTED_HASH } from '../../shared/types.js';
 import { buildGitShowUriParts, STAGED_AUTHORITY, WORKTREE_AUTHORITY } from '../utils/gitShowUri.js';
+import { compareSlotRevision, multiDiffNeedsHead, planMultiDiffEntries, resolveMultiDiffRevisions, type DiffSide } from '../utils/multiDiffPlan.js';
 import type { GitServiceRegistry } from './GitServiceRegistry.js';
 import type { WebviewRuntime } from './WebviewRuntime.js';
 
@@ -74,10 +75,8 @@ export class EditorCommandService {
       return;
     }
 
-    const parent = parentHash ?? `${hash}~1`;
-    const fileName = filePath.split('/').pop() ?? filePath;
-    const leftUri = this.buildGitShowUri(parent, filePath, `${parent.slice(0, 8)}: ${fileName}`);
-    const rightUri = this.buildGitShowUri(hash, filePath, `${hash.slice(0, 8)}: ${fileName}`);
+    const leftUri = this.buildCommitSideUri(parentHash ?? `${hash}~1`, filePath);
+    const rightUri = this.buildCommitSideUri(hash, filePath);
     const title = `${filePath} (${hash.slice(0, 7)})`;
 
     try {
@@ -89,14 +88,13 @@ export class EditorCommandService {
   }
 
   async openStagedDiffEditor(filePath: string): Promise<void> {
-    const fileName = filePath.split('/').pop() ?? filePath;
     const headHash = await this.getHeadHash();
     if (!headHash) {
       this.log.warn(`Cannot resolve HEAD for staged diff: ${filePath}`);
       return;
     }
-    const leftUri = this.buildGitShowUri(headHash, filePath, `${headHash.slice(0, 8)}: ${fileName}`);
-    const rightUri = this.buildGitShowUri(STAGED_AUTHORITY, filePath, `Staged: ${fileName}`);
+    const leftUri = this.buildCommitSideUri(headHash, filePath);
+    const rightUri = this.buildDiffSideUri({ revision: { kind: 'index' }, filePath, isSubmodule: false });
     const title = `${filePath} (Staged)`;
     try {
       await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title);
@@ -106,9 +104,7 @@ export class EditorCommandService {
   }
 
   async openFileAtRevision(hash: string, filePath: string): Promise<void> {
-    const shortHash = hash.slice(0, 8);
-    const fileName = filePath.split('/').pop() ?? filePath;
-    const uri = this.buildGitShowUri(hash, filePath, `${shortHash}: ${fileName}`);
+    const uri = this.buildCommitSideUri(hash, filePath);
 
     try {
       const doc = await vscode.workspace.openTextDocument(uri);
@@ -147,24 +143,65 @@ export class EditorCommandService {
     isSubmodule?: boolean;
   }): Promise<void> {
     void payload.status;
-    const fileName = payload.filePath.split('/').pop() ?? payload.filePath;
-
-    const buildUri = (hash: string | null): vscode.Uri => {
-      if (hash === null) {
-        // Working-tree slot. A submodule has no file to point at here — see
-        // `buildWorktreeSubmoduleUri`.
-        return payload.isSubmodule
-          ? this.buildWorktreeSubmoduleUri(payload.filePath, fileName)
-          : vscode.Uri.file(path.join(this.runtime.currentRepoPath, payload.filePath));
-      }
-      return this.buildGitShowUri(hash, payload.filePath, `${hash.slice(0, 8)}: ${fileName}`);
-    };
+    const buildUri = (hash: string | null): vscode.Uri => this.buildDiffSideUri({
+      revision: compareSlotRevision(hash),
+      filePath: payload.filePath,
+      isSubmodule: payload.isSubmodule === true,
+    });
 
     try {
       await vscode.commands.executeCommand('vscode.diff', buildUri(payload.aHash), buildUri(payload.bHash), payload.title);
     } catch {
       this.log.warn(`Compare diff editor failed for: ${payload.filePath}`);
     }
+  }
+
+  /**
+   * "Open Changes": every file of one list in VS Code's multi-file diff editor.
+   * Each call opens a fresh editor, so reopening a list after it changed never
+   * shows the old file set.
+   */
+  async openMultiDiffEditor(title: string, source: MultiDiffSource, files: MultiDiffFile[]): Promise<void> {
+    const headHash = multiDiffNeedsHead(source) ? await this.getHeadHash() : '';
+    const entries = planMultiDiffEntries(resolveMultiDiffRevisions(source, headHash), files);
+    const resources = entries.map((entry) => [
+      this.buildWorkingTreeFileUri(entry.filePath),
+      entry.original && this.buildDiffSideUri(entry.original),
+      entry.modified && this.buildDiffSideUri(entry.modified),
+    ]);
+
+    try {
+      await vscode.commands.executeCommand('vscode.changes', title, resources);
+    } catch (error) {
+      this.log.warn(`Multi-file diff editor failed: ${error}`);
+      vscode.window.showWarningMessage('Could not open the changes. The multi-file diff editor needs VS Code 1.86 or later.');
+    }
+  }
+
+  /**
+   * One side of a diff as a URI. The working-tree side of a submodule has no file
+   * to point at — see `buildWorktreeSubmoduleUri`.
+   */
+  private buildDiffSideUri(side: DiffSide): vscode.Uri {
+    const fileName = side.filePath.split('/').pop() ?? side.filePath;
+    switch (side.revision.kind) {
+      case 'commit':
+        return this.buildGitShowUri(side.revision.hash, side.filePath, `${side.revision.hash.slice(0, 8)}: ${fileName}`);
+      case 'index':
+        return this.buildGitShowUri(STAGED_AUTHORITY, side.filePath, `Staged: ${fileName}`);
+      case 'workingTree':
+        return side.isSubmodule
+          ? this.buildWorktreeSubmoduleUri(side.filePath, fileName)
+          : this.buildWorkingTreeFileUri(side.filePath);
+    }
+  }
+
+  private buildWorkingTreeFileUri(filePath: string): vscode.Uri {
+    return vscode.Uri.file(path.join(this.runtime.currentRepoPath, filePath));
+  }
+
+  private buildCommitSideUri(hash: string, filePath: string): vscode.Uri {
+    return this.buildDiffSideUri({ revision: { kind: 'commit', hash }, filePath, isSubmodule: false });
   }
 
   async openWorktreeFolder(worktreePath: string): Promise<void> {
@@ -211,11 +248,10 @@ export class EditorCommandService {
 
   private async openUncommittedDiff(filePath: string, status?: FileChangeStatus, isSubmodule?: boolean): Promise<void> {
     const fileName = filePath.split('/').pop() ?? filePath;
-    const absolutePath = path.join(this.runtime.currentRepoPath, filePath);
 
     if (status === 'untracked') {
       const leftUri = vscode.Uri.parse(`untitled:${fileName}`);
-      const rightUri = vscode.Uri.file(absolutePath);
+      const rightUri = this.buildWorkingTreeFileUri(filePath);
       await this.tryOpenDiff(leftUri, rightUri, `${filePath} (Untracked)`, `Diff editor failed for untracked file: ${filePath}`);
       return;
     }
@@ -226,14 +262,14 @@ export class EditorCommandService {
       return;
     }
 
-    const leftUri = this.buildGitShowUri(headHash, filePath, `${headHash.slice(0, 8)}: ${fileName}`);
+    const leftUri = this.buildCommitSideUri(headHash, filePath);
 
     if (status === 'deleted') {
       await this.tryOpenDiff(leftUri, vscode.Uri.parse(`untitled:${fileName}`), `${filePath} (Deleted)`, `Diff editor failed for deleted file: ${filePath}`);
       return;
     }
 
-    const rightUri = isSubmodule ? this.buildWorktreeSubmoduleUri(filePath, fileName) : vscode.Uri.file(absolutePath);
+    const rightUri = this.buildDiffSideUri({ revision: { kind: 'workingTree' }, filePath, isSubmodule: isSubmodule === true });
     await this.tryOpenDiff(leftUri, rightUri, `${filePath} (Working Tree)`, `Diff editor failed for uncommitted file: ${filePath}`);
   }
 

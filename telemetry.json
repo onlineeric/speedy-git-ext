@@ -63,7 +63,7 @@
       "action": {
         "classification": "SystemMetaData",
         "purpose": "FeatureInsight",
-        "comment": "Action id from the closed catalog (e.g. cherryPick, copyHash, checkoutDoubleClick, moreActions, moreOptions, goToParent, goToChild, clearRevealedCommits, openAutolinkCustom, openAutolinkGitHub, openAutolinkGitLab, settingsSave, settingsSaveAndClose, settingsDiscardAndClose)."
+        "comment": "Action id from the closed catalog (e.g. cherryPick, copyHash, checkoutDoubleClick, moreActions, moreOptions, goToParent, goToChild, openChangesCommit, openChangesStash, openChangesStaged, openChangesUnstaged, openChangesCompare, clearRevealedCommits, openAutolinkCustom, openAutolinkGitHub, openAutolinkGitLab, settingsSave, settingsSaveAndClose, settingsDiscardAndClose)."
       }
     },
     "dialogOutcome": {

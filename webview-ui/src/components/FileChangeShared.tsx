@@ -1,9 +1,11 @@
-import type { FileChange, FileViewMode } from '@shared/types';
+import type { FileChange, FileViewMode, MultiDiffSource } from '@shared/types';
+import type { UiAction } from '@shared/telemetry';
 import { UNCOMMITTED_HASH } from '@shared/types';
-import { CopyIcon, CopiedIcon, FileIcon, FileCodeIcon, StageIcon, UnstageIcon, DiscardIcon, ListViewIcon, TreeViewIcon } from './icons';
+import { CopyIcon, CopiedIcon, FileIcon, FileCodeIcon, StageIcon, UnstageIcon, DiscardIcon, ListViewIcon, TreeViewIcon, OpenChangesIcon } from './icons';
 import { rpcClient } from '../rpc/rpcClient';
 import { useCopyFeedback } from '../hooks/useCopyFeedback';
 import { useGraphStore } from '../stores/graphStore';
+import { trackUiInteraction } from '../utils/telemetry';
 import {
   ACCENT_COLOR,
   ADDED_COLOR,
@@ -125,6 +127,35 @@ export function ViewModeToggle() {
         <TreeViewIcon size={16} />
       </button>
     </span>
+  );
+}
+
+/** What an "Open Changes" button opens, and which telemetry action it reports. */
+export interface OpenChangesTarget {
+  title: string;
+  source: MultiDiffSource;
+  telemetryAction: Extract<UiAction, `openChanges${string}`>;
+}
+
+/** Opens every file of a list in VS Code's multi-file diff editor (#217). */
+export function OpenChangesButton({ target, files }: { target: OpenChangesTarget; files: FileChange[] }) {
+  if (files.length === 0) return null;
+
+  const handleClick = () => {
+    trackUiInteraction('commitDetails', target.telemetryAction);
+    rpcClient.openMultiDiff(target.title, target.source, files);
+  };
+
+  return (
+    <button
+      className="rounded p-0.5 hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+      style={NEUTRAL_STYLE}
+      onClick={handleClick}
+      title="Open Changes"
+      aria-label="Open Changes"
+    >
+      <OpenChangesIcon size={16} />
+    </button>
   );
 }
 

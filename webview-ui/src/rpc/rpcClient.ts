@@ -2,7 +2,7 @@ import type { RequestMessage, ResponseMessage } from '@shared/messages';
 import type { CustomAutolink } from '@shared/autolinks';
 import type { FixupCommitArgsOptions } from '@shared/fixupCommit';
 import type { RefExpectation } from '@shared/refRevalidation';
-import type { BranchCheckoutTarget, CherryPickOptions, Commit, CompareMode, GraphFilters, InteractiveRebaseConfig, RebaseRangeCommit, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, WorktreeBranchMode, ToolbarBooleanSetting, WorktreeFolderNameStyle } from '@shared/types';
+import type { BranchCheckoutTarget, CherryPickOptions, Commit, CompareMode, GraphFilters, InteractiveRebaseConfig, RebaseRangeCommit, MergeOptions, PersistedUIState, PushForceMode, ResetMode, RevertOptions, SlotValue, CommitParentInfo, FileChangeStatus, MultiDiffFile, MultiDiffSource, WorktreeBranchMode, ToolbarBooleanSetting, WorktreeFolderNameStyle } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
 import {
   COMMIT_NAVIGATION_MESSAGES,
@@ -563,6 +563,14 @@ class RpcClient {
 
   openCompareDiff(payload: { filePath: string; aHash: string | null; bHash: string | null; status: FileChangeStatus; title: string; isSubmodule?: boolean }) {
     this.send({ type: 'openCompareDiff', payload });
+  }
+
+  openMultiDiff(title: string, source: MultiDiffSource, files: MultiDiffFile[]) {
+    this.send({
+      type: 'openMultiDiff',
+      // Only what the diff needs: a FileChange also carries counts and stage state.
+      payload: { title, source, files: files.map(({ path, oldPath, status, isSubmodule }) => ({ path, oldPath, status, isSubmodule })) },
+    });
   }
 
   openFile(hash: string, filePath: string) {

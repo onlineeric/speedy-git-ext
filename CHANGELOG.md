@@ -4,6 +4,14 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.22.0] - 2026-10-31
+
+### Added
+- **Open Changes: every file of a list in one diff editor.** A new **Open Changes** button on the details panel's file lists opens VS Code's multi-file diff editor with all the files stacked in one tab, so a whole commit can be read top to bottom instead of one file at a time. It is on a commit's file list (compared with its first parent), on **Staged Changes** and **Unstaged Changes** (each its own button, beside **Unstage All** / **Stage All**), on a stash's **Changes**, and on a **Compare** result (first ref to second). Each file shows the same two sides as clicking it on its own; added and deleted files show as such, a renamed file is compared with its old path, and a changed submodule shows its `Subproject commit` line. Reopening a list after it changed opens a fresh editor with the current files.
+
+### Credits — Open Changes (#217)
+- Thanks to [@tbuyukliev](https://github.com/tbuyukliev) for asking for a commit's full diff in one tab, like Source Control's **Open Changes**, in [#217](https://github.com/onlineeric/speedy-git-ext/issues/217)!
+
 ## [5.21.0] - 2026-10-23
 
 ### Changed

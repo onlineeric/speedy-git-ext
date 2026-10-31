@@ -13,7 +13,7 @@ import { buildChildLinks, buildParentLinks, childrenMayBeIncomplete, relatedComm
 import { trackUiInteraction } from '../utils/telemetry';
 import { CloseIcon, MoveRightIcon, MoveBottomIcon, ChevronDownIcon, ChevronRightIcon, InfoIcon, GoToHeadIcon, WarningIcon } from './icons';
 import { FileChangesTreeView } from './FileChangesTreeView';
-import { FileChangeRow, ViewModeToggle } from './FileChangeShared';
+import { FileChangeRow, OpenChangesButton, ViewModeToggle, type OpenChangesTarget } from './FileChangeShared';
 import { AuthorBadge } from './AuthorBadge';
 import { formatAuthorIdentity } from '../utils/authorIdentity';
 import { DiscardDialog } from './DiscardDialog';
@@ -275,13 +275,15 @@ function CompareLoadingBody() {
 function CompareBody({ result }: { result: CompareResult }) {
   const fileViewMode = useGraphStore((state) => state.fileViewMode);
 
+  const compareTitle = `${slotLabel(result.a)} → ${slotLabel(result.b)}`;
+
   const handleFileClick = (file: FileChange) => {
     rpcClient.openCompareDiff({
       filePath: file.path,
       aHash: result.aResolvedHash,
       bHash: result.bResolvedHash,
       status: file.status,
-      title: `${slotLabel(result.a)} → ${slotLabel(result.b)} · ${file.path}`,
+      title: `${compareTitle} · ${file.path}`,
       isSubmodule: file.isSubmodule,
     });
   };
@@ -306,6 +308,14 @@ function CompareBody({ result }: { result: CompareResult }) {
       <div className="px-3 py-2">
         <div className="mb-1 flex items-center gap-2">
           <ViewModeToggle />
+          <OpenChangesButton
+            files={result.files}
+            target={{
+              title: compareTitle,
+              source: { kind: 'compare', aHash: result.aResolvedHash, bHash: result.bResolvedHash },
+              telemetryAction: 'openChangesCompare',
+            }}
+          />
         </div>
         {fileViewMode === 'list' ? (
           <div className="space-y-0.5">
@@ -802,6 +812,11 @@ function FileChangesList({
   };
 
   const isUncommitted = details.hash === UNCOMMITTED_HASH;
+  const commitOpenChanges: OpenChangesTarget = {
+    title: `${details.abbreviatedHash} · ${details.subject}`,
+    source: { kind: 'commit', hash: details.hash, parentHash: details.parents[0] },
+    telemetryAction: 'openChangesCommit',
+  };
 
   if (isUncommitted) {
     return (
@@ -832,6 +847,7 @@ function FileChangesList({
             onFileClick={handleFileClick}
             fileViewMode={fileViewMode}
             variant="staged"
+            openChanges={{ title: 'Staged Changes', source: { kind: 'staged' }, telemetryAction: 'openChangesStaged' }}
             onBulkAction={() => rpcClient.unstageAll()}
             bulkActionLabel="Unstage All"
           />
@@ -845,6 +861,7 @@ function FileChangesList({
             onFileClick={handleFileClick}
             fileViewMode={fileViewMode}
             variant="unstaged"
+            openChanges={{ title: 'Unstaged Changes', source: { kind: 'unstaged' }, telemetryAction: 'openChangesUnstaged' }}
             onBulkAction={() => rpcClient.stageAll()}
             bulkActionLabel="Stage All"
             onDiscardClick={setDiscardFile}
@@ -881,6 +898,7 @@ function FileChangesList({
             onFileClick={handleFileClick}
             fileViewMode={fileViewMode}
             variant="changes"
+            openChanges={{ ...commitOpenChanges, telemetryAction: 'openChangesStash' }}
           />
         )}
         {untrackedFiles.length > 0 && (
@@ -905,6 +923,7 @@ function FileChangesList({
           {details.files.length} file{details.files.length !== 1 ? 's' : ''} changed
         </span>
         <ViewModeToggle />
+        <OpenChangesButton files={details.files} target={commitOpenChanges} />
       </div>
       {fileViewMode === 'list' ? (
         <div className="space-y-0.5">
@@ -938,6 +957,7 @@ function FileChangeSection({
   onFileClick,
   fileViewMode,
   variant,
+  openChanges,
   onBulkAction,
   bulkActionLabel,
   onDiscardClick,
@@ -949,6 +969,7 @@ function FileChangeSection({
   onFileClick: (file: FileChange) => void;
   fileViewMode: FileViewMode;
   variant: 'staged' | 'unstaged' | 'conflict' | 'changes' | 'untracked';
+  openChanges?: OpenChangesTarget;
   onBulkAction?: () => void;
   bulkActionLabel?: string;
   onDiscardClick?: (file: FileChange) => void;
@@ -975,15 +996,18 @@ function FileChangeSection({
           <span style={{ color: variantColor }}>{title}</span>
           <span className="text-[var(--vscode-descriptionForeground)]">({files.length})</span>
         </button>
-        {onBulkAction && bulkActionLabel && (
-          <button
-            className="ml-auto text-[10px] rounded px-1.5 py-0.5 text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)]"
-            onClick={onBulkAction}
-            title={bulkActionLabel}
-          >
-            {bulkActionLabel}
-          </button>
-        )}
+        <span className="ml-2 flex items-center gap-1">
+          {openChanges && <OpenChangesButton files={files} target={openChanges} />}
+          {onBulkAction && bulkActionLabel && (
+            <button
+              className="text-[10px] rounded px-1.5 py-0.5 text-[var(--vscode-descriptionForeground)] hover:bg-[var(--vscode-toolbar-hoverBackground)] hover:text-[var(--vscode-foreground)]"
+              onClick={onBulkAction}
+              title={bulkActionLabel}
+            >
+              {bulkActionLabel}
+            </button>
+          )}
+        </span>
       </div>
       {!collapsed && (
         fileViewMode === 'list' ? (
