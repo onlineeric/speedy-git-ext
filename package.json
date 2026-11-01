@@ -217,7 +217,7 @@
         "speedyGit.toolbar.showLabels": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Show a small text label under each toolbar icon button (Filter, Search, Compare, Worktrees, Refresh, Fetch, View, Remote, Settings, What's New, Help). You can also toggle this by right-clicking any toolbar button."
+          "markdownDescription": "Show a small text label under each toolbar icon button (Filter, Search, Compare, Worktrees, Refresh, Fetch, View, Remote, Settings, News, Help). You can also toggle this by right-clicking any toolbar button."
         },
         "speedyGit.toolbar.showRemoteButton": {
           "type": "boolean",

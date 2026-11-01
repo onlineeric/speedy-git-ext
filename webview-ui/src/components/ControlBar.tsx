@@ -25,7 +25,7 @@ import {
   GoToHeadIcon,
   NewTabIcon,
   HelpIcon,
-  SparkleIcon,
+  GiftIcon,
   ToolbarSeparatorIcon,
   WorktreeIcon,
 } from './icons';
@@ -319,8 +319,8 @@ export function ControlBar() {
           />
 
           <ToolbarIconButton
-            label="What's New"
-            icon={<SparkleIcon className={iconClass} />}
+            label="News"
+            icon={<GiftIcon className={iconClass} />}
             onClick={() => {
               trackUiInteraction('toolbar', 'whatsNew');
               useGraphStore.getState().setWhatsNewBrowseOpen(true);

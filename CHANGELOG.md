@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - **Git command timeout setting.** A new **Git** tab in the **View** dialog has **Git command timeout**, in seconds (also `speedyGit.git.timeoutSeconds` in VS Code's Settings). It is one limit for every git command Speedy Git runs: loading the graph, push, pull, fetch, commit hooks and the rest. The default is 60 seconds. Values under 15 are raised to 15, there is no maximum, and `0` means no timeout. Emptying the box resets it to the default. A change applies to the next command, with no reload. When a command times out, the message now says how long it waited and where to raise the limit.
-- **What's New button.** A new **What's New** button in the toolbar, between **Settings** and **Help**, opens the release notes at any time, with no countdown before **Close**. Like the other toolbar buttons, it can show a label and moves into the overflow menu when the toolbar is narrow.
+- **News button.** A new **News** button in the toolbar, between **Settings** and **Help**, opens the What's New release notes at any time, with no countdown before **Close**. Like the other toolbar buttons, it can show a label and moves into the overflow menu when the toolbar is narrow.
 - **Browse every release's notes.** **‹** and **›** buttons at the bottom of the What's New dialog step to the previous and next release's notes, with the version shown between them.
 
 ### Changed

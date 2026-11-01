@@ -201,8 +201,8 @@ webview-ui/src/assets.d.ts        # `*.png` imports are `data:` URLs — vite.co
 ### Toolbar, panels, widgets
 
 ```
-├── ControlBar.tsx                # Top toolbar with actions, incl. "Open New Graph Tab" beside Go to HEAD, What's New
-│                                 #   (between Settings and Help) and the peer-activity notice (informational; it disables nothing)
+├── ControlBar.tsx                # Top toolbar with actions, incl. "Open New Graph Tab" beside Go to HEAD, News
+│                                 #   (What's New; between Settings and Help) and the peer-activity notice (informational; it disables nothing)
 ├── ResponsiveToolbar.tsx         # Measures visible action widths; collapses right, then the left group in two
 │                                 #   phases (unpinned items first, then pinned Refresh/Fetch/HEAD) into More
 │                                 #   dropdowns, which reuse `menuPanelClass` and hide separators by

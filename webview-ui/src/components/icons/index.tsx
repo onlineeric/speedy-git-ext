@@ -528,6 +528,20 @@ export function SparkleIcon({ className, style }: IconProps) {
   );
 }
 
+/** Gift box with a bow — 12×12, the toolbar's News button. Inherits text color via currentColor */
+export function GiftIcon({ className, style }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} style={style} aria-hidden>
+      <g stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round">
+        <rect x={1.5} y={4.2} width={9} height={2.2} rx={0.5} />
+        <path d="M 2.4 6.4 V 10.5 H 9.6 V 6.4" />
+        <line x1={6} y1={4.2} x2={6} y2={10.5} />
+        <path d="M 6 4.2 C 5 2.3 3.1 2.2 3.3 3.3 C 3.5 4.1 5 4.2 6 4.2 C 7 4.2 8.5 4.1 8.7 3.3 C 8.9 2.2 7 2.3 6 4.2 Z" />
+      </g>
+    </svg>
+  );
+}
+
 /** Heart — 12×12, for thanking a contributor. Inherits text color via currentColor */
 export function HeartIcon({ className, style }: IconProps) {
   return (

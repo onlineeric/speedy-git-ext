@@ -22,8 +22,8 @@ import {
   ColumnsIcon,
   GoToHeadIcon,
   NewTabIcon,
+  GiftIcon,
   OpenChangesIcon,
-  SparkleIcon,
 } from './icons';
 import { SubmoduleBadge } from './FileChangeShared';
 import { InlineRefBadge } from './InlineRefBadge';
@@ -154,13 +154,13 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           <div className="flex items-start gap-3">
             <span className="shrink-0">
               <ToolbarButtonSample
-                icon={<SparkleIcon className="h-6 w-6" />}
-                label="What's New"
+                icon={<GiftIcon className="h-6 w-6" />}
+                label="News"
                 accent={SHOWCASE_PURPLE_COLOR}
               />
             </span>
             <p className={bodyTextClassName}>
-              The new <UiLabel>What's New</UiLabel> button, between <UiLabel>Settings</UiLabel> and{' '}
+              The new <UiLabel>News</UiLabel> button, between <UiLabel>Settings</UiLabel> and{' '}
               <UiLabel>Help</UiLabel>, opens these notes at any time. The{' '}
               <ChevronLeftIcon className="inline align-[-2px]" /> and{' '}
               <ChevronRightIcon className="inline align-[-2px]" /> arrows at the bottom of this dialog step back
