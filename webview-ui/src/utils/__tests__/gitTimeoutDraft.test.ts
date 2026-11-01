@@ -28,6 +28,11 @@ describe('gitTimeoutDraft', () => {
     expect(gitTimeoutDraftToSave('300')).toBe(300);
   });
 
+  it('saves an invalid value as a reset, which is what its note promises', () => {
+    expect(gitTimeoutDraftToSave('-3')).toBeNull();
+    expect(gitTimeoutDraftToSave('abc')).toBeNull();
+  });
+
   it('explains every value that does not simply mean "this many seconds"', () => {
     expect(describeGitTimeoutDraft('')).toContain('default, 60 seconds');
     expect(describeGitTimeoutDraft('0')).toContain('No timeout');

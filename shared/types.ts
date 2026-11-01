@@ -234,19 +234,30 @@ export const NO_GIT_TIMEOUT = 0;
 export const MIN_GIT_TIMEOUT_SECONDS = 15;
 
 /**
+ * Read a configured or typed timeout as a number of seconds, before the floor
+ * applies. `undefined` when it does not name one — empty, unparseable or
+ * negative — which means "the default". The one statement of what counts as a
+ * value, so the dialog can tell "invalid" apart from a value that happens to
+ * equal the default.
+ */
+export function parseGitTimeoutSeconds(value: unknown): number | undefined {
+  const parsed =
+    typeof value === 'string' ? (value.trim() === '' ? Number.NaN : Number(value.trim())) : value;
+  if (typeof parsed !== 'number' || !Number.isFinite(parsed) || parsed < 0) return undefined;
+  return parsed;
+}
+
+/**
  * Coerce a configured or typed timeout into the value that applies.
  *
  * Shared by the backend that reads the setting and the dialog that edits it,
- * so the box can say what a value will become before it is saved. Empty,
- * unparseable or negative means "the default"; 0 is kept as "no timeout";
- * anything between 0 and the floor is raised to the floor.
+ * so the box can say what a value will become before it is saved. No value
+ * (see {@link parseGitTimeoutSeconds}) means "the default"; 0 is kept as
+ * "no timeout"; anything between 0 and the floor is raised to the floor.
  */
 export function normalizeGitTimeoutSeconds(value: unknown): number {
-  const parsed =
-    typeof value === 'string' ? (value.trim() === '' ? Number.NaN : Number(value.trim())) : value;
-  if (typeof parsed !== 'number' || !Number.isFinite(parsed) || parsed < 0) {
-    return DEFAULT_USER_SETTINGS.gitTimeoutSeconds;
-  }
+  const parsed = parseGitTimeoutSeconds(value);
+  if (parsed === undefined) return DEFAULT_USER_SETTINGS.gitTimeoutSeconds;
   if (parsed === NO_GIT_TIMEOUT) return NO_GIT_TIMEOUT;
   return Math.max(MIN_GIT_TIMEOUT_SECONDS, Math.round(parsed));
 }

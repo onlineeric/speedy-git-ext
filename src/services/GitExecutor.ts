@@ -1,8 +1,7 @@
 import { spawn } from 'child_process';
 import type { LogOutputChannel } from 'vscode';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
-import { NO_GIT_TIMEOUT } from '../../shared/types.js';
-import { gitCommandTimeoutSeconds, gitTimeoutMessage } from './gitCommandTimeout.js';
+import { gitCommandTimeoutDelayMs, gitCommandTimeoutSeconds, gitTimeoutMessage } from './gitCommandTimeout.js';
 
 export interface GitExecOptions {
   args: string[];
@@ -58,6 +57,7 @@ export class GitExecutor {
     const { args, cwd, env, abortSignal, stdin } = options;
     // Read per command, so a changed setting applies to the very next one.
     const timeoutSeconds = gitCommandTimeoutSeconds();
+    const timeoutDelayMs = gitCommandTimeoutDelayMs(timeoutSeconds);
     const cmdString = `git ${args.join(' ')}`;
 
     if (abortSignal?.aborted) {
@@ -105,13 +105,13 @@ export class GitExecutor {
       if (abortSignal) abortSignal.addEventListener('abort', onAbort, { once: true });
 
       const timeoutId =
-        timeoutSeconds === NO_GIT_TIMEOUT
+        timeoutDelayMs === undefined
           ? undefined
           : setTimeout(() => {
               gitProcess.kill();
               this.log.error(`Git command timed out after ${timeoutSeconds}s: ${cmdString}`);
               safeResolve(err(new GitError(gitTimeoutMessage(timeoutSeconds), 'TIMEOUT', cmdString)));
-            }, timeoutSeconds * 1000);
+            }, timeoutDelayMs);
 
       gitProcess.stdout?.on('data', (data: Buffer) => {
         stdoutChunks.push(data);

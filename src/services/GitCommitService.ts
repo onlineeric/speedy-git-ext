@@ -11,7 +11,6 @@ import {
   type FixupCommitKind,
 } from '../../shared/fixupCommit.js';
 import { createEditorScriptDir, prepareMessageReplacingEditor, removeEditorScriptDir } from './gitEditorScripts.js';
-import { gitCommandTimeoutSeconds } from './gitCommandTimeout.js';
 
 /**
  * What we tell the user after we stopped waiting on a commit — the wait ended,
@@ -231,7 +230,8 @@ export class GitCommitService {
     const head = await readHeadHash(this.executor, this.workspacePath);
     const stoppedWaiting =
       cause.code === 'TIMEOUT'
-        ? `${capitalize(wording.operation)} did not finish within ${gitCommandTimeoutSeconds()} seconds, so waiting stopped.`
+        ? // The executor's message already names the limit that applied and where to raise it.
+          `Waiting for ${wording.operation} stopped. ${cause.message}`
         : `Waiting for ${wording.operation} was cancelled.`;
 
     const completed = head.success ? await wasCompleted(head.value) : undefined;

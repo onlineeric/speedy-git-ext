@@ -9,9 +9,7 @@ import {
   isGitTimeoutDraftChanged,
   toGitTimeoutDraft,
 } from '../utils/gitTimeoutDraft';
-import { dialogSectionLabelClassName } from './dialogStyles';
-
-const hintClassName = 'text-[11px] leading-4 text-[var(--vscode-descriptionForeground)]';
+import { dialogHintClassName, dialogSectionLabelClassName, settingNumberInputClassName } from './dialogStyles';
 
 /**
  * The Git tab of the Settings dialog: how Speedy Git runs git itself.
@@ -53,21 +51,21 @@ function GitTimeoutField() {
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder={String(DEFAULT_USER_SETTINGS.gitTimeoutSeconds)}
-            className="w-20 rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] px-1.5 py-1 text-right text-[var(--vscode-input-foreground)] focus:border-[var(--vscode-focusBorder)] focus:outline-none"
+            className={`w-20 ${settingNumberInputClassName}`}
             aria-label="Git command timeout in seconds"
             aria-describedby="git-timeout-hint"
           />
           <span>seconds</span>
         </span>
       </label>
-      <p id="git-timeout-hint" className={`${hintClassName} mt-1`}>
+      <p id="git-timeout-hint" className={`${dialogHintClassName} mt-1`}>
         How long any git command may run before Speedy Git stops it — loading the graph, push, pull, fetch, commit
         hooks and everything else. Default {DEFAULT_USER_SETTINGS.gitTimeoutSeconds}, minimum{' '}
         {MIN_GIT_TIMEOUT_SECONDS}. Enter <strong>0 for no timeout</strong>: a command that stalls then keeps running
         until you reload the window.
       </p>
       {/* Always rendered, so the dialog does not change height as the note comes and goes. */}
-      <p className={`${hintClassName} mt-1 min-h-[1rem]`} role="status">
+      <p className={`${dialogHintClassName} mt-1 min-h-[1rem]`} role="status">
         {note}
       </p>
     </div>

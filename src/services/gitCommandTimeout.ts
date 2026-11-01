@@ -1,4 +1,4 @@
-import { DEFAULT_USER_SETTINGS } from '../../shared/types.js';
+import { DEFAULT_USER_SETTINGS, NO_GIT_TIMEOUT } from '../../shared/types.js';
 
 /**
  * The timeout every git spawn uses, from `speedyGit.git.timeoutSeconds`.
@@ -11,6 +11,13 @@ import { DEFAULT_USER_SETTINGS } from '../../shared/types.js';
  */
 let timeoutSeconds = DEFAULT_USER_SETTINGS.gitTimeoutSeconds;
 
+/**
+ * The longest delay `setTimeout` honours (2^31 − 1 ms, about 24.8 days). Node
+ * replaces a longer one with 1 ms, so an over-long timeout would kill every
+ * command at once instead of never.
+ */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
 /** Takes an already-normalized value (`normalizeGitTimeoutSeconds`). */
 export function setGitCommandTimeoutSeconds(seconds: number): void {
   timeoutSeconds = seconds;
@@ -21,7 +28,22 @@ export function gitCommandTimeoutSeconds(): number {
   return timeoutSeconds;
 }
 
+/**
+ * The timer delay for a timeout of `seconds`, or `undefined` when no timer
+ * should be armed: 0 means no timeout, and a value past what a timer can hold
+ * is, for any real command, the same thing.
+ */
+export function gitCommandTimeoutDelayMs(seconds: number): number | undefined {
+  if (seconds === NO_GIT_TIMEOUT) return undefined;
+  const delayMs = seconds * 1000;
+  return delayMs > MAX_TIMER_DELAY_MS ? undefined : delayMs;
+}
+
+/** Where the user can change the limit; part of every timeout message. */
+export const GIT_TIMEOUT_SETTING_HINT =
+  'To allow longer, raise "Git command timeout" in the View dialog\'s Git tab (speedyGit.git.timeoutSeconds), or set it to 0 for no timeout.';
+
 /** What the user sees when a command is stopped: the limit, and where to raise it. */
 export function gitTimeoutMessage(seconds: number): string {
-  return `Git command timed out after ${seconds} seconds. To allow longer, raise "Git command timeout" in the View dialog's Git tab (speedyGit.git.timeoutSeconds), or set it to 0 for no timeout.`;
+  return `Git command timed out after ${seconds} seconds. ${GIT_TIMEOUT_SETTING_HINT}`;
 }

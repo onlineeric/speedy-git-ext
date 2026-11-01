@@ -1,7 +1,7 @@
 import type { LogOutputChannel } from 'vscode';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { GitExecutor } from '../services/GitExecutor.js';
-import { setGitCommandTimeoutSeconds } from '../services/gitCommandTimeout.js';
+import { gitCommandTimeoutDelayMs, setGitCommandTimeoutSeconds } from '../services/gitCommandTimeout.js';
 import { DEFAULT_USER_SETTINGS, NO_GIT_TIMEOUT } from '../../shared/types.js';
 
 const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as LogOutputChannel;
@@ -107,5 +107,17 @@ describe('GitExecutor timeout', () => {
 
     const result = await promise;
     expect(!result.success && result.error.code).toBe('CANCELLED');
+  });
+});
+
+describe('gitCommandTimeoutDelayMs', () => {
+  it('arms no timer for 0, or for a value a timer cannot hold (Node would fire it after 1 ms)', () => {
+    expect(gitCommandTimeoutDelayMs(NO_GIT_TIMEOUT)).toBeUndefined();
+    expect(gitCommandTimeoutDelayMs(3_000_000)).toBeUndefined();
+  });
+
+  it('converts any other value to milliseconds', () => {
+    expect(gitCommandTimeoutDelayMs(60)).toBe(60_000);
+    expect(gitCommandTimeoutDelayMs(2_147_483)).toBe(2_147_483_000);
   });
 });

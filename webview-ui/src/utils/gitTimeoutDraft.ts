@@ -3,6 +3,7 @@ import {
   MIN_GIT_TIMEOUT_SECONDS,
   NO_GIT_TIMEOUT,
   normalizeGitTimeoutSeconds,
+  parseGitTimeoutSeconds,
 } from '@shared/types';
 
 /**
@@ -23,9 +24,14 @@ export function isGitTimeoutDraftChanged(draft: string, saved: number): boolean 
   return normalizeGitTimeoutSeconds(draft) !== saved;
 }
 
-/** What Save writes: an emptied box clears the setting (`null`), so it falls back to the default. */
+/**
+ * What Save writes. A box that does not hold a number of seconds — emptied, or
+ * invalid — clears the setting (`null`), so it falls back to the default, as
+ * the note under the box says, rather than pinning today's default value.
+ */
 export function gitTimeoutDraftToSave(draft: string): number | null {
-  return draft.trim() === '' ? null : normalizeGitTimeoutSeconds(draft);
+  const seconds = parseGitTimeoutSeconds(draft);
+  return seconds === undefined ? null : normalizeGitTimeoutSeconds(seconds);
 }
 
 /**
@@ -34,16 +40,12 @@ export function gitTimeoutDraftToSave(draft: string): number | null {
  * box is never a surprise after saving. `undefined` when there is nothing to add.
  */
 export function describeGitTimeoutDraft(draft: string): string | undefined {
-  const trimmed = draft.trim();
-  if (trimmed === '') return `Empty: uses the default, ${DEFAULT_USER_SETTINGS.gitTimeoutSeconds} seconds.`;
-
-  const applied = normalizeGitTimeoutSeconds(trimmed);
-  if (applied === NO_GIT_TIMEOUT) return 'No timeout: git commands are never stopped.';
-  if (Number(trimmed) < 0 || !Number.isFinite(Number(trimmed))) {
+  if (draft.trim() === '') return `Empty: uses the default, ${DEFAULT_USER_SETTINGS.gitTimeoutSeconds} seconds.`;
+  const seconds = parseGitTimeoutSeconds(draft);
+  if (seconds === undefined) {
     return `Not a valid number: uses the default, ${DEFAULT_USER_SETTINGS.gitTimeoutSeconds} seconds.`;
   }
-  if (applied === MIN_GIT_TIMEOUT_SECONDS && Number(trimmed) < MIN_GIT_TIMEOUT_SECONDS) {
-    return `Below the minimum: uses ${MIN_GIT_TIMEOUT_SECONDS} seconds.`;
-  }
+  if (seconds === NO_GIT_TIMEOUT) return 'No timeout: git commands are never stopped.';
+  if (seconds < MIN_GIT_TIMEOUT_SECONDS) return `Below the minimum: uses ${MIN_GIT_TIMEOUT_SECONDS} seconds.`;
   return undefined;
 }

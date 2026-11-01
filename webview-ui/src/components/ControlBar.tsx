@@ -42,6 +42,15 @@ const PANEL_TOGGLE_ACTIONS = {
   worktree: { open: 'worktreeOpen', close: 'worktreeClose' },
 } as const;
 
+/**
+ * The Fetch spinner's fallback reset, for a reply it cannot detect (a repeat of
+ * the same success text). It waits out the git command timeout plus a margin
+ * for the reload that follows, and never less than the original 30s — which is
+ * also what applies with no timeout (0), where nothing bounds the fetch.
+ */
+const MIN_FETCH_SAFETY_NET_MS = 30_000;
+const FETCH_SAFETY_NET_MARGIN_MS = 15_000;
+
 export function ControlBar() {
   const { branches, filters, setFilters, mergedCommits, loading, totalLoadedWithoutFilter, setActiveToggleWidget, activeToggleWidget, isRefreshing } = useGraphStore();
   const graphFilters = useGraphStore((state) => state.filters);
@@ -130,8 +139,11 @@ export function ControlBar() {
 
     rpcClient.fetch(undefined, true, filters);
 
-    // Reset after success/error response or timeout (30s safety net)
-    const timeout = setTimeout(() => setFetching(false), 30_000);
+    // Reset after success/error response, or a safety net that outlasts the git
+    // command timeout so the spinner never clears while the fetch still runs.
+    const { gitTimeoutSeconds } = useGraphStore.getState().userSettings;
+    const safetyNetMs = Math.max(MIN_FETCH_SAFETY_NET_MS, gitTimeoutSeconds * 1000 + FETCH_SAFETY_NET_MARGIN_MS);
+    const timeout = setTimeout(() => setFetching(false), safetyNetMs);
     const prevSuccess = useGraphStore.getState().successMessage;
     const prevError = useGraphStore.getState().error;
     const unsub = useGraphStore.subscribe((state) => {

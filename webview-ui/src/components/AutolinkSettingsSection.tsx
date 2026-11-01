@@ -21,7 +21,7 @@ import {
 import type { SettingSaveOutcome } from '../utils/settingDrafts';
 import { resolveRemoteAutolinkTarget } from '../utils/remoteAutolinkTarget';
 import { trackUiInteraction } from '../utils/telemetry';
-import { buttonSecondaryClassName, dialogSectionLabelClassName } from './dialogStyles';
+import { buttonSecondaryClassName, dialogHintClassName, dialogSectionLabelClassName } from './dialogStyles';
 import { FieldError } from './FieldError';
 import { CloseIcon } from './icons';
 
@@ -30,8 +30,6 @@ const inputClassName =
 const validBorderClassName = 'border-[var(--vscode-input-border)]';
 const invalidBorderClassName = 'border-[var(--vscode-inputValidation-errorBorder)]';
 const NO_ERRORS: ReadonlyMap<number, CustomAutolinkErrors> = new Map();
-
-const hintClassName = 'text-[11px] leading-4 text-[var(--vscode-descriptionForeground)]';
 
 /**
  * The AutoLinks tab of the Settings dialog: the GitHub/GitLab switch, then the
@@ -77,11 +75,11 @@ function RemoteAutolinksToggle() {
         />
         <span>GitHub and GitLab references</span>
       </label>
-      <p className={`${hintClassName} mt-1`}>
+      <p className={`${dialogHintClassName} mt-1`}>
         <code>#123</code> and <code>GH-123</code> on GitHub, <code>#123</code> and <code>!123</code> on GitLab,
         and <code>owner/repo#123</code> on either link to the repository’s issue or pull request.
       </p>
-      <p className={`${hintClassName} mt-1`}>
+      <p className={`${dialogHintClassName} mt-1`}>
         {target
           ? <>This repository: <span className="text-[var(--vscode-foreground)]">{new URL(target.webBaseUrl).host}/{target.repoPath}</span></>
           : 'Not linked here: the only remote, or else upstream, or else origin, must be on github.com or gitlab.com, so a link never points to the wrong place.'}
@@ -151,17 +149,17 @@ function CustomAutolinksEditor() {
 
   return (
     <div className="min-w-0">
-      <p className={`${hintClassName} mb-1`}>
+      <p className={`${dialogHintClassName} mb-1`}>
         For trackers such as Jira. Prefix <code>Jira-</code> with URL{' '}
         <code>https://jira.example.com/browse/Jira-{AUTOLINK_NUMBER_PLACEHOLDER}</code> links{' '}
         <code>Jira-123</code>; <code>{AUTOLINK_NUMBER_PLACEHOLDER}</code> is where the number goes.
       </p>
-      <p className={`${hintClassName} mb-2`}>
+      <p className={`${dialogHintClassName} mb-2`}>
         A prefix with a space goes in double quotes: <code>"Jira "</code> with URL{' '}
         <code>https://jira.example.com/browse/{AUTOLINK_NUMBER_PLACEHOLDER}</code> links <code>Jira 123</code>.
         Spaces outside the quotes are ignored; write <code>\"</code> for a double quote inside them.
       </p>
-      <p className={`${hintClassName} mb-2`}>
+      <p className={`${dialogHintClassName} mb-2`}>
         With <strong>Ignore case</strong> checked, <code>Jira-</code> also links <code>JIRA-123</code> and{' '}
         <code>jira-123</code>.
       </p>

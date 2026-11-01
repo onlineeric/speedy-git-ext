@@ -3,7 +3,13 @@ import { rpcClient } from '../rpc/rpcClient';
 import { useGraphStore } from '../stores/graphStore';
 import { trackDialogOutcome, trackUiInteraction } from '../utils/telemetry';
 import { MAX_AVATAR_REFRESH_DAYS, MIN_AVATAR_REFRESH_DAYS, clampAvatarRefreshDays } from '@shared/types';
-import { buttonPrimaryClassName, buttonSecondaryClassName, dialogSectionLabelClassName } from './dialogStyles';
+import {
+  buttonPrimaryClassName,
+  buttonSecondaryClassName,
+  dialogHintClassName,
+  dialogSectionLabelClassName,
+  settingNumberInputClassName,
+} from './dialogStyles';
 
 /**
  * Avatars section of the View popover.
@@ -116,7 +122,7 @@ export function AvatarSettingsSection() {
             onKeyDown={(event) => {
               if (event.key === 'Enter') event.currentTarget.blur();
             }}
-            className="w-16 rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] px-1.5 py-1 text-right text-[var(--vscode-input-foreground)] focus:border-[var(--vscode-focusBorder)] focus:outline-none"
+            className={`w-16 ${settingNumberInputClassName}`}
             aria-label="Days before an avatar is refreshed"
           />
           <span>days</span>
@@ -132,7 +138,7 @@ export function AvatarSettingsSection() {
         >
           Clear all cached avatars
         </button>
-        <p className="mt-1.5 text-[11px] leading-4 text-[var(--vscode-descriptionForeground)]">
+        <p className={`${dialogHintClassName} mt-1.5`}>
           Avatars disappear and are looked up again from scratch, about one per second.
         </p>
       </div>

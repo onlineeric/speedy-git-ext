@@ -104,9 +104,10 @@ export class ExtensionController {
       }),
     );
 
-    // Settings first: it applies the git timeout before discovery spawns git.
-    this.registerSettingsListener();
+    // Before discovery, which spawns git under this timeout.
+    this.applyGitCommandTimeout();
     this.initRepoDiscovery();
+    this.registerSettingsListener();
     this.registerSplitEditorFill();
   }
 
@@ -213,7 +214,6 @@ export class ExtensionController {
   }
 
   private registerSettingsListener() {
-    this.applyGitCommandTimeout();
     this.context.subscriptions.push(
       vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration('speedyGit.statusBarText') && this.statusBarItem) {
