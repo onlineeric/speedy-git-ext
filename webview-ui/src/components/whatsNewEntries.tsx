@@ -10,6 +10,7 @@ import { OpenChangesIllustration } from './OpenChangesIllustration';
 import autolinksRowScreenshot from '../../../resources/autolinks.png';
 import settingsAutolinksScreenshot from '../../../resources/settings-autolinks.png';
 import filtersShowBadgedScreenshot from '../../../resources/Filters_show-badged.png';
+import gitTimeoutScreenshot from '../../../resources/git-timeout.png';
 import goToParentChildrenScreenshot from '../../../resources/goto-parent-children.png';
 import revealCommitScreenshot from '../../../resources/reveal-commit.png';
 import showChangesCommitScreenshot from '../../../resources/show-changes-commit.png';
@@ -128,6 +129,20 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
               it, with no reload.
             </Step>
           </StepFlow>
+          <div className="mt-3">
+            <Screenshot
+              src={gitTimeoutScreenshot}
+              alt="The View button opens the Settings dialog, whose new Git tab has the Git command timeout box set to 60 seconds"
+              width={686}
+              height={349}
+              caption={
+                <>
+                  <UiLabel>View</UiLabel> → <UiLabel>Git</UiLabel> → <UiLabel>Git command timeout</UiLabel>. The{' '}
+                  <UiLabel>News</UiLabel> button reopens these notes.
+                </>
+              }
+            />
+          </div>
           <p className={`${bodyTextClassName} mt-3`}>
             It covers everything Speedy Git runs: loading the graph, push, pull, fetch, commit hooks and the rest, so
             there is no list of slow commands to learn. It is also <code>speedyGit.git.timeoutSeconds</code> in VS
