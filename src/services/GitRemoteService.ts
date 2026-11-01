@@ -31,7 +31,6 @@ export class GitRemoteService {
     const result = await this.executor.execute({
       args,
       cwd: this.workspacePath,
-      timeout: 60000,
     });
     if (!result.success) return result;
     return ok('Push completed');
@@ -57,7 +56,6 @@ export class GitRemoteService {
     const result = await this.executor.execute({
       args,
       cwd: this.workspacePath,
-      timeout: 60000,
     });
     if (!result.success) return result;
     return ok('Pull completed');

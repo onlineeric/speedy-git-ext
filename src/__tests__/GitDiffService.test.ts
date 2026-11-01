@@ -505,7 +505,6 @@ describe('GitDiffService.openExternalDirDiff', () => {
     await service.openExternalDirDiff('abc1234');
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({
       args: ['difftool', '--dir-diff', '--no-prompt', 'abc1234~1', 'abc1234'],
-      timeout: 60000,
     }));
   });
 

@@ -919,6 +919,11 @@ class RpcClient {
     return this.awaitSettingSave((requestId) => this.send({ type: 'setCustomAutolinks', payload: { autolinks, requestId } }));
   }
 
+  /** `null` resets the setting to its default. Resolves once the backend has written it. */
+  setGitTimeoutSeconds(seconds: number | null): Promise<SettingSaveOutcome> {
+    return this.awaitSettingSave((requestId) => this.send({ type: 'setGitTimeoutSeconds', payload: { seconds, requestId } }));
+  }
+
   /**
    * Send a settings write the Settings dialog waits on, and resolve with its
    * `settingSaveResult`. Every such write goes through here, so a new one is a

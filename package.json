@@ -2,7 +2,7 @@
   "name": "speedy-git-ext",
   "displayName": "Speedy Git",
   "description": "A performance-first, lightweight Git graph visualization extension for VS Code",
-  "version": "5.22.0",
+  "version": "5.23.0",
   "publisher": "onlineeric",
   "license": "MIT",
   "repository": {
@@ -191,6 +191,12 @@
           "maximum": 365,
           "markdownDescription": "How long a looked-up avatar stays cached before it is refreshed in the background. Avatars are cached per author email and reused across repositories, so a longer window means far fewer GitHub API requests. A stale entry keeps displaying while it refreshes, and GitHub avatar image URLs are stable — so a longer window does not mean out-of-date pictures."
         },
+        "speedyGit.git.timeoutSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 0,
+          "markdownDescription": "Maximum time, in seconds, any git command Speedy Git runs may take before it is stopped. This covers everything: loading the graph, push, pull, fetch, commit hooks and the rest. Values below 15 are treated as 15. Set to `0` for no timeout; a command that stalls (a network hang, an unanswered credential prompt) then keeps running until you reload the window."
+        },
         "speedyGit.showRemoteBranches": {
           "type": "boolean",
           "default": true,
@@ -211,7 +217,7 @@
         "speedyGit.toolbar.showLabels": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Show a small text label under each toolbar icon button (Filter, Search, Compare, Worktrees, Refresh, Fetch, View, Remote, Settings). You can also toggle this by right-clicking any toolbar button."
+          "markdownDescription": "Show a small text label under each toolbar icon button (Filter, Search, Compare, Worktrees, Refresh, Fetch, View, Remote, Settings, What's New, Help). You can also toggle this by right-clicking any toolbar button."
         },
         "speedyGit.toolbar.showRemoteButton": {
           "type": "boolean",

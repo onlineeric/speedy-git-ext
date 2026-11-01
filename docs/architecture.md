@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-10-31**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-11-01**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -78,6 +78,8 @@ src/
 │       ├── autolinkHandlers.ts    # View dialog's Autolinks: re-validates + writes speedyGit.autolinks.* (defined scope);
 │                                 #   an invalid custom list is refused whole, nothing written. The custom list
 │                                 #   answers with settingSaveResult (the dialog waits on it), not an error toast
+│       ├── gitSettingsHandlers.ts # View dialog's Git tab: writes speedyGit.git.timeoutSeconds (defined scope; null clears it
+│       │                          #   back to the default), re-normalized, answered with settingSaveResult
 │       ├── settingWriteReplies.ts # How a settings handler reports a write: writeSettingWithReply (settingSaveResult for a
 │       │                             #   dialog that waits) or writeSettingOrToast (the standard error toast)
 │       ├── updateSpeedyGitSetting.ts # Writes one speedyGit.* setting; ExtensionController broadcasts the change.
@@ -87,7 +89,9 @@ src/
 │       └── vscodeCommandHandlers.ts # settings, clipboard, openExternal (http/https only), updatePersistedUIState, openNewGraphTab
 ├── services/                     # All repo-bound; every method returns Result<T, GitError>
 │   ├── index.ts                  # Barrel export for all services
-│   ├── GitExecutor.ts            # Spawns git processes, 30s timeout — the only place git is invoked
+│   ├── GitExecutor.ts            # Spawns git processes, configured timeout (none at 0) — the only place git is invoked
+│   ├── gitCommandTimeout.ts      # The one timeout every spawn uses (speedyGit.git.timeoutSeconds), set by ExtensionController
+│                                 #   at activation and on change; plus the timeout error text naming the setting
 │   ├── GitLogService.ts          # Parses git log (null-byte format), branches, branches-containing-a-commit, authors + `user.email` (Filter "Me"), unfiltered commits by hash (`--no-walk`, revealed commits). Default 500 commits.
 │   │                             #   Also walks stash base commits, so a stash survives its branch moving
 │   ├── GitDiffService.ts         # Commit details (+ parent subjects), file changes, file content at revision; submodule (gitlink) pointers
@@ -197,8 +201,8 @@ webview-ui/src/assets.d.ts        # `*.png` imports are `data:` URLs — vite.co
 ### Toolbar, panels, widgets
 
 ```
-├── ControlBar.tsx                # Top toolbar with actions, incl. "Open New Graph Tab" beside Go to HEAD and the
-│                                 #   peer-activity notice (informational; it disables nothing)
+├── ControlBar.tsx                # Top toolbar with actions, incl. "Open New Graph Tab" beside Go to HEAD, What's New
+│                                 #   (between Settings and Help) and the peer-activity notice (informational; it disables nothing)
 ├── ResponsiveToolbar.tsx         # Measures visible action widths; collapses right, then the left group in two
 │                                 #   phases (unpinned items first, then pinned Refresh/Fetch/HEAD) into More
 │                                 #   dropdowns, which reuse `menuPanelClass` and hide separators by
@@ -211,11 +215,12 @@ webview-ui/src/assets.d.ts        # `*.png` imports are `data:` URLs — vite.co
 │                                 #   debounced 300ms, everything else recomputes at once in a layout effect
 ├── CompareWidget.tsx             # Branch comparison
 ├── WorktreeWidget.tsx            # Worktree list + create/remove (046-git-worktrees)
-├── ViewSettingsDialog.tsx        # Movable "Settings" dialog with View (columns left, avatars right) and AutoLinks tabs (Radix dialog + @dnd-kit sortable); open state lives in the store.
+├── ViewSettingsDialog.tsx        # Movable "Settings" dialog with View (columns left, avatars right), AutoLinks and Git tabs (Radix dialog + @dnd-kit sortable); open state lives in the store.
 │                                 #   Each tab's content sits in a SettingDraftScope; unsaved handling is useUnsavedSettings
 ├── SettingsDialogFooter.tsx      # Settings dialog footer: Close, or while a setting is unsaved "Unsaved changes: …" +
 │                                 #   Discard and Close / Save / Save and Close; flashes when a close is refused
 ├── AvatarSettingsSection.tsx     # Avatars pane of the View dialog: GitHub allow/remove-token, refresh-days, clear cache
+├── GitSettingsSection.tsx        # Git tab of the Settings dialog: "Git command timeout" (seconds, 0 = none), a setting draft
 ├── AutolinkSettingsSection.tsx   # AutoLinks tab of the Settings dialog: Autolinks section (GitHub/GitLab toggle + detected repo), then a Custom autolinks section
 │                                 #   editor (useSettingDraft + useRegisterSettingDraft; saved from the dialog footer, nothing saved while any row is invalid)
 ├── AutolinkAnchor.tsx            # One autolinked reference: opens via openExternal, swallows the row click, tracks by source
@@ -295,9 +300,10 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── DiscardDialog.tsx  DiscardAllDialog.tsx  FilePickerDialog.tsx
 ├── RefBadgeLegend.tsx            # Standalone "Badge Legend" section; samples are real `RefLabel`s in lane-0 color
 │                                 #   so it can't drift from the graph. Needs no props — reused by the What's New dialog
-├── WhatsNewDialog.tsx            # First-run release notes, poster layout (gradient hero + headline + optional
-│                                 #   illustration); hero scrolls with the content, only the footer is pinned;
-│                                 #   close button counts down before enabling (Esc/outside held too)
+├── WhatsNewDialog.tsx            # Release notes, poster layout (gradient hero + headline + optional illustration); hero
+│                                 #   scrolls with the content, only the footer is pinned. Footer ‹ › arrows browse every
+│                                 #   entry. After an upgrade, close counts down before enabling (Esc/outside held too);
+│                                 #   opened from the toolbar's What's New button, no countdown
 ├── whatsNewEntries.tsx           # Per-version release-note content. A patch with no entry inherits its series'
 │                                 #   notes (5.18.1 → 5.18.0) unless already seen; a series with no entry shows nothing
 ├── whatsNewBlocks.tsx            # Poster pieces entries compose: ContributorThanks, FeatureCard/Grid, Step/StepFlow,
@@ -309,6 +315,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── AutolinksIllustration.tsx     # 5.19.0 hero: animated miniature of a commit message's references turning into links
 ├── BadgedCommitsIllustration.tsx # 5.20.0 hero: animated miniature of "Always show badged commits" bringing back main's tip
 ├── OpenChangesIllustration.tsx   # 5.22.0 hero: animated miniature of Open Changes opening the multi-file diff editor
+├── GitTimeoutIllustration.tsx    # 5.23.0 hero: animated miniature of a slow push running past the old 60s limit
 └── HelpDialog.tsx                # "Help & Feedback": Badge Legend + GitHub Issues + docs/changelog/marketplace + version
 ```
 
@@ -394,6 +401,8 @@ utils/
 │                                 #   memoizes on input identity so row memos hold
 ├── remoteAutolinkTarget.ts       # PURE: which repo a bare #123 means — github.com/gitlab.com only; sole remote, else
 │                                 #   upstream, else origin; never swaps in another remote; null = no links
+├── gitTimeoutDraft.ts            # PURE: Git tab's timeout box as a draft — dirty check, save value (empty = reset), the
+│                                 #   note explaining 0 / below-minimum / empty
 ├── customAutolinkDraft.ts        # PURE: Settings dialog's custom-autolink draft rows, all-or-nothing save validation, dirty/same-list checks
 ├── settingDrafts.ts              # PURE: SettingDraft contract, unsaved/tab queries, save-all (each setting on its own;
 │                                 #   first failure in dialog order reported), the follow-saved-value rule

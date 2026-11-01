@@ -47,6 +47,12 @@ export interface UserSettings {
   customAutolinks: CustomAutolink[];
   /** `speedyGit.autolinks.remoteProvider.enabled`: link `#123` etc. to the GitHub/GitLab remote. */
   remoteAutolinksEnabled: boolean;
+  /**
+   * `speedyGit.git.timeoutSeconds`: how long any git command may run before it
+   * is stopped, already normalized by {@link normalizeGitTimeoutSeconds}.
+   * {@link NO_GIT_TIMEOUT} means never.
+   */
+  gitTimeoutSeconds: number;
 }
 
 /**
@@ -154,6 +160,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   toolbarShowRemoteButton: true,
   customAutolinks: [],
   remoteAutolinksEnabled: true,
+  gitTimeoutSeconds: 60,
 };
 
 /**
@@ -211,6 +218,37 @@ export function clampAvatarRefreshDays(value: number | string, fallback: number)
   const parsed = typeof value === 'string' ? Number.parseInt(value.trim(), 10) : value;
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(MAX_AVATAR_REFRESH_DAYS, Math.max(MIN_AVATAR_REFRESH_DAYS, Math.round(parsed)));
+}
+
+/**
+ * `speedyGit.git.timeoutSeconds`: one limit for every git command Speedy Git
+ * runs — graph loading and push alike — so nobody has to know which commands
+ * are "long". The timeout only guards against a hung process; a healthy command
+ * never gets near it, so one generous value costs nothing.
+ *
+ * 0 turns the limit off. The floor exists because a few seconds would break
+ * ordinary graph loading on a large repository; there is deliberately no
+ * ceiling, since anyone who wants "very long" could equally have chosen 0.
+ */
+export const NO_GIT_TIMEOUT = 0;
+export const MIN_GIT_TIMEOUT_SECONDS = 15;
+
+/**
+ * Coerce a configured or typed timeout into the value that applies.
+ *
+ * Shared by the backend that reads the setting and the dialog that edits it,
+ * so the box can say what a value will become before it is saved. Empty,
+ * unparseable or negative means "the default"; 0 is kept as "no timeout";
+ * anything between 0 and the floor is raised to the floor.
+ */
+export function normalizeGitTimeoutSeconds(value: unknown): number {
+  const parsed =
+    typeof value === 'string' ? (value.trim() === '' ? Number.NaN : Number(value.trim())) : value;
+  if (typeof parsed !== 'number' || !Number.isFinite(parsed) || parsed < 0) {
+    return DEFAULT_USER_SETTINGS.gitTimeoutSeconds;
+  }
+  if (parsed === NO_GIT_TIMEOUT) return NO_GIT_TIMEOUT;
+  return Math.max(MIN_GIT_TIMEOUT_SECONDS, Math.round(parsed));
 }
 
 /**

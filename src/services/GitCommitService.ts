@@ -11,15 +11,7 @@ import {
   type FixupCommitKind,
 } from '../../shared/fixupCommit.js';
 import { createEditorScriptDir, prepareMessageReplacingEditor, removeEditorScriptDir } from './gitEditorScripts.js';
-
-/**
- * Committing runs `pre-commit` and `commit-msg` hooks, and git runs them even
- * for a message-only amend where the tree does not change. husky/lint-staged
- * setups routinely take tens of seconds, so this operation gets a longer ceiling
- * than the executor's 30s default — long enough for ordinary hook tooling, short
- * enough to fail rather than hang on something stuck.
- */
-const AMEND_TIMEOUT_MS = 60_000;
+import { gitCommandTimeoutSeconds } from './gitCommandTimeout.js';
 
 /**
  * What we tell the user after we stopped waiting on a commit — the wait ended,
@@ -148,7 +140,6 @@ export class GitCommitService {
       args,
       cwd: this.workspacePath,
       stdin: message,
-      timeout: AMEND_TIMEOUT_MS,
       abortSignal,
     });
 
@@ -193,7 +184,6 @@ export class GitCommitService {
         // fixup/squash need no editor: GitExecutor's no-op one accepts git's
         // prepared `fixup! <subject>` / `squash! <subject>` unchanged.
         env: scriptDir ? prepareMessageReplacingEditor(scriptDir, message ?? '') : undefined,
-        timeout: AMEND_TIMEOUT_MS,
         abortSignal,
       });
 
@@ -241,7 +231,7 @@ export class GitCommitService {
     const head = await readHeadHash(this.executor, this.workspacePath);
     const stoppedWaiting =
       cause.code === 'TIMEOUT'
-        ? `${capitalize(wording.operation)} did not finish within ${AMEND_TIMEOUT_MS / 1000} seconds, so waiting stopped.`
+        ? `${capitalize(wording.operation)} did not finish within ${gitCommandTimeoutSeconds()} seconds, so waiting stopped.`
         : `Waiting for ${wording.operation} was cancelled.`;
 
     const completed = head.success ? await wasCompleted(head.value) : undefined;

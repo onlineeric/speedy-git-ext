@@ -8,6 +8,7 @@ import { ConfirmDialog } from './components/ConfirmDialog';
 import { ToastContainer } from './components/ToastContainer';
 import { BranchCheckoutDialogs } from './components/BranchCheckoutDialogs';
 import { WhatsNewDialog } from './components/WhatsNewDialog';
+import { findUnseenWhatsNewEntry, WHATS_NEW_ENTRIES_NEWEST_FIRST } from './components/whatsNewEntries';
 
 export function App() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -16,6 +17,11 @@ export function App() {
   const setActiveToggleWidget = useGraphStore((state) => state.setActiveToggleWidget);
   const whatsNew = useGraphStore((state) => state.whatsNew);
   const setWhatsNew = useGraphStore((state) => state.setWhatsNew);
+  const whatsNewBrowseOpen = useGraphStore((state) => state.whatsNewBrowseOpen);
+  const setWhatsNewBrowseOpen = useGraphStore((state) => state.setWhatsNewBrowseOpen);
+  // After an upgrade: the running version's notes, unless already seen.
+  const unseenWhatsNewEntry = whatsNew ? findUnseenWhatsNewEntry(whatsNew) : undefined;
+  const latestWhatsNewEntry = WHATS_NEW_ENTRIES_NEWEST_FIRST[0];
   const setSelectedCommit = useGraphStore((state) => state.setSelectedCommit);
   const setCommitDetails = useGraphStore((state) => state.setCommitDetails);
   const setDetailsPanelOpen = useGraphStore((state) => state.setDetailsPanelOpen);
@@ -151,16 +157,24 @@ export function App() {
         </div>
         {showPanel && <CommitDetailsPanel />}
       </div>
-      {whatsNew && (
+      {whatsNew && unseenWhatsNewEntry && (
         <WhatsNewDialog
-          open
-          version={whatsNew.version}
-          lastShownVersion={whatsNew.lastShownVersion}
+          initialEntry={unseenWhatsNewEntry}
           countdownSeconds={whatsNew.countdownSeconds}
-          onClose={(shownVersion) => {
+          onClose={() => {
             setWhatsNew(null);
-            rpcClient.dismissWhatsNew(shownVersion);
+            // The entry the upgrade brought is what was seen, whichever one the
+            // user had browsed to when they closed it.
+            rpcClient.dismissWhatsNew(unseenWhatsNewEntry.version);
           }}
+        />
+      )}
+      {/* From the toolbar: opens on the newest notes, and the user chose to look, so no countdown. */}
+      {whatsNewBrowseOpen && !unseenWhatsNewEntry && latestWhatsNewEntry && (
+        <WhatsNewDialog
+          initialEntry={latestWhatsNewEntry}
+          countdownSeconds={0}
+          onClose={() => setWhatsNewBrowseOpen(false)}
         />
       )}
       <ConfirmDialog

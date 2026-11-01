@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
-import { chooseUnseenWhatsNewEntry, type WhatsNewPayload } from '@shared/whatsNew';
+import { chooseUnseenWhatsNewEntry, sortWhatsNewEntriesNewestFirst, type WhatsNewPayload } from '@shared/whatsNew';
 import { AutolinksIllustration } from './AutolinksIllustration';
 import { AutosquashIllustration } from './AutosquashIllustration';
 import { BadgedCommitsIllustration } from './BadgedCommitsIllustration';
 import { CommitNavigationIllustration } from './CommitNavigationIllustration';
+import { GitTimeoutIllustration } from './GitTimeoutIllustration';
 import { MultiTabIllustration } from './MultiTabIllustration';
 import { OpenChangesIllustration } from './OpenChangesIllustration';
 import autolinksRowScreenshot from '../../../resources/autolinks.png';
@@ -13,7 +14,17 @@ import goToParentChildrenScreenshot from '../../../resources/goto-parent-childre
 import revealCommitScreenshot from '../../../resources/reveal-commit.png';
 import showChangesCommitScreenshot from '../../../resources/show-changes-commit.png';
 import showChangesUncommittedScreenshot from '../../../resources/show-changes-uncommitted.png';
-import { BranchIcon, CloudIcon, GoToHeadIcon, NewTabIcon, OpenChangesIcon } from './icons';
+import {
+  BranchIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CloudIcon,
+  ColumnsIcon,
+  GoToHeadIcon,
+  NewTabIcon,
+  OpenChangesIcon,
+  SparkleIcon,
+} from './icons';
 import { SubmoduleBadge } from './FileChangeShared';
 import { InlineRefBadge } from './InlineRefBadge';
 import { RefBadgeLegend } from './RefBadgeLegend';
@@ -90,6 +101,76 @@ export interface WhatsNewEntry {
  * with nothing worth interrupting for needs no other opt-out.
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
+  {
+    version: '5.23.0',
+    headline: 'Choose how long git commands may run, or turn the timeout off.',
+    illustration: <GitTimeoutIllustration />,
+    content: (
+      <div className="space-y-6">
+        <ContributorThanks login="tbuyukliev">
+          This release comes from your report in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/219">#219</ExternalLink>: a force
+          push on a huge repository was stopped after 60 seconds, other commands after 30, and there was no setting
+          to change either. Thank you for coming back with another one!
+        </ContributorThanks>
+
+        <WhatsNewSection title="One limit for every git command">
+          <StepFlow>
+            <Step label="1" title="Open View" accent={SHOWCASE_BLUE_COLOR}>
+              The <ColumnsIcon className="inline align-[-2px]" /> <UiLabel>View</UiLabel> button on the right of the
+              toolbar.
+            </Step>
+            <Step label="2" title="Go to the Git tab" accent={SHOWCASE_PURPLE_COLOR}>
+              A new tab beside <UiLabel>View</UiLabel> and <UiLabel>AutoLinks</UiLabel>.
+            </Step>
+            <Step label="3" title="Set the seconds" accent={SHOWCASE_GREEN_COLOR}>
+              Type into <UiLabel>Git command timeout</UiLabel>, then <UiLabel>Save</UiLabel>. The next command uses
+              it, with no reload.
+            </Step>
+          </StepFlow>
+          <p className={`${bodyTextClassName} mt-3`}>
+            It covers everything Speedy Git runs: loading the graph, push, pull, fetch, commit hooks and the rest, so
+            there is no list of slow commands to learn. It is also <code>speedyGit.git.timeoutSeconds</code> in VS
+            Code’s Settings.
+          </p>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="Pick a value">
+          <FeatureGrid>
+            <FeatureCard mark="60" title="Default: 60 seconds" accent={SHOWCASE_BLUE_COLOR}>
+              Push, pull and fetch keep the 60 seconds they always had. Everything else had 30 and now gets 60 too.
+            </FeatureCard>
+            <FeatureCard mark="↑" title="As long as you need" accent={SHOWCASE_GREEN_COLOR}>
+              No maximum. Values under 15 are raised to 15, so the graph can still load.
+            </FeatureCard>
+            <FeatureCard mark="0" title="No timeout" accent={SHOWCASE_ORANGE_COLOR}>
+              Enter <UiLabel>0</UiLabel> and nothing is ever stopped. A command that stalls keeps running until you
+              reload the window.
+            </FeatureCard>
+          </FeatureGrid>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="What’s New, whenever you like">
+          <div className="flex items-start gap-3">
+            <span className="shrink-0">
+              <ToolbarButtonSample
+                icon={<SparkleIcon className="h-6 w-6" />}
+                label="What's New"
+                accent={SHOWCASE_PURPLE_COLOR}
+              />
+            </span>
+            <p className={bodyTextClassName}>
+              The new <UiLabel>What's New</UiLabel> button, between <UiLabel>Settings</UiLabel> and{' '}
+              <UiLabel>Help</UiLabel>, opens these notes at any time. The{' '}
+              <ChevronLeftIcon className="inline align-[-2px]" /> and{' '}
+              <ChevronRightIcon className="inline align-[-2px]" /> arrows at the bottom of this dialog step back
+              through every earlier release, so a feature you missed is never more than a few clicks away.
+            </p>
+          </div>
+        </WhatsNewSection>
+      </div>
+    ),
+  },
   {
     version: '5.22.0',
     headline: 'Open Changes: review every file of a commit in one diff editor.',
@@ -911,3 +992,6 @@ export function findUnseenWhatsNewEntry(
 ): WhatsNewEntry | undefined {
   return chooseUnseenWhatsNewEntry(whatsNew, WHATS_NEW_ENTRIES);
 }
+
+/** Every entry newest first: what the dialog's arrows step through. */
+export const WHATS_NEW_ENTRIES_NEWEST_FIRST: readonly WhatsNewEntry[] = sortWhatsNewEntriesNewestFirst(WHATS_NEW_ENTRIES);

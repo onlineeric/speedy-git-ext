@@ -61,7 +61,6 @@ export class GitTagService {
     const result = await this.executor.execute({
       args: ['push', remote ?? 'origin', ...(force ? ['--force'] : []), `refs/tags/${tagName}`],
       cwd: this.workspacePath,
-      timeout: 60000,
     });
     if (!result.success) return result;
     return ok(`Pushed tag '${tagName}'`);
@@ -84,7 +83,6 @@ export class GitTagService {
     const result = await this.executor.execute({
       args: ['push', remote, '--delete', tagName],
       cwd: this.workspacePath,
-      timeout: 60000,
       env: { LC_ALL: 'C' },
     });
     if (!result.success) {

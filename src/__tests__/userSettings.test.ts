@@ -7,6 +7,9 @@ import {
   MAX_AVATAR_REFRESH_DAYS,
   MAX_BATCH_COMMIT_SIZE,
   MIN_AVATAR_REFRESH_DAYS,
+  MIN_GIT_TIMEOUT_SECONDS,
+  NO_GIT_TIMEOUT,
+  normalizeGitTimeoutSeconds,
   normalizeWorktreeFolderNameStyle,
 } from '../../shared/types.js';
 
@@ -113,5 +116,34 @@ describe('normalizeWorktreeFolderNameStyle', () => {
     expect(normalizeWorktreeFolderNameStyle('')).toBe('nested');
     expect(normalizeWorktreeFolderNameStyle(undefined)).toBe('nested');
     expect(normalizeWorktreeFolderNameStyle(42)).toBe('nested');
+  });
+});
+
+describe('normalizeGitTimeoutSeconds', () => {
+  it('defaults to 60 seconds, the old longest timeout, so no operation gets a shorter one on upgrade', () => {
+    expect(DEFAULT_USER_SETTINGS.gitTimeoutSeconds).toBe(60);
+    expect(normalizeGitTimeoutSeconds(undefined)).toBe(60);
+  });
+
+  it('keeps 0 as "no timeout"', () => {
+    expect(normalizeGitTimeoutSeconds(0)).toBe(NO_GIT_TIMEOUT);
+    expect(normalizeGitTimeoutSeconds('0')).toBe(NO_GIT_TIMEOUT);
+  });
+
+  it('raises anything between 0 and the floor to the floor', () => {
+    expect(normalizeGitTimeoutSeconds(1)).toBe(MIN_GIT_TIMEOUT_SECONDS);
+    expect(normalizeGitTimeoutSeconds(0.4)).toBe(MIN_GIT_TIMEOUT_SECONDS);
+    expect(normalizeGitTimeoutSeconds('14')).toBe(MIN_GIT_TIMEOUT_SECONDS);
+  });
+
+  it('has no ceiling, and rounds to whole seconds', () => {
+    expect(normalizeGitTimeoutSeconds(86_400)).toBe(86_400);
+    expect(normalizeGitTimeoutSeconds('90.6')).toBe(91);
+  });
+
+  it('falls back to the default for empty, unparseable or negative values', () => {
+    for (const value of ['', '  ', 'abc', -5, Number.NaN, null, 'Infinity']) {
+      expect(normalizeGitTimeoutSeconds(value), String(value)).toBe(60);
+    }
   });
 });

@@ -43,7 +43,7 @@ describe('GitBranchService.deleteBranch', () => {
 });
 
 describe('GitBranchService.fastForwardFromRemote', () => {
-  it('runs only `git fetch <remote> <branch>:<branch>` with the 60s timeout when setUpstream is not requested', async () => {
+  it('runs only `git fetch <remote> <branch>:<branch>` when setUpstream is not requested', async () => {
     const service = new GitBranchService('/repo', mockLog);
     const executeSpy = vi.spyOn(service['executor'], 'execute').mockResolvedValue({
       success: true,
@@ -58,7 +58,6 @@ describe('GitBranchService.fastForwardFromRemote', () => {
     expect(executeSpy).toHaveBeenNthCalledWith(1, {
       args: ['fetch', 'origin', 'feature-x:feature-x'],
       cwd: '/repo',
-      timeout: 60000,
     });
   });
 
@@ -76,7 +75,6 @@ describe('GitBranchService.fastForwardFromRemote', () => {
     expect(executeSpy).toHaveBeenNthCalledWith(1, {
       args: ['fetch', 'origin', 'feature-x:feature-x'],
       cwd: '/repo',
-      timeout: 60000,
     });
     expect(executeSpy).toHaveBeenNthCalledWith(2, {
       args: ['branch', '--set-upstream-to=origin/feature-x', 'feature-x'],

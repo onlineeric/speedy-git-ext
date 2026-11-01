@@ -104,7 +104,6 @@ export class GitBranchService {
     const result = await this.executor.execute({
       args,
       cwd: this.workspacePath,
-      timeout: 60000, // Network operations get longer timeout
     });
 
     if (!result.success) {
@@ -125,7 +124,6 @@ export class GitBranchService {
     const fetchResult = await this.executor.execute({
       args: ['fetch', remote, `${branch}:${branch}`],
       cwd: this.workspacePath,
-      timeout: 60000,
     });
 
     if (!fetchResult.success) {
@@ -217,7 +215,6 @@ export class GitBranchService {
     const result = await this.executor.execute({
       args: ['push', remote, '--delete', name],
       cwd: this.workspacePath,
-      timeout: 60000,
     });
     if (!result.success) return result;
     return ok(`Deleted remote branch '${remote}/${name}'`);

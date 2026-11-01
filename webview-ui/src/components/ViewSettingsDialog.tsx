@@ -32,6 +32,7 @@ import { SettingDraftScope, useSettingDraftRegistry } from '../hooks/useSettingD
 import { useUnsavedSettings } from '../hooks/useUnsavedSettings';
 import { AutolinkSettingsSection } from './AutolinkSettingsSection';
 import { AvatarSettingsSection } from './AvatarSettingsSection';
+import { GitSettingsSection } from './GitSettingsSection';
 import { DialogTabs, type DialogTab } from './DialogTabs';
 import { dialogDragHandleProps, MovableDialogContent } from './MovableDialogContent';
 import {
@@ -41,7 +42,7 @@ import {
   dialogOverlayClassName,
   dialogSectionLabelClassName,
 } from './dialogStyles';
-import { ColumnsIcon, LinkIcon } from './icons';
+import { BranchIcon, ColumnsIcon, LinkIcon } from './icons';
 import { SettingsDialogFooter } from './SettingsDialogFooter';
 import { ToolbarIconButton, RemoteButtonToggleItem, TOGGLE_BUTTON_TONES } from './ToolbarIconButton';
 
@@ -68,7 +69,7 @@ const COLUMN_WARNINGS: Partial<Record<CommitTableColumnId, string>> = {
     'Warning: signature checks run in the background and can use high CPU in large repositories. Keep this column hidden on slower machines.',
 };
 
-const SETTINGS_TAB_IDS = ['view', 'autolinks'] as const;
+const SETTINGS_TAB_IDS = ['view', 'autolinks', 'git'] as const;
 type SettingsTabId = (typeof SETTINGS_TAB_IDS)[number];
 
 function isSettingsTabId(tabId: string): tabId is SettingsTabId {
@@ -212,6 +213,7 @@ export function ViewSettingsDialog() {
         icon: <LinkIcon className={TAB_ICON_CLASS} />,
         content: <AutolinkSettingsSection />,
       },
+      { id: 'git', label: 'Git', icon: <BranchIcon className={TAB_ICON_CLASS} />, content: <GitSettingsSection /> },
     ] satisfies DialogTab<SettingsTabId>[]
   ).map((tab) => ({
     ...tab,

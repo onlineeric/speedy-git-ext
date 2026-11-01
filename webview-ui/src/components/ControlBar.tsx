@@ -25,6 +25,7 @@ import {
   GoToHeadIcon,
   NewTabIcon,
   HelpIcon,
+  SparkleIcon,
   ToolbarSeparatorIcon,
   WorktreeIcon,
 } from './icons';
@@ -314,6 +315,19 @@ export function ControlBar() {
             aria-label="Open extension settings"
             {...TOGGLE_BUTTON_TONES.inactive}
             title="Extension settings"
+            extraMenuItems={<RemoteButtonToggleItem />}
+          />
+
+          <ToolbarIconButton
+            label="What's New"
+            icon={<SparkleIcon className={iconClass} />}
+            onClick={() => {
+              trackUiInteraction('toolbar', 'whatsNew');
+              useGraphStore.getState().setWhatsNewBrowseOpen(true);
+            }}
+            aria-label="What's new in Speedy Git"
+            {...TOGGLE_BUTTON_TONES.inactive}
+            title="What's new: release notes for every version"
             extraMenuItems={<RemoteButtonToggleItem />}
           />
 
