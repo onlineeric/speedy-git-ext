@@ -408,6 +408,9 @@ interface GraphStore {
   /** Release notes to show, or null once dismissed / when this run doesn't qualify. */
   whatsNew: WhatsNewPayload | null;
   setWhatsNew: (payload: WhatsNewPayload | null) => void;
+  /** The What's New dialog opened from the toolbar, as opposed to after an upgrade. */
+  whatsNewBrowseOpen: boolean;
+  setWhatsNewBrowseOpen: (open: boolean) => void;
   recomputeVisibility: () => void;
   resetAllFilters: (options?: { preserveBranches?: boolean }) => void;
   setIsRefreshing: (value: boolean) => void;
@@ -1380,6 +1383,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
   whatsNew: null,
   setWhatsNew: (payload) => set({ whatsNew: payload }),
+  whatsNewBrowseOpen: false,
+  setWhatsNewBrowseOpen: (open) => set({ whatsNewBrowseOpen: open }),
   recomputeVisibility: () => {
     const { commits, stashes } = get();
     const view = computeGraphView(get(), { commits, stashes, uncommitted: getUncommittedContext(get()) });

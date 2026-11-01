@@ -8,6 +8,7 @@ import { ConfirmDialog } from './components/ConfirmDialog';
 import { ToastContainer } from './components/ToastContainer';
 import { BranchCheckoutDialogs } from './components/BranchCheckoutDialogs';
 import { WhatsNewDialog } from './components/WhatsNewDialog';
+import { findUnseenWhatsNewEntry, WHATS_NEW_ENTRIES_NEWEST_FIRST } from './components/whatsNewEntries';
 
 export function App() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -16,6 +17,23 @@ export function App() {
   const setActiveToggleWidget = useGraphStore((state) => state.setActiveToggleWidget);
   const whatsNew = useGraphStore((state) => state.whatsNew);
   const setWhatsNew = useGraphStore((state) => state.setWhatsNew);
+  const whatsNewBrowseOpen = useGraphStore((state) => state.whatsNewBrowseOpen);
+  const setWhatsNewBrowseOpen = useGraphStore((state) => state.setWhatsNewBrowseOpen);
+  // After an upgrade: the running version's notes, unless already seen. They take
+  // precedence over the toolbar's News button, which opens the newest notes.
+  const unseenWhatsNewEntry = whatsNew ? findUnseenWhatsNewEntry(whatsNew) : undefined;
+  const whatsNewDialogEntry =
+    unseenWhatsNewEntry ?? (whatsNewBrowseOpen ? WHATS_NEW_ENTRIES_NEWEST_FIRST[0] : undefined);
+  const closeWhatsNewDialog = () => {
+    // A News click that landed before the upgrade's notes arrived must not reopen them.
+    setWhatsNewBrowseOpen(false);
+    if (unseenWhatsNewEntry) {
+      setWhatsNew(null);
+      // The entry the upgrade brought is what was seen, whichever one the
+      // user had browsed to when they closed it.
+      rpcClient.dismissWhatsNew(unseenWhatsNewEntry.version);
+    }
+  };
   const setSelectedCommit = useGraphStore((state) => state.setSelectedCommit);
   const setCommitDetails = useGraphStore((state) => state.setCommitDetails);
   const setDetailsPanelOpen = useGraphStore((state) => state.setDetailsPanelOpen);
@@ -151,16 +169,14 @@ export function App() {
         </div>
         {showPanel && <CommitDetailsPanel />}
       </div>
-      {whatsNew && (
+      {whatsNewDialogEntry && (
         <WhatsNewDialog
-          open
-          version={whatsNew.version}
-          lastShownVersion={whatsNew.lastShownVersion}
-          countdownSeconds={whatsNew.countdownSeconds}
-          onClose={(shownVersion) => {
-            setWhatsNew(null);
-            rpcClient.dismissWhatsNew(shownVersion);
-          }}
+          // Remount when the upgrade's notes take over from a browse, so they open on their own entry.
+          key={unseenWhatsNewEntry ? 'upgrade' : 'browse'}
+          initialEntry={whatsNewDialogEntry}
+          // From the toolbar the user chose to look, so no countdown.
+          countdownSeconds={unseenWhatsNewEntry && whatsNew ? whatsNew.countdownSeconds : 0}
+          onClose={closeWhatsNewDialog}
         />
       )}
       <ConfirmDialog

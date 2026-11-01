@@ -25,10 +25,12 @@ import {
   clampBatchCommitSize,
   DEFAULT_GRAPH_COLORS,
   DEFAULT_USER_SETTINGS,
+  normalizeGitTimeoutSeconds,
   normalizeWorktreeFolderNameStyle,
   type UserDateFormat,
   type UserSettings,
 } from '../shared/types.js';
+import { setGitCommandTimeoutSeconds } from './services/gitCommandTimeout.js';
 
 /** Settings the webview renders from, so a change to one reloads every graph. */
 const WEBVIEW_SETTING_SECTIONS = [
@@ -47,6 +49,7 @@ const WEBVIEW_SETTING_SECTIONS = [
   'speedyGit.toolbar.showRemoteButton',
   'speedyGit.autolinks.custom',
   'speedyGit.autolinks.remoteProvider.enabled',
+  'speedyGit.git.timeoutSeconds',
 ];
 
 /**
@@ -101,6 +104,8 @@ export class ExtensionController {
       }),
     );
 
+    // Before discovery, which spawns git under this timeout.
+    this.applyGitCommandTimeout();
     this.initRepoDiscovery();
     this.registerSettingsListener();
     this.registerSplitEditorFill();
@@ -213,6 +218,10 @@ export class ExtensionController {
       vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration('speedyGit.statusBarText') && this.statusBarItem) {
           this.statusBarItem.text = this.readStatusBarText();
+        }
+
+        if (event.affectsConfiguration('speedyGit.git.timeoutSeconds')) {
+          this.applyGitCommandTimeout();
         }
 
         if (this.didSpeedyGitWebviewSettingsChange(event)) {
@@ -464,6 +473,17 @@ export class ExtensionController {
     this.statusBarItem = undefined;
   }
 
+  /** Hand the configured timeout to every git spawn; takes effect on the next command. */
+  private applyGitCommandTimeout() {
+    setGitCommandTimeoutSeconds(this.readGitTimeoutSeconds());
+  }
+
+  private readGitTimeoutSeconds(): number {
+    return normalizeGitTimeoutSeconds(
+      vscode.workspace.getConfiguration('speedyGit').get<unknown>('git.timeoutSeconds'),
+    );
+  }
+
   private didSpeedyGitWebviewSettingsChange(event: vscode.ConfigurationChangeEvent): boolean {
     return WEBVIEW_SETTING_SECTIONS.some((section) => event.affectsConfiguration(section));
   }
@@ -516,6 +536,7 @@ export class ExtensionController {
         'autolinks.remoteProvider.enabled',
         DEFAULT_USER_SETTINGS.remoteAutolinksEnabled,
       ),
+      gitTimeoutSeconds: this.readGitTimeoutSeconds(),
     };
   }
 

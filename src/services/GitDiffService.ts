@@ -317,7 +317,6 @@ export class GitDiffService {
     const result = await this.executor.execute({
       args: ['difftool', '--dir-diff', '--no-prompt', parent, hash],
       cwd: this.workspacePath,
-      timeout: 60000,
     });
 
     if (!result.success) {

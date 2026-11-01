@@ -1,7 +1,9 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { useRef, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { adjacentWhatsNewEntries } from '@shared/whatsNew';
 import { useCountdown } from '../hooks/useCountdown';
 import { useDialogTelemetry } from '../hooks/useDialogTelemetry';
+import { trackUiInteraction } from '../utils/telemetry';
 import {
   ACCENT_COLOR,
   BORDER_COLOR,
@@ -12,24 +14,30 @@ import {
 import {
   buttonInertClassName,
   buttonPrimaryClassName,
+  buttonSecondaryColorsClassName,
   dialogContentClassName,
   dialogContentStyle,
   dialogOverlayClassName,
 } from './dialogStyles';
-import { SparkleIcon } from './icons';
-import { findUnseenWhatsNewEntry } from './whatsNewEntries';
+import { ChevronLeftIcon, ChevronRightIcon, SparkleIcon } from './icons';
+import { WHATS_NEW_ENTRIES_NEWEST_FIRST, type WhatsNewEntry } from './whatsNewEntries';
 
 interface WhatsNewDialogProps {
-  /** The running version; resolved to its series' notes, nothing renders if there are none. */
-  version: string;
-  /** Entry version last dismissed; that entry does not render again. */
-  lastShownVersion: string | undefined;
-  /** Seconds the close button stays disabled — shorter in development. */
+  /** The entry the dialog opens on; the arrows step to older and newer ones from here. */
+  initialEntry: WhatsNewEntry;
+  /**
+   * Seconds the close button stays disabled: the backend's countdown when the
+   * dialog interrupts after an upgrade, 0 when the user asked for it.
+   */
   countdownSeconds: number;
-  open: boolean;
-  /** Receives the entry version shown, which is what gets recorded as seen. */
-  onClose: (shownVersion: string) => void;
+  onClose: () => void;
 }
+
+/** A square icon button: the secondary colors, so it reads as clickable before it is hovered. */
+const navButtonClassName =
+  `inline-flex h-7 w-7 items-center justify-center rounded ${buttonSecondaryColorsClassName} ` +
+  'focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--vscode-focusBorder)] ' +
+  'disabled:pointer-events-none disabled:opacity-40';
 
 /** The hero's wash: two theme accents fading into the dialog surface. */
 const heroStyle: CSSProperties = {
@@ -46,38 +54,60 @@ const versionPillStyle: CSSProperties = {
 /**
  * "What's new in vX.Y.Z", shown once per entry on the first run after install —
  * a patch release without notes of its own shows its series' notes, and only if
- * they have not been seen yet.
+ * they have not been seen yet — and on demand from the toolbar's What's New
+ * button. Either way the footer's arrows browse every release's notes.
  *
  * Laid out as a poster rather than a notice — a gradient hero carrying the
  * headline and an optional illustration, then the entry's content — because its
  * job is to make a new feature worth a look, and a wall of text reads as
  * something to dismiss.
  *
- * The close button counts down before it enables, which is the whole reason the
- * dialog can justify interrupting: without it, a dialog that appears on launch
+ * The close button counts down before it enables when the dialog interrupts,
+ * which is the whole reason it can justify interrupting: without it, a dialog that appears on launch
  * is dismissed reflexively before anything is read. Escape and clicking away are
  * held back for the same span, so the countdown cannot simply be routed around.
+ * Opened from the toolbar there is nothing to justify, so there is no countdown.
+ *
+ * Mount it when it opens (`{state && <WhatsNewDialog … />}`): the countdown and
+ * the browsed entry both start from that mount.
  *
  * Content comes from `whatsNewEntries`, so adding a release means adding an
  * entry there and nothing here.
  */
-export function WhatsNewDialog({ version, lastShownVersion, countdownSeconds, open, onClose }: WhatsNewDialogProps) {
-  const entry = findUnseenWhatsNewEntry({ version, lastShownVersion });
-  const telemetry = useDialogTelemetry('whatsNew', open);
-  const remaining = useCountdown(countdownSeconds, open && entry !== undefined);
+export function WhatsNewDialog({ initialEntry, countdownSeconds, onClose }: WhatsNewDialogProps) {
+  const [entry, setEntry] = useState(initialEntry);
+  const { older, newer } = adjacentWhatsNewEntries(WHATS_NEW_ENTRIES_NEWEST_FIRST, entry.version);
+  const telemetry = useDialogTelemetry('whatsNew', true);
+  const remaining = useCountdown(countdownSeconds, true);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  if (!entry) return null;
+  // Each release's notes start from their own top, not wherever the last one was scrolled to.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [entry]);
 
   const locked = remaining > 0;
   const handleClose = () => {
     if (locked) return;
     telemetry.confirmed();
-    onClose(entry.version);
+    onClose();
+  };
+
+  const showOlder = () => {
+    if (!older) return;
+    trackUiInteraction('whatsNewDialog', 'whatsNewOlderVersion');
+    setEntry(older);
+  };
+
+  const showNewer = () => {
+    if (!newer) return;
+    trackUiInteraction('whatsNewDialog', 'whatsNewNewerVersion');
+    setEntry(newer);
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
+    <Dialog.Root open onOpenChange={(isOpen) => !isOpen && handleClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className={dialogOverlayClassName} />
         <Dialog.Content
@@ -98,7 +128,7 @@ export function WhatsNewDialog({ version, lastShownVersion, countdownSeconds, op
           {/* The hero scrolls with the content: pinned, it would leave a short window
               almost no room for a release's screenshots. Only the footer stays put, so
               Close is always reachable. */}
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
             <header className="relative overflow-hidden px-7 pb-6 pt-6" style={heroStyle}>
               {/* Soft glows behind the text; purely decorative. */}
               <span
@@ -135,7 +165,37 @@ export function WhatsNewDialog({ version, lastShownVersion, countdownSeconds, op
             <div className="px-7 py-5">{entry.content}</div>
           </div>
 
-          <footer className="flex shrink-0 items-center justify-end border-t border-[var(--vscode-panel-border)] px-7 py-3">
+          <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--vscode-panel-border)] px-7 py-3">
+            <nav className="flex items-center gap-2" aria-label="Release notes versions">
+              <button
+                type="button"
+                className={navButtonClassName}
+                onClick={showOlder}
+                disabled={!older}
+                title={older ? `Previous: v${older.version}` : 'This is the oldest release with notes'}
+                aria-label={older ? `Show v${older.version}` : 'No older release notes'}
+              >
+                <ChevronLeftIcon size={16} strokeWidth={1.6} />
+              </button>
+              {/* Fixed width so the arrows stay put as the version text changes length. */}
+              <span
+                className="min-w-[4.5rem] text-center text-xs font-semibold tabular-nums text-[var(--vscode-foreground)]"
+                aria-live="polite"
+              >
+                v{entry.version}
+              </span>
+              <button
+                type="button"
+                className={navButtonClassName}
+                onClick={showNewer}
+                disabled={!newer}
+                title={newer ? `Next: v${newer.version}` : 'This is the newest release'}
+                aria-label={newer ? `Show v${newer.version}` : 'No newer release notes'}
+              >
+                <ChevronRightIcon size={16} strokeWidth={1.6} />
+              </button>
+            </nav>
+
             <button
               ref={closeRef}
               type="button"

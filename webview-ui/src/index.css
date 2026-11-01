@@ -148,6 +148,20 @@
   98%, 100% { opacity: 0; }
 }
 
+/* The git timeout illustration: a slow push fills its track straight past the
+   struck-out old 60s limit, then reports done. The resting state is a full
+   track with "done" showing, so with no animation it reads as the result. */
+@keyframes whats-new-timeout-bar {
+  0% { transform: scaleX(0); }
+  75%, 92% { transform: scaleX(1); }
+  100% { transform: scaleX(0); }
+}
+@keyframes whats-new-timeout-done {
+  0%, 74% { opacity: 0; }
+  80%, 92% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 @layer utilities {
   .animate-whats-new-countdown {
     transform-origin: left;
@@ -207,6 +221,12 @@
     .animate-whats-new-changes-file {
       animation: whats-new-changes-file 5s ease-out infinite;
       animation-delay: var(--whats-new-changes-delay, 0s);
+    }
+    .animate-whats-new-timeout-bar {
+      animation: whats-new-timeout-bar 5s ease-in-out infinite;
+    }
+    .animate-whats-new-timeout-done {
+      animation: whats-new-timeout-done 5s ease-out infinite;
     }
   }
   .animate-toast-in {

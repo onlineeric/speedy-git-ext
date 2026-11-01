@@ -15,7 +15,6 @@ describe('GitRemoteService.push', () => {
     await service.push('origin', 'main');
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({
       args: ['push', 'origin', 'main'],
-      timeout: 60000,
     }));
   });
 

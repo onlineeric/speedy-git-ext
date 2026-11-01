@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  adjacentWhatsNewEntries,
   buildWhatsNewPayload,
   chooseUnseenWhatsNewEntry,
   isExactVersion,
   resolveWhatsNewEntry,
   shouldRecordWhatsNew,
+  sortWhatsNewEntriesNewestFirst,
   WHATS_NEW_COUNTDOWN_SECONDS,
 } from '../../shared/whatsNew.js';
 
@@ -124,5 +126,31 @@ describe('chooseUnseenWhatsNewEntry', () => {
 
   it('shows nothing for a series without notes', () => {
     expect(choose('5.19.0', '5.18.0')).toBeUndefined();
+  });
+});
+
+describe('browsing entries', () => {
+  const versions = (entries: { version: string }[]) => entries.map((entry) => entry.version);
+
+  it('sorts newest first by version, not by text or file order', () => {
+    const sorted = sortWhatsNewEntriesNewestFirst([
+      { version: '5.9.0' },
+      { version: '5.10.1' },
+      { version: '5.10.0' },
+      { version: '5.23.0' },
+    ]);
+    expect(versions(sorted)).toEqual(['5.23.0', '5.10.1', '5.10.0', '5.9.0']);
+  });
+
+  it('sorts a malformed version last', () => {
+    expect(versions(sortWhatsNewEntriesNewestFirst([{ version: 'v1' }, { version: '1.0.0' }]))).toEqual(['1.0.0', 'v1']);
+  });
+
+  it('finds the older and newer neighbours, with nothing past either end', () => {
+    const entries = [{ version: '3.0.0' }, { version: '2.0.0' }, { version: '1.0.0' }];
+    expect(adjacentWhatsNewEntries(entries, '2.0.0')).toEqual({ older: entries[2], newer: entries[0] });
+    expect(adjacentWhatsNewEntries(entries, '3.0.0')).toEqual({ older: entries[1], newer: undefined });
+    expect(adjacentWhatsNewEntries(entries, '1.0.0')).toEqual({ older: undefined, newer: entries[1] });
+    expect(adjacentWhatsNewEntries(entries, '9.9.9')).toEqual({ older: undefined, newer: undefined });
   });
 });

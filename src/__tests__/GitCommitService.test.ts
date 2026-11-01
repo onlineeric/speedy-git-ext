@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { GitCommitService } from '../services/GitCommitService.js';
 import { GitError, ok, err, type Result } from '../../shared/errors.js';
 import type { GitExecResult } from '../services/GitExecutor.js';
+import { gitTimeoutMessage } from '../services/gitCommandTimeout.js';
 
 const mockLog = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as LogOutputChannel;
 
@@ -97,13 +98,14 @@ describe('GitCommitService.amendCommit', () => {
     expect(argsOfCommit(spy)).not.toContain('-m');
   });
 
-  it('gives the amend a 60s ceiling instead of the executor default', async () => {
+  it("reports a timeout with the executor's message, which names the limit that applied", async () => {
     const service = new GitCommitService('/repo', mockLog);
-    const spy = stubExecutor(service, [HEAD]);
+    stubExecutor(service, [HEAD, HEAD], () => err(new GitError(gitTimeoutMessage(120), 'TIMEOUT')));
 
-    await service.amendCommit({ message: 'new', includeStaged: false, expectedHead: HEAD });
+    const result = await service.amendCommit({ message: 'new', includeStaged: false, expectedHead: HEAD });
 
-    expect(commitCall(spy)?.timeout).toBe(60_000);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.message).toContain(gitTimeoutMessage(120));
   });
 
   it('surfaces an ordinary git failure unchanged', async () => {

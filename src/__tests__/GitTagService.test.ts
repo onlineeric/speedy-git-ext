@@ -106,17 +106,6 @@ describe('GitTagService.pushTag', () => {
     }));
   });
 
-  it('uses an extended timeout for push', async () => {
-    const service = new GitTagService('/repo', mockLog);
-    const spy = vi.spyOn(service['executor'], 'execute').mockResolvedValue({
-      success: true,
-      value: { stdout: '', stderr: '' },
-    });
-
-    await service.pushTag('v1.0');
-    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ timeout: 60000 }));
-  });
-
   it('passes through underlying errors', async () => {
     const service = new GitTagService('/repo', mockLog);
     vi.spyOn(service['executor'], 'execute').mockResolvedValue({

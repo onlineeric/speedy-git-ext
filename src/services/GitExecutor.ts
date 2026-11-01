@@ -1,11 +1,11 @@
 import { spawn } from 'child_process';
 import type { LogOutputChannel } from 'vscode';
 import { GitError, type Result, ok, err } from '../../shared/errors.js';
+import { gitCommandTimeoutDelayMs, gitCommandTimeoutSeconds, gitTimeoutMessage } from './gitCommandTimeout.js';
 
 export interface GitExecOptions {
   args: string[];
   cwd: string;
-  timeout?: number;
   env?: Record<string, string>;
   /** Optional cancellation signal. When aborted, the spawned process is killed
    *  and the executor resolves with a `'CANCELLED'` GitError. If the signal is
@@ -54,7 +54,10 @@ export class GitExecutor {
   }
 
   private async run(options: GitExecOptions): Promise<Result<GitExecRawResult>> {
-    const { args, cwd, timeout = 30000, env, abortSignal, stdin } = options;
+    const { args, cwd, env, abortSignal, stdin } = options;
+    // Read per command, so a changed setting applies to the very next one.
+    const timeoutSeconds = gitCommandTimeoutSeconds();
+    const timeoutDelayMs = gitCommandTimeoutDelayMs(timeoutSeconds);
     const cmdString = `git ${args.join(' ')}`;
 
     if (abortSignal?.aborted) {
@@ -67,7 +70,7 @@ export class GitExecutor {
 
     // Nothing here is attached to a terminal, so any git command that would open
     // an editor (`merge`/`revert`/`cherry-pick`/`rebase --continue`, `commit`,
-    // `tag -a`, `pull --no-rebase`) blocks until the timeout above kills it and
+    // `tag -a`, `pull --no-rebase`) blocks until the timeout kills it (or forever, with no timeout) and
     // surfaces as `TIMEOUT` rather than as a finished operation. That is a property
     // of how this extension spawns git, not of any one subcommand, so the
     // no-op editor is the default for every spawn. Caller `env` is spread after it,
@@ -101,19 +104,14 @@ export class GitExecutor {
 
       if (abortSignal) abortSignal.addEventListener('abort', onAbort, { once: true });
 
-      const timeoutId = setTimeout(() => {
-        gitProcess.kill();
-        this.log.error(`Git command timed out after ${timeout}ms: ${cmdString}`);
-        safeResolve(
-          err(
-            new GitError(
-              `Git command timed out after ${timeout}ms`,
-              'TIMEOUT',
-              cmdString
-            )
-          )
-        );
-      }, timeout);
+      const timeoutId =
+        timeoutDelayMs === undefined
+          ? undefined
+          : setTimeout(() => {
+              gitProcess.kill();
+              this.log.error(`Git command timed out after ${timeoutSeconds}s: ${cmdString}`);
+              safeResolve(err(new GitError(gitTimeoutMessage(timeoutSeconds), 'TIMEOUT', cmdString)));
+            }, timeoutDelayMs);
 
       gitProcess.stdout?.on('data', (data: Buffer) => {
         stdoutChunks.push(data);

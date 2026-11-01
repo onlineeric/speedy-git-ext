@@ -196,6 +196,8 @@ export type RequestMessage =
    * `settingSaveResult` with the same `requestId`, so the dialog can wait for the write.
    */
   | { type: 'setCustomAutolinks'; payload: { autolinks: CustomAutolink[]; requestId: number } }
+  /** `seconds: null` clears the setting, so it falls back to the default. */
+  | { type: 'setGitTimeoutSeconds'; payload: { seconds: number | null; requestId: number } }
   | { type: 'setRemoteAutolinksEnabled'; payload: { enabled: boolean } }
   | { type: 'getSubmodules'; payload: Record<string, never> }
   /** @deprecated since 041-submodule-selector — selector navigation uses switchRepo. Handler kept for legacy compatibility; will be removed in a follow-up. */
@@ -371,7 +373,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   createFixupCommit: true, cancelCommitWait: true, getGitVersion: true,
   loadMoreCommits: true, locateHead: true, getCommitsByHash: true, openSettings: true, switchRepo: true, displayRepo: true,
   getSettings: true, setToolbarSetting: true, setWorktreeFolderNameStyle: true,
-  setCustomAutolinks: true, setRemoteAutolinksEnabled: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
+  setCustomAutolinks: true, setRemoteAutolinksEnabled: true, setGitTimeoutSeconds: true, getSubmodules: true, openSubmodule: true, backToParentRepo: true,
   getAvatarAuthState: true, requestGitHubAuth: true, removeGitHubAuth: true, setAvatarRefreshDays: true,
   clearAvatarCache: true,
   updateSubmodule: true, initSubmodule: true,

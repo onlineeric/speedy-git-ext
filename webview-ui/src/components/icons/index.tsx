@@ -431,6 +431,15 @@ export function ChevronDownIcon({ className }: IconProps) {
   );
 }
 
+/** Left-pointing chevron, the mirror of {@link ChevronRightIcon} — 12×12, inherits text color via currentColor */
+export function ChevronLeftIcon({ className, size = 12, strokeWidth = 1.3 }: IconProps & { size?: number; strokeWidth?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" className={className} aria-hidden>
+      <path d="M 7.5 3 L 4.5 6 L 7.5 9" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** Chevron right — 12×12 by default, inherits text color via currentColor */
 export function ChevronRightIcon({ className, size = 12, strokeWidth = 1.3 }: IconProps & { size?: number; strokeWidth?: number }) {
   return (
@@ -515,6 +524,20 @@ export function SparkleIcon({ className, style }: IconProps) {
     <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} style={style} aria-hidden>
       <path d="M 5 1 Q 5.6 4.4 9 5 Q 5.6 5.6 5 9 Q 4.4 5.6 1 5 Q 4.4 4.4 5 1 Z" fill="currentColor" />
       <path d="M 9.5 7.5 Q 9.8 9.2 11.5 9.5 Q 9.8 9.8 9.5 11.5 Q 9.2 9.8 7.5 9.5 Q 9.2 9.2 9.5 7.5 Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Gift box with a bow — 12×12, the toolbar's News button. Inherits text color via currentColor */
+export function GiftIcon({ className, style }: IconProps) {
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" className={className} style={style} aria-hidden>
+      <g stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round">
+        <rect x={1.5} y={4.2} width={9} height={2.2} rx={0.5} />
+        <path d="M 2.4 6.4 V 10.5 H 9.6 V 6.4" />
+        <line x1={6} y1={4.2} x2={6} y2={10.5} />
+        <path d="M 6 4.2 C 5 2.3 3.1 2.2 3.3 3.3 C 3.5 4.1 5 4.2 6 4.2 C 7 4.2 8.5 4.1 8.7 3.3 C 8.9 2.2 7 2.3 6 4.2 Z" />
+      </g>
     </svg>
   );
 }

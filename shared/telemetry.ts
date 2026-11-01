@@ -146,15 +146,16 @@ export type UiSurface = (typeof UI_SURFACES)[number];
 
 export const UI_ACTIONS = [
   // Toolbar buttons (ControlBar)
-  'filter', 'search', 'compare', 'worktrees', 'refresh', 'fetch', 'goToHead', 'openNewGraphTab', 'view', 'remote', 'settings', 'help',
+  'filter', 'search', 'compare', 'worktrees', 'refresh', 'fetch', 'goToHead', 'openNewGraphTab', 'view', 'remote', 'settings', 'whatsNew', 'help',
   'moreActions', 'moreOptions',
   // Toolbar right-click menu
   'toggleLabels', 'toggleRemoteButton',
   // Help dialog links (which support surface the user chose)
   'helpReportIssue', 'helpOpenRepository', 'helpOpenChangelog', 'helpOpenMarketplace',
   'helpCopyIssuesUrl',
-  // "What's new" dialog: which release-note link the user followed
-  'whatsNewOpenContribution',
+  // "What's new" dialog: which release-note link the user followed, and the
+  // footer arrows that browse to an older / newer release's notes
+  'whatsNewOpenContribution', 'whatsNewOlderVersion', 'whatsNewNewerVersion',
   // Commit context menu
   'compareCommits', 'setCompareBase', 'compareWithBase',
   'checkoutCommit', 'createBranch', 'createTag', 'createWorktree',

@@ -4,6 +4,7 @@ import { GIT_ERROR_CODES, type GitErrorCode } from '../../shared/errors.js';
 import { MUTATING_OPERATIONS, TRACKED_OPERATIONS, type TrackedOperation } from '../../shared/telemetry.js';
 import type { WebviewRequestContext } from './WebviewRequestContext.js';
 import { autolinkHandlers } from './handlers/autolinkHandlers.js';
+import { gitSettingsHandlers } from './handlers/gitSettingsHandlers.js';
 import { avatarHandlers } from './handlers/avatarHandlers.js';
 import { branchHandlers } from './handlers/branchHandlers.js';
 import { commitHandlers } from './handlers/commitHandlers.js';
@@ -46,6 +47,7 @@ export const requestHandlers = {
   ...telemetryHandlers,
   ...avatarHandlers,
   ...autolinkHandlers,
+  ...gitSettingsHandlers,
 } satisfies RequestHandlerMap;
 
 /**

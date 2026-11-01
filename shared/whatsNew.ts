@@ -136,3 +136,33 @@ export function chooseUnseenWhatsNewEntry<T extends { version: string }>(
   const entry = resolveWhatsNewEntry(version, entries);
   return entry?.version === lastShownVersion ? undefined : entry;
 }
+
+/**
+ * Entries newest first, for browsing release notes from version to version.
+ * Sorted by version rather than trusting the file's order, so an entry pasted
+ * in the wrong place still lands where it belongs. A malformed version (which
+ * `whatsNewEntries`' test rejects anyway) sorts last.
+ */
+export function sortWhatsNewEntriesNewestFirst<T extends { version: string }>(entries: readonly T[]): T[] {
+  const rank = (entry: T) => parseExactVersion(entry.version);
+  return [...entries].sort((a, b) => {
+    const left = rank(a);
+    const right = rank(b);
+    if (!left || !right) return left ? -1 : right ? 1 : 0;
+    return right.major - left.major || right.minor - left.minor || right.patch - left.patch;
+  });
+}
+
+/**
+ * The entries either side of `version` in a newest-first list: `older` is what
+ * the dialog's back arrow opens, `newer` its forward arrow. Each is `undefined`
+ * at its end of the list, which is what disables that arrow.
+ */
+export function adjacentWhatsNewEntries<T extends { version: string }>(
+  newestFirst: readonly T[],
+  version: string,
+): { older: T | undefined; newer: T | undefined } {
+  const index = newestFirst.findIndex((entry) => entry.version === version);
+  if (index === -1) return { older: undefined, newer: undefined };
+  return { older: newestFirst[index + 1], newer: newestFirst[index - 1] };
+}

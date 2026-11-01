@@ -43,7 +43,7 @@ const EMPTY_VERDICT: SignatureVerdict = {
  * in parallel cuts a large batch's wall-clock time roughly proportionally on
  * multi-core machines. Kept per-commit (rather than one batched `git log
  * --no-walk` over many hashes) so the crypto actually runs in parallel across
- * processes and no single process risks the executor's 30s timeout.
+ * processes and no single process risks the executor's command timeout.
  */
 const VERIFY_CONCURRENCY = Math.max(2, Math.min(8, cpus().length));
 

@@ -104,6 +104,13 @@ export const buttonDangerClassName =
 export const dialogSectionLabelClassName =
   'mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--vscode-descriptionForeground)]';
 
+/** The small explanatory text under a setting. Spacing is left to the call site. */
+export const dialogHintClassName = 'text-[11px] leading-4 text-[var(--vscode-descriptionForeground)]';
+
+/** A short right-aligned number box for a setting. Width is left to the call site. */
+export const settingNumberInputClassName =
+  'rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] px-1.5 py-1 text-right text-[var(--vscode-input-foreground)] focus:border-[var(--vscode-focusBorder)] focus:outline-none';
+
 /** A commit-message box: monospace, resizable, dimmed while disabled. */
 export const dialogMessageTextareaClassName =
   'w-full resize-y rounded border border-[var(--vscode-input-border)] bg-[var(--vscode-input-background)] p-2 font-mono text-sm text-[var(--vscode-input-foreground)] disabled:opacity-60';
