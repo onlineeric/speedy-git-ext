@@ -341,7 +341,7 @@ stores/
 │                                 #   044-code-refactor replaced whole-store subscriptions with selectors
 │                                 #   rather than splitting the file
 └── graphSelectors.ts             # Derived reads shared by several components (useOperationInProgress,
-                                  #   useCurrentLocalBranch, useAutolinkRules) — one selector each, so callers can't disagree.
+                                  #   useCurrentLocalBranch, useAutolinkRules, useDisplayedRepoAuthors(+FirstLoad)) — one selector each, so callers can't disagree.
                                   #   isOwnOperationInProgress is the PURE half: THIS tab only, never a peer's
 
 rpc/rpcClient.ts                  # Singleton RPC client, webview↔extension via acquireVsCodeApi()

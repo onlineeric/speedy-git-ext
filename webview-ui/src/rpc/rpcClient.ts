@@ -151,8 +151,6 @@ class RpcClient {
         // T034: re-run any active working-tree compare when the graph refreshes (FR-032)
         store.maybeRerunCompareForWorkingTree();
         this.firePrefetch();
-        // After the first page has rendered, never beside it: on a large repo
-        // the author scan walks the whole history.
         this.prefetchAuthorsIfMissing();
         break;
       case 'commitsAppended': {
@@ -457,9 +455,13 @@ class RpcClient {
         store.setRepoAuthorList(repoPath, { authors, currentUserEmail });
         break;
       }
-      case 'authorListFailed':
-        store.endAuthorListLoad(message.payload.repoPath);
+      case 'authorListFailed': {
+        const { repoPath, error } = message.payload;
+        store.endAuthorListLoad(repoPath, !!error);
+        // Only an open panel is waiting on the answer, so only it reports the failure.
+        if (error && store.activeToggleWidget === 'filter') store.setError(error.message);
         break;
+      }
       case 'uncommittedChanges':
         store.setUncommittedChanges(message.payload);
         break;
@@ -481,8 +483,6 @@ class RpcClient {
         store.maybeRerunCompareForWorkingTree();
         if (message.payload.commits !== null) {
           this.firePrefetch();
-          // The first load and every repo / submodule switch arrive here, not as
-          // `commits`, and by now the backend shows the repo the scan is for.
           this.prefetchAuthorsIfMissing();
         }
         break;
@@ -509,15 +509,24 @@ class RpcClient {
    * Filter panel mid-prefetch waits on the one scan instead of starting another.
    */
   refreshAuthors() {
-    const repoPath = useGraphStore.getState().displayedRepoPath;
-    if (!repoPath || !useGraphStore.getState().beginAuthorListLoad(repoPath)) return;
-    this.send({ type: 'getAuthors', payload: { repoPath } });
+    const { displayedRepoPath, beginAuthorListLoad } = useGraphStore.getState();
+    if (!displayedRepoPath || !beginAuthorListLoad(displayedRepoPath)) return;
+    this.send({ type: 'getAuthors', payload: { repoPath: displayedRepoPath } });
   }
 
-  /** Prefetch the displayed repo's authors once per session, so the Filter panel never opens empty. */
+  /**
+   * Prefetch the displayed repo's authors once per session, so the Filter panel
+   * never opens empty. Called when a page of commits lands — the first load and
+   * every repo / submodule switch arrive as `initialData` — because by then the
+   * backend shows that repo; a request sent mid-switch is refused. Runs after the
+   * first page renders, since on a large repo the scan walks the whole history.
+   * Skips a repo already scanned, and one whose scan git failed.
+   */
   private prefetchAuthorsIfMissing() {
-    const { authorListsByRepo, displayedRepoPath } = useGraphStore.getState();
-    if (!authorListsByRepo.has(displayedRepoPath)) this.refreshAuthors();
+    const { authorScansByRepo, displayedRepoPath } = useGraphStore.getState();
+    const scan = authorScansByRepo.get(displayedRepoPath);
+    if (scan?.list || scan?.status === 'failed') return;
+    this.refreshAuthors();
   }
 
   getBranches() {

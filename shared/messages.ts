@@ -338,8 +338,14 @@ export type ResponseMessage =
    */
   | { type: 'whatsNew'; payload: WhatsNewPayload }
   | { type: 'authorList'; payload: { repoPath: string; authors: Author[]; /** `git config user.email`, for the Filter panel's "Me" button. */ currentUserEmail: string | null } }
-  /** A `getAuthors` for `repoPath` ended without a list (git failed, or the repo was no longer displayed). */
-  | { type: 'authorListFailed'; payload: { repoPath: string } }
+  /**
+   * A `getAuthors` for `repoPath` ended without a list. `error` is set when git
+   * failed and absent when the scan was refused (the repo was no longer
+   * displayed). Never sent as the generic `error`: the scan usually runs as a
+   * background prefetch, and that channel rejects whatever unrelated request is
+   * pending.
+   */
+  | { type: 'authorListFailed'; payload: { repoPath: string; error?: GitError | { message: string } } }
   | { type: 'uncommittedChanges'; payload: UncommittedSummary }
   | { type: 'conflictState'; payload: ConflictState }
   | { type: 'initialData'; payload: InitialDataPayload }

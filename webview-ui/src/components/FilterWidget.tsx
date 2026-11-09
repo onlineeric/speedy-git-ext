@@ -58,6 +58,15 @@ function getAuthorSearchText(author: Author): string {
 const BADGED_COMMIT_OPACITY_OPTIONS: readonly SegmentedToggleOption<BadgedCommitOpacity>[] =
   BADGED_COMMIT_OPACITIES.map((value) => ({ value, label: `${value}%` }));
 
+/** `user.email` arrives with the first author scan, so until then "Me" is loading, not unconfigured. */
+function meButtonTitle(currentUserEmail: string | null, isMeSelected: boolean, firstLoad: boolean): string {
+  if (firstLoad) return 'Loading authors...';
+  if (!currentUserEmail) return 'Set git config user.email to filter to your own commits';
+  return isMeSelected
+    ? `Remove yourself (${currentUserEmail}) from the author filter`
+    : `Add yourself (${currentUserEmail}) to the author filter`;
+}
+
 export function FilterWidget() {
   const filters = useGraphStore((s) => s.filters);
   const { authors: authorList, currentUserEmail } = useDisplayedRepoAuthors();
@@ -75,13 +84,9 @@ export function FilterWidget() {
   const graphColors = useGraphStore((s) => s.userSettings.graphColors);
   const branches = useGraphStore((s) => s.branches);
 
-  // Show the cached list at once and refresh it behind the scenes, so an author
-  // whose first commit arrived since the last scan appears without a wait.
-  // Replacing the list never touches `filters.authors` (emails), so the
-  // selection survives the swap. On open only: a repo switch while the panel is
-  // open is the prefetch's job, which runs once the backend shows the new repo —
-  // a request sent at the moment of switching is refused as being for a repo it
-  // does not show yet.
+  // Show the cached list at once and refresh it behind the scenes; the selection
+  // lives in `filters.authors`, so the swap never touches it. On open only — a
+  // repo switch while open is `prefetchAuthorsIfMissing`'s job.
   useEffect(() => {
     rpcClient.refreshAuthors();
   }, []);
@@ -253,13 +258,14 @@ export function FilterWidget() {
 
   const renderAuthorTrigger = useCallback(
     (selectedCount: number) => {
-      const authors = useGraphStore.getState().filters.authors;
       let label: string;
       if (selectedCount === 0) {
         label = 'All Authors';
       } else if (selectedCount === 1) {
-        const email = authors?.[0];
-        label = authorList.find((a) => a.email === email)?.name ?? 'All Authors';
+        const email = filters.authors?.[0];
+        // An email the cached list doesn't know yet (a just-fetched author) is
+        // still an active filter, so show the email rather than "All Authors".
+        label = authorList.find((a) => a.email === email)?.name ?? email ?? 'All Authors';
       } else {
         label = `${selectedCount} authors selected`;
       }
@@ -275,7 +281,7 @@ export function FilterWidget() {
         </button>
       );
     },
-    [authorList, authorListFirstLoad],
+    [authorList, authorListFirstLoad, filters.authors],
   );
 
   const renderAuthorItem = useCallback(
@@ -390,13 +396,7 @@ export function FilterWidget() {
               onClick={handleMeToggle}
               disabled={!currentUserEmail}
               aria-pressed={isMeSelected}
-              title={
-                !currentUserEmail
-                  ? 'Set git config user.email to filter to your own commits'
-                  : isMeSelected
-                    ? `Remove yourself (${currentUserEmail}) from the author filter`
-                    : `Add yourself (${currentUserEmail}) to the author filter`
-              }
+              title={meButtonTitle(currentUserEmail, isMeSelected, authorListFirstLoad)}
               className={`shrink-0 ${compactButtonClassName} ${
                 isMeSelected ? buttonPrimaryColorsClassName : buttonSecondaryColorsClassName
               }`}

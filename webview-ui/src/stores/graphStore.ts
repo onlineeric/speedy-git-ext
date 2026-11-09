@@ -120,6 +120,16 @@ export interface RepoAuthorList {
   currentUserEmail: string | null;
 }
 
+/**
+ * One repo's author scan. `failed` means git itself failed, which would fail
+ * again, so the prefetch leaves it alone; opening the Filter panel still retries.
+ */
+export interface RepoAuthorScan {
+  /** The last successful scan; kept through later loading and failed states. */
+  list?: RepoAuthorList;
+  status: 'loading' | 'idle' | 'failed';
+}
+
 interface GraphStore {
   commits: Commit[];
   branches: Branch[];
@@ -261,14 +271,12 @@ interface GraphStore {
    */
   worktreeBaseDir: string | null;
   /**
-   * Author lists by repo path, kept for the whole session so switching back to a
+   * Author scans by repo path, kept for the whole session so switching back to a
    * repo — or opening the Filter panel — never shows an empty or foreign list.
-   * Each entry is prefetched once per repo after its first commits load and
-   * refreshed in the background whenever the Filter panel opens.
+   * Prefetched once per repo after its first load; refreshed whenever the Filter
+   * panel opens.
    */
-  authorListsByRepo: ReadonlyMap<string, RepoAuthorList>;
-  /** Repos with an author scan in flight, so a second request never starts beside it. */
-  authorListLoadingRepos: ReadonlySet<string>;
+  authorScansByRepo: ReadonlyMap<string, RepoAuthorScan>;
   worktreeByHead: Map<string, WorktreeInfo[]>;
   worktreeByBranch: Map<string, WorktreeInfo>;
   detachedWorktreesByHead: Map<string, WorktreeInfo[]>;
@@ -415,10 +423,10 @@ interface GraphStore {
   prevMatch: () => void;
   /** Marks a scan of `repoPath` as started; false (and no change) when one is already running. */
   beginAuthorListLoad: (repoPath: string) => boolean;
-  /** Stores a finished scan and ends its in-flight mark. */
+  /** Stores a finished scan, keeping the previous list object when nothing changed. */
   setRepoAuthorList: (repoPath: string, list: RepoAuthorList) => void;
-  /** Ends a scan's in-flight mark without a result (failed or refused). */
-  endAuthorListLoad: (repoPath: string) => void;
+  /** Ends a scan without a result: `failed` when git failed, else it was refused. */
+  endAuthorListLoad: (repoPath: string, failed: boolean) => void;
   setUncommittedChanges: (payload: UncommittedSummary) => void;
   setConflictState: (state: ConflictState) => void;
   /** Release notes to show, or null once dismissed / when this run doesn't qualify. */
@@ -582,11 +590,19 @@ function keepUnchangedCustomAutolinks(incoming: UserSettings, current: UserSetti
     : incoming;
 }
 
-function withoutRepo(repos: ReadonlySet<string>, repoPath: string): ReadonlySet<string> {
-  if (!repos.has(repoPath)) return repos;
-  const next = new Set(repos);
-  next.delete(repoPath);
-  return next;
+function sameRepoAuthorList(a: RepoAuthorList | undefined, b: RepoAuthorList): boolean {
+  return !!a
+    && a.currentUserEmail === b.currentUserEmail
+    && a.authors.length === b.authors.length
+    && a.authors.every((author, i) => author.email === b.authors[i].email && author.name === b.authors[i].name);
+}
+
+function withAuthorScan(
+  scans: ReadonlyMap<string, RepoAuthorScan>,
+  repoPath: string,
+  scan: RepoAuthorScan,
+): ReadonlyMap<string, RepoAuthorScan> {
+  return new Map(scans).set(repoPath, scan);
 }
 
 function retainByHash<T>(map: Record<string, T>, hashes: Set<string>): Record<string, T> {
@@ -680,8 +696,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   commitTableLayout: cloneCommitTableLayout(DEFAULT_PERSISTED_UI_STATE.commitTableLayout),
   hoveredCommitHash: null,
   tooltipAnchorRect: null,
-  authorListsByRepo: new Map(),
-  authorListLoadingRepos: new Set(),
+  authorScansByRepo: new Map(),
   worktreeList: [],
   worktreeListLoading: false,
   worktreeBaseDir: null,
@@ -1346,17 +1361,24 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     };
   }),
   beginAuthorListLoad: (repoPath) => {
-    const loading = get().authorListLoadingRepos;
-    if (loading.has(repoPath)) return false;
-    set({ authorListLoadingRepos: new Set(loading).add(repoPath) });
+    const scans = get().authorScansByRepo;
+    const scan = scans.get(repoPath);
+    if (scan?.status === 'loading') return false;
+    set({ authorScansByRepo: withAuthorScan(scans, repoPath, { list: scan?.list, status: 'loading' }) });
     return true;
   },
-  setRepoAuthorList: (repoPath, list) => set((state) => ({
-    authorListsByRepo: new Map(state.authorListsByRepo).set(repoPath, list),
-    authorListLoadingRepos: withoutRepo(state.authorListLoadingRepos, repoPath),
-  })),
-  endAuthorListLoad: (repoPath) => set((state) => ({
-    authorListLoadingRepos: withoutRepo(state.authorListLoadingRepos, repoPath),
+  setRepoAuthorList: (repoPath, list) => set((state) => {
+    const previous = state.authorScansByRepo.get(repoPath)?.list;
+    // An unchanged refresh (the usual panel open) keeps the old object, so the
+    // Filter panel's memos and the dropdown's rows don't redo their work.
+    const kept = previous && sameRepoAuthorList(previous, list) ? previous : list;
+    return { authorScansByRepo: withAuthorScan(state.authorScansByRepo, repoPath, { list: kept, status: 'idle' }) };
+  }),
+  endAuthorListLoad: (repoPath, failed) => set((state) => ({
+    authorScansByRepo: withAuthorScan(state.authorScansByRepo, repoPath, {
+      list: state.authorScansByRepo.get(repoPath)?.list,
+      status: failed ? 'failed' : 'idle',
+    }),
   })),
   setUncommittedChanges: (payload) => {
     const hasChanges = payload.stagedCount + payload.unstagedCount + payload.untrackedCount > 0;

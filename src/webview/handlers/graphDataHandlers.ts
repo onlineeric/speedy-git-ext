@@ -7,20 +7,25 @@ import { postUncommittedCommitDetails } from './workingTreeHandlers.js';
 export const graphDataHandlers = {
   getAuthors: async (message, context) => {
     const { repoPath } = message.payload;
-    // The webview keys its author lists by repo; answering for a repo it no
-    // longer means would file one repo's authors under another's path.
+    // Answering for a repo no longer displayed would file its authors under another's path.
     if (repoPath !== context.runtime.currentRepoPath) {
       context.postMessage({ type: 'authorListFailed', payload: { repoPath } });
       return;
     }
     const { gitLogService } = context.services.current();
-    const [result, userEmail] = await Promise.all([gitLogService.getAuthors(), gitLogService.getCurrentUserEmail()]);
-    if (result.success) {
-      const currentUserEmail = userEmail.success ? userEmail.value : null;
-      context.postMessage({ type: 'authorList', payload: { repoPath, authors: result.value, currentUserEmail } });
-    } else {
-      context.postMessage({ type: 'error', payload: { error: result.error } });
+    try {
+      const [result, userEmail] = await Promise.all([gitLogService.getAuthors(), gitLogService.getCurrentUserEmail()]);
+      if (result.success) {
+        const currentUserEmail = userEmail.success ? userEmail.value : null;
+        context.postMessage({ type: 'authorList', payload: { repoPath, authors: result.value, currentUserEmail } });
+      } else {
+        context.postMessage({ type: 'authorListFailed', payload: { repoPath, error: result.error } });
+      }
+    } catch (error) {
+      // Still end the webview's in-flight mark, or the repo reads "Loading..."
+      // and refuses every later scan for the rest of the session.
       context.postMessage({ type: 'authorListFailed', payload: { repoPath } });
+      throw error;
     }
   },
 

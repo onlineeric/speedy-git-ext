@@ -27,7 +27,7 @@ const authorRequests = () => sent.filter((m) => m.type === 'getAuthors').map((m)
 beforeEach(() => {
   sent = [];
   vi.spyOn(rpcClient, 'send').mockImplementation((message) => { sent.push(message as never); });
-  useGraphStore.setState({ authorListsByRepo: new Map(), authorListLoadingRepos: new Set(), displayedRepoPath: '/repo' });
+  useGraphStore.setState({ authorScansByRepo: new Map(), displayedRepoPath: '/repo' });
 });
 
 afterEach(() => vi.restoreAllMocks());
@@ -46,6 +46,23 @@ describe('author list prefetch', () => {
     useGraphStore.getState().setRepoAuthorList('/repo', { authors: [], currentUserEmail: null });
     rpcClient['handleMessage']({ type: 'initialData', payload: initialData() });
     expect(authorRequests()).toEqual([]);
+  });
+
+  it('stops prefetching a repo whose scan git failed, and only reports it while the panel is open', () => {
+    useGraphStore.setState({ displayedRepoPath: '/broken', activeToggleWidget: null, error: undefined });
+    rpcClient.refreshAuthors();
+    rpcClient['handleMessage']({ type: 'authorListFailed', payload: { repoPath: '/broken', error: { message: 'timed out' } } });
+    rpcClient['handleMessage']({ type: 'initialData', payload: initialData() });
+
+    expect(authorRequests()).toEqual(['/broken']);
+    expect(useGraphStore.getState().error).toBeUndefined();
+
+    useGraphStore.setState({ activeToggleWidget: 'filter' });
+    rpcClient.refreshAuthors();
+    rpcClient['handleMessage']({ type: 'authorListFailed', payload: { repoPath: '/broken', error: { message: 'timed out' } } });
+
+    expect(authorRequests()).toEqual(['/broken', '/broken']);
+    expect(useGraphStore.getState().error).toBe('timed out');
   });
 
   it('retries after a refused scan once the repo has loaded', () => {

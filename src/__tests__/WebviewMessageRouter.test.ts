@@ -261,7 +261,7 @@ describe('WebviewMessageRouter', () => {
     expect(postMessage).toHaveBeenCalledWith({ type: 'authorListFailed', payload: { repoPath: '/repo-a' } });
   });
 
-  it('reports a failed author scan both as an error and as a failure for its repo', async () => {
+  it('reports a failed author scan as a failure for its repo, never as the generic error', async () => {
     const error = { code: 'TIMEOUT', message: 'timed out' };
     const services = new GitServiceRegistry({
       gitLogService: {
@@ -277,7 +277,24 @@ describe('WebviewMessageRouter', () => {
 
     await router.dispatch({ type: 'getAuthors', payload: { repoPath: '/repo' } });
 
-    expect(postMessage).toHaveBeenCalledWith({ type: 'error', payload: { error } });
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    expect(postMessage).toHaveBeenCalledWith({ type: 'authorListFailed', payload: { repoPath: '/repo', error } });
+  });
+
+  it('ends the webview\'s in-flight mark when the author scan throws', async () => {
+    const services = new GitServiceRegistry({
+      gitLogService: {
+        getAuthors: vi.fn().mockRejectedValue(new Error('boom')),
+        getCurrentUserEmail: vi.fn().mockResolvedValue({ success: true, value: null }),
+      },
+    } as never);
+    const postMessage = vi.fn();
+    const router = new WebviewMessageRouter(
+      { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+      { services, postMessage, log: {}, runtime: { currentRepoPath: '/repo' } } as never,
+    );
+
+    await expect(router.dispatch({ type: 'getAuthors', payload: { repoPath: '/repo' } })).rejects.toThrow('boom');
     expect(postMessage).toHaveBeenCalledWith({ type: 'authorListFailed', payload: { repoPath: '/repo' } });
   });
 

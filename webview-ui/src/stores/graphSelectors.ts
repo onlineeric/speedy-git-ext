@@ -102,11 +102,13 @@ const NO_AUTHORS: RepoAuthorList = { authors: [], currentUserEmail: null };
  * show another repo's authors.
  */
 export function useDisplayedRepoAuthors(): RepoAuthorList {
-  return useGraphStore((s) => s.authorListsByRepo.get(s.displayedRepoPath) ?? NO_AUTHORS);
+  return useGraphStore((s) => s.authorScansByRepo.get(s.displayedRepoPath)?.list ?? NO_AUTHORS);
 }
 
 /** Whether the displayed repo has never been scanned and a scan is running now. */
 export function useDisplayedRepoAuthorsFirstLoad(): boolean {
-  return useGraphStore((s) =>
-    !s.authorListsByRepo.has(s.displayedRepoPath) && s.authorListLoadingRepos.has(s.displayedRepoPath));
+  return useGraphStore((s) => {
+    const scan = s.authorScansByRepo.get(s.displayedRepoPath);
+    return scan?.status === 'loading' && !scan.list;
+  });
 }
