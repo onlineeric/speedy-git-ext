@@ -113,6 +113,13 @@ function buildWorktreeLookups(list: WorktreeInfo[]): WorktreeLookups {
   return { worktreeByHead, worktreeByBranch, detachedWorktreesByHead };
 }
 
+/** One repo's Filter-panel author data, as one `getAuthors` scan answered it. */
+export interface RepoAuthorList {
+  authors: Author[];
+  /** `git config user.email` in that repo, for the Filter panel's "Me" button. */
+  currentUserEmail: string | null;
+}
+
 interface GraphStore {
   commits: Commit[];
   branches: Branch[];
@@ -253,8 +260,15 @@ interface GraphStore {
    * are re-sent whenever the repo changes.
    */
   worktreeBaseDir: string | null;
-  authorList: Author[];
-  authorListLoading: boolean;
+  /**
+   * Author lists by repo path, kept for the whole session so switching back to a
+   * repo — or opening the Filter panel — never shows an empty or foreign list.
+   * Each entry is prefetched once per repo after its first commits load and
+   * refreshed in the background whenever the Filter panel opens.
+   */
+  authorListsByRepo: ReadonlyMap<string, RepoAuthorList>;
+  /** Repos with an author scan in flight, so a second request never starts beside it. */
+  authorListLoadingRepos: ReadonlySet<string>;
   worktreeByHead: Map<string, WorktreeInfo[]>;
   worktreeByBranch: Map<string, WorktreeInfo>;
   detachedWorktreesByHead: Map<string, WorktreeInfo[]>;
@@ -399,10 +413,12 @@ interface GraphStore {
   setSearchMatches: (matchIndices: number[], terms: readonly SearchTerm[]) => void;
   nextMatch: () => void;
   prevMatch: () => void;
-  /** `git config user.email` of the displayed repo; arrives with `authorList`. */
-  currentUserEmail: string | null;
-  setAuthorList: (authors: Author[], currentUserEmail: string | null) => void;
-  setAuthorListLoading: (loading: boolean) => void;
+  /** Marks a scan of `repoPath` as started; false (and no change) when one is already running. */
+  beginAuthorListLoad: (repoPath: string) => boolean;
+  /** Stores a finished scan and ends its in-flight mark. */
+  setRepoAuthorList: (repoPath: string, list: RepoAuthorList) => void;
+  /** Ends a scan's in-flight mark without a result (failed or refused). */
+  endAuthorListLoad: (repoPath: string) => void;
   setUncommittedChanges: (payload: UncommittedSummary) => void;
   setConflictState: (state: ConflictState) => void;
   /** Release notes to show, or null once dismissed / when this run doesn't qualify. */
@@ -566,6 +582,13 @@ function keepUnchangedCustomAutolinks(incoming: UserSettings, current: UserSetti
     : incoming;
 }
 
+function withoutRepo(repos: ReadonlySet<string>, repoPath: string): ReadonlySet<string> {
+  if (!repos.has(repoPath)) return repos;
+  const next = new Set(repos);
+  next.delete(repoPath);
+  return next;
+}
+
 function retainByHash<T>(map: Record<string, T>, hashes: Set<string>): Record<string, T> {
   const next: Record<string, T> = {};
   for (const hash of Object.keys(map)) {
@@ -657,9 +680,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   commitTableLayout: cloneCommitTableLayout(DEFAULT_PERSISTED_UI_STATE.commitTableLayout),
   hoveredCommitHash: null,
   tooltipAnchorRect: null,
-  authorList: [],
-  currentUserEmail: null,
-  authorListLoading: false,
+  authorListsByRepo: new Map(),
+  authorListLoadingRepos: new Set(),
   worktreeList: [],
   worktreeListLoading: false,
   worktreeBaseDir: null,
@@ -1079,9 +1101,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
             submoduleSelection: 'parent' as const,
             displayedRepoPath: activeRepoPath,
             submodules: [],
-            authorList: [],
-            currentUserEmail: null,
-            authorListLoading: false,
             remotes: [],
             stashes: [],
             worktreeList: [],
@@ -1129,9 +1148,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       lastClickedHash: undefined,
       commitDetails: undefined,
       detailsPanelOpen: false,
-      authorList: [],
-      currentUserEmail: null,
-      authorListLoading: false,
       remotes: [],
       stashes: [],
       worktreeList: [],
@@ -1181,9 +1197,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       lastClickedHash: undefined,
       commitDetails: undefined,
       detailsPanelOpen: false,
-      authorList: [],
-      currentUserEmail: null,
-      authorListLoading: false,
       remotes: [],
       stashes: [],
       worktreeList: [],
@@ -1332,8 +1345,19 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedCommits: [],
     };
   }),
-  setAuthorList: (authors, currentUserEmail) => set({ authorList: authors, currentUserEmail }),
-  setAuthorListLoading: (authorListLoading) => set({ authorListLoading }),
+  beginAuthorListLoad: (repoPath) => {
+    const loading = get().authorListLoadingRepos;
+    if (loading.has(repoPath)) return false;
+    set({ authorListLoadingRepos: new Set(loading).add(repoPath) });
+    return true;
+  },
+  setRepoAuthorList: (repoPath, list) => set((state) => ({
+    authorListsByRepo: new Map(state.authorListsByRepo).set(repoPath, list),
+    authorListLoadingRepos: withoutRepo(state.authorListLoadingRepos, repoPath),
+  })),
+  endAuthorListLoad: (repoPath) => set((state) => ({
+    authorListLoadingRepos: withoutRepo(state.authorListLoadingRepos, repoPath),
+  })),
   setUncommittedChanges: (payload) => {
     const hasChanges = payload.stagedCount + payload.unstagedCount + payload.untrackedCount > 0;
     const counts = { stagedCount: payload.stagedCount, unstagedCount: payload.unstagedCount, untrackedCount: payload.untrackedCount };

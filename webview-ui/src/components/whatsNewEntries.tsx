@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { chooseUnseenWhatsNewEntry, sortWhatsNewEntriesNewestFirst, type WhatsNewPayload } from '@shared/whatsNew';
 import { AutolinksIllustration } from './AutolinksIllustration';
+import { AuthorPrefetchIllustration } from './AuthorPrefetchIllustration';
 import { AutosquashIllustration } from './AutosquashIllustration';
 import { BadgedCommitsIllustration } from './BadgedCommitsIllustration';
 import { CommitNavigationIllustration } from './CommitNavigationIllustration';
@@ -21,6 +22,7 @@ import {
   ChevronRightIcon,
   CloudIcon,
   ColumnsIcon,
+  FilterIcon,
   GoToHeadIcon,
   NewTabIcon,
   GiftIcon,
@@ -102,6 +104,49 @@ export interface WhatsNewEntry {
  * with nothing worth interrupting for needs no other opt-out.
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
+  {
+    version: '5.24.0',
+    headline: 'The Filter panel’s authors and Me button are ready the moment you open it.',
+    illustration: <AuthorPrefetchIllustration />,
+    content: (
+      <div className="space-y-6">
+        <ContributorThanks login="tbuyukliev">
+          This release comes from your report in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/221">#221</ExternalLink>: on a large
+          repository the <UiLabel>Me</UiLabel> button sat disabled for seconds with no sign it was still loading.
+          Thank you for another sharp catch!
+        </ContributorThanks>
+
+        <WhatsNewSection title="No more waiting on the Filter panel">
+          <StepFlow>
+            <Step label="1" title="Open a graph" accent={SHOWCASE_BLUE_COLOR}>
+              Once the first commits are on screen, Speedy Git reads the repository’s authors in the background.
+            </Step>
+            <Step label="2" title="Open Filter" accent={SHOWCASE_GREEN_COLOR}>
+              The <FilterIcon className="inline align-[-2px]" /> <UiLabel>Filter</UiLabel> button. The{' '}
+              <UiLabel>Authors</UiLabel> list is already filled and <UiLabel>Me</UiLabel> is ready to click.
+            </Step>
+          </StepFlow>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="Fast, and still up to date">
+          <FeatureGrid>
+            <FeatureCard mark="1" title="One list per repository" accent={SHOWCASE_BLUE_COLOR}>
+              Each repository and submodule keeps its own author list for the session, so switching back never loads
+              it again.
+            </FeatureCard>
+            <FeatureCard mark="+" title="New authors appear" accent={SHOWCASE_GREEN_COLOR}>
+              Opening the panel shows the list at once and refreshes it behind the scenes, so someone whose first
+              commit you just fetched joins the list.
+            </FeatureCard>
+            <FeatureCard mark="✓" title="Your picks stay" accent={SHOWCASE_PURPLE_COLOR}>
+              Authors you already selected stay selected when the refreshed list arrives.
+            </FeatureCard>
+          </FeatureGrid>
+        </WhatsNewSection>
+      </div>
+    ),
+  },
   {
     version: '5.23.0',
     headline: 'Choose how long git commands may run, or turn the timeout off.',

@@ -11,7 +11,7 @@ import type { CSSProperties } from 'react';
 import type { Branch } from '@shared/types';
 import { getAutolinkRules, type AutolinkRule } from '../utils/autolinks';
 import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils';
-import { useGraphStore } from './graphStore';
+import { useGraphStore, type RepoAuthorList } from './graphStore';
 
 /** The fields that say whether THIS tab is running something. */
 export interface OwnOperationState {
@@ -92,4 +92,21 @@ export function useAutolinkRules(): readonly AutolinkRule[] {
   return useGraphStore((s) =>
     getAutolinkRules(s.userSettings.customAutolinks, s.userSettings.remoteAutolinksEnabled, s.remotes),
   );
+}
+
+const NO_AUTHORS: RepoAuthorList = { authors: [], currentUserEmail: null };
+
+/**
+ * The displayed repo's author list and `user.email`, empty until its first scan
+ * answers. Each repo's entry is its own object, so switching repos can never
+ * show another repo's authors.
+ */
+export function useDisplayedRepoAuthors(): RepoAuthorList {
+  return useGraphStore((s) => s.authorListsByRepo.get(s.displayedRepoPath) ?? NO_AUTHORS);
+}
+
+/** Whether the displayed repo has never been scanned and a scan is running now. */
+export function useDisplayedRepoAuthorsFirstLoad(): boolean {
+  return useGraphStore((s) =>
+    !s.authorListsByRepo.has(s.displayedRepoPath) && s.authorListLoadingRepos.has(s.displayedRepoPath));
 }

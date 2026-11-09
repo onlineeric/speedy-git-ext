@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-11-01**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-11-09**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -309,6 +309,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── whatsNewBlocks.tsx            # Poster pieces entries compose: ContributorThanks, FeatureCard/Grid, Step/StepFlow,
 │                                 #   UiLabel, ToolbarButtonSample, WhatsNewSection, ExternalLink, Screenshot (+ numbered
 │                                 #   pins in percent) and ScreenshotPinLegend/Item. Screenshots live in `resources/`
+├── AuthorPrefetchIllustration.tsx # 5.24.0 hero: Filter panel Authors row ready, a just-fetched author joining the list
 ├── AutosquashIllustration.tsx    # 5.16.0 hero: animated mini-graph of a fixup! commit folding into its target
 ├── MultiTabIllustration.tsx      # 5.17.0 hero: animated miniature of the New Tab button opening a second graph group
 ├── CommitNavigationIllustration.tsx # 5.18.0 hero: animated miniature of Go to parent commit landing on the parent row

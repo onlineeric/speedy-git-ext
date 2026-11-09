@@ -277,7 +277,7 @@ describe('WebviewMessageRouter', () => {
     const postMessage = vi.fn();
     const router = new WebviewMessageRouter(
       { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
-      { services, postMessage, log: {} } as never,
+      { services, postMessage, log: {}, runtime: { currentRepoPath: '/repo' } } as never,
     );
 
     services.update({
@@ -287,13 +287,13 @@ describe('WebviewMessageRouter', () => {
       },
     } as never);
 
-    await router.dispatch({ type: 'getAuthors', payload: {} });
+    await router.dispatch({ type: 'getAuthors', payload: { repoPath: '/repo' } });
 
     expect(oldGetAuthors).not.toHaveBeenCalled();
     expect(newGetAuthors).toHaveBeenCalledTimes(1);
     expect(postMessage).toHaveBeenCalledWith({
       type: 'authorList',
-      payload: { authors: [{ name: 'Alice', email: 'a@example.com' }], currentUserEmail: null },
+      payload: { repoPath: '/repo', authors: [{ name: 'Alice', email: 'a@example.com' }], currentUserEmail: null },
     });
   });
 });

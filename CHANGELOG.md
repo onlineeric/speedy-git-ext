@@ -4,6 +4,14 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.24.0] - 2026-11-09
+
+### Changed
+- **The Filter panel's author list and Me button are ready when the panel opens.** Speedy Git now loads each repository's author list in the background, once the first page of commits has loaded, instead of waiting until you open the Filter panel. On a large repository that used to leave **Me** disabled and the **Authors** dropdown reading "Loading..." for several seconds. Each repository keeps its own list for the session, so switching back to a repository doesn't load it again. Opening the panel shows the list straight away and refreshes it in the background, so an author whose first commit you just fetched still appears, and the authors you already selected stay selected.
+
+### Credits — Filter panel loading (#221)
+- Thanks to [@tbuyukliev](https://github.com/tbuyukliev) for reporting that the **Me** button stayed disabled for seconds with no sign it was still loading in [#221](https://github.com/onlineeric/speedy-git-ext/issues/221)!
+
 ## [5.23.0] - 2026-11-01
 
 ### Added

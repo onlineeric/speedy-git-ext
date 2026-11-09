@@ -151,6 +151,9 @@ class RpcClient {
         // T034: re-run any active working-tree compare when the graph refreshes (FR-032)
         store.maybeRerunCompareForWorkingTree();
         this.firePrefetch();
+        // After the first page has rendered, never beside it: on a large repo
+        // the author scan walks the whole history.
+        this.prefetchAuthorsIfMissing();
         break;
       case 'commitsAppended': {
         if (message.payload.generation !== store.fetchGeneration) {
@@ -237,11 +240,6 @@ class RpcClient {
         // the flow has its own terminal response — headLocation,
         // headLocationFailed, commitsAppended, prefetchError — so it always ends
         // on a message that is actually its own.
-        // Clear the author-fetch guard so a failed getAuthors() can be retried.
-        // Author fetch failures arrive here (not as an `authorList` message), so
-        // without this the FilterWidget's `authorListLoading` guard stays true and
-        // blocks every retry for the rest of the session.
-        store.setAuthorListLoading(false);
         this.rejectPendingLookups(errorMessage);
         if (this.pendingWorktreePath) {
           this.pendingWorktreePath.reject(new Error(errorMessage));
@@ -454,9 +452,13 @@ class RpcClient {
       case 'persistedUIState':
         store.hydratePersistedUIState(message.payload.uiState);
         break;
-      case 'authorList':
-        store.setAuthorList(message.payload.authors, message.payload.currentUserEmail);
-        store.setAuthorListLoading(false);
+      case 'authorList': {
+        const { repoPath, authors, currentUserEmail } = message.payload;
+        store.setRepoAuthorList(repoPath, { authors, currentUserEmail });
+        break;
+      }
+      case 'authorListFailed':
+        store.endAuthorListLoad(message.payload.repoPath);
         break;
       case 'uncommittedChanges':
         store.setUncommittedChanges(message.payload);
@@ -479,6 +481,9 @@ class RpcClient {
         store.maybeRerunCompareForWorkingTree();
         if (message.payload.commits !== null) {
           this.firePrefetch();
+          // The first load and every repo / submodule switch arrive here, not as
+          // `commits`, and by now the backend shows the repo the scan is for.
+          this.prefetchAuthorsIfMissing();
         }
         break;
       case 'compareResult': {
@@ -498,9 +503,21 @@ class RpcClient {
     this.send({ type: 'getCommits', payload: { filters } });
   }
 
-  getAuthors() {
-    useGraphStore.getState().setAuthorListLoading(true);
-    this.send({ type: 'getAuthors', payload: {} });
+  /**
+   * Scan the displayed repo's authors in the background. A no-op while a scan
+   * of that repo is already running — the prefetch included — so opening the
+   * Filter panel mid-prefetch waits on the one scan instead of starting another.
+   */
+  refreshAuthors() {
+    const repoPath = useGraphStore.getState().displayedRepoPath;
+    if (!repoPath || !useGraphStore.getState().beginAuthorListLoad(repoPath)) return;
+    this.send({ type: 'getAuthors', payload: { repoPath } });
+  }
+
+  /** Prefetch the displayed repo's authors once per session, so the Filter panel never opens empty. */
+  private prefetchAuthorsIfMissing() {
+    const { authorListsByRepo, displayedRepoPath } = useGraphStore.getState();
+    if (!authorListsByRepo.has(displayedRepoPath)) this.refreshAuthors();
   }
 
   getBranches() {

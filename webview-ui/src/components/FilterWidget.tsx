@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { BADGED_COMMIT_OPACITIES, type Author, type BadgedCommitOpacity } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
+import { useDisplayedRepoAuthors, useDisplayedRepoAuthorsFirstLoad } from '../stores/graphSelectors';
 import { rpcClient } from '../rpc/rpcClient';
 import { MultiSelectDropdown } from './MultiSelectDropdown';
 import { SegmentedToggle, type SegmentedToggleOption } from './SegmentedToggle';
@@ -59,9 +60,8 @@ const BADGED_COMMIT_OPACITY_OPTIONS: readonly SegmentedToggleOption<BadgedCommit
 
 export function FilterWidget() {
   const filters = useGraphStore((s) => s.filters);
-  const authorList = useGraphStore((s) => s.authorList);
-  const authorListLoading = useGraphStore((s) => s.authorListLoading);
-  const currentUserEmail = useGraphStore((s) => s.currentUserEmail);
+  const { authors: authorList, currentUserEmail } = useDisplayedRepoAuthors();
+  const authorListFirstLoad = useDisplayedRepoAuthorsFirstLoad();
   const setFilters = useGraphStore((s) => s.setFilters);
   const recomputeVisibility = useGraphStore((s) => s.recomputeVisibility);
   const alwaysShowBadgedCommits = useGraphStore((s) => s.alwaysShowBadgedCommits);
@@ -75,10 +75,16 @@ export function FilterWidget() {
   const graphColors = useGraphStore((s) => s.userSettings.graphColors);
   const branches = useGraphStore((s) => s.branches);
 
+  // Show the cached list at once and refresh it behind the scenes, so an author
+  // whose first commit arrived since the last scan appears without a wait.
+  // Replacing the list never touches `filters.authors` (emails), so the
+  // selection survives the swap. On open only: a repo switch while the panel is
+  // open is the prefetch's job, which runs once the backend shows the new repo —
+  // a request sent at the moment of switching is refused as being for a repo it
+  // does not show yet.
   useEffect(() => {
-    if (authorList.length > 0 || authorListLoading) return;
-    rpcClient.getAuthors();
-  }, [authorList.length, authorListLoading]);
+    rpcClient.refreshAuthors();
+  }, []);
 
   // Message filter local state
   const [messageText, setMessageText] = useState<string>(() => filters.textFilter ?? '');
@@ -247,15 +253,13 @@ export function FilterWidget() {
 
   const renderAuthorTrigger = useCallback(
     (selectedCount: number) => {
-      const loading = useGraphStore.getState().authorListLoading;
       const authors = useGraphStore.getState().filters.authors;
-      const list = useGraphStore.getState().authorList;
       let label: string;
       if (selectedCount === 0) {
         label = 'All Authors';
       } else if (selectedCount === 1) {
         const email = authors?.[0];
-        label = list.find((a) => a.email === email)?.name ?? 'All Authors';
+        label = authorList.find((a) => a.email === email)?.name ?? 'All Authors';
       } else {
         label = `${selectedCount} authors selected`;
       }
@@ -264,14 +268,14 @@ export function FilterWidget() {
           className="px-2 py-1 text-sm bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] rounded focus:outline-none focus:border-[var(--vscode-focusBorder)] text-left truncate min-w-[120px] max-w-[260px] flex items-center gap-1"
           title={label}
         >
-          <span className="truncate">{loading ? 'Loading...' : label}</span>
+          <span className="truncate">{authorListFirstLoad ? 'Loading...' : label}</span>
           <svg className="ml-auto flex-shrink-0" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
       );
     },
-    [],
+    [authorList, authorListFirstLoad],
   );
 
   const renderAuthorItem = useCallback(

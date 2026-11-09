@@ -161,6 +161,14 @@
   80%, 92% { opacity: 1; }
   100% { opacity: 0; }
 }
+/* The author prefetch illustration: a just-fetched author joins the already
+   loaded list. The resting state shows them, so with no animation it reads as
+   the result. */
+@keyframes whats-new-author-join {
+  0%, 35% { opacity: 0; transform: translateY(-3px); }
+  45%, 92% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(0); }
+}
 
 @layer utilities {
   .animate-whats-new-countdown {
@@ -227,6 +235,9 @@
     }
     .animate-whats-new-timeout-done {
       animation: whats-new-timeout-done 5s ease-out infinite;
+    }
+    .animate-whats-new-author-join {
+      animation: whats-new-author-join 5s ease-out infinite;
     }
   }
   .animate-toast-in {
