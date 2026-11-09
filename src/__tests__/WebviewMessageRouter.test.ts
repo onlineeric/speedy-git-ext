@@ -180,7 +180,7 @@ describe('WebviewMessageRouter operation telemetry middleware', () => {
       },
     });
 
-    await router.dispatch({ type: 'getAuthors', payload: {} });
+    await router.dispatch({ type: 'getAuthors', payload: { repoPath: '/repo' } });
 
     expect(sendOperation).not.toHaveBeenCalled();
   });
@@ -226,7 +226,7 @@ describe('WebviewMessageRouter', () => {
     const postMessage = vi.fn();
     const router = new WebviewMessageRouter(
       { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
-      { services, postMessage, log: {} } as never,
+      { services, postMessage, log: {}, runtime: { currentRepoPath: '/repo' } } as never,
     );
 
     services.update({
@@ -236,14 +236,66 @@ describe('WebviewMessageRouter', () => {
       },
     } as never);
 
-    await router.dispatch({ type: 'getAuthors', payload: {} });
+    await router.dispatch({ type: 'getAuthors', payload: { repoPath: '/repo' } });
 
     expect(oldGetAuthors).not.toHaveBeenCalled();
     expect(newGetAuthors).toHaveBeenCalledTimes(1);
     expect(postMessage).toHaveBeenCalledWith({
       type: 'authorList',
-      payload: { authors: [{ name: 'Alice', email: 'a@example.com' }], currentUserEmail: 'me@example.com' },
+      payload: { repoPath: '/repo', authors: [{ name: 'Alice', email: 'a@example.com' }], currentUserEmail: 'me@example.com' },
     });
+  });
+
+  it('refuses an author scan for a repo the tab no longer displays, without running git', async () => {
+    const getAuthors = vi.fn();
+    const services = new GitServiceRegistry({ gitLogService: { getAuthors, getCurrentUserEmail: vi.fn() } } as never);
+    const postMessage = vi.fn();
+    const router = new WebviewMessageRouter(
+      { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+      { services, postMessage, log: {}, runtime: { currentRepoPath: '/repo-b' } } as never,
+    );
+
+    await router.dispatch({ type: 'getAuthors', payload: { repoPath: '/repo-a' } });
+
+    expect(getAuthors).not.toHaveBeenCalled();
+    expect(postMessage).toHaveBeenCalledWith({ type: 'authorListFailed', payload: { repoPath: '/repo-a' } });
+  });
+
+  it('reports a failed author scan as a failure for its repo, never as the generic error', async () => {
+    const error = { code: 'TIMEOUT', message: 'timed out' };
+    const services = new GitServiceRegistry({
+      gitLogService: {
+        getAuthors: vi.fn().mockResolvedValue({ success: false, error }),
+        getCurrentUserEmail: vi.fn().mockResolvedValue({ success: true, value: null }),
+      },
+    } as never);
+    const postMessage = vi.fn();
+    const router = new WebviewMessageRouter(
+      { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+      { services, postMessage, log: {}, runtime: { currentRepoPath: '/repo' } } as never,
+    );
+
+    await router.dispatch({ type: 'getAuthors', payload: { repoPath: '/repo' } });
+
+    expect(postMessage).toHaveBeenCalledTimes(1);
+    expect(postMessage).toHaveBeenCalledWith({ type: 'authorListFailed', payload: { repoPath: '/repo', error } });
+  });
+
+  it('ends the webview\'s in-flight mark when the author scan throws', async () => {
+    const services = new GitServiceRegistry({
+      gitLogService: {
+        getAuthors: vi.fn().mockRejectedValue(new Error('boom')),
+        getCurrentUserEmail: vi.fn().mockResolvedValue({ success: true, value: null }),
+      },
+    } as never);
+    const postMessage = vi.fn();
+    const router = new WebviewMessageRouter(
+      { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+      { services, postMessage, log: {}, runtime: { currentRepoPath: '/repo' } } as never,
+    );
+
+    await expect(router.dispatch({ type: 'getAuthors', payload: { repoPath: '/repo' } })).rejects.toThrow('boom');
+    expect(postMessage).toHaveBeenCalledWith({ type: 'authorListFailed', payload: { repoPath: '/repo' } });
   });
 
   it('mirrors a mutating operation to peers, and releases it when the handler returns', async () => {

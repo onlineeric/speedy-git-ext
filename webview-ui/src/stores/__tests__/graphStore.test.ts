@@ -162,8 +162,6 @@ describe('graphStore — setInitialData', () => {
   it('clears deferred repo data when the active parent repo changes', () => {
     useGraphStore.setState({
       activeParentRepoPath: '/old',
-      authorList: [{ name: 'Old Author', email: 'old@example.com' }],
-      authorListLoading: true,
       remotes: [{ name: 'origin', fetchUrl: 'old', pushUrl: 'old' }],
       stashes: [{
         index: 0,
@@ -190,8 +188,6 @@ describe('graphStore — setInitialData', () => {
     );
 
     const after = useGraphStore.getState();
-    expect(after.authorList).toEqual([]);
-    expect(after.authorListLoading).toBe(false);
     expect(after.remotes).toEqual([]);
     expect(after.stashes).toEqual([]);
     expect(after.worktreeList).toEqual([]);
@@ -636,5 +632,70 @@ describe('graphStore — revealed commits (GH #214)', () => {
     const state = useGraphStore.getState();
     expect(state.revealedExtraCommits.map((c) => c.hash)).toEqual(['newer00']);
     expect(state.revealedCommitHashes.has('newer00')).toBe(true);
+  });
+});
+
+describe('graphStore — per-repo author lists', () => {
+  const listOf = (repoPath: string) => useGraphStore.getState().authorScansByRepo.get(repoPath)?.list;
+
+  beforeEach(() => {
+    useGraphStore.setState({ authorScansByRepo: new Map() });
+  });
+
+  it('starts one scan per repo at a time, so a refresh never runs beside the prefetch', () => {
+    const store = useGraphStore.getState();
+    expect(store.beginAuthorListLoad('/a')).toBe(true);
+    expect(useGraphStore.getState().beginAuthorListLoad('/a')).toBe(false);
+    expect(useGraphStore.getState().beginAuthorListLoad('/b')).toBe(true);
+  });
+
+  it('files a finished scan under its own repo and frees that repo for the next scan', () => {
+    const store = useGraphStore.getState();
+    store.beginAuthorListLoad('/a');
+    store.setRepoAuthorList('/a', { authors: [{ name: 'Alice', email: 'a@x' }], currentUserEmail: 'me@x' });
+
+    expect(listOf('/a')).toEqual({ authors: [{ name: 'Alice', email: 'a@x' }], currentUserEmail: 'me@x' });
+    expect(listOf('/b')).toBeUndefined();
+    expect(useGraphStore.getState().beginAuthorListLoad('/a')).toBe(true);
+  });
+
+  it('keeps the previous list object when a refresh finds nothing new', () => {
+    const store = useGraphStore.getState();
+    store.setRepoAuthorList('/a', { authors: [{ name: 'Alice', email: 'a@x' }], currentUserEmail: 'me@x' });
+    const first = listOf('/a');
+
+    useGraphStore.getState().setRepoAuthorList('/a', { authors: [{ name: 'Alice', email: 'a@x' }], currentUserEmail: 'me@x' });
+    expect(listOf('/a')).toBe(first);
+
+    useGraphStore.getState().setRepoAuthorList('/a', {
+      authors: [{ name: 'Alice', email: 'a@x' }, { name: 'Carol', email: 'c@x' }],
+      currentUserEmail: 'me@x',
+    });
+    expect(listOf('/a')).not.toBe(first);
+    expect(listOf('/a')?.authors).toHaveLength(2);
+  });
+
+  it('ends a failed or refused scan without touching its cached list', () => {
+    const store = useGraphStore.getState();
+    store.setRepoAuthorList('/a', { authors: [{ name: 'Alice', email: 'a@x' }], currentUserEmail: null });
+    store.beginAuthorListLoad('/a');
+    useGraphStore.getState().endAuthorListLoad('/a', true);
+
+    const scan = useGraphStore.getState().authorScansByRepo.get('/a');
+    expect(scan?.status).toBe('failed');
+    expect(scan?.list?.authors).toHaveLength(1);
+
+    useGraphStore.getState().beginAuthorListLoad('/a');
+    useGraphStore.getState().endAuthorListLoad('/a', false);
+    expect(useGraphStore.getState().authorScansByRepo.get('/a')?.status).toBe('idle');
+  });
+
+  it('keeps every repo\'s list across a repo switch', () => {
+    useGraphStore.getState().setRepoAuthorList('/old', { authors: [{ name: 'Old', email: 'o@x' }], currentUserEmail: null });
+    useGraphStore.setState({ activeParentRepoPath: '/old' });
+
+    useGraphStore.getState().setRepos([{ path: '/new', name: 'new', displayName: 'new' }], '/new');
+
+    expect(listOf('/old')?.authors).toEqual([{ name: 'Old', email: 'o@x' }]);
   });
 });

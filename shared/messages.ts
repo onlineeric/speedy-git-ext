@@ -120,7 +120,8 @@ export type RequestMessage =
   | { type: 'isCommitPushed'; payload: { hash: string } }
   | { type: 'getCommitParents'; payload: { hashes: string[] } }
   // Authors
-  | { type: 'getAuthors'; payload: Record<string, never> }
+  /** `repoPath` is the displayed repo the scan is for; the backend refuses it once that is no longer what it shows. */
+  | { type: 'getAuthors'; payload: { repoPath: string } }
   // Pagination & settings
   | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string }; targetIndex?: number } }
   /**
@@ -336,7 +337,15 @@ export type ResponseMessage =
    * series' entry and stays silent when there is none or it equals `lastShownVersion`.
    */
   | { type: 'whatsNew'; payload: WhatsNewPayload }
-  | { type: 'authorList'; payload: { authors: Author[]; /** `git config user.email`, for the Filter panel's "Me" button. */ currentUserEmail: string | null } }
+  | { type: 'authorList'; payload: { repoPath: string; authors: Author[]; /** `git config user.email`, for the Filter panel's "Me" button. */ currentUserEmail: string | null } }
+  /**
+   * A `getAuthors` for `repoPath` ended without a list. `error` is set when git
+   * failed and absent when the scan was refused (the repo was no longer
+   * displayed). Never sent as the generic `error`: the scan usually runs as a
+   * background prefetch, and that channel rejects whatever unrelated request is
+   * pending.
+   */
+  | { type: 'authorListFailed'; payload: { repoPath: string; error?: GitError | { message: string } } }
   | { type: 'uncommittedChanges'; payload: UncommittedSummary }
   | { type: 'conflictState'; payload: ConflictState }
   | { type: 'initialData'; payload: InitialDataPayload }
@@ -402,7 +411,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   checkoutNeedsStash: true, branchCheckoutFinished: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, settingSaveResult: true, submodulesData: true, submoduleOperationResult: true,
   pushResult: true, avatarUrls: true, avatarAuthState: true, avatarCacheCleared: true, tagMetadata: true, worktreeList: true, worktreePathResolved: true, worktreeEnvFiles: true, branchPrefix: true, containingBranches: true,
-  persistedUIState: true, authorList: true, uncommittedChanges: true, conflictState: true,
+  persistedUIState: true, authorList: true, authorListFailed: true, uncommittedChanges: true, conflictState: true,
   whatsNew: true,
   initialData: true,
   compareResult: true, compareError: true,

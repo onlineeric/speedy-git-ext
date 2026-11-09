@@ -113,6 +113,23 @@ function buildWorktreeLookups(list: WorktreeInfo[]): WorktreeLookups {
   return { worktreeByHead, worktreeByBranch, detachedWorktreesByHead };
 }
 
+/** One repo's Filter-panel author data, as one `getAuthors` scan answered it. */
+export interface RepoAuthorList {
+  authors: Author[];
+  /** `git config user.email` in that repo, for the Filter panel's "Me" button. */
+  currentUserEmail: string | null;
+}
+
+/**
+ * One repo's author scan. `failed` means git itself failed, which would fail
+ * again, so the prefetch leaves it alone; opening the Filter panel still retries.
+ */
+export interface RepoAuthorScan {
+  /** The last successful scan; kept through later loading and failed states. */
+  list?: RepoAuthorList;
+  status: 'loading' | 'idle' | 'failed';
+}
+
 interface GraphStore {
   commits: Commit[];
   branches: Branch[];
@@ -253,8 +270,13 @@ interface GraphStore {
    * are re-sent whenever the repo changes.
    */
   worktreeBaseDir: string | null;
-  authorList: Author[];
-  authorListLoading: boolean;
+  /**
+   * Author scans by repo path, kept for the whole session so switching back to a
+   * repo — or opening the Filter panel — never shows an empty or foreign list.
+   * Prefetched once per repo after its first load; refreshed whenever the Filter
+   * panel opens.
+   */
+  authorScansByRepo: ReadonlyMap<string, RepoAuthorScan>;
   worktreeByHead: Map<string, WorktreeInfo[]>;
   worktreeByBranch: Map<string, WorktreeInfo>;
   detachedWorktreesByHead: Map<string, WorktreeInfo[]>;
@@ -399,10 +421,12 @@ interface GraphStore {
   setSearchMatches: (matchIndices: number[], terms: readonly SearchTerm[]) => void;
   nextMatch: () => void;
   prevMatch: () => void;
-  /** `git config user.email` of the displayed repo; arrives with `authorList`. */
-  currentUserEmail: string | null;
-  setAuthorList: (authors: Author[], currentUserEmail: string | null) => void;
-  setAuthorListLoading: (loading: boolean) => void;
+  /** Marks a scan of `repoPath` as started; false (and no change) when one is already running. */
+  beginAuthorListLoad: (repoPath: string) => boolean;
+  /** Stores a finished scan, keeping the previous list object when nothing changed. */
+  setRepoAuthorList: (repoPath: string, list: RepoAuthorList) => void;
+  /** Ends a scan without a result: `failed` when git failed, else it was refused. */
+  endAuthorListLoad: (repoPath: string, failed: boolean) => void;
   setUncommittedChanges: (payload: UncommittedSummary) => void;
   setConflictState: (state: ConflictState) => void;
   /** Release notes to show, or null once dismissed / when this run doesn't qualify. */
@@ -566,6 +590,21 @@ function keepUnchangedCustomAutolinks(incoming: UserSettings, current: UserSetti
     : incoming;
 }
 
+function sameRepoAuthorList(a: RepoAuthorList | undefined, b: RepoAuthorList): boolean {
+  return !!a
+    && a.currentUserEmail === b.currentUserEmail
+    && a.authors.length === b.authors.length
+    && a.authors.every((author, i) => author.email === b.authors[i].email && author.name === b.authors[i].name);
+}
+
+function withAuthorScan(
+  scans: ReadonlyMap<string, RepoAuthorScan>,
+  repoPath: string,
+  scan: RepoAuthorScan,
+): ReadonlyMap<string, RepoAuthorScan> {
+  return new Map(scans).set(repoPath, scan);
+}
+
 function retainByHash<T>(map: Record<string, T>, hashes: Set<string>): Record<string, T> {
   const next: Record<string, T> = {};
   for (const hash of Object.keys(map)) {
@@ -657,9 +696,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   commitTableLayout: cloneCommitTableLayout(DEFAULT_PERSISTED_UI_STATE.commitTableLayout),
   hoveredCommitHash: null,
   tooltipAnchorRect: null,
-  authorList: [],
-  currentUserEmail: null,
-  authorListLoading: false,
+  authorScansByRepo: new Map(),
   worktreeList: [],
   worktreeListLoading: false,
   worktreeBaseDir: null,
@@ -1079,9 +1116,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
             submoduleSelection: 'parent' as const,
             displayedRepoPath: activeRepoPath,
             submodules: [],
-            authorList: [],
-            currentUserEmail: null,
-            authorListLoading: false,
             remotes: [],
             stashes: [],
             worktreeList: [],
@@ -1129,9 +1163,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       lastClickedHash: undefined,
       commitDetails: undefined,
       detailsPanelOpen: false,
-      authorList: [],
-      currentUserEmail: null,
-      authorListLoading: false,
       remotes: [],
       stashes: [],
       worktreeList: [],
@@ -1181,9 +1212,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       lastClickedHash: undefined,
       commitDetails: undefined,
       detailsPanelOpen: false,
-      authorList: [],
-      currentUserEmail: null,
-      authorListLoading: false,
       remotes: [],
       stashes: [],
       worktreeList: [],
@@ -1332,8 +1360,26 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedCommits: [],
     };
   }),
-  setAuthorList: (authors, currentUserEmail) => set({ authorList: authors, currentUserEmail }),
-  setAuthorListLoading: (authorListLoading) => set({ authorListLoading }),
+  beginAuthorListLoad: (repoPath) => {
+    const scans = get().authorScansByRepo;
+    const scan = scans.get(repoPath);
+    if (scan?.status === 'loading') return false;
+    set({ authorScansByRepo: withAuthorScan(scans, repoPath, { list: scan?.list, status: 'loading' }) });
+    return true;
+  },
+  setRepoAuthorList: (repoPath, list) => set((state) => {
+    const previous = state.authorScansByRepo.get(repoPath)?.list;
+    // An unchanged refresh (the usual panel open) keeps the old object, so the
+    // Filter panel's memos and the dropdown's rows don't redo their work.
+    const kept = previous && sameRepoAuthorList(previous, list) ? previous : list;
+    return { authorScansByRepo: withAuthorScan(state.authorScansByRepo, repoPath, { list: kept, status: 'idle' }) };
+  }),
+  endAuthorListLoad: (repoPath, failed) => set((state) => ({
+    authorScansByRepo: withAuthorScan(state.authorScansByRepo, repoPath, {
+      list: state.authorScansByRepo.get(repoPath)?.list,
+      status: failed ? 'failed' : 'idle',
+    }),
+  })),
   setUncommittedChanges: (payload) => {
     const hasChanges = payload.stagedCount + payload.unstagedCount + payload.untrackedCount > 0;
     const counts = { stagedCount: payload.stagedCount, unstagedCount: payload.unstagedCount, untrackedCount: payload.untrackedCount };
