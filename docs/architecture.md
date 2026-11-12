@@ -456,7 +456,7 @@ utils/
 │                                 #   and every ref badge the row actually renders. Never matches the uncommitted row
 ├── searchHighlight.ts            # PURE: substring/prefix highlight segments (overlapping and adjacent matches merge
 │                                 #   into one box) + `refSearchMatchKind` — label match, hidden match, or none
-├── filterUtils.ts                # Author/date filter logic; `toggleAuthorFilterEmail` shared by the Authors dropdown and the "Me" button; `authorFilterLabel` (dropdown caption, counted from the filter, not the loaded list)
+├── filterUtils.ts                # Author/date filter logic; `toggleAuthorFilterEmail` shared by the Authors dropdown and the "Me" button; `selectedAuthorEntries` (the selection built from the filter, not the loaded list — an unlisted email stands in under itself) feeding the dropdown, its caption (`authorFilterLabel`) and the selected-author badges
 ├── refStyle.ts                   # Per-ref-kind badge styling
 ├── refBadgeContent.ts            # What a ref badge shows: label, lead icons (fork = local, cloud = remote;
 │                                 #   merged = both), remote count on the cloud, and the title tooltip

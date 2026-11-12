@@ -8,10 +8,9 @@
  * disagree about something as basic as "is an operation running right now".
  */
 import type { CSSProperties } from 'react';
-import type { Branch } from '@shared/types';
+import type { Author, Branch } from '@shared/types';
 import { getAutolinkRules, type AutolinkRule } from '../utils/autolinks';
 import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils';
-import type { Author } from '@shared/types';
 import { useGraphStore } from './graphStore';
 
 /** The fields that say whether THIS tab is running something. */

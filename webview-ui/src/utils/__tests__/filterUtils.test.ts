@@ -5,6 +5,7 @@ import {
   toDisplayRef,
   toggleAuthorFilterEmail,
   authorFilterLabel,
+  selectedAuthorEntries,
   type BranchBadge,
 } from '../filterUtils';
 
@@ -119,22 +120,33 @@ describe('toDisplayRef', () => {
   });
 });
 
-describe('authorFilterLabel', () => {
+describe('selectedAuthorEntries', () => {
   const authors = [{ name: 'Alice', email: 'a@x' }];
 
-  it('reads All Authors with no author filter', () => {
-    expect(authorFilterLabel(undefined, authors)).toBe('All Authors');
-    expect(authorFilterLabel([], authors)).toBe('All Authors');
+  it('is empty with no author filter', () => {
+    expect(selectedAuthorEntries(undefined, authors)).toEqual([]);
   });
 
-  it('names a single selected author, or shows the email when the list does not hold it', () => {
-    expect(authorFilterLabel(['a@x'], authors)).toBe('Alice');
+  it('keeps an email the list does not hold, standing in under the email', () => {
     // "Me" before the scan answers, or a user.email with no commits.
-    expect(authorFilterLabel(['me@x'], [])).toBe('me@x');
+    expect(selectedAuthorEntries(['a@x', 'me@x'], authors)).toEqual([
+      { name: 'Alice', email: 'a@x' },
+      { name: 'me@x', email: 'me@x' },
+    ]);
+  });
+});
+
+describe('authorFilterLabel', () => {
+  it('reads All Authors with nothing selected', () => {
+    expect(authorFilterLabel([])).toBe('All Authors');
   });
 
-  it('counts every selected email, including ones the list does not hold', () => {
-    expect(authorFilterLabel(['a@x', 'me@x'], authors)).toBe('2 authors selected');
+  it('names a single selected author', () => {
+    expect(authorFilterLabel([{ name: 'Alice', email: 'a@x' }])).toBe('Alice');
+  });
+
+  it('counts several selected authors', () => {
+    expect(authorFilterLabel(selectedAuthorEntries(['a@x', 'me@x'], []))).toBe('2 authors selected');
   });
 });
 

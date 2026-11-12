@@ -12,7 +12,7 @@ import { AuthorBadge } from './AuthorBadge';
 import { AuthorAvatar } from './AuthorAvatar';
 import { RefLabel } from './RefLabel';
 import { getBranchLaneColorStyle } from '../utils/filterUtils';
-import { toDisplayRef, combineBranchRefs, toggleAuthorFilterEmail, authorFilterLabel } from '../utils/filterUtils';
+import { toDisplayRef, combineBranchRefs, toggleAuthorFilterEmail, authorFilterLabel, selectedAuthorEntries } from '../utils/filterUtils';
 import DatePicker from 'react-datepicker';
 import { format, parse, isValid } from 'date-fns';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -173,7 +173,7 @@ export function FilterWidget() {
 
   // Author dropdown helpers
   const selectedAuthors = useMemo(
-    () => authorList.filter((a) => filters.authors?.includes(a.email)),
+    () => selectedAuthorEntries(filters.authors, authorList),
     [authorList, filters.authors],
   );
 
@@ -259,11 +259,10 @@ export function FilterWidget() {
   );
 
   const renderAuthorTrigger = useCallback(
-    // Not the dropdown's own count: that counts only selections the loaded list holds.
-    () => {
-      const label = authorFilterLabel(filters.authors, authorList);
+    (selectedCount: number) => {
+      const label = authorFilterLabel(selectedAuthors);
       // An active filter is shown even mid-scan, so "Me" never reads as "Loading...".
-      const showLoading = authorListFirstLoad && !filters.authors?.length;
+      const showLoading = authorListFirstLoad && selectedCount === 0;
       return (
         <button
           className="px-2 py-1 text-sm bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] rounded focus:outline-none focus:border-[var(--vscode-focusBorder)] text-left truncate min-w-[120px] max-w-[260px] flex items-center gap-1"
@@ -276,7 +275,7 @@ export function FilterWidget() {
         </button>
       );
     },
-    [authorList, authorListFirstLoad, filters.authors],
+    [selectedAuthors, authorListFirstLoad],
   );
 
   const renderAuthorItem = useCallback(
@@ -399,19 +398,16 @@ export function FilterWidget() {
               Me
             </button>
           </div>
-          {(filters.authors?.length ?? 0) > 0 ? (
+          {selectedAuthors.length > 0 ? (
             <div className="flex flex-wrap gap-1 max-h-[104px] overflow-y-auto">
-              {filters.authors!.map((email) => {
-                const author = authorList.find((a) => a.email === email);
-                return (
-                  <AuthorBadge
-                    key={email}
-                    name={author?.name ?? email}
-                    email={email}
-                    onRemove={() => handleAuthorRemove(email)}
-                  />
-                );
-              })}
+              {selectedAuthors.map((author) => (
+                <AuthorBadge
+                  key={author.email}
+                  name={author.name}
+                  email={author.email}
+                  onRemove={() => handleAuthorRemove(author.email)}
+                />
+              ))}
             </div>
           ) : (
             <span className="text-[var(--vscode-descriptionForeground)]">All authors</span>
