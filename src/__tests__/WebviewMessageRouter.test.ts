@@ -229,21 +229,56 @@ describe('WebviewMessageRouter', () => {
       { services, postMessage, log: {}, runtime: { currentRepoPath: '/repo' } } as never,
     );
 
+    const newGetCurrentUserEmail = vi.fn();
     services.update({
-      gitLogService: {
-        getAuthors: newGetAuthors,
-        getCurrentUserEmail: vi.fn().mockResolvedValue({ success: true, value: 'me@example.com' }),
-      },
+      gitLogService: { getAuthors: newGetAuthors, getCurrentUserEmail: newGetCurrentUserEmail },
     } as never);
 
     await router.dispatch({ type: 'getAuthors', payload: { repoPath: '/repo' } });
 
     expect(oldGetAuthors).not.toHaveBeenCalled();
     expect(newGetAuthors).toHaveBeenCalledTimes(1);
+    // user.email has its own request, so the scan never waits on or carries it.
+    expect(newGetCurrentUserEmail).not.toHaveBeenCalled();
     expect(postMessage).toHaveBeenCalledWith({
       type: 'authorList',
-      payload: { repoPath: '/repo', authors: [{ name: 'Alice', email: 'a@example.com' }], currentUserEmail: 'me@example.com' },
+      payload: { repoPath: '/repo', authors: [{ name: 'Alice', email: 'a@example.com' }] },
     });
+  });
+
+  it('answers getCurrentUserEmail for the displayed repo, null when user.email is not set', async () => {
+    const getCurrentUserEmail = vi.fn()
+      .mockResolvedValueOnce({ success: true, value: 'me@example.com' })
+      .mockResolvedValueOnce({ success: true, value: null });
+    const services = new GitServiceRegistry({ gitLogService: { getAuthors: vi.fn(), getCurrentUserEmail } } as never);
+    const postMessage = vi.fn();
+    const router = new WebviewMessageRouter(
+      { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+      { services, postMessage, log: {}, runtime: { currentRepoPath: '/repo' } } as never,
+    );
+
+    await router.dispatch({ type: 'getCurrentUserEmail', payload: { repoPath: '/repo' } });
+    await router.dispatch({ type: 'getCurrentUserEmail', payload: { repoPath: '/repo' } });
+
+    expect(postMessage.mock.calls.map(([message]) => message)).toEqual([
+      { type: 'currentUserEmail', payload: { repoPath: '/repo', email: 'me@example.com' } },
+      { type: 'currentUserEmail', payload: { repoPath: '/repo', email: null } },
+    ]);
+  });
+
+  it('does not answer getCurrentUserEmail for a repo the tab no longer displays', async () => {
+    const getCurrentUserEmail = vi.fn();
+    const services = new GitServiceRegistry({ gitLogService: { getAuthors: vi.fn(), getCurrentUserEmail } } as never);
+    const postMessage = vi.fn();
+    const router = new WebviewMessageRouter(
+      { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as never,
+      { services, postMessage, log: {}, runtime: { currentRepoPath: '/repo-b' } } as never,
+    );
+
+    await router.dispatch({ type: 'getCurrentUserEmail', payload: { repoPath: '/repo-a' } });
+
+    expect(getCurrentUserEmail).not.toHaveBeenCalled();
+    expect(postMessage).not.toHaveBeenCalled();
   });
 
   it('refuses an author scan for a repo the tab no longer displays, without running git', async () => {

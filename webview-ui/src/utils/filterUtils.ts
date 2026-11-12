@@ -1,7 +1,19 @@
-import type { Commit, Branch } from '@shared/types';
+import type { Author, Commit, Branch } from '@shared/types';
 import type { GraphTopology } from './graphTopology';
 import type { DisplayRef } from '../types/displayRefs';
 import { getColor, getLaneColorStyle, DEFAULT_GRAPH_PALETTE } from './colorUtils';
+
+/**
+ * The Authors dropdown's caption, counted from the filter itself rather than
+ * from the loaded list: an email the list doesn't hold — "Me" before the scan
+ * answers, or a user.email with no commits — is still an active filter.
+ */
+export function authorFilterLabel(selectedEmails: readonly string[] | undefined, authors: readonly Author[]): string {
+  if (!selectedEmails?.length) return 'All Authors';
+  if (selectedEmails.length > 1) return `${selectedEmails.length} authors selected`;
+  const email = selectedEmails[0];
+  return authors.find((author) => author.email === email)?.name ?? email;
+}
 
 /**
  * Add an email to the author filter, or remove it when already there. `undefined`

@@ -11,7 +11,8 @@ import type { CSSProperties } from 'react';
 import type { Branch } from '@shared/types';
 import { getAutolinkRules, type AutolinkRule } from '../utils/autolinks';
 import { getColor, getLaneColorStyle, resolvePalette } from '../utils/colorUtils';
-import { useGraphStore, type RepoAuthorList } from './graphStore';
+import type { Author } from '@shared/types';
+import { useGraphStore } from './graphStore';
 
 /** The fields that say whether THIS tab is running something. */
 export interface OwnOperationState {
@@ -94,15 +95,20 @@ export function useAutolinkRules(): readonly AutolinkRule[] {
   );
 }
 
-const NO_AUTHORS: RepoAuthorList = { authors: [], currentUserEmail: null };
+const NO_AUTHORS: Author[] = [];
 
 /**
- * The displayed repo's author list and `user.email`, empty until its first scan
- * answers. Each repo's entry is its own object, so switching repos can never
- * show another repo's authors.
+ * The displayed repo's author list, empty until its first scan answers. Each
+ * repo's entry is its own array, so switching repos can never show another
+ * repo's authors.
  */
-export function useDisplayedRepoAuthors(): RepoAuthorList {
+export function useDisplayedRepoAuthors(): Author[] {
   return useGraphStore((s) => s.authorScansByRepo.get(s.displayedRepoPath)?.list ?? NO_AUTHORS);
+}
+
+/** The displayed repo's `user.email`: null when not set, undefined until read. */
+export function useDisplayedRepoUserEmail(): string | null | undefined {
+  return useGraphStore((s) => s.userEmailByRepo.get(s.displayedRepoPath));
 }
 
 /** Whether the displayed repo has never been scanned and a scan is running now. */

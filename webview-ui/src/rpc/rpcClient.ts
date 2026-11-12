@@ -151,7 +151,7 @@ class RpcClient {
         // T034: re-run any active working-tree compare when the graph refreshes (FR-032)
         store.maybeRerunCompareForWorkingTree();
         this.firePrefetch();
-        this.prefetchAuthorsIfMissing();
+        this.prefetchFilterDataIfMissing();
         break;
       case 'commitsAppended': {
         if (message.payload.generation !== store.fetchGeneration) {
@@ -450,11 +450,12 @@ class RpcClient {
       case 'persistedUIState':
         store.hydratePersistedUIState(message.payload.uiState);
         break;
-      case 'authorList': {
-        const { repoPath, authors, currentUserEmail } = message.payload;
-        store.setRepoAuthorList(repoPath, { authors, currentUserEmail });
+      case 'authorList':
+        store.setRepoAuthorList(message.payload.repoPath, message.payload.authors);
         break;
-      }
+      case 'currentUserEmail':
+        store.setRepoUserEmail(message.payload.repoPath, message.payload.email);
+        break;
       case 'authorListFailed': {
         const { repoPath, error } = message.payload;
         store.endAuthorListLoad(repoPath, !!error);
@@ -483,7 +484,7 @@ class RpcClient {
         store.maybeRerunCompareForWorkingTree();
         if (message.payload.commits !== null) {
           this.firePrefetch();
-          this.prefetchAuthorsIfMissing();
+          this.prefetchFilterDataIfMissing();
         }
         break;
       case 'compareResult': {
@@ -514,16 +515,25 @@ class RpcClient {
     this.send({ type: 'getAuthors', payload: { repoPath: displayedRepoPath } });
   }
 
+  /** Re-read the displayed repo's `user.email` — one config read, cheap enough for every Filter panel open. */
+  refreshCurrentUserEmail() {
+    const { displayedRepoPath } = useGraphStore.getState();
+    if (!displayedRepoPath) return;
+    this.send({ type: 'getCurrentUserEmail', payload: { repoPath: displayedRepoPath } });
+  }
+
   /**
-   * Prefetch the displayed repo's authors once per session, so the Filter panel
-   * never opens empty. Called when a page of commits lands — the first load and
-   * every repo / submodule switch arrive as `initialData` — because by then the
-   * backend shows that repo; a request sent mid-switch is refused. Runs after the
-   * first page renders, since on a large repo the scan walks the whole history.
-   * Skips a repo already scanned, and one whose scan git failed.
+   * Prefetch what the Filter panel needs for the displayed repo, once per
+   * session, so it never opens empty. Called when a page of commits lands — the
+   * first load and every repo / submodule switch arrive as `initialData` —
+   * because by then the backend shows that repo; a request sent mid-switch is
+   * refused. `user.email` comes first and on its own, so "Me" is ready within
+   * milliseconds; the author scan walks the whole history, hence after the first
+   * page renders. Skips a repo already read, and an author scan git failed.
    */
-  private prefetchAuthorsIfMissing() {
-    const { authorScansByRepo, displayedRepoPath } = useGraphStore.getState();
+  private prefetchFilterDataIfMissing() {
+    const { authorScansByRepo, userEmailByRepo, displayedRepoPath } = useGraphStore.getState();
+    if (!userEmailByRepo.has(displayedRepoPath)) this.refreshCurrentUserEmail();
     const scan = authorScansByRepo.get(displayedRepoPath);
     if (scan?.list || scan?.status === 'failed') return;
     this.refreshAuthors();

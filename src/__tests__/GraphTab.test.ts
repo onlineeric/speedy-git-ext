@@ -283,10 +283,7 @@ describe('WebviewMessageRouter', () => {
     );
 
     services.update({
-      gitLogService: {
-        getAuthors: newGetAuthors,
-        getCurrentUserEmail: vi.fn().mockResolvedValue({ success: true, value: null }),
-      },
+      gitLogService: { getAuthors: newGetAuthors, getCurrentUserEmail: vi.fn() },
     } as never);
 
     await router.dispatch({ type: 'getAuthors', payload: { repoPath: '/repo' } });
@@ -295,7 +292,7 @@ describe('WebviewMessageRouter', () => {
     expect(newGetAuthors).toHaveBeenCalledTimes(1);
     expect(postMessage).toHaveBeenCalledWith({
       type: 'authorList',
-      payload: { repoPath: '/repo', authors: [{ name: 'Alice', email: 'a@example.com' }], currentUserEmail: null },
+      payload: { repoPath: '/repo', authors: [{ name: 'Alice', email: 'a@example.com' }] },
     });
   });
 });

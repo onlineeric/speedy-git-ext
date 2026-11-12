@@ -4,6 +4,17 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.24.2] - 2026-11-12
+
+### Changed
+- **The Filter panel's Me button no longer waits for the author list.** Speedy Git now reads your `git config user.email` on its own, which takes a moment, so **Me** is ready almost as soon as the graph opens, even on a large repository where the **Authors** list takes several seconds to load. **Me** works even when your email isn't in the list yet, or has no commits in this repository, in which case the filter simply shows no commits.
+
+### Fixed
+- **The Authors dropdown read "All Authors" while an author filter was on.** It happened when the selected email wasn't in the loaded list, for example **Me** before the list had loaded. The dropdown now shows the selected author's name, or their email when the list doesn't have it yet.
+
+### Credits — Filter panel loading (#221)
+- Thanks to [@tbuyukliev](https://github.com/tbuyukliev) for suggesting that **Me** shouldn't depend on the author list, in [#221](https://github.com/onlineeric/speedy-git-ext/issues/221)!
+
 ## [5.24.1] - 2026-11-12
 
 ### Fixed

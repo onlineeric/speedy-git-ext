@@ -23,11 +23,12 @@ const initialData = (): InitialDataPayload => ({
 
 let sent: Array<{ type: string; payload: Record<string, unknown> }>;
 const authorRequests = () => sent.filter((m) => m.type === 'getAuthors').map((m) => m.payload.repoPath);
+const emailRequests = () => sent.filter((m) => m.type === 'getCurrentUserEmail').map((m) => m.payload.repoPath);
 
 beforeEach(() => {
   sent = [];
   vi.spyOn(rpcClient, 'send').mockImplementation((message) => { sent.push(message as never); });
-  useGraphStore.setState({ authorScansByRepo: new Map(), displayedRepoPath: '/repo' });
+  useGraphStore.setState({ authorScansByRepo: new Map(), userEmailByRepo: new Map(), displayedRepoPath: '/repo' });
 });
 
 afterEach(() => vi.restoreAllMocks());
@@ -55,7 +56,7 @@ describe('author list prefetch', () => {
   });
 
   it('does not prefetch a repo already scanned this session', () => {
-    useGraphStore.getState().setRepoAuthorList('/repo', { authors: [], currentUserEmail: null });
+    useGraphStore.getState().setRepoAuthorList('/repo', []);
     rpcClient['handleMessage']({ type: 'initialData', payload: initialData() });
     expect(authorRequests()).toEqual([]);
   });
@@ -82,5 +83,27 @@ describe('author list prefetch', () => {
     rpcClient['handleMessage']({ type: 'authorListFailed', payload: { repoPath: '/repo' } });
     rpcClient['handleMessage']({ type: 'initialData', payload: initialData() });
     expect(authorRequests()).toEqual(['/repo', '/repo']);
+  });
+
+  it('reads user.email ahead of, and apart from, the author scan, once per repo', () => {
+    rpcClient['handleMessage']({ type: 'initialData', payload: initialData() });
+    expect(sent.map((m) => m.type).filter((t) => t === 'getCurrentUserEmail' || t === 'getAuthors'))
+      .toEqual(['getCurrentUserEmail', 'getAuthors']);
+
+    rpcClient['handleMessage']({ type: 'currentUserEmail', payload: { repoPath: '/repo', email: 'me@x' } });
+    expect(useGraphStore.getState().userEmailByRepo.get('/repo')).toBe('me@x');
+
+    // A later page load does not read it again; a Filter panel open does.
+    rpcClient['handleMessage']({ type: 'initialData', payload: initialData() });
+    expect(emailRequests()).toEqual(['/repo']);
+    rpcClient.refreshCurrentUserEmail();
+    expect(emailRequests()).toEqual(['/repo', '/repo']);
+  });
+
+  it('reads user.email for a repo whose author scan failed', () => {
+    useGraphStore.getState().endAuthorListLoad('/repo', true);
+    rpcClient['handleMessage']({ type: 'initialData', payload: initialData() });
+    expect(emailRequests()).toEqual(['/repo']);
+    expect(authorRequests()).toEqual([]);
   });
 });

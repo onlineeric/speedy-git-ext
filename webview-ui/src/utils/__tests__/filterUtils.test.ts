@@ -4,6 +4,7 @@ import {
   combineBranchRefs,
   toDisplayRef,
   toggleAuthorFilterEmail,
+  authorFilterLabel,
   type BranchBadge,
 } from '../filterUtils';
 
@@ -115,6 +116,25 @@ describe('toDisplayRef', () => {
       remoteNames: ['origin/feat'],
     };
     expect(toDisplayRef(badge)).toEqual({ type: 'remote-branch', remoteName: 'origin/feat' });
+  });
+});
+
+describe('authorFilterLabel', () => {
+  const authors = [{ name: 'Alice', email: 'a@x' }];
+
+  it('reads All Authors with no author filter', () => {
+    expect(authorFilterLabel(undefined, authors)).toBe('All Authors');
+    expect(authorFilterLabel([], authors)).toBe('All Authors');
+  });
+
+  it('names a single selected author, or shows the email when the list does not hold it', () => {
+    expect(authorFilterLabel(['a@x'], authors)).toBe('Alice');
+    // "Me" before the scan answers, or a user.email with no commits.
+    expect(authorFilterLabel(['me@x'], [])).toBe('me@x');
+  });
+
+  it('counts every selected email, including ones the list does not hold', () => {
+    expect(authorFilterLabel(['a@x', 'me@x'], authors)).toBe('2 authors selected');
   });
 });
 

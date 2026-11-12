@@ -14,10 +14,9 @@ export const graphDataHandlers = {
     }
     const { gitLogService } = context.services.current();
     try {
-      const [result, userEmail] = await Promise.all([gitLogService.getAuthors(), gitLogService.getCurrentUserEmail()]);
+      const result = await gitLogService.getAuthors();
       if (result.success) {
-        const currentUserEmail = userEmail.success ? userEmail.value : null;
-        context.postMessage({ type: 'authorList', payload: { repoPath, authors: result.value, currentUserEmail } });
+        context.postMessage({ type: 'authorList', payload: { repoPath, authors: result.value } });
       } else {
         context.postMessage({ type: 'authorListFailed', payload: { repoPath, error: result.error } });
       }
@@ -27,6 +26,16 @@ export const graphDataHandlers = {
       context.postMessage({ type: 'authorListFailed', payload: { repoPath } });
       throw error;
     }
+  },
+
+  // Its own request, not part of `getAuthors`: reading one config value takes
+  // milliseconds, so "Me" need not wait for the full-history author scan (#221).
+  getCurrentUserEmail: async (message, context) => {
+    const { repoPath } = message.payload;
+    // Same guard as `getAuthors`: never file one repo's email under another's path.
+    if (repoPath !== context.runtime.currentRepoPath) return;
+    const result = await context.services.current().gitLogService.getCurrentUserEmail();
+    context.postMessage({ type: 'currentUserEmail', payload: { repoPath, email: result.success ? result.value : null } });
   },
 
   getCommits: async (message, context) => {
@@ -177,6 +186,7 @@ export const graphDataHandlers = {
 } satisfies Pick<
   RequestHandlerMap,
   | 'getAuthors'
+  | 'getCurrentUserEmail'
   | 'getCommits'
   | 'loadMoreCommits'
   | 'locateHead'

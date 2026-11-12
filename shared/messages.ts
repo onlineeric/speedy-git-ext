@@ -122,6 +122,8 @@ export type RequestMessage =
   // Authors
   /** `repoPath` is the displayed repo the scan is for; the backend refuses it once that is no longer what it shows. */
   | { type: 'getAuthors'; payload: { repoPath: string } }
+  /** `git config user.email` of `repoPath`, for the Filter panel's "Me" button. Unanswered once that repo is no longer displayed. */
+  | { type: 'getCurrentUserEmail'; payload: { repoPath: string } }
   // Pagination & settings
   | { type: 'loadMoreCommits'; payload: { skip: number; generation: number; filters: { branches?: string[]; author?: string; authors?: string[]; afterDate?: string; beforeDate?: string }; targetIndex?: number } }
   /**
@@ -341,7 +343,9 @@ export type ResponseMessage =
    * series' entry and stays silent when there is none or it equals `lastShownVersion`.
    */
   | { type: 'whatsNew'; payload: WhatsNewPayload }
-  | { type: 'authorList'; payload: { repoPath: string; authors: Author[]; /** `git config user.email`, for the Filter panel's "Me" button. */ currentUserEmail: string | null } }
+  | { type: 'authorList'; payload: { repoPath: string; authors: Author[] } }
+  /** `email` is null when `user.email` is not set. */
+  | { type: 'currentUserEmail'; payload: { repoPath: string; email: string | null } }
   /**
    * A `getAuthors` for `repoPath` ended without a list. `error` is set when git
    * failed and absent when the scan was refused (the repo was no longer
@@ -394,7 +398,7 @@ const REQUEST_TYPES: Record<RequestMessage['type'], true> = {
   getWorktreeList: true, resolveWorktreePath: true, getWorktreeEnvFiles: true, addWorktree: true,
   removeWorktree: true, pruneWorktree: true, openWorktree: true, revealWorktree: true,
   getContainingBranches: true, openExternal: true, dismissWhatsNew: true,
-  openCurrentFile: true, updatePersistedUIState: true, getAuthors: true,
+  openCurrentFile: true, updatePersistedUIState: true, getAuthors: true, getCurrentUserEmail: true,
   getUncommittedChanges: true,
   stageFiles: true, unstageFiles: true, stageAll: true, unstageAll: true,
   discardFiles: true, discardAllUnstaged: true, stashWithMessage: true, stashSelected: true,
@@ -415,7 +419,7 @@ const RESPONSE_TYPES: Record<ResponseMessage['type'], true> = {
   checkoutNeedsStash: true, branchCheckoutFinished: true, checkoutCommitNeedsStash: true, deleteBranchNeedsForce: true, checkoutPullFailed: true,
   settingsData: true, settingSaveResult: true, submodulesData: true, submoduleOperationResult: true,
   pushResult: true, avatarUrls: true, avatarAuthState: true, avatarCacheCleared: true, tagMetadata: true, worktreeList: true, worktreePathResolved: true, worktreeEnvFiles: true, branchPrefix: true, containingBranches: true,
-  persistedUIState: true, authorList: true, authorListFailed: true, uncommittedChanges: true, conflictState: true,
+  persistedUIState: true, authorList: true, authorListFailed: true, currentUserEmail: true, uncommittedChanges: true, conflictState: true,
   whatsNew: true,
   initialData: true,
   compareResult: true, compareError: true,

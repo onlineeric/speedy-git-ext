@@ -53,7 +53,7 @@ src/
 │                                 #   resolves its base dir off that one `git worktree list`
 │   ├── OperationGuard.ts         # In-progress checks (rebase/cherry-pick/revert/merge) → GitError | null
 │   └── handlers/                 # Domain RPC handlers; fetch services from the registry at call time
-│       ├── graphDataHandlers.ts  # getCommits/loadMore/locateHead/getCommitsByHash/getBranches/getCommitDetails/getAuthors/refresh
+│       ├── graphDataHandlers.ts  # getCommits/loadMore/locateHead/getCommitsByHash/getBranches/getCommitDetails/getAuthors/getCurrentUserEmail/refresh
 │       ├── branchHandlers.ts     # create/rename/delete/fast-forward branch; `git.branchPrefix` read; commit checkout; merge + continue/abort merge
 │       ├── branchCheckoutHandlers.ts # Shared branch checkout/stash/pull execution; operation guard, busy lock,
 │                                     #   repository-bound recovery and request-correlated completion
@@ -341,7 +341,7 @@ stores/
 │                                 #   044-code-refactor replaced whole-store subscriptions with selectors
 │                                 #   rather than splitting the file
 └── graphSelectors.ts             # Derived reads shared by several components (useOperationInProgress,
-                                  #   useCurrentLocalBranch, useAutolinkRules, useDisplayedRepoAuthors(+FirstLoad)) — one selector each, so callers can't disagree.
+                                  #   useCurrentLocalBranch, useAutolinkRules, useDisplayedRepoAuthors(+FirstLoad), useDisplayedRepoUserEmail) — one selector each, so callers can't disagree.
                                   #   isOwnOperationInProgress is the PURE half: THIS tab only, never a peer's
 
 rpc/rpcClient.ts                  # Singleton RPC client, webview↔extension via acquireVsCodeApi()
@@ -456,7 +456,7 @@ utils/
 │                                 #   and every ref badge the row actually renders. Never matches the uncommitted row
 ├── searchHighlight.ts            # PURE: substring/prefix highlight segments (overlapping and adjacent matches merge
 │                                 #   into one box) + `refSearchMatchKind` — label match, hidden match, or none
-├── filterUtils.ts                # Author/date filter logic; `toggleAuthorFilterEmail` shared by the Authors dropdown and the "Me" button
+├── filterUtils.ts                # Author/date filter logic; `toggleAuthorFilterEmail` shared by the Authors dropdown and the "Me" button; `authorFilterLabel` (dropdown caption, counted from the filter, not the loaded list)
 ├── refStyle.ts                   # Per-ref-kind badge styling
 ├── refBadgeContent.ts            # What a ref badge shows: label, lead icons (fork = local, cloud = remote;
 │                                 #   merged = both), remote count on the cloud, and the title tooltip
