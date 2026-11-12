@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { BADGED_COMMIT_OPACITIES, type Author, type BadgedCommitOpacity } from '@shared/types';
 import { useGraphStore } from '../stores/graphStore';
-import { useDisplayedRepoAuthors, useDisplayedRepoAuthorsFirstLoad } from '../stores/graphSelectors';
+import { useDisplayedRepoAuthors, useDisplayedRepoAuthorsFirstLoad, useDisplayedRepoUserEmail } from '../stores/graphSelectors';
 import { rpcClient } from '../rpc/rpcClient';
 import { MultiSelectDropdown } from './MultiSelectDropdown';
 import { SegmentedToggle, type SegmentedToggleOption } from './SegmentedToggle';
@@ -12,7 +12,7 @@ import { AuthorBadge } from './AuthorBadge';
 import { AuthorAvatar } from './AuthorAvatar';
 import { RefLabel } from './RefLabel';
 import { getBranchLaneColorStyle } from '../utils/filterUtils';
-import { toDisplayRef, combineBranchRefs, toggleAuthorFilterEmail } from '../utils/filterUtils';
+import { toDisplayRef, combineBranchRefs, toggleAuthorFilterEmail, authorFilterLabel, selectedAuthorEntries } from '../utils/filterUtils';
 import DatePicker from 'react-datepicker';
 import { format, parse, isValid } from 'date-fns';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -58,9 +58,9 @@ function getAuthorSearchText(author: Author): string {
 const BADGED_COMMIT_OPACITY_OPTIONS: readonly SegmentedToggleOption<BadgedCommitOpacity>[] =
   BADGED_COMMIT_OPACITIES.map((value) => ({ value, label: `${value}%` }));
 
-/** `user.email` arrives with the first author scan, so until then "Me" is loading, not unconfigured. */
-function meButtonTitle(currentUserEmail: string | null, isMeSelected: boolean, firstLoad: boolean): string {
-  if (firstLoad) return 'Loading authors...';
+/** `undefined` until the repo's `user.email` has been read, which takes milliseconds — loading, not unconfigured. */
+function meButtonTitle(currentUserEmail: string | null | undefined, isMeSelected: boolean): string {
+  if (currentUserEmail === undefined) return 'Reading git config user.email...';
   if (!currentUserEmail) return 'Set git config user.email to filter to your own commits';
   return isMeSelected
     ? `Remove yourself (${currentUserEmail}) from the author filter`
@@ -69,7 +69,8 @@ function meButtonTitle(currentUserEmail: string | null, isMeSelected: boolean, f
 
 export function FilterWidget() {
   const filters = useGraphStore((s) => s.filters);
-  const { authors: authorList, currentUserEmail } = useDisplayedRepoAuthors();
+  const authorList = useDisplayedRepoAuthors();
+  const currentUserEmail = useDisplayedRepoUserEmail();
   const authorListFirstLoad = useDisplayedRepoAuthorsFirstLoad();
   const setFilters = useGraphStore((s) => s.setFilters);
   const recomputeVisibility = useGraphStore((s) => s.recomputeVisibility);
@@ -84,10 +85,11 @@ export function FilterWidget() {
   const graphColors = useGraphStore((s) => s.userSettings.graphColors);
   const branches = useGraphStore((s) => s.branches);
 
-  // Show the cached list at once and refresh it behind the scenes; the selection
-  // lives in `filters.authors`, so the swap never touches it. On open only — a
-  // repo switch while open is `prefetchAuthorsIfMissing`'s job.
+  // Show the cached list and email at once and refresh them behind the scenes;
+  // the selection lives in `filters.authors`, so the swap never touches it. On
+  // open only — a repo switch while open is `prefetchFilterDataIfMissing`'s job.
   useEffect(() => {
+    rpcClient.refreshCurrentUserEmail();
     rpcClient.refreshAuthors();
   }, []);
 
@@ -171,7 +173,7 @@ export function FilterWidget() {
 
   // Author dropdown helpers
   const selectedAuthors = useMemo(
-    () => authorList.filter((a) => filters.authors?.includes(a.email)),
+    () => selectedAuthorEntries(filters.authors, authorList),
     [authorList, filters.authors],
   );
 
@@ -258,30 +260,22 @@ export function FilterWidget() {
 
   const renderAuthorTrigger = useCallback(
     (selectedCount: number) => {
-      let label: string;
-      if (selectedCount === 0) {
-        label = 'All Authors';
-      } else if (selectedCount === 1) {
-        const email = filters.authors?.[0];
-        // An email the cached list doesn't know yet (a just-fetched author) is
-        // still an active filter, so show the email rather than "All Authors".
-        label = authorList.find((a) => a.email === email)?.name ?? email ?? 'All Authors';
-      } else {
-        label = `${selectedCount} authors selected`;
-      }
+      const label = authorFilterLabel(selectedAuthors);
+      // An active filter is shown even mid-scan, so "Me" never reads as "Loading...".
+      const showLoading = authorListFirstLoad && selectedCount === 0;
       return (
         <button
           className="px-2 py-1 text-sm bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)] border border-[var(--vscode-input-border)] rounded focus:outline-none focus:border-[var(--vscode-focusBorder)] text-left truncate min-w-[120px] max-w-[260px] flex items-center gap-1"
           title={label}
         >
-          <span className="truncate">{authorListFirstLoad ? 'Loading...' : label}</span>
+          <span className="truncate">{showLoading ? 'Loading...' : label}</span>
           <svg className="ml-auto flex-shrink-0" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
       );
     },
-    [authorList, authorListFirstLoad, filters.authors],
+    [selectedAuthors, authorListFirstLoad],
   );
 
   const renderAuthorItem = useCallback(
@@ -396,7 +390,7 @@ export function FilterWidget() {
               onClick={handleMeToggle}
               disabled={!currentUserEmail}
               aria-pressed={isMeSelected}
-              title={meButtonTitle(currentUserEmail, isMeSelected, authorListFirstLoad)}
+              title={meButtonTitle(currentUserEmail, isMeSelected)}
               className={`shrink-0 ${compactButtonClassName} ${
                 isMeSelected ? buttonPrimaryColorsClassName : buttonSecondaryColorsClassName
               }`}
@@ -404,19 +398,16 @@ export function FilterWidget() {
               Me
             </button>
           </div>
-          {(filters.authors?.length ?? 0) > 0 ? (
+          {selectedAuthors.length > 0 ? (
             <div className="flex flex-wrap gap-1 max-h-[104px] overflow-y-auto">
-              {filters.authors!.map((email) => {
-                const author = authorList.find((a) => a.email === email);
-                return (
-                  <AuthorBadge
-                    key={email}
-                    name={author?.name ?? email}
-                    email={email}
-                    onRemove={() => handleAuthorRemove(email)}
-                  />
-                );
-              })}
+              {selectedAuthors.map((author) => (
+                <AuthorBadge
+                  key={author.email}
+                  name={author.name}
+                  email={author.email}
+                  onRemove={() => handleAuthorRemove(author.email)}
+                />
+              ))}
             </div>
           ) : (
             <span className="text-[var(--vscode-descriptionForeground)]">All authors</span>

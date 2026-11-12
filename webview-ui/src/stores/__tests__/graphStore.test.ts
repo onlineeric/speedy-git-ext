@@ -691,38 +691,35 @@ describe('graphStore — per-repo author lists', () => {
   it('files a finished scan under its own repo and frees that repo for the next scan', () => {
     const store = useGraphStore.getState();
     store.beginAuthorListLoad('/a');
-    store.setRepoAuthorList('/a', { authors: [{ name: 'Alice', email: 'a@x' }], currentUserEmail: 'me@x' });
+    store.setRepoAuthorList('/a', [{ name: 'Alice', email: 'a@x' }]);
 
-    expect(listOf('/a')).toEqual({ authors: [{ name: 'Alice', email: 'a@x' }], currentUserEmail: 'me@x' });
+    expect(listOf('/a')).toEqual([{ name: 'Alice', email: 'a@x' }]);
     expect(listOf('/b')).toBeUndefined();
     expect(useGraphStore.getState().beginAuthorListLoad('/a')).toBe(true);
   });
 
   it('keeps the previous list object when a refresh finds nothing new', () => {
     const store = useGraphStore.getState();
-    store.setRepoAuthorList('/a', { authors: [{ name: 'Alice', email: 'a@x' }], currentUserEmail: 'me@x' });
+    store.setRepoAuthorList('/a', [{ name: 'Alice', email: 'a@x' }]);
     const first = listOf('/a');
 
-    useGraphStore.getState().setRepoAuthorList('/a', { authors: [{ name: 'Alice', email: 'a@x' }], currentUserEmail: 'me@x' });
+    useGraphStore.getState().setRepoAuthorList('/a', [{ name: 'Alice', email: 'a@x' }]);
     expect(listOf('/a')).toBe(first);
 
-    useGraphStore.getState().setRepoAuthorList('/a', {
-      authors: [{ name: 'Alice', email: 'a@x' }, { name: 'Carol', email: 'c@x' }],
-      currentUserEmail: 'me@x',
-    });
+    useGraphStore.getState().setRepoAuthorList('/a', [{ name: 'Alice', email: 'a@x' }, { name: 'Carol', email: 'c@x' }]);
     expect(listOf('/a')).not.toBe(first);
-    expect(listOf('/a')?.authors).toHaveLength(2);
+    expect(listOf('/a')).toHaveLength(2);
   });
 
   it('ends a failed or refused scan without touching its cached list', () => {
     const store = useGraphStore.getState();
-    store.setRepoAuthorList('/a', { authors: [{ name: 'Alice', email: 'a@x' }], currentUserEmail: null });
+    store.setRepoAuthorList('/a', [{ name: 'Alice', email: 'a@x' }]);
     store.beginAuthorListLoad('/a');
     useGraphStore.getState().endAuthorListLoad('/a', true);
 
     const scan = useGraphStore.getState().authorScansByRepo.get('/a');
     expect(scan?.status).toBe('failed');
-    expect(scan?.list?.authors).toHaveLength(1);
+    expect(scan?.list).toHaveLength(1);
 
     useGraphStore.getState().beginAuthorListLoad('/a');
     useGraphStore.getState().endAuthorListLoad('/a', false);
@@ -730,11 +727,28 @@ describe('graphStore — per-repo author lists', () => {
   });
 
   it('keeps every repo\'s list across a repo switch', () => {
-    useGraphStore.getState().setRepoAuthorList('/old', { authors: [{ name: 'Old', email: 'o@x' }], currentUserEmail: null });
+    useGraphStore.getState().setRepoAuthorList('/old', [{ name: 'Old', email: 'o@x' }]);
     useGraphStore.setState({ activeParentRepoPath: '/old' });
 
     useGraphStore.getState().setRepos([{ path: '/new', name: 'new', displayName: 'new' }], '/new');
 
-    expect(listOf('/old')?.authors).toEqual([{ name: 'Old', email: 'o@x' }]);
+    expect(listOf('/old')).toEqual([{ name: 'Old', email: 'o@x' }]);
+  });
+
+  it('files user.email per repo, keeping null (not set) apart from not yet read', () => {
+    useGraphStore.setState({ userEmailByRepo: new Map() });
+    const store = useGraphStore.getState();
+    store.setRepoUserEmail('/a', 'me@x');
+    store.setRepoUserEmail('/b', null);
+
+    const emails = useGraphStore.getState().userEmailByRepo;
+    expect(emails.get('/a')).toBe('me@x');
+    expect(emails.has('/b')).toBe(true);
+    expect(emails.get('/b')).toBeNull();
+    expect(emails.has('/c')).toBe(false);
+
+    // An unchanged re-read (every Filter panel open) leaves the map untouched.
+    useGraphStore.getState().setRepoUserEmail('/a', 'me@x');
+    expect(useGraphStore.getState().userEmailByRepo).toBe(emails);
   });
 });

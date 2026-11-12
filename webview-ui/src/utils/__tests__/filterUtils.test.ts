@@ -4,6 +4,8 @@ import {
   combineBranchRefs,
   toDisplayRef,
   toggleAuthorFilterEmail,
+  authorFilterLabel,
+  selectedAuthorEntries,
   type BranchBadge,
 } from '../filterUtils';
 
@@ -115,6 +117,36 @@ describe('toDisplayRef', () => {
       remoteNames: ['origin/feat'],
     };
     expect(toDisplayRef(badge)).toEqual({ type: 'remote-branch', remoteName: 'origin/feat' });
+  });
+});
+
+describe('selectedAuthorEntries', () => {
+  const authors = [{ name: 'Alice', email: 'a@x' }];
+
+  it('is empty with no author filter', () => {
+    expect(selectedAuthorEntries(undefined, authors)).toEqual([]);
+  });
+
+  it('keeps an email the list does not hold, standing in under the email', () => {
+    // "Me" before the scan answers, or a user.email with no commits.
+    expect(selectedAuthorEntries(['a@x', 'me@x'], authors)).toEqual([
+      { name: 'Alice', email: 'a@x' },
+      { name: 'me@x', email: 'me@x' },
+    ]);
+  });
+});
+
+describe('authorFilterLabel', () => {
+  it('reads All Authors with nothing selected', () => {
+    expect(authorFilterLabel([])).toBe('All Authors');
+  });
+
+  it('names a single selected author', () => {
+    expect(authorFilterLabel([{ name: 'Alice', email: 'a@x' }])).toBe('Alice');
+  });
+
+  it('counts several selected authors', () => {
+    expect(authorFilterLabel(selectedAuthorEntries(['a@x', 'me@x'], []))).toBe('2 authors selected');
   });
 });
 

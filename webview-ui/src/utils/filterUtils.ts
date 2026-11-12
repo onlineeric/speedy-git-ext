@@ -1,7 +1,25 @@
-import type { Commit, Branch } from '@shared/types';
+import type { Author, Commit, Branch } from '@shared/types';
 import type { GraphTopology } from './graphTopology';
 import type { DisplayRef } from '../types/displayRefs';
 import { getColor, getLaneColorStyle, DEFAULT_GRAPH_PALETTE } from './colorUtils';
+
+/**
+ * The selected authors, taken from the filter rather than from the loaded list:
+ * an email the list doesn't hold — "Me" before the scan answers, or a user.email
+ * with no commits — is still an active filter, so it stands in under its email.
+ */
+export function selectedAuthorEntries(selectedEmails: readonly string[] | undefined, authors: readonly Author[]): Author[] {
+  return (selectedEmails ?? []).map(
+    (email) => authors.find((author) => author.email === email) ?? { name: email, email },
+  );
+}
+
+/** The Authors dropdown's caption for a selection built by `selectedAuthorEntries`. */
+export function authorFilterLabel(selected: readonly Author[]): string {
+  if (selected.length === 0) return 'All Authors';
+  if (selected.length > 1) return `${selected.length} authors selected`;
+  return selected[0].name;
+}
 
 /**
  * Add an email to the author filter, or remove it when already there. `undefined`
