@@ -84,6 +84,7 @@ export class GraphTab {
       getSettings: () => options.getSettings(),
       getBatchSize: () => this.getBatchSize(),
       getSubmoduleStack: () => [...this.runtime.submoduleStack],
+      sendRepoList: () => this.sendRepoList(),
       telemetry: options.shared.telemetry,
     });
     this.refreshCoordinator = new RefreshCoordinator(this.log, this.dataLoader);

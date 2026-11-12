@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-11-09**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-11-12**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -45,7 +45,7 @@ src/
 │   ├── PersistedUIStateStore.ts  # Load/save/validate UI state + per-repo table layout (column-width healing).
 │                                 #   Seed-on-open, last-write-wins across tabs; reloadRepoLayout re-reads only
 │                                 #   the table layout on a repo switch
-│   ├── RepoDataLoader.ts         # Initial + deferred data, avatar cache hydration/enqueue, submodules, initial-load perf/error telemetry
+│   ├── RepoDataLoader.ts         # Initial + deferred data, avatar cache hydration/enqueue, submodules, initial-load perf/error telemetry, one-time `repoList` re-send ahead of a tab's first `initialData`
 │   ├── RefreshCoordinator.ts     # When to load: initial/manual/auto, hidden-panel deferral, loading lifecycle
 │   ├── EditorCommandService.ts   # VS Code diff/file/compare editors, worktree folder/reveal, signature help.
 │                                 #   openMultiDiffEditor ("Open Changes") opens `vscode.changes` from multiDiffPlan

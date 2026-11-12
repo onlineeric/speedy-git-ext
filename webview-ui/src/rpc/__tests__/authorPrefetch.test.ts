@@ -42,6 +42,18 @@ describe('author list prefetch', () => {
     expect(authorRequests()).toEqual(['/repo', '/repo/repo-a']);
   });
 
+  it('prefetches once the re-sent repo list arrives, when the first one was lost (#221)', () => {
+    // A lost first `repoList` leaves the displayed repo unknown, so nothing can be scanned.
+    useGraphStore.setState({ activeParentRepoPath: '', displayedRepoPath: '' });
+    rpcClient['handleMessage']({ type: 'initialData', payload: initialData() });
+    expect(authorRequests()).toEqual([]);
+
+    // The backend re-sends it just ahead of the first `initialData`.
+    rpcClient['handleMessage']({ type: 'repoList', payload: { repos: [], activeRepoPath: '/repo' } });
+    rpcClient['handleMessage']({ type: 'initialData', payload: initialData() });
+    expect(authorRequests()).toEqual(['/repo']);
+  });
+
   it('does not prefetch a repo already scanned this session', () => {
     useGraphStore.getState().setRepoAuthorList('/repo', { authors: [], currentUserEmail: null });
     rpcClient['handleMessage']({ type: 'initialData', payload: initialData() });

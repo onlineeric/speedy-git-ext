@@ -99,6 +99,7 @@ function createLoaderFixture(options: {
     getSettings: () => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }),
     getBatchSize: () => 500,
     getSubmoduleStack: () => [],
+    sendRepoList: () => postMessage({ type: 'repoList', payload: { repos: [], activeRepoPath: runtime.topLevelRepoPath } }),
     telemetry,
   });
 
@@ -122,6 +123,37 @@ describe('RepoDataLoader', () => {
       type: 'initialData',
       payload: expect.objectContaining({ commits: [commit] }),
     }));
+  });
+
+  it('re-sends the repo list once per tab, immediately before the first initialData (#221)', async () => {
+    const { dataLoader, postMessage } = createLoaderFixture();
+    const postedTypes = () => postMessage.mock.calls.map(([message]) => message.type as string);
+
+    await dataLoader.sendInitialData();
+    const first = postedTypes();
+    expect(first.filter((type) => type === 'repoList')).toHaveLength(1);
+    expect(first.indexOf('repoList')).toBe(first.indexOf('initialData') - 1);
+
+    postMessage.mockClear();
+    await dataLoader.sendInitialData();
+    await dataLoader.sendInitialData(undefined, true);
+    expect(postedTypes()).not.toContain('repoList');
+  });
+
+  it('does not re-send the repo list on the first load after a repo switch', async () => {
+    const runtime = new WebviewRuntime('/repo-a');
+    const { dataLoader, postMessage } = createLoaderFixture({ runtime });
+    await dataLoader.sendInitialData();
+    postMessage.mockClear();
+
+    runtime.resetRepoScopedState('/repo-b');
+    dataLoader.resetRepoScopedState();
+    expect(runtime.initialLoadSent).toBe(false);
+    await dataLoader.sendInitialData();
+
+    const postedTypes = postMessage.mock.calls.map(([message]) => message.type as string);
+    expect(postedTypes).toContain('initialData');
+    expect(postedTypes).not.toContain('repoList');
   });
 
   it('uses commits=null on auto-refresh when fingerprint is unchanged', async () => {
