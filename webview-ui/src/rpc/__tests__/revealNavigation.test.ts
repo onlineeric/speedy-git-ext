@@ -105,4 +105,16 @@ describe('Go to — reveal filtered-out targets (GH #214)', () => {
 
     expect(useGraphStore.getState().revealedExtraCommits.map((c) => c.hash).sort()).toEqual(['newer', 'old']);
   });
+
+  it('keeps the extras when the refresh re-read failed in git, rather than reading them as gone', () => {
+    useGraphStore.getState().addRevealedExtraCommit(commit('old'));
+    rpcClient['handleMessage']({ type: 'commits', payload: { commits: useGraphStore.getState().commits } });
+
+    rpcClient['handleMessage']({
+      type: 'commitsByHash',
+      payload: { requestId: lastByHashRequest().requestId, commits: [], failed: true },
+    });
+
+    expect(useGraphStore.getState().revealedExtraCommits.map((c) => c.hash)).toEqual(['old']);
+  });
 });

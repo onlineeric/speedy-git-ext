@@ -2,6 +2,7 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 import { useGraphStore } from '../stores/graphStore';
 import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
+import { toggleAuthorFilterEmail } from '../utils/filterUtils';
 import { MenuItem } from './MenuItem';
 import { MenuContent } from './MenuContent';
 
@@ -43,14 +44,7 @@ function AuthorFilterMenuItems({ authorEmail }: { authorEmail: string }) {
 
   const handleToggle = () => {
     trackUiInteraction('authorMenu', 'toggleAuthorFilter');
-    const current = useGraphStore.getState().filters.authors ?? [];
-    let next: string[];
-    if (isFiltered) {
-      next = current.filter((e) => e !== authorEmail);
-    } else {
-      next = [...current, authorEmail];
-    }
-    const authors = next.length > 0 ? next : undefined;
+    const authors = toggleAuthorFilterEmail(useGraphStore.getState().filters.authors, authorEmail);
     setFilters({ authors });
     rpcClient.getCommits({ ...useGraphStore.getState().filters, authors });
   };

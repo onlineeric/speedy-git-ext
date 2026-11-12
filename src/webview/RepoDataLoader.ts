@@ -33,6 +33,8 @@ export interface RepoDataLoaderDependencies {
   readonly getBatchSize: () => number;
   /** The breadcrumb the submodules payload carries; navigation itself is the handlers' job. */
   readonly getSubmoduleStack: () => SubmoduleNavEntry[];
+  /** Runs once, just before this loader posts its first `initialData`. */
+  readonly beforeFirstInitialData: () => void;
   readonly telemetry: TelemetryService;
 }
 
@@ -88,8 +90,8 @@ function avatarUrlsSignature(urls: AvatarUrlMap): string {
 }
 
 export class RepoDataLoader {
-  /** One-shot: the `perf initialLoad` telemetry event fires once per session. */
-  private initialLoadPerfSent = false;
+  /** Once per loader, i.e. per tab — unlike `runtime.initialLoadSent`, never reset by a repo switch. */
+  private initialDataPosted = false;
   private gitHubRepo: GitHubRepoRef | null = null;
   // In-flight init, so concurrent loads coalesce onto one attempt. Cleared once
   // settled; a failed attempt (null repo) is retried on the next load.
@@ -226,12 +228,14 @@ export class RepoDataLoader {
       errors,
     };
 
+    const isFirstOfTab = !this.initialDataPosted;
+    this.initialDataPosted = true;
+    if (isFirstOfTab) this.deps.beforeFirstInitialData();
     this.deps.postMessage({ type: 'initialData', payload });
 
-    if (isInitialLoad && !this.initialLoadPerfSent) {
-      // Once per session (US5): duration of the first data load with the
+    if (isInitialLoad && isFirstOfTab) {
+      // Once per tab (US5): duration of the first data load with the
       // commit count expressed only as a coarse bucket (FR-013).
-      this.initialLoadPerfSent = true;
       this.deps.telemetry.sendPerfInitialLoad(
         performance.now() - loadStart,
         toCommitCountBucket(fetchedCommits.length),

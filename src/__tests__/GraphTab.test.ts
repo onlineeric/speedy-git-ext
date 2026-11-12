@@ -131,6 +131,7 @@ function createRepoDataLoaderFixture(options: {
     getSettings: () => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }),
     getBatchSize: () => 500,
     getSubmoduleStack: () => [],
+    beforeFirstInitialData: vi.fn(),
     telemetry: createTelemetryStub(),
   });
 
@@ -187,6 +188,7 @@ describe('GraphTab initial load performance', () => {
       getSettings: () => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }),
       getBatchSize: () => 500,
       getSubmoduleStack: () => [],
+      beforeFirstInitialData: vi.fn(),
       telemetry: createTelemetryStub(),
     });
 

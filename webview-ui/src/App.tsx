@@ -43,7 +43,6 @@ export function App() {
   useEffect(() => {
     // Settings are sent synchronously by sendInitialData() and submodules arrive
     // via the decoupled `submodulesData` message — no explicit RPC needed here.
-    rpcClient.initialize();
     rootRef.current?.focus();
   }, []);
 

@@ -300,8 +300,12 @@ export type ResponseMessage =
    * on an unrelated request's error that happens to arrive mid-navigation.
    */
   | { type: 'headLocationFailed'; payload: { error: GitError | { message: string } } }
-  /** Answer to `getCommitsByHash`: the requested commits that exist; never an error. */
-  | { type: 'commitsByHash'; payload: { requestId: number; commits: Commit[] } }
+  /**
+   * Answer to `getCommitsByHash`: the requested commits that exist; never an
+   * error. `failed` means git could not read them at all, which is not the same
+   * as "they no longer exist" — a refresh's re-read keeps its extras then.
+   */
+  | { type: 'commitsByHash'; payload: { requestId: number; commits: Commit[]; failed?: boolean } }
   | { type: 'repoList'; payload: { repos: RepoInfo[]; activeRepoPath: string } }
   | { type: 'checkoutNeedsStash'; payload: BranchCheckoutRequest }
   | { type: 'branchCheckoutFinished'; payload: { requestId: number } }

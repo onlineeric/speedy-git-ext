@@ -227,20 +227,22 @@ export class GitLogService {
    * The given commits, each formatted and decorated exactly like a `getCommits`
    * row, regardless of any filter (GH #214: a navigation target outside the
    * filtered stream). Hashes that are not valid object names or no longer exist
-   * are left out rather than failing the call.
+   * are left out rather than failing the call; only git itself failing is an
+   * error, so a caller can tell "gone" apart from "could not be read".
    *
    * One `git log --no-walk` covers the batch; `--ignore-missing` makes git skip
    * a name that no longer resolves (rebased away, gc'd) instead of refusing the
    * whole batch over it.
    */
-  async getCommitsByHash(hashes: readonly string[]): Promise<Commit[]> {
+  async getCommitsByHash(hashes: readonly string[]): Promise<Result<Commit[]>> {
     const valid = hashes.filter(isObjectName);
-    if (valid.length === 0) return [];
+    if (valid.length === 0) return ok([]);
     const result = await this.executor.execute({
       args: ['log', '--no-walk', '--ignore-missing', `--format=${LOG_FORMAT}`, '--decorate=full', ...valid, '--'],
       cwd: this.workspacePath,
     });
-    return result.success ? parseLogOutput(result.value.stdout) : [];
+    if (!result.success) return result;
+    return ok(parseLogOutput(result.value.stdout));
   }
 
   /** Full hash of the commit HEAD points at. Fails on an unborn branch (fresh repo). */

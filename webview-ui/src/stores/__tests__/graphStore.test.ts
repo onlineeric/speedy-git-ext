@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { useGraphStore } from '../graphStore';
 import type { Commit, FileChange, RemoteInfo, StashEntry, WorktreeInfo } from '@shared/types';
 import type { InitialDataPayload } from '@shared/messages';
@@ -198,6 +198,35 @@ describe('graphStore — setInitialData', () => {
     expect(after.uncommittedStagedFiles).toEqual([]);
     expect(after.uncommittedCounts.stagedCount).toBe(0);
     expect(after.hasUncommittedChanges).toBe(false);
+  });
+});
+
+describe('graphStore — repeated repoList for the same repo (#221 re-send)', () => {
+  const initialState = useGraphStore.getState();
+  afterEach(() => useGraphStore.setState(initialState, true));
+
+  it('leaves filters, submodule navigation and repo-scoped data untouched', () => {
+    const repos = [
+      { path: '/parent', name: 'parent', displayName: 'parent' },
+      { path: '/other', name: 'other', displayName: 'other' },
+    ];
+    const remote = { name: 'origin', fetchUrl: 'https://example.com/r.git', pushUrl: 'https://example.com/r.git' };
+    useGraphStore.setState({
+      activeParentRepoPath: '/parent',
+      submoduleSelection: 'libs/sub',
+      displayedRepoPath: '/parent/libs/sub',
+      filters: { ...initialState.filters, authors: ['a@example.com'] },
+      remotes: [remote],
+    });
+
+    useGraphStore.getState().setRepos(repos, '/parent');
+
+    const after = useGraphStore.getState();
+    expect(after.repos).toEqual(repos);
+    expect(after.submoduleSelection).toBe('libs/sub');
+    expect(after.displayedRepoPath).toBe('/parent/libs/sub');
+    expect(after.filters.authors).toEqual(['a@example.com']);
+    expect(after.remotes).toEqual([remote]);
   });
 });
 
@@ -474,6 +503,16 @@ describe('graphStore — always show badged commits', () => {
     expect(state.mergedCommits.map((c) => c.hash)).toEqual(['mine000', 'tagged0']);
     expect(state.filterKeptCommitHashes).toEqual(new Set(['tagged0']));
     expect(state.hiddenCommitHashes).toEqual(new Set());
+  });
+
+  it('leaves an in-flight batch valid: toggling the option moves no filter', () => {
+    filterToMine();
+    const { fetchGeneration } = useGraphStore.getState();
+
+    useGraphStore.getState().setAlwaysShowBadgedCommits(true);
+    useGraphStore.getState().setUserSettings({ ...useGraphStore.getState().userSettings, showTags: false });
+
+    expect(useGraphStore.getState().fetchGeneration).toBe(fetchGeneration);
   });
 
   it('does not recompute when no Author or Message filter is active', () => {

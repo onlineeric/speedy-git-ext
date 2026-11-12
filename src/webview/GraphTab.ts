@@ -84,6 +84,10 @@ export class GraphTab {
       getSettings: () => options.getSettings(),
       getBatchSize: () => this.getBatchSize(),
       getSubmoduleStack: () => [...this.runtime.submoduleStack],
+      // The `repoList` posted by `open()` can be lost (#221), so it is sent again
+      // where a listener is certain. Only before the first load: a later re-send
+      // could carry a repo the user has since switched away from.
+      beforeFirstInitialData: () => this.sendRepoList(),
       telemetry: options.shared.telemetry,
     });
     this.refreshCoordinator = new RefreshCoordinator(this.log, this.dataLoader);
@@ -149,6 +153,7 @@ export class GraphTab {
     // commit load does not need it, so the two run together rather than in turn.
     const identity = this.resolveIdentity();
     this.sendWhatsNew();
+    // Paints the repo selector early; the copy that is sure to arrive comes with the first load.
     this.sendRepoList();
     this.sendSettingsData(this.options.getSettings());
     await Promise.all([identity, this.refreshCoordinator.reload()]);

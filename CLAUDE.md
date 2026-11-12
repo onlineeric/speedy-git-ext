@@ -110,6 +110,7 @@ Rules:
 - **Handlers must stay stateless about repos**: resolve git services via `context.services` (the `GitServiceRegistry`) *at request time*. Never capture a service instance at construction — repo switching and submodule navigation atomically replace the registry, so captured references go stale.
 - **Don't pass the provider to handlers**: give them only what they need through `WebviewRequestContext`.
 - **State ownership**: table layout is per-repo; other UI state is global.
+- **A message posted when a panel opens can be lost.** VS Code hands queued messages to the page on its `load` event (or a 200 ms fallback), which can beat the webview's listener. The listener is therefore registered in `index.tsx` *before* the first render — never move it back into an effect — and anything the webview cannot work without must arrive with or after `initialData`: `sendInitialData` re-sends `persistedUIState`/`settingsData` every load, and `GraphTab` re-sends `repoList` through the loader's one-time `beforeFirstInitialData` hook (#221; a repo-keyed feature with no `displayedRepoPath` silently does nothing). Only that once — a later re-send can carry a repo the user has since switched away from. `whatsNew` is still posted only at open, so on a busy startup the dialog can be missed until the next session; re-sending it would risk reopening a dialog just closed.
 
 ### Multiple Graph Tabs — One Tab Owns a View
 

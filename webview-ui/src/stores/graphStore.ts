@@ -548,14 +548,20 @@ function selectedIndexIn(mergedCommits: Commit[], selectedCommit: string | undef
 }
 
 /**
- * Apply a change to the revealed list and the graph it shows in one `set`, leaving every other
- * piece of state alone. Declared as a function (hoisted) because it reads the store the `create`
- * call below builds.
+ * Apply a display-only change and the graph it shows in one `set`, leaving every other piece of
+ * state alone. Unlike `recomputeVisibility`, no filter moved: the loaded stream and any in-flight
+ * batch stay valid, so the fetch generation and empty-batch tracking are left alone. Declared as a
+ * function (hoisted) because it reads the store the `create` call below builds.
  */
-function applyRevealChange(change: Pick<GraphStore, 'revealedCommitHashes' | 'revealedExtraCommits'> & Partial<GraphStore>): void {
+function applyGraphViewChange(change: Partial<GraphStore> = {}): void {
   const state = { ...useGraphStore.getState(), ...change };
   const view = computeGraphView(state, { commits: state.commits, stashes: state.stashes, uncommitted: getUncommittedContext(state) });
   useGraphStore.setState({ ...change, ...view });
+}
+
+/** {@link applyGraphViewChange} for the revealed list, which must name both of its parts. */
+function applyRevealChange(change: Pick<GraphStore, 'revealedCommitHashes' | 'revealedExtraCommits'> & Partial<GraphStore>): void {
+  applyGraphViewChange(change);
 }
 
 /** A commit's content is fixed by its hash; only its ref decorations can differ on a re-read. */
@@ -770,9 +776,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setAlwaysShowBadgedCommits: (alwaysShowBadgedCommits) => {
     const state = get();
     if (state.alwaysShowBadgedCommits === alwaysShowBadgedCommits) return;
-    set({ alwaysShowBadgedCommits });
     // With no Author / Message filter both visibility sets are empty either way.
-    if (hasClientSideVisibilityFilter(state.filters)) get().recomputeVisibility();
+    if (hasClientSideVisibilityFilter(state.filters)) applyGraphViewChange({ alwaysShowBadgedCommits });
+    else set({ alwaysShowBadgedCommits });
   },
   // Merge, never replace: the background refresh queue posts avatars in small
   // batches as they resolve, and each batch must leave earlier ones in place.
@@ -1270,7 +1276,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const badgeSettingsChanged = settings.showTags !== state.userSettings.showTags
       || settings.showRemoteBranches !== state.userSettings.showRemoteBranches;
     if (badgeSettingsChanged && state.alwaysShowBadgedCommits && hasClientSideVisibilityFilter(state.filters)) {
-      get().recomputeVisibility();
+      applyGraphViewChange();
     }
   },
   openSearch: () => set((state) => ({
@@ -1453,8 +1459,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       ...clearedReveals(state),
     };
   }),
-  // Unlike recomputeVisibility, a reveal changes no filter: the loaded stream and any in-flight
-  // batch stay valid, so the fetch generation and empty-batch tracking are left alone.
+  // A reveal changes no filter, so it goes through applyGraphViewChange, not recomputeVisibility.
   revealCommit: (hash) => {
     const { revealedCommitHashes, revealedExtraCommits } = get();
     applyRevealChange({ revealedCommitHashes: new Set(revealedCommitHashes).add(hash), revealedExtraCommits });

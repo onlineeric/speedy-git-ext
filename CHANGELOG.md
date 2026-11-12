@@ -4,6 +4,14 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.24.1] - 2026-11-12
+
+### Fixed
+- **The Filter panel's Me button could stay disabled for as long as the graph tab was open.** When a graph opened while VS Code was busy, for example right after startup, the tab could miss which repository it was showing. The author list then never loaded, so **Me** stayed disabled and the **Authors** dropdown stayed empty until the tab was closed. Checking out a branch from a badge could also fail in that tab with "The repository changed or another checkout is running". A graph now always learns its repository, however busy VS Code is while it opens.
+
+### Credits — Filter panel loading (#221)
+- Thanks again to [@tbuyukliev](https://github.com/tbuyukliev) for reporting in [#221](https://github.com/onlineeric/speedy-git-ext/issues/221) that **Me** stayed disabled after 5.24.0!
+
 ## [5.24.0] - 2026-11-09
 
 ### Changed
