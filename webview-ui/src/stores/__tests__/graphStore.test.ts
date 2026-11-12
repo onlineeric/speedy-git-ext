@@ -505,6 +505,16 @@ describe('graphStore — always show badged commits', () => {
     expect(state.hiddenCommitHashes).toEqual(new Set());
   });
 
+  it('leaves an in-flight batch valid: toggling the option moves no filter', () => {
+    filterToMine();
+    const { fetchGeneration } = useGraphStore.getState();
+
+    useGraphStore.getState().setAlwaysShowBadgedCommits(true);
+    useGraphStore.getState().setUserSettings({ ...useGraphStore.getState().userSettings, showTags: false });
+
+    expect(useGraphStore.getState().fetchGeneration).toBe(fetchGeneration);
+  });
+
   it('does not recompute when no Author or Message filter is active', () => {
     const { mergedCommits, topology } = useGraphStore.getState();
 

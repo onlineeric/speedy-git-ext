@@ -41,7 +41,6 @@ export function App() {
   const selectCommit = useGraphStore((state) => state.selectCommit);
 
   useEffect(() => {
-    // The RPC listener is registered in index.tsx, before the first render.
     // Settings are sent synchronously by sendInitialData() and submodules arrive
     // via the decoupled `submodulesData` message — no explicit RPC needed here.
     rootRef.current?.focus();

@@ -126,8 +126,11 @@ export const graphDataHandlers = {
 
   getCommitsByHash: async (message, context) => {
     const { requestId, hashes } = message.payload;
-    const commits = await context.services.current().gitLogService.getCommitsByHash(hashes);
-    context.postMessage({ type: 'commitsByHash', payload: { requestId, commits } });
+    const result = await context.services.current().gitLogService.getCommitsByHash(hashes);
+    context.postMessage({
+      type: 'commitsByHash',
+      payload: result.success ? { requestId, commits: result.value } : { requestId, commits: [], failed: true },
+    });
   },
 
   getBranches: async (_message, context) => {

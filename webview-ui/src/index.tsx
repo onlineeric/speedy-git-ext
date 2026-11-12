@@ -4,11 +4,9 @@ import { App } from './App';
 import { rpcClient } from './rpc/rpcClient';
 import './index.css';
 
-// Listen before the first render, not in an effect after it. VS Code delivers
-// the messages the extension posted while the page loaded as soon as the page's
-// `load` event fires, which can be before React has committed and run effects;
-// any of them arriving with no listener is gone for good (issue #221). Handlers
-// only write to the Zustand store, which needs no mounted component.
+// Listen before the first render, never in an effect: VS Code delivers the
+// messages posted while the page loaded on its `load` event, which can beat
+// React's effects, and a message with no listener is gone (#221).
 rpcClient.initialize();
 
 const root = document.getElementById('root');

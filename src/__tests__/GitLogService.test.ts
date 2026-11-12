@@ -310,28 +310,28 @@ describe('GitLogService.getCommitsByHash', () => {
     const executeSpy = vi.spyOn(service['executor'], 'execute')
       .mockResolvedValue({ success: true, value: { stdout: `${lineFor(hashA)}\n${lineFor(hashB)}\n`, stderr: '' } });
 
-    const commits = await service.getCommitsByHash([hashA, hashB]);
+    const result = await service.getCommitsByHash([hashA, hashB]);
 
-    expect(commits.map((c) => c.hash)).toEqual([hashA, hashB]);
+    expect(result.success && result.value.map((c) => c.hash)).toEqual([hashA, hashB]);
     expect(executeSpy).toHaveBeenCalledTimes(1);
     expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({
       args: ['log', '--no-walk', '--ignore-missing', '--format=%H%x00%h%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D', '--decorate=full', hashA, hashB, '--'],
     }));
   });
 
-  it('answers with no commits rather than an error when git fails', async () => {
+  it('reports a git failure as an error, distinct from commits that no longer exist', async () => {
     const service = new GitLogService('/repo', mockLog);
     vi.spyOn(service['executor'], 'execute')
       .mockResolvedValue({ success: false, error: new GitError('not a git repository', 'COMMAND_FAILED') });
 
-    expect(await service.getCommitsByHash([hashA])).toEqual([]);
+    expect((await service.getCommitsByHash([hashA])).success).toBe(false);
   });
 
   it('never passes anything but a bare object name to git', async () => {
     const service = new GitLogService('/repo', mockLog);
     const executeSpy = vi.spyOn(service['executor'], 'execute');
 
-    expect(await service.getCommitsByHash(['--all', 'HEAD~1', ''])).toEqual([]);
+    expect(await service.getCommitsByHash(['--all', 'HEAD~1', ''])).toEqual({ success: true, value: [] });
     expect(executeSpy).not.toHaveBeenCalled();
   });
 });

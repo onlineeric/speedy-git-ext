@@ -192,7 +192,7 @@ class RpcClient {
         break;
       }
       case 'commitsByHash':
-        this.handleCommitsByHash(message.payload.requestId, message.payload.commits);
+        this.handleCommitsByHash(message.payload.requestId, message.payload.commits, message.payload.failed === true);
         break;
       case 'headLocationFailed':
         // Only this response — never the generic `error` below — ends the flow
@@ -1180,12 +1180,13 @@ class RpcClient {
     this.send({ type: 'getCommitsByHash', payload: { requestId, hashes } });
   }
 
-  private handleCommitsByHash(requestId: number, commits: Commit[]) {
+  private handleCommitsByHash(requestId: number, commits: Commit[], failed: boolean) {
     const store = useGraphStore.getState();
     const revalidation = this.pendingExtrasRevalidations.get(requestId);
     if (revalidation) {
       this.pendingExtrasRevalidations.delete(requestId);
-      if (revalidation.revealGeneration === store.revealGeneration) {
+      // A read git could not do says nothing about whether the extras still exist: keep them.
+      if (!failed && revalidation.revealGeneration === store.revealGeneration) {
         store.replaceRevealedExtraCommits(revalidation.hashes, commits);
       }
       return;

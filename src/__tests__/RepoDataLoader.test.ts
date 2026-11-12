@@ -99,7 +99,7 @@ function createLoaderFixture(options: {
     getSettings: () => ({ ...DEFAULT_USER_SETTINGS, avatarsEnabled: false }),
     getBatchSize: () => 500,
     getSubmoduleStack: () => [],
-    sendRepoList: () => postMessage({ type: 'repoList', payload: { repos: [], activeRepoPath: runtime.topLevelRepoPath } }),
+    beforeFirstInitialData: () => postMessage({ type: 'repoList', payload: { repos: [], activeRepoPath: runtime.topLevelRepoPath } }),
     telemetry,
   });
 
@@ -125,9 +125,8 @@ describe('RepoDataLoader', () => {
     }));
   });
 
-  it('re-sends the repo list once per tab, immediately before the first initialData (#221)', async () => {
+  it('runs beforeFirstInitialData once per tab, immediately before the first initialData (#221)', async () => {
     const { dataLoader, postMessage } = createLoaderFixture();
-    const postedTypes = () => postMessage.mock.calls.map(([message]) => message.type as string);
 
     await dataLoader.sendInitialData();
     const first = postedTypes();
@@ -138,9 +137,25 @@ describe('RepoDataLoader', () => {
     await dataLoader.sendInitialData();
     await dataLoader.sendInitialData(undefined, true);
     expect(postedTypes()).not.toContain('repoList');
+
+    function postedTypes() {
+      return postMessage.mock.calls.map(([message]) => message.type as string);
+    }
   });
 
-  it('does not re-send the repo list on the first load after a repo switch', async () => {
+  it('reports the initial-load perf event once per tab, not again after a repo switch', async () => {
+    const runtime = new WebviewRuntime('/repo-a');
+    const { dataLoader, telemetry } = createLoaderFixture({ runtime });
+    await dataLoader.sendInitialData();
+    await dataLoader.sendInitialData();
+    runtime.resetRepoScopedState('/repo-b');
+    dataLoader.resetRepoScopedState();
+    await dataLoader.sendInitialData();
+
+    expect(telemetry.sendPerfInitialLoad).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not run beforeFirstInitialData again on the first load after a repo switch', async () => {
     const runtime = new WebviewRuntime('/repo-a');
     const { dataLoader, postMessage } = createLoaderFixture({ runtime });
     await dataLoader.sendInitialData();

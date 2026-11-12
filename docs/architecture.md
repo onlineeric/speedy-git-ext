@@ -45,7 +45,7 @@ src/
 │   ├── PersistedUIStateStore.ts  # Load/save/validate UI state + per-repo table layout (column-width healing).
 │                                 #   Seed-on-open, last-write-wins across tabs; reloadRepoLayout re-reads only
 │                                 #   the table layout on a repo switch
-│   ├── RepoDataLoader.ts         # Initial + deferred data, avatar cache hydration/enqueue, submodules, initial-load perf/error telemetry, one-time `repoList` re-send ahead of a tab's first `initialData`
+│   ├── RepoDataLoader.ts         # Initial + deferred data, avatar cache hydration/enqueue, submodules, initial-load perf/error telemetry, one-time `beforeFirstInitialData` hook (the tab's `repoList` re-send, #221)
 │   ├── RefreshCoordinator.ts     # When to load: initial/manual/auto, hidden-panel deferral, loading lifecycle
 │   ├── EditorCommandService.ts   # VS Code diff/file/compare editors, worktree folder/reveal, signature help.
 │                                 #   openMultiDiffEditor ("Open Changes") opens `vscode.changes` from multiDiffPlan

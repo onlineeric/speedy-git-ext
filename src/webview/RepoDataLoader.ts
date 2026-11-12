@@ -33,8 +33,8 @@ export interface RepoDataLoaderDependencies {
   readonly getBatchSize: () => number;
   /** The breadcrumb the submodules payload carries; navigation itself is the handlers' job. */
   readonly getSubmoduleStack: () => SubmoduleNavEntry[];
-  /** Posts the tab's repo list; re-sent once ahead of the tab's first `initialData`. */
-  readonly sendRepoList: () => void;
+  /** Runs once, just before this loader posts its first `initialData`. */
+  readonly beforeFirstInitialData: () => void;
   readonly telemetry: TelemetryService;
 }
 
@@ -90,13 +90,8 @@ function avatarUrlsSignature(urls: AvatarUrlMap): string {
 }
 
 export class RepoDataLoader {
-  /** One-shot: the `perf initialLoad` telemetry event fires once per session. */
-  private initialLoadPerfSent = false;
-  /**
-   * One-shot per tab, deliberately NOT reset on a repo switch (unlike
-   * `runtime.initialLoadSent`). See the re-send in {@link sendInitialData}.
-   */
-  private repoListResent = false;
+  /** Once per loader, i.e. per tab — unlike `runtime.initialLoadSent`, never reset by a repo switch. */
+  private initialDataPosted = false;
   private gitHubRepo: GitHubRepoRef | null = null;
   // In-flight init, so concurrent loads coalesce onto one attempt. Cleared once
   // settled; a failed attempt (null repo) is retried on the next load.
@@ -233,23 +228,14 @@ export class RepoDataLoader {
       errors,
     };
 
-    // The `repoList` posted when the panel opens can be lost: VS Code may hand it
-    // to the webview before its listener exists (issue #221). Without it the
-    // webview never learns the displayed repo, which repo-keyed features (the
-    // author list, branch checkout) need. Re-send it once, just ahead of the first
-    // `initialData`, which by then has a listener to land on. Only once per tab: a
-    // re-send on a later load could carry a repo the user has since switched away
-    // from.
-    if (!this.repoListResent) {
-      this.repoListResent = true;
-      this.deps.sendRepoList();
-    }
+    const isFirstOfTab = !this.initialDataPosted;
+    this.initialDataPosted = true;
+    if (isFirstOfTab) this.deps.beforeFirstInitialData();
     this.deps.postMessage({ type: 'initialData', payload });
 
-    if (isInitialLoad && !this.initialLoadPerfSent) {
-      // Once per session (US5): duration of the first data load with the
+    if (isInitialLoad && isFirstOfTab) {
+      // Once per tab (US5): duration of the first data load with the
       // commit count expressed only as a coarse bucket (FR-013).
-      this.initialLoadPerfSent = true;
       this.deps.telemetry.sendPerfInitialLoad(
         performance.now() - loadStart,
         toCommitCountBucket(fetchedCommits.length),
