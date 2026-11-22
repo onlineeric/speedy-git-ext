@@ -17,12 +17,17 @@ import {
 } from '../utils/commitTableLayout';
 import { computeScrollTopForRow } from '../utils/rowVisibility';
 import { EMPTY_SEARCH_TERMS } from '../utils/searchQuery';
+import { CHECKOUT_BADGE_ATTRIBUTE, decideRowClick } from '../utils/detailsPanelHold';
 
 const ROW_HEIGHT = 28;
 
 interface GraphContainerProps {
   selectedCommit: string | undefined;
   onSelectCommit: (hash: string | undefined) => void;
+}
+
+function isCheckoutBadgeClick(event: React.MouseEvent): boolean {
+  return event.target instanceof Element && event.target.closest(`[${CHECKOUT_BADGE_ATTRIBUTE}]`) !== null;
 }
 
 function computeMaxVisibleRefs(width: number): number {
@@ -51,6 +56,8 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
   const clearSelectedCommits = useGraphStore((state) => state.clearSelectedCommits);
   const setSelectionAnchor = useGraphStore((state) => state.setSelectionAnchor);
   const selectCommit = useGraphStore((state) => state.selectCommit);
+  const holdDetailsPanel = useGraphStore((state) => state.holdDetailsPanel);
+  const cancelHeldDetailsPanel = useGraphStore((state) => state.cancelHeldDetailsPanel);
   const selectedCommitIndex = useGraphStore((state) => state.selectedCommitIndex);
   const searchState = useGraphStore((state) => state.searchState);
   const searchTerms = useGraphStore((state) => state.searchTerms);
@@ -287,10 +294,22 @@ export function GraphContainer({ selectedCommit, onSelectCommit }: GraphContaine
       return;
     }
 
+    const action = decideRowClick({
+      onCheckoutBadge: isCheckoutBadgeClick(event),
+      clickCount: event.detail,
+      detailsPanelOpen: useGraphStore.getState().detailsPanelOpen,
+    });
+    if (action === 'badgeSecondClick') {
+      cancelHeldDetailsPanel(hash);
+      return;
+    }
+
     clearSelectedCommits();
     setSelectionAnchor(hash);
     selectCommit(index);
     onSelectCommit(hash);
+    // After the details request: holding first would be cleared by the selection above.
+    if (action === 'selectAndHold') holdDetailsPanel(hash);
   };
 
   const resolvedTableLayout = useMemo(

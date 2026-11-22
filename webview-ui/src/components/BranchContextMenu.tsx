@@ -7,6 +7,8 @@ import { useGraphStore } from '../stores/graphStore';
 import { useCurrentLocalBranch, useOperationInProgress } from '../stores/graphSelectors';
 import type { UiAction, UiSurface } from '@shared/telemetry';
 import { trackUiInteraction } from '../utils/telemetry';
+import { isEventFromPortal } from '../utils/portalEvents';
+import { CHECKOUT_BADGE_ATTRIBUTE } from '../utils/detailsPanelHold';
 import {
   buildDeleteRemoteBranchCommand,
   buildFastForwardLocalBranchCommand,
@@ -50,11 +52,19 @@ interface BranchContextMenuProps {
   children: React.ReactNode;
 }
 
+/**
+ * Marks a badge whose double-click checks out, so the row's click handler can
+ * hold the details panel back for the double-click window (GH #225).
+ */
+function checkoutBadgeMarker(refInfo: RefInfo) {
+  return refInfo.type === 'branch' || refInfo.type === 'remote' ? { [CHECKOUT_BADGE_ATTRIBUTE]: true } : {};
+}
+
 export function BranchContextMenu({ refInfo, commit, children }: BranchContextMenuProps) {
   return (
-    <span onDoubleClick={(event) => {
+    <span {...checkoutBadgeMarker(refInfo)} onDoubleClick={(event) => {
       // Portal dialogs bubble through React too; only the actual badge is a target.
-      if (!event.currentTarget.contains(event.target as Node)) return;
+      if (isEventFromPortal(event)) return;
       event.stopPropagation();
       if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       if (refInfo.type === 'branch' || refInfo.type === 'remote') {
@@ -67,7 +77,7 @@ export function BranchContextMenu({ refInfo, commit, children }: BranchContextMe
       }
       requestBranchCheckout(refInfo, 'doubleClick');
     }}>
-      <LazyContextMenu stopPropagation body={<BranchContextMenuBody refInfo={refInfo} commit={commit} />}>
+      <LazyContextMenu nested body={<BranchContextMenuBody refInfo={refInfo} commit={commit} />}>
         {children}
       </LazyContextMenu>
     </span>

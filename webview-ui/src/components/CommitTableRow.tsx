@@ -354,7 +354,7 @@ function renderColumn({
               )}
               {visibleRefs.map((displayRef) =>
                 displayRef.type === 'stash' ? (
-                  <StashContextMenu key={displayRefKey(displayRef)} commit={commit} stashIndex={stashIndex}>
+                  <StashContextMenu nested key={displayRefKey(displayRef)} commit={commit} stashIndex={stashIndex}>
                     <RefLabel
                       checkoutHint
                       displayRef={displayRef}

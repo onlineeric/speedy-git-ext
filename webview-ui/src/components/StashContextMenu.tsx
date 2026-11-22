@@ -13,6 +13,8 @@ import { MenuContent } from './MenuContent';
 interface StashContextMenuProps {
   commit: Commit;
   stashIndex: number;
+  /** The trigger is the stash badge inside the stash row, not the row itself. */
+  nested?: boolean;
   children: React.ReactNode;
 }
 
@@ -21,15 +23,15 @@ interface StashContextMenuProps {
 // Stashes are not selectable in compare slot dropdowns either; this exclusion is enforced
 // across all compare entry points.
 
-export function StashContextMenu({ commit, stashIndex, children }: StashContextMenuProps) {
+export function StashContextMenu({ commit, stashIndex, nested, children }: StashContextMenuProps) {
   return (
-    <LazyContextMenu body={<StashContextMenuBody commit={commit} stashIndex={stashIndex} />}>
+    <LazyContextMenu nested={nested} body={<StashContextMenuBody commit={commit} stashIndex={stashIndex} />}>
       {children}
     </LazyContextMenu>
   );
 }
 
-function StashContextMenuBody({ commit, stashIndex }: Omit<StashContextMenuProps, 'children'>) {
+function StashContextMenuBody({ commit, stashIndex }: Omit<StashContextMenuProps, 'children' | 'nested'>) {
   const [dropConfirmOpen, setDropConfirmOpen] = useState(false);
   const isValidIndex = stashIndex >= 0;
 

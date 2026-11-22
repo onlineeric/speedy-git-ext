@@ -69,6 +69,13 @@ import { trackUi } from '../utils/telemetry';
 import { joinRepoPath } from '../utils/repoPath';
 import { stripLocalBranchPrefix } from '../utils/worktreeDisplay';
 import { EMPTY_SEARCH_TERMS, type SearchTerm } from '../utils/searchQuery';
+import {
+  BADGE_DOUBLE_CLICK_WINDOW_MS,
+  onBadgeDoubleClick,
+  onDetailsArrived,
+  onHoldWindowElapsed,
+  type DetailsPanelHold,
+} from '../utils/detailsPanelHold';
 import type { WhatsNewPayload } from '@shared/whatsNew';
 import { isSameCustomAutolinkList } from '@shared/autolinks';
 
@@ -131,6 +138,8 @@ interface GraphStore {
   selectedCommitIndex: number;
   commitDetails: CommitDetails | undefined;
   detailsPanelOpen: boolean;
+  /** A branch-badge click is holding the closed panel back for the double-click window (GH #225). */
+  detailsPanelHold: DetailsPanelHold | null;
   detailsPanelPosition: DetailsPanelPosition;
   loading: boolean;
   error: string | undefined;
@@ -368,6 +377,10 @@ interface GraphStore {
   clearCommitFlash: () => void;
   setCommitDetails: (details: CommitDetails | undefined) => void;
   setDetailsPanelOpen: (open: boolean) => void;
+  /** Hold the closed panel's auto-open for this commit until the double-click window ends. */
+  holdDetailsPanel: (hash: string) => void;
+  /** The held badge was double-clicked: keep the panel closed. */
+  cancelHeldDetailsPanel: (hash: string) => void;
   toggleDetailsPanelPosition: () => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | undefined) => void;
@@ -635,6 +648,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   selectedCommitIndex: -1,
   commitDetails: undefined,
   detailsPanelOpen: false,
+  detailsPanelHold: null,
   detailsPanelPosition: DEFAULT_PERSISTED_UI_STATE.detailsPanelPosition,
   loading: true,
   error: undefined,
@@ -892,6 +906,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       lastClickedHash: commit.hash,
       selectedCommits: [],
       compareResult: null,
+      detailsPanelHold: null,
     });
   },
   setGoToHeadState: (goToHeadState) => set({ goToHeadState }),
@@ -927,13 +942,30 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       lastClickedHash: commit.hash,
       selectedCommits: [],
       compareResult: null,
+      detailsPanelHold: null,
     });
   },
-  setCommitDetails: (commitDetails) => set({
-    commitDetails,
-    detailsPanelOpen: commitDetails !== undefined,
-  }),
+  setCommitDetails: (commitDetails) => {
+    if (!commitDetails) {
+      set({ commitDetails, detailsPanelOpen: false });
+      return;
+    }
+    const { hold, open } = onDetailsArrived(get().detailsPanelHold, commitDetails.hash);
+    set({ commitDetails, detailsPanelHold: hold, ...(open ? { detailsPanelOpen: true } : {}) });
+  },
   setDetailsPanelOpen: (detailsPanelOpen) => set({ detailsPanelOpen }),
+  holdDetailsPanel: (hash) => {
+    set({ detailsPanelHold: { hash, phase: 'waiting' } });
+    setTimeout(() => {
+      const { detailsPanelHold, commitDetails } = get();
+      const { hold, open } = onHoldWindowElapsed(detailsPanelHold, hash, commitDetails?.hash);
+      set({ detailsPanelHold: hold, ...(open ? { detailsPanelOpen: true } : {}) });
+    }, BADGE_DOUBLE_CLICK_WINDOW_MS);
+  },
+  cancelHeldDetailsPanel: (hash) => {
+    const { detailsPanelHold, commitDetails } = get();
+    set({ detailsPanelHold: onBadgeDoubleClick(detailsPanelHold, hash, commitDetails?.hash) });
+  },
   toggleDetailsPanelPosition: () =>
     set((state) => ({
       detailsPanelPosition: state.detailsPanelPosition === 'bottom' ? 'right' : 'bottom',
@@ -1169,6 +1201,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       lastClickedHash: undefined,
       commitDetails: undefined,
       detailsPanelOpen: false,
+      detailsPanelHold: null,
       remotes: [],
       stashes: [],
       worktreeList: [],
@@ -1218,6 +1251,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       lastClickedHash: undefined,
       commitDetails: undefined,
       detailsPanelOpen: false,
+      detailsPanelHold: null,
       remotes: [],
       stashes: [],
       worktreeList: [],

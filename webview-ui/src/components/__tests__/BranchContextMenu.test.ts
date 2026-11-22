@@ -61,4 +61,9 @@ describe('branch badge double-click event', () => {
   it('does not intercept the existing single-click row selection', () => {
     expect(wrapper().props.onClick).toBeUndefined();
   });
+
+  it('marks only checkout-able badges for the details panel hold', () => {
+    expect(wrapper().props['data-checkout-badge']).toBe(true);
+    expect(wrapper('tag').props['data-checkout-badge']).toBeUndefined();
+  });
 });
