@@ -17,7 +17,7 @@ import {
 } from '../utils/commitTableLayout';
 import { computeScrollTopForRow } from '../utils/rowVisibility';
 import { EMPTY_SEARCH_TERMS } from '../utils/searchQuery';
-import { CHECKOUT_BADGE_ATTRIBUTE, decideRowClick } from '../utils/detailsPanelHold';
+import { CHECKOUT_BADGE_ATTRIBUTE, decideRowClick, isCheckoutGesture } from '../utils/detailsPanelHold';
 
 const ROW_HEIGHT = 28;
 
@@ -27,7 +27,9 @@ interface GraphContainerProps {
 }
 
 function isCheckoutBadgeClick(event: React.MouseEvent): boolean {
-  return event.target instanceof Element && event.target.closest(`[${CHECKOUT_BADGE_ATTRIBUTE}]`) !== null;
+  return isCheckoutGesture(event)
+    && event.target instanceof Element
+    && event.target.closest(`[${CHECKOUT_BADGE_ATTRIBUTE}]`) !== null;
 }
 
 function computeMaxVisibleRefs(width: number): number {

@@ -247,8 +247,8 @@ webview-ui/src/assets.d.ts        # `*.png` imports are `data:` URLs — vite.co
 │                                 #   mounts only on first right-click — keeps virtualized rows cheap when scrolling.
 │                                 #   `nested` wraps the trigger in NestedMenuBoundary
 └── NestedMenuBoundary.tsx        # For a menu whose trigger sits inside a commit row (badges, author/date cells):
-                                  #   keeps the right-click, and stops portal clicks (menu items, its dialogs) from
-                                  #   reaching the row, so a menu action never selects the row (GH #225)
+                                  #   keeps the right-click for the inner menu. Its portal clicks are ignored by
+                                  #   CommitTableRow itself, so a menu action never selects the row (GH #225)
 ```
 
 Menu building blocks — see `CLAUDE.md` for the reuse rules:

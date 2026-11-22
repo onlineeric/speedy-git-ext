@@ -34,19 +34,19 @@ export function QuietMenusIllustration() {
           <div key={index} className="flex h-3.5 items-center gap-1.5">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: SHOWCASE_BLUE_COLOR }} />
             {index === BADGE_ROW && (
-              <span
-                className="inline-flex shrink-0 items-center gap-0.5 rounded border px-1"
-                style={{ borderColor: SHOWCASE_BLUE_COLOR, background: tint(SHOWCASE_BLUE_COLOR, 20) }}
-              >
-                <BranchIcon className="h-2 w-2" />
-                feature
-              </span>
-            )}
-            {index === BADGE_ROW && (
-              <span className="animate-whats-new-menu-done inline-flex shrink-0 items-center gap-0.5" style={{ color: ADDED_COLOR }}>
-                <CheckIcon className="h-2 w-2" />
-                copied
-              </span>
+              <>
+                <span
+                  className="inline-flex shrink-0 items-center gap-0.5 rounded border px-1"
+                  style={{ borderColor: SHOWCASE_BLUE_COLOR, background: tint(SHOWCASE_BLUE_COLOR, 20) }}
+                >
+                  <BranchIcon className="h-2 w-2" />
+                  feature
+                </span>
+                <span className="animate-whats-new-menu-done inline-flex shrink-0 items-center gap-0.5" style={{ color: ADDED_COLOR }}>
+                  <CheckIcon className="h-2 w-2" />
+                  copied
+                </span>
+              </>
             )}
             <span className="block h-1 rounded-full" style={{ width, background: tint(NEUTRAL_COLOR, 35) }} />
           </div>
@@ -65,7 +65,7 @@ export function QuietMenusIllustration() {
               {item}
               {index === CLICKED_ITEM && (
                 <span
-                  className="animate-whats-new-menu-click absolute inset-0 rounded border opacity-0 motion-reduce:hidden"
+                  className="animate-whats-new-autolink-click absolute inset-0 rounded border opacity-0 motion-reduce:hidden"
                   style={{ borderColor: SHOWCASE_ORANGE_COLOR }}
                 />
               )}

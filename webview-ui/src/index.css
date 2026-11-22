@@ -171,17 +171,12 @@
 }
 
 /* The quiet menus illustration: a branch badge's menu opens, Copy Branch Name
-   is clicked, the menu closes and the badge reports "copied" while the details
+   is clicked (reusing whats-new-autolink-click), the menu closes and the badge reports "copied" while the details
    panel stays closed. With no animation the menu and the mark both show. */
 @keyframes whats-new-menu-open {
   0%, 8% { opacity: 0; transform: scale(0.95); }
   14%, 50% { opacity: 1; transform: scale(1); }
   58%, 100% { opacity: 0; transform: scale(1); }
-}
-@keyframes whats-new-menu-click {
-  0%, 34% { opacity: 0; transform: scale(0.9); }
-  40% { opacity: 1; transform: scale(1); }
-  52%, 100% { opacity: 0; transform: scale(1.15); }
 }
 @keyframes whats-new-menu-done {
   0%, 56% { opacity: 0; }
@@ -260,9 +255,6 @@
     }
     .animate-whats-new-menu-open {
       animation: whats-new-menu-open 5s ease-out infinite;
-    }
-    .animate-whats-new-menu-click {
-      animation: whats-new-menu-click 5s ease-out infinite;
     }
     .animate-whats-new-menu-done {
       animation: whats-new-menu-done 5s ease-out infinite;

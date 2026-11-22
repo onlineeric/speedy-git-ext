@@ -8,7 +8,7 @@ import { useCurrentLocalBranch, useOperationInProgress } from '../stores/graphSe
 import type { UiAction, UiSurface } from '@shared/telemetry';
 import { trackUiInteraction } from '../utils/telemetry';
 import { isEventFromPortal } from '../utils/portalEvents';
-import { CHECKOUT_BADGE_ATTRIBUTE } from '../utils/detailsPanelHold';
+import { CHECKOUT_BADGE_ATTRIBUTE, isCheckoutGesture } from '../utils/detailsPanelHold';
 import {
   buildDeleteRemoteBranchCommand,
   buildFastForwardLocalBranchCommand,
@@ -52,22 +52,16 @@ interface BranchContextMenuProps {
   children: React.ReactNode;
 }
 
-/**
- * Marks a badge whose double-click checks out, so the row's click handler can
- * hold the details panel back for the double-click window (GH #225).
- */
-function checkoutBadgeMarker(refInfo: RefInfo) {
-  return refInfo.type === 'branch' || refInfo.type === 'remote' ? { [CHECKOUT_BADGE_ATTRIBUTE]: true } : {};
-}
-
 export function BranchContextMenu({ refInfo, commit, children }: BranchContextMenuProps) {
+  const isBranchBadge = refInfo.type === 'branch' || refInfo.type === 'remote';
   return (
-    <span {...checkoutBadgeMarker(refInfo)} onDoubleClick={(event) => {
+    // The marker lets the row's click handler hold the details panel for the double-click window (GH #225).
+    <span {...(isBranchBadge && { [CHECKOUT_BADGE_ATTRIBUTE]: true })} onDoubleClick={(event) => {
       // Portal dialogs bubble through React too; only the actual badge is a target.
       if (isEventFromPortal(event)) return;
       event.stopPropagation();
-      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-      if (refInfo.type === 'branch' || refInfo.type === 'remote') {
+      if (!isCheckoutGesture(event)) return;
+      if (isBranchBadge) {
         // Clear the browser's word selection after double-click, without
         // preventing the mousedown events needed for normal drag-to-select.
         const selection = event.currentTarget.ownerDocument.getSelection();
