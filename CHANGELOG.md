@@ -4,6 +4,15 @@ All notable changes to the "speedy-git-ext" extension will be documented in this
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [5.25.0] - 2026-11-22
+
+### Changed
+- **Right-click menus no longer open the details panel.** Actions from a branch or tag badge's right-click menu, such as **Copy Branch Name**, **Rename Branch...** and **Delete Branch**, used to also select the commit and open the details panel. So did the stash badge's menu, the detached-worktree badge's menu, and the **Author** and **Date** cells' filter items. They now work like the commit row's own menu: the action runs, and the details panel and your selection stay as they were, including commits you Ctrl- or Shift-selected. This helps most on a small screen, where the panel took space from the graph and had to be closed after every such action.
+- **Double-clicking a branch badge to check it out no longer opens the details panel.** A single click on a badge still selects the row straight away. When the panel is closed, it now opens a moment later, after the time a double-click takes, so a double-click can keep it closed. A panel that is already open updates straight away, as before.
+
+### Credits — Quieter details panel (#225)
+- Thanks to [@tbuyukliev](https://github.com/tbuyukliev) for explaining in [#225](https://github.com/onlineeric/speedy-git-ext/issues/225) which actions kept making them close the details panel, and suggesting that badge menus behave like the commit row's menu!
+
 ## [5.24.2] - 2026-11-12
 
 ### Changed

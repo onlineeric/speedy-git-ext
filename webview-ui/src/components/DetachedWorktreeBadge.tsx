@@ -28,7 +28,7 @@ export function DetachedWorktreeBadge({ worktrees, laneColorStyle }: DetachedWor
   };
 
   return (
-    <LazyContextMenu stopPropagation body={<DetachedWorktreeBadgeMenu worktrees={worktrees} />}>
+    <LazyContextMenu nested body={<DetachedWorktreeBadgeMenu worktrees={worktrees} />}>
       <span
         className={`inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 text-xs${fallbackColor}`}
         title={title}

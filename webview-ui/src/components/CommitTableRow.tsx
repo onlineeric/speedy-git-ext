@@ -28,6 +28,7 @@ import type { ResolvedCommitTableLayout } from '../utils/commitTableLayout';
 import { SignatureColumnCell } from './SignatureColumnCell';
 import { DetachedWorktreeBadge } from './DetachedWorktreeBadge';
 import { prioritizeWorktreeDisplayRefs, worktreeForDisplayRef } from '../utils/worktreeDisplay';
+import { isEventFromPortal } from '../utils/portalEvents';
 import {
   COMPARE_BASE_COLOR,
   COMPARE_TARGET_COLOR,
@@ -188,7 +189,11 @@ export const CommitTableRow = memo(function CommitTableRow({
         gridTemplateColumns: layout.gridTemplateColumns,
         width: layout.tableWidth,
       }}
-      onClick={onClick}
+      onClick={(event) => {
+        // A nested menu's items and dialogs render in portals, which React still
+        // bubbles here: they must not select the row (GH #225).
+        if (!isEventFromPortal(event)) onClick(event);
+      }}
     >
       {layout.columns.map((column, columnIndex) => {
         const cellContent = renderColumn({
@@ -354,7 +359,7 @@ function renderColumn({
               )}
               {visibleRefs.map((displayRef) =>
                 displayRef.type === 'stash' ? (
-                  <StashContextMenu key={displayRefKey(displayRef)} commit={commit} stashIndex={stashIndex}>
+                  <StashContextMenu nested key={displayRefKey(displayRef)} commit={commit} stashIndex={stashIndex}>
                     <RefLabel
                       checkoutHint
                       displayRef={displayRef}

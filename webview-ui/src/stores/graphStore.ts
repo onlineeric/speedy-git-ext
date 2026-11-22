@@ -69,6 +69,13 @@ import { trackUi } from '../utils/telemetry';
 import { joinRepoPath } from '../utils/repoPath';
 import { stripLocalBranchPrefix } from '../utils/worktreeDisplay';
 import { EMPTY_SEARCH_TERMS, type SearchTerm } from '../utils/searchQuery';
+import {
+  BADGE_DOUBLE_CLICK_WINDOW_MS,
+  onBadgeDoubleClick,
+  onDetailsArrived,
+  onHoldWindowElapsed,
+  type DetailsPanelHold,
+} from '../utils/detailsPanelHold';
 import type { WhatsNewPayload } from '@shared/whatsNew';
 import { isSameCustomAutolinkList } from '@shared/autolinks';
 
@@ -131,6 +138,8 @@ interface GraphStore {
   selectedCommitIndex: number;
   commitDetails: CommitDetails | undefined;
   detailsPanelOpen: boolean;
+  /** A branch-badge click is holding the closed panel back for the double-click window (GH #225). */
+  detailsPanelHold: DetailsPanelHold | null;
   detailsPanelPosition: DetailsPanelPosition;
   loading: boolean;
   error: string | undefined;
@@ -368,6 +377,10 @@ interface GraphStore {
   clearCommitFlash: () => void;
   setCommitDetails: (details: CommitDetails | undefined) => void;
   setDetailsPanelOpen: (open: boolean) => void;
+  /** Hold the closed panel's auto-open for this commit until the double-click window ends. */
+  holdDetailsPanel: (hash: string) => void;
+  /** The held badge was double-clicked: keep the panel closed. */
+  cancelHeldDetailsPanel: (hash: string) => void;
   toggleDetailsPanelPosition: () => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | undefined) => void;
@@ -621,6 +634,14 @@ function retainByHash<T>(map: Record<string, T>, hashes: Set<string>): Record<st
 /** One-shot: the `perf topology` telemetry event fires once per webview session (049-usage-telemetry). */
 let topologyPerfSent = false;
 
+/** Monotonic id per details-panel hold, so an old window timer cannot end a newer hold. */
+let detailsPanelHoldTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** The store patch for a hold transition: the new hold, plus opening the panel when the step says so. */
+function holdPatch({ hold, open }: { hold: DetailsPanelHold | null; open: boolean }) {
+  return { detailsPanelHold: hold, ...(open ? { detailsPanelOpen: true } : {}) };
+}
+
 /** Stops the "Go to HEAD" navigation, leaving any active flash to finish. */
 const GO_TO_HEAD_IDLE = { goToHeadState: 'idle', pendingHead: null } as const;
 
@@ -635,6 +656,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   selectedCommitIndex: -1,
   commitDetails: undefined,
   detailsPanelOpen: false,
+  detailsPanelHold: null,
   detailsPanelPosition: DEFAULT_PERSISTED_UI_STATE.detailsPanelPosition,
   loading: true,
   error: undefined,
@@ -892,6 +914,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       lastClickedHash: commit.hash,
       selectedCommits: [],
       compareResult: null,
+      detailsPanelHold: null,
     });
   },
   setGoToHeadState: (goToHeadState) => set({ goToHeadState }),
@@ -927,13 +950,27 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       lastClickedHash: commit.hash,
       selectedCommits: [],
       compareResult: null,
+      detailsPanelHold: null,
     });
   },
-  setCommitDetails: (commitDetails) => set({
-    commitDetails,
-    detailsPanelOpen: commitDetails !== undefined,
-  }),
+  setCommitDetails: (commitDetails) => {
+    if (!commitDetails) {
+      set({ commitDetails, detailsPanelOpen: false });
+      return;
+    }
+    set({ commitDetails, ...holdPatch(onDetailsArrived(get().detailsPanelHold, commitDetails.hash)) });
+  },
   setDetailsPanelOpen: (detailsPanelOpen) => set({ detailsPanelOpen }),
+  holdDetailsPanel: (hash) => {
+    set({ detailsPanelHold: { hash, phase: 'waiting' } });
+    clearTimeout(detailsPanelHoldTimer);
+    detailsPanelHoldTimer = setTimeout(() => {
+      set(holdPatch(onHoldWindowElapsed(get().detailsPanelHold)));
+    }, BADGE_DOUBLE_CLICK_WINDOW_MS);
+  },
+  cancelHeldDetailsPanel: (hash) => {
+    set({ detailsPanelHold: onBadgeDoubleClick(get().detailsPanelHold, hash) });
+  },
   toggleDetailsPanelPosition: () =>
     set((state) => ({
       detailsPanelPosition: state.detailsPanelPosition === 'bottom' ? 'right' : 'bottom',
@@ -1169,6 +1206,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       lastClickedHash: undefined,
       commitDetails: undefined,
       detailsPanelOpen: false,
+      detailsPanelHold: null,
       remotes: [],
       stashes: [],
       worktreeList: [],
@@ -1218,6 +1256,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       lastClickedHash: undefined,
       commitDetails: undefined,
       detailsPanelOpen: false,
+      detailsPanelHold: null,
       remotes: [],
       stashes: [],
       worktreeList: [],
@@ -1346,6 +1385,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedCommitIndex: commitIndex,
       lastClickedHash: commit?.hash,
       selectedCommits: [],
+      detailsPanelHold: null,
     };
   }),
   prevMatch: () => set((state) => {
@@ -1364,6 +1404,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       selectedCommitIndex: commitIndex,
       lastClickedHash: commit?.hash,
       selectedCommits: [],
+      detailsPanelHold: null,
     };
   }),
   beginAuthorListLoad: (repoPath) => {

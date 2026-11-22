@@ -8,6 +8,7 @@ import { CommitNavigationIllustration } from './CommitNavigationIllustration';
 import { GitTimeoutIllustration } from './GitTimeoutIllustration';
 import { MultiTabIllustration } from './MultiTabIllustration';
 import { OpenChangesIllustration } from './OpenChangesIllustration';
+import { QuietMenusIllustration } from './QuietMenusIllustration';
 import autolinksRowScreenshot from '../../../resources/autolinks.png';
 import settingsAutolinksScreenshot from '../../../resources/settings-autolinks.png';
 import filtersShowBadgedScreenshot from '../../../resources/Filters_show-badged.png';
@@ -104,6 +105,53 @@ export interface WhatsNewEntry {
  * with nothing worth interrupting for needs no other opt-out.
  */
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
+  {
+    version: '5.25.0',
+    headline: 'The details panel opens when you want a commit, not after every menu click.',
+    illustration: <QuietMenusIllustration />,
+    content: (
+      <div className="space-y-6">
+        <ContributorThanks login="tbuyukliev">
+          This release comes from your feedback in{' '}
+          <ExternalLink url="https://github.com/onlineeric/speedy-git-ext/issues/225">#225</ExternalLink>: copying a
+          branch name from its badge opened the details panel every time, so you closed it every time. Thank you for
+          explaining your workflow so clearly!
+        </ContributorThanks>
+
+        <WhatsNewSection title="Menus leave the panel alone">
+          <p className={`${bodyTextClassName} mb-3`}>
+            Especially on a small screen, the panel took space from the graph whenever an action happened to touch a
+            commit. Right-click menus now work the way the commit row&apos;s own menu always has: they act, and the
+            panel and your selection stay as they were.
+          </p>
+          <FeatureGrid>
+            <FeatureCard mark="⑂" title="Branch and tag badges" accent={SHOWCASE_BLUE_COLOR}>
+              <UiLabel>Copy Branch Name</UiLabel>, <UiLabel>Rename Branch...</UiLabel>, <UiLabel>Delete Branch</UiLabel>{' '}
+              and every other badge action.
+            </FeatureCard>
+            <FeatureCard mark="@" title="Author and date cells" accent={SHOWCASE_GREEN_COLOR}>
+              <UiLabel>Add Author to filter</UiLabel> and <UiLabel>Filter from this date</UiLabel> just filter.
+            </FeatureCard>
+            <FeatureCard mark="✓" title="Selection kept" accent={SHOWCASE_PURPLE_COLOR}>
+              Commits you Ctrl-selected stay selected after a badge action.
+            </FeatureCard>
+          </FeatureGrid>
+        </WhatsNewSection>
+
+        <WhatsNewSection title="Double-click to check out, nothing else">
+          <FeatureGrid>
+            <FeatureCard mark="2×" title="Double-click a branch badge" gitFlag="git checkout" accent={SHOWCASE_ORANGE_COLOR}>
+              Switches to the branch. A closed details panel stays closed.
+            </FeatureCard>
+            <FeatureCard mark="1×" title="Single click still selects" accent={SHOWCASE_BLUE_COLOR}>
+              The row is selected at once and the panel opens a moment later, as usual. An open panel updates straight
+              away.
+            </FeatureCard>
+          </FeatureGrid>
+        </WhatsNewSection>
+      </div>
+    ),
+  },
   {
     version: '5.24.0',
     headline: 'The Filter panel’s authors and Me button are ready the moment you open it.',

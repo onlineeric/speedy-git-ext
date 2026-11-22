@@ -5,7 +5,7 @@ Complete annotated file map of the codebase. **This file is not loaded into agen
 explicitly pointed at it.
 
 > **Accuracy warning.** This map drifts whenever files are added, renamed, or deleted. It was
-> last reconciled against the filesystem on **2026-11-12**. If an entry here disagrees with the
+> last reconciled against the filesystem on **2026-11-22**. If an entry here disagrees with the
 > filesystem, the filesystem wins — verify with `Glob`/`find` before relying on it.
 
 For the architecture that *doesn't* change file-by-file — data flow, RPC conventions, telemetry
@@ -243,8 +243,12 @@ webview-ui/src/assets.d.ts        # `*.png` imports are `data:` URLs — vite.co
 ├── AuthorContextMenu.tsx         # Author cell menu
 ├── DateContextMenu.tsx           # Date cell menu
 ├── UncommittedContextMenu.tsx    # Uncommitted-changes node menu
-└── LazyContextMenu.tsx           # Wraps a Radix menu so its heavy body (items/dialogs/store subscriptions)
-                                  #   mounts only on first right-click — keeps virtualized rows cheap when scrolling
+├── LazyContextMenu.tsx           # Wraps a Radix menu so its heavy body (items/dialogs/store subscriptions)
+│                                 #   mounts only on first right-click — keeps virtualized rows cheap when scrolling.
+│                                 #   `nested` wraps the trigger in NestedMenuBoundary
+└── NestedMenuBoundary.tsx        # For a menu whose trigger sits inside a commit row (badges, author/date cells):
+                                  #   keeps the right-click for the inner menu. Its portal clicks are ignored by
+                                  #   CommitTableRow itself, so a menu action never selects the row (GH #225)
 ```
 
 Menu building blocks — see `CLAUDE.md` for the reuse rules:
@@ -317,6 +321,7 @@ All use `dialogStyles.ts` for sizing and `useDialogTelemetry` for outcome report
 ├── BadgedCommitsIllustration.tsx # 5.20.0 hero: animated miniature of "Always show badged commits" bringing back main's tip
 ├── OpenChangesIllustration.tsx   # 5.22.0 hero: animated miniature of Open Changes opening the multi-file diff editor
 ├── GitTimeoutIllustration.tsx    # 5.23.0 hero: animated miniature of a slow push running past the old 60s limit
+├── QuietMenusIllustration.tsx    # 5.25.0 hero: animated miniature of Copy Branch Name leaving the details panel closed
 └── HelpDialog.tsx                # "Help & Feedback": Badge Legend + GitHub Issues + docs/changelog/marketplace + version
 ```
 
@@ -417,6 +422,9 @@ utils/
 ├── fixupCommitOptions.ts         # PURE: Create Fixup Commit availability, preselection and confirm rules
 ├── branchCheckout.ts             # Shared checkout decisions and interaction dispatch; menu vs double-click
 │                                 #   pull policy, busy/worktree checks, telemetry; reads store only on interaction
+├── detailsPanelHold.ts           # PURE: a branch-badge click holds a closed details panel for the double-click window
+│                                 #   so double-click checkout keeps it closed; row-click decision + hold transitions (GH #225)
+├── portalEvents.ts               # isEventFromPortal: did a React event bubble from a portal rather than the element's DOM
 ├── branchSelection.ts            # getBranchKey (bare name vs remote/name) + additive select-all-local
 ├── mergedCommits.ts              # Detect merged-branch commit grouping for badges
 ├── refNameField.ts               # Live ref-name validation state (error suppressed while empty or still the prefill) + late-prefill merge

@@ -5,6 +5,7 @@ import { trackUiInteraction } from '../utils/telemetry';
 import { toggleAuthorFilterEmail } from '../utils/filterUtils';
 import { MenuItem } from './MenuItem';
 import { MenuContent } from './MenuContent';
+import { NestedMenuBoundary } from './NestedMenuBoundary';
 
 interface AuthorContextMenuProps {
   authorEmail: string;
@@ -22,7 +23,7 @@ interface AuthorContextMenuProps {
  */
 export function AuthorContextMenu({ authorEmail, children }: AuthorContextMenuProps) {
   return (
-    <span onContextMenu={(e) => e.stopPropagation()}>
+    <NestedMenuBoundary>
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
         <ContextMenu.Portal>
@@ -31,7 +32,7 @@ export function AuthorContextMenu({ authorEmail, children }: AuthorContextMenuPr
           </MenuContent>
         </ContextMenu.Portal>
       </ContextMenu.Root>
-    </span>
+    </NestedMenuBoundary>
   );
 }
 

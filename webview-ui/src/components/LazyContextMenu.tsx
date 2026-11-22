@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import { NestedMenuBoundary } from './NestedMenuBoundary';
 
 interface LazyContextMenuProps {
   /** The trigger content (e.g. a commit row or ref badge). Always rendered. */
@@ -11,11 +12,11 @@ interface LazyContextMenuProps {
    */
   body: React.ReactNode;
   /**
-   * Stop the contextmenu event from bubbling to a parent context menu. Used by
-   * nested triggers (e.g. a branch badge inside a commit row) so the inner menu
-   * wins. Mirrors the wrapper that AuthorContextMenu/DateContextMenu use.
+   * The trigger sits inside a commit row (e.g. a ref badge): wrap it in
+   * `NestedMenuBoundary`, so this menu wins the right-click and its items and
+   * dialogs don't select the row.
    */
-  stopPropagation?: boolean;
+  nested?: boolean;
 }
 
 /**
@@ -31,7 +32,7 @@ interface LazyContextMenuProps {
  * stays mounted for the row's lifetime (until it scrolls out and unmounts),
  * which keeps dialog state alive across the menu-close → dialog-open transition.
  */
-export function LazyContextMenu({ children, body, stopPropagation }: LazyContextMenuProps) {
+export function LazyContextMenu({ children, body, nested }: LazyContextMenuProps) {
   const [activated, setActivated] = useState(false);
 
   const root = (
@@ -45,8 +46,5 @@ export function LazyContextMenu({ children, body, stopPropagation }: LazyContext
     </ContextMenu.Root>
   );
 
-  if (stopPropagation) {
-    return <span onContextMenu={(e) => e.stopPropagation()}>{root}</span>;
-  }
-  return root;
+  return nested ? <NestedMenuBoundary>{root}</NestedMenuBoundary> : root;
 }

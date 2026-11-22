@@ -4,6 +4,7 @@ import { rpcClient } from '../rpc/rpcClient';
 import { trackUiInteraction } from '../utils/telemetry';
 import { MenuItem } from './MenuItem';
 import { MenuContent } from './MenuContent';
+import { NestedMenuBoundary } from './NestedMenuBoundary';
 
 interface DateContextMenuProps {
   /** Unix timestamp (milliseconds) */
@@ -19,7 +20,7 @@ interface DateContextMenuProps {
  */
 export function DateContextMenu({ authorDate, children }: DateContextMenuProps) {
   return (
-    <span onContextMenu={(e) => e.stopPropagation()}>
+    <NestedMenuBoundary>
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
         <ContextMenu.Portal>
@@ -28,7 +29,7 @@ export function DateContextMenu({ authorDate, children }: DateContextMenuProps) 
           </MenuContent>
         </ContextMenu.Portal>
       </ContextMenu.Root>
-    </span>
+    </NestedMenuBoundary>
   );
 }
 
